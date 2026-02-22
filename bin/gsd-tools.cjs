@@ -176,52 +176,42 @@ function safeReadFile(filePath) {
 
 function loadConfig(cwd) {
   const configPath = path.join(cwd, '.planning', 'config.json');
-  const defaults = {
-    model_profile: 'balanced',
-    commit_docs: true,
-    search_gitignored: false,
-    branching_strategy: 'none',
-    phase_branch_template: 'gsd/phase-{phase}-{slug}',
-    milestone_branch_template: 'gsd/{milestone}-{slug}',
-    research: true,
-    plan_checker: true,
-    verifier: true,
-    parallelization: true,
-    brave_search: false,
-  };
+
+  // Build defaults from CONFIG_SCHEMA
+  const defaults = {};
+  for (const [key, def] of Object.entries(CONFIG_SCHEMA)) {
+    defaults[key] = def.default;
+  }
 
   try {
     const raw = fs.readFileSync(configPath, 'utf-8');
     const parsed = JSON.parse(raw);
 
-    const get = (key, nested) => {
+    // Lookup priority: flat key → nested path → aliases
+    const get = (key, def) => {
       if (parsed[key] !== undefined) return parsed[key];
-      if (nested && parsed[nested.section] && parsed[nested.section][nested.field] !== undefined) {
-        return parsed[nested.section][nested.field];
+      if (def.nested && parsed[def.nested.section] && parsed[def.nested.section][def.nested.field] !== undefined) {
+        return parsed[def.nested.section][def.nested.field];
+      }
+      for (const alias of def.aliases) {
+        if (parsed[alias] !== undefined) return parsed[alias];
       }
       return undefined;
     };
 
-    const parallelization = (() => {
-      const val = get('parallelization');
-      if (typeof val === 'boolean') return val;
-      if (typeof val === 'object' && val !== null && 'enabled' in val) return val.enabled;
-      return defaults.parallelization;
-    })();
-
-    return {
-      model_profile: get('model_profile') ?? defaults.model_profile,
-      commit_docs: get('commit_docs', { section: 'planning', field: 'commit_docs' }) ?? defaults.commit_docs,
-      search_gitignored: get('search_gitignored', { section: 'planning', field: 'search_gitignored' }) ?? defaults.search_gitignored,
-      branching_strategy: get('branching_strategy', { section: 'git', field: 'branching_strategy' }) ?? defaults.branching_strategy,
-      phase_branch_template: get('phase_branch_template', { section: 'git', field: 'phase_branch_template' }) ?? defaults.phase_branch_template,
-      milestone_branch_template: get('milestone_branch_template', { section: 'git', field: 'milestone_branch_template' }) ?? defaults.milestone_branch_template,
-      research: get('research', { section: 'workflow', field: 'research' }) ?? defaults.research,
-      plan_checker: get('plan_checker', { section: 'workflow', field: 'plan_check' }) ?? defaults.plan_checker,
-      verifier: get('verifier', { section: 'workflow', field: 'verifier' }) ?? defaults.verifier,
-      parallelization,
-      brave_search: get('brave_search') ?? defaults.brave_search,
-    };
+    const result = {};
+    for (const [key, def] of Object.entries(CONFIG_SCHEMA)) {
+      if (def.coerce === 'parallelization') {
+        // Special coercion: {enabled: true} → true
+        const val = get(key, def);
+        if (typeof val === 'boolean') { result[key] = val; }
+        else if (typeof val === 'object' && val !== null && 'enabled' in val) { result[key] = val.enabled; }
+        else { result[key] = def.default; }
+      } else {
+        result[key] = get(key, def) ?? def.default;
+      }
+    }
+    return result;
   } catch {
     return defaults;
   }
@@ -633,22 +623,18 @@ function cmdConfigEnsureSection(cwd, raw) {
     // Ignore malformed global defaults, fall back to hardcoded
   }
 
-  // Create default config (user-level defaults override hardcoded defaults)
-  const hardcoded = {
-    model_profile: 'balanced',
-    commit_docs: true,
-    search_gitignored: false,
-    branching_strategy: 'none',
-    phase_branch_template: 'gsd/phase-{phase}-{slug}',
-    milestone_branch_template: 'gsd/{milestone}-{slug}',
-    workflow: {
-      research: true,
-      plan_check: true,
-      verifier: true,
-    },
-    parallelization: true,
-    brave_search: hasBraveSearch,
-  };
+  // Build default config from CONFIG_SCHEMA (reconstructing nested structure)
+  const hardcoded = {};
+  for (const [key, def] of Object.entries(CONFIG_SCHEMA)) {
+    if (def.nested) {
+      if (!hardcoded[def.nested.section]) hardcoded[def.nested.section] = {};
+      hardcoded[def.nested.section][def.nested.field] = def.default;
+    } else {
+      hardcoded[key] = def.default;
+    }
+  }
+  // Runtime override: brave_search auto-detected from env/file
+  hardcoded.brave_search = hasBraveSearch;
   const defaults = {
     ...hardcoded,
     ...userDefaults,
@@ -5950,20 +5936,23 @@ function cmdValidateConfig(cwd, raw) {
     return;
   }
 
-  // Known config schema
-  const knownKeys = {
-    mode: { type: 'string', default: 'interactive', description: 'Execution mode (interactive or yolo)' },
-    commit_docs: { type: 'boolean', default: true, description: 'Auto-commit planning docs' },
-    search_gitignored: { type: 'boolean', default: false, description: 'Include gitignored files in searches' },
-    parallelization: { type: 'boolean', default: true, description: 'Enable parallel plan execution' },
-    research_enabled: { type: 'boolean', default: true, description: 'Enable research phase' },
-    model_profile: { type: 'string', default: 'balanced', description: 'Active model profile (quality/balanced/budget)' },
-    model_profiles: { type: 'object', default: {}, description: 'Model assignments per agent' },
-    depth: { type: 'string', default: 'standard', description: 'Planning depth (quick/standard/comprehensive)' },
-    workflow: { type: 'object', default: { research: true, plan_check: true, verifier: true }, description: 'Workflow toggles (research, plan_check, verifier)' },
-    test_commands: { type: 'object', default: {}, description: 'Test commands by framework (e.g., { elixir: "mix test" })' },
-    test_gate: { type: 'boolean', default: true, description: 'Block plan completion on test failure' },
-  };
+  // Derive known keys from CONFIG_SCHEMA (single source of truth)
+  const knownKeys = {};
+  for (const [key, def] of Object.entries(CONFIG_SCHEMA)) {
+    knownKeys[key] = { type: def.type, default: def.default, description: def.description };
+    // Register aliases as known keys (e.g., research_enabled → research)
+    for (const alias of def.aliases) {
+      knownKeys[alias] = { type: def.type, default: def.default, description: `Alias for ${key}: ${def.description}` };
+    }
+  }
+  // Register section container keys as known (workflow, planning, git)
+  const sectionNames = new Set();
+  for (const [, def] of Object.entries(CONFIG_SCHEMA)) {
+    if (def.nested) sectionNames.add(def.nested.section);
+  }
+  for (const section of sectionNames) {
+    knownKeys[section] = { type: 'object', default: {}, description: `${section} configuration section` };
+  }
 
   const warnings = [];
   const effective = {};
