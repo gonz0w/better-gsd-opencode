@@ -90,7 +90,10 @@ Plans:
   1. Commands that read the same file multiple times during a single invocation only hit the filesystem once — subsequent reads come from the in-memory LRU cache
   2. `cmdCodebaseImpact()` spawns a single grep process for multiple patterns instead of one process per pattern
   3. `cmdContextBudget()` reads `context_window` and `context_target_percent` from config.json, falling back to 200K/50% defaults when not configured
-**Plans**: TBD
+**Plans**: 2/2 plans executed
+Plans:
+- [ ] 05-01-PLAN.md — In-memory file cache + batch grep optimization
+- [ ] 05-02-PLAN.md — Configurable context window
 
 ## Progress
 
@@ -103,4 +106,4 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5
 | 2. Error Handling & Hardening | 2/2 | Complete | 2026-02-22 |
 | 3. Developer Experience & Discoverability | 3/3 | Complete | 2026-02-22 |
 | 4. Build System & Module Split | 3/3 | Complete | 2026-02-22 |
-| 5. Performance & Polish | 0/? | Not started | - |
+| 5. Performance & Polish | 0/2 | Planned | - |
