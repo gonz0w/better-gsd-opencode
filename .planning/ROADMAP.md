@@ -55,7 +55,7 @@ Full details: `.planning/milestones/v1.0-ROADMAP.md`
   3. Existing workflows continue to work identically without `--compact` flag (backward compatible)
 **Plans**: 2 plans
 Plans:
-- [ ] 07-01-PLAN.md — --compact flag + compact profiles for all 12 init commands [CLIP-02]
+- [x] 07-01-PLAN.md — --compact flag + compact profiles for all 12 init commands [CLIP-02] — completed 2026-02-22
 - [ ] 07-02-PLAN.md — Context manifests in compact mode + reduction verification [CLIP-03]
 
 ### Phase 8: Workflow & Reference Compression
@@ -90,6 +90,6 @@ Plans:
 | 4. Build System & Module Split | v1.0 | 3/3 | Complete | 2026-02-22 |
 | 5. Performance & Polish | v1.0 | 2/2 | Complete | 2026-02-22 |
 | 6. Token Measurement & Output Infrastructure | v1.1 | 3/3 | Complete | 2026-02-22 |
-| 7. Init Command Compaction | v1.1 | 0/2 | Not started | - |
+| 7. Init Command Compaction | v1.1 | 1/2 | In progress | - |
 | 8. Workflow & Reference Compression | v1.1 | 0/? | Not started | - |
 | 9. Tech Debt Cleanup | v1.1 | 0/? | Not started | - |

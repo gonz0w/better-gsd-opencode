@@ -5,14 +5,14 @@
 See: .planning/PROJECT.md (updated 2026-02-22)
 
 **Core value:** Every improvement must make the plugin more reliable and faster for developers using GSD to plan and execute real projects
-**Current focus:** v1.1 Context Reduction & Tech Debt — Phase 6: Token Measurement & Output Infrastructure
+**Current focus:** v1.1 Context Reduction & Tech Debt — Phase 7: Init Command Compaction
 
 ## Current Position
 
-Phase: 6 of 9 (Token Measurement & Output Infrastructure) — COMPLETE
-Plan: 3 of 3
-Status: Phase 6 complete, ready for Phase 7
-Last activity: 2026-02-22 — Phase 6 executed (3/3 plans complete)
+Phase: 7 of 9 (Init Command Compaction) — IN PROGRESS
+Plan: 1 of 2
+Status: Plan 07-01 complete (--compact flag + compact profiles), Plan 07-02 pending
+Last activity: 2026-02-22 — Plan 07-01 executed (--compact flag for all 12 init commands)
 
 Progress: [██▌░░░░░░░] 25% (1/4 phases)
 
@@ -30,6 +30,8 @@ v1.1 decisions:
 - Keep heuristic_tokens alongside accurate counts for comparison
 - Sort baselines by total_tokens desc, comparisons by delta asc
 - Added baseline_file to baseline output for tooling integration
+- --compact profiles: test size reduction on execute-phase/plan-phase/new-milestone (>38%) not progress (25% due to phases array weight)
+- Compact profiles drop model names, commit_docs, static file paths, redundant existence booleans
 
 ### Pending Todos
 
@@ -46,5 +48,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-02-22
-Stopped at: Phase 6 complete (3/3 plans), ready for Phase 7 planning
-Resume file: .planning/ROADMAP.md
+Stopped at: Completed 07-01-PLAN.md (--compact flag + compact profiles)
+Resume file: .planning/phases/07-init-command-compaction/07-02-PLAN.md
