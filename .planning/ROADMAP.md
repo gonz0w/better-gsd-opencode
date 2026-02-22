@@ -25,7 +25,7 @@ Full details: `.planning/milestones/v1.0-ROADMAP.md`
 **Milestone Goal:** Reduce token/context consumption across all GSD layers (workflows, CLI output, planning docs, research files) by 30%+ while resolving remaining tech debt.
 
 - [x] **Phase 6: Token Measurement & Output Infrastructure** (3 plans) - Accurate token counting, workflow baselines, and `--fields` flag for all commands — completed 2026-02-22
-- [x] **Phase 7: Init Command Compaction** - `--compact` flag for init commands and context manifests for agent loading (completed 2026-02-22)
+- [ ] **Phase 7: Init Command Compaction** - `--compact` flag for init commands and context manifests for agent loading (gap closure in progress)
 - [ ] **Phase 8: Workflow & Reference Compression** - Rewrite workflows for 30%+ reduction, deduplicate shared content, add selective section loading
 - [ ] **Phase 9: Tech Debt Cleanup** - Fix broken test, complete --help coverage, create plan templates
 
@@ -53,10 +53,11 @@ Full details: `.planning/milestones/v1.0-ROADMAP.md`
   1. All 12 init commands accept `--compact` flag returning essential-only data (38-50% smaller than full output, measured by token count)
   2. Init commands in `--compact` mode include a context manifest telling agents which files and sections to load next
   3. Existing workflows continue to work identically without `--compact` flag (backward compatible)
-**Plans**: 2/2 plans complete
+**Plans**: 3 plans (2 complete, 1 gap closure)
 Plans:
 - [x] 07-01-PLAN.md — --compact flag + compact profiles for all 12 init commands [CLIP-02] — completed 2026-02-22
-- [ ] 07-02-PLAN.md — Context manifests in compact mode + reduction verification [CLIP-03]
+- [x] 07-02-PLAN.md — Context manifests in compact mode + reduction verification [CLIP-03] — completed 2026-02-22
+- [ ] 07-03-PLAN.md — Gap closure: split --manifest from --compact to meet 38% reduction target [CLIP-02, CLIP-03]
 
 ### Phase 8: Workflow & Reference Compression
 **Goal**: Workflow prompts and reference files consume significantly fewer tokens while preserving agent behavior quality
@@ -90,6 +91,6 @@ Plans:
 | 4. Build System & Module Split | v1.0 | 3/3 | Complete | 2026-02-22 |
 | 5. Performance & Polish | v1.0 | 2/2 | Complete | 2026-02-22 |
 | 6. Token Measurement & Output Infrastructure | v1.1 | 3/3 | Complete | 2026-02-22 |
-| 7. Init Command Compaction | 2/2 | Complete   | 2026-02-22 | - |
+| 7. Init Command Compaction | v1.1 | 2/3 | In Progress (gap closure) | - |
 | 8. Workflow & Reference Compression | v1.1 | 0/? | Not started | - |
 | 9. Tech Debt Cleanup | v1.1 | 0/? | Not started | - |
