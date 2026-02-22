@@ -507,6 +507,23 @@ function debugLog(context, message, err) {
   process.stderr.write(line + '\n');
 }
 
+/**
+ * Escape a string for safe interpolation into a shell command.
+ * Wraps in single quotes and escapes internal single quotes.
+ * Same pattern used in execGit() — extracted here for reuse.
+ */
+function sanitizeShellArg(arg) {
+  return "'" + String(arg).replace(/'/g, "'\\''") + "'";
+}
+
+/**
+ * Validate that a string is a strict YYYY-MM-DD date.
+ * Prevents non-date strings from being interpolated into --since git args.
+ */
+function isValidDateString(str) {
+  return /^\d{4}-\d{2}-\d{2}$/.test(str);
+}
+
 // ─── Commands ─────────────────────────────────────────────────────────────────
 
 function cmdGenerateSlug(text, raw) {
@@ -5042,8 +5059,12 @@ function getSessionDiffSummary(cwd) {
     const sessionMatch = state.match(/\*\*Last session:\*\*\s*(\S+)/);
     if (sessionMatch && sessionMatch[1] > (since || '')) since = sessionMatch[1].split('T')[0];
     if (!since) return null;
+    if (!isValidDateString(since)) {
+      debugLog('feature.sessionDiff', `invalid date string rejected: ${since}`);
+      return null;
+    }
 
-    const log = execSync(`git log --since="${since}" --oneline --no-merges -- .planning/ 2>/dev/null`, {
+    const log = execSync(`git log --since=${sanitizeShellArg(since)} --oneline --no-merges -- .planning/ 2>/dev/null`, {
       cwd, encoding: 'utf-8', timeout: 5000
     }).trim();
     const commits = log ? log.split('\n').filter(Boolean) : [];
@@ -5073,10 +5094,17 @@ function cmdSessionDiff(cwd, raw) {
     return;
   }
 
+  if (!isValidDateString(since)) {
+    output({ error: 'Invalid date format in STATE.md', changes: [] }, raw);
+    return;
+  }
+
+  const sanitizedSince = sanitizeShellArg(since);
+
   // Get git commits since last activity
   const changes = [];
   try {
-    const result = execSync(`git log --since="${since}" --oneline --no-merges -- .planning/`, {
+    const result = execSync(`git log --since=${sanitizedSince} --oneline --no-merges -- .planning/`, {
       cwd, encoding: 'utf-8', timeout: 10000
     }).trim();
     if (result) {
@@ -5090,7 +5118,7 @@ function cmdSessionDiff(cwd, raw) {
   // Get file-level changes since last activity
   const filesChanged = [];
   try {
-    const result = execSync(`git diff --name-only --since="${since}" HEAD -- .planning/`, {
+    const result = execSync(`git diff --name-only --since=${sanitizedSince} HEAD -- .planning/`, {
       cwd, encoding: 'utf-8', timeout: 10000
     }).trim();
     if (result) {
@@ -5100,7 +5128,7 @@ function cmdSessionDiff(cwd, raw) {
     debugLog('feature.sessionDiff', 'exec failed', e);
     // Fallback: use log-based diffstat
     try {
-      const result = execSync(`git log --since="${since}" --name-only --pretty=format: -- .planning/`, {
+      const result = execSync(`git log --since=${sanitizedSince} --name-only --pretty=format: -- .planning/`, {
         cwd, encoding: 'utf-8', timeout: 10000
       }).trim();
       if (result) {
@@ -5675,7 +5703,7 @@ function cmdCodebaseImpact(cwd, filePaths, raw) {
     for (const pattern of searchPatterns) {
       try {
         const grepResult = execSync(
-          `grep -rl "${pattern}" --include="*.ex" --include="*.exs" --include="*.go" --include="*.py" --include="*.ts" --include="*.tsx" --include="*.js" . 2>/dev/null | grep -v node_modules | grep -v _build | grep -v deps | head -30`,
+          `grep -rl --fixed-strings ${sanitizeShellArg(pattern)} --include="*.ex" --include="*.exs" --include="*.go" --include="*.py" --include="*.ts" --include="*.tsx" --include="*.js" . 2>/dev/null | grep -v node_modules | grep -v _build | grep -v deps | head -30`,
           { cwd, encoding: 'utf-8', timeout: 15000 }
         ).trim();
         if (grepResult) {
