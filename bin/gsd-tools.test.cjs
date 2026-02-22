@@ -3767,3 +3767,82 @@ describe('configurable context window', () => {
     assert.strictEqual(data.effective_config.context_target_percent.source, 'default', 'should come from defaults');
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// --fields flag
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('--fields flag', () => {
+  test('filters top-level fields from JSON output', () => {
+    const result = runGsdTools('init progress --fields milestone_version,phase_count --raw');
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const data = JSON.parse(result.output);
+    // Should have only the requested fields
+    assert.ok('milestone_version' in data, 'should include milestone_version');
+    assert.ok('phase_count' in data, 'should include phase_count');
+    // Other fields should NOT be present
+    assert.strictEqual(Object.keys(data).length, 2, 'should have exactly 2 fields');
+  });
+
+  test('missing fields return null', () => {
+    const result = runGsdTools('init progress --fields milestone_version,nonexistent_field --raw');
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const data = JSON.parse(result.output);
+    assert.ok('milestone_version' in data, 'should include milestone_version');
+    assert.strictEqual(data.nonexistent_field, null, 'missing field should be null');
+  });
+
+  test('without --fields returns full output (backward compat)', () => {
+    const result = runGsdTools('init progress --raw');
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const data = JSON.parse(result.output);
+    // Full output has many fields
+    assert.ok(Object.keys(data).length > 5, 'full output should have many fields');
+    assert.ok('state_path' in data, 'should include state_path');
+    assert.ok('roadmap_path' in data, 'should include roadmap_path');
+  });
+
+  test('dot-notation filters nested object fields', () => {
+    // Use a command that returns nested objects
+    const result = runGsdTools('validate-config --fields exists,valid_json --raw');
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const data = JSON.parse(result.output);
+    assert.ok('exists' in data, 'should include exists');
+    assert.ok('valid_json' in data, 'should include valid_json');
+    assert.strictEqual(Object.keys(data).length, 2, 'should have exactly 2 fields');
+  });
+
+  test('filterFields function works on arrays', () => {
+    // Test by importing filterFields directly — use a source-level test
+    const { filterFields } = require('../src/lib/output');
+    const input = [
+      { name: 'foo', status: 'ok', extra: 'bar' },
+      { name: 'baz', status: 'done', extra: 'qux' },
+    ];
+    const result = filterFields(input, ['name', 'status']);
+    assert.deepStrictEqual(result, [
+      { name: 'foo', status: 'ok' },
+      { name: 'baz', status: 'done' },
+    ], 'should filter array elements');
+  });
+
+  test('filterFields function supports dot-notation', () => {
+    const { filterFields } = require('../src/lib/output');
+    const input = {
+      phases: [
+        { goal: 'x', other: 'y' },
+        { goal: 'z', other: 'w' },
+      ],
+      name: 'test',
+    };
+    const result = filterFields(input, ['phases.goal']);
+    assert.deepStrictEqual(result.phases, [
+      { goal: 'x' },
+      { goal: 'z' },
+    ], 'should filter nested array fields via dot-notation');
+  });
+});

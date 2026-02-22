@@ -58,6 +58,17 @@ async function main() {
   const raw = rawIndex !== -1;
   if (rawIndex !== -1) args.splice(rawIndex, 1);
 
+  // Parse --fields global flag for JSON output filtering
+  const fieldsIdx = args.indexOf('--fields');
+  if (fieldsIdx !== -1) {
+    const fieldsValue = args[fieldsIdx + 1];
+    const requestedFields = fieldsValue ? fieldsValue.split(',') : null;
+    args.splice(fieldsIdx, 2); // Remove --fields and its value from args
+    if (requestedFields) {
+      global._gsdRequestedFields = requestedFields;
+    }
+  }
+
   const command = args[0];
   const cwd = process.cwd();
 
