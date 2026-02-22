@@ -1,16 +1,22 @@
 # Milestones
 
-## 🔵 v1.1 Context Reduction & Tech Debt (Active)
+## ✅ v1.1 Context Reduction & Tech Debt (Shipped: 2026-02-22)
 
-**Goal:** Reduce token/context consumption across all GSD layers by 30%+ while resolving remaining tech debt.
-**Phases:** 6-9 (4 phases)
-**Requirements:** 13 (MEAS-01–03, CLIP-01–03, WKFL-01–04, DEBT-01–03)
+**Phases completed:** 4 phases, 10 plans
+**Commits:** 42 | **Files changed:** 78 | **Lines:** +12,642 / -4,576
+**Timeline:** 1 day (2026-02-22)
 
-**Phase overview:**
-- Phase 6: Token Measurement & Output Infrastructure
-- Phase 7: Init Command Compaction
-- Phase 8: Workflow & Reference Compression
-- Phase 9: Tech Debt Cleanup
+**Key accomplishments:**
+- Integrated tokenx for accurate BPE-based token estimation with workflow baseline measurement and before/after comparison tooling
+- Added --compact flag achieving 46.7% average output reduction across all 12 init commands, plus opt-in --manifest for context-aware loading
+- Built extract-sections CLI with dual-boundary parsing enabling 67% reference file reduction via selective section loading
+- Compressed top 8 workflows by 54.6% average (39,426 to 15,542 tokens) preserving all behavioral logic
+- Added summary/detail tiers to all 6 research templates for context-aware planner loading
+- Resolved all pre-existing tech debt: fixed failing test, completed 44-command help coverage, created plan templates
+
+**Archives:**
+- `.planning/milestones/v1.1-ROADMAP.md`
+- `.planning/milestones/v1.1-REQUIREMENTS.md`
 
 ---
 
@@ -33,4 +39,3 @@
 - `.planning/milestones/v1.0-REQUIREMENTS.md`
 
 ---
-

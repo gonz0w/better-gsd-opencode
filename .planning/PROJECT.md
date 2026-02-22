@@ -2,22 +2,19 @@
 
 ## What This Is
 
-A zero-dependency, single-file Node.js CLI built from 15 organized `src/` modules via esbuild, producing `bin/gsd-tools.cjs`. It provides structured data operations for AI-driven project planning workflows. v1.0 established the test suite, module split, and observability layer. v1.1 focuses on reducing context consumption across all workflow layers and resolving remaining tech debt.
+A zero-dependency, single-file Node.js CLI built from 15 organized `src/` modules via esbuild, producing `bin/gsd-tools.cjs`. It provides structured data operations for AI-driven project planning workflows. v1.0 established the test suite, module split, and observability layer. v1.1 added context reduction across all workflow layers (46.7% CLI output reduction, 54.6% workflow compression, 67% reference file reduction) and resolved all remaining tech debt.
 
 ## Core Value
 
 Every improvement must make the plugin more reliable and faster for developers using GSD to plan and execute real projects — no regressions, no breaking changes.
 
-## Current Milestone: v1.1 Context Reduction & Tech Debt
+## Current State: v1.1 Shipped
 
-**Goal:** Reduce token/context consumption across workflows, planning doc reads, research outputs, and CLI output while resolving remaining tech debt items.
+**Shipped:** 2026-02-22
+**Milestones completed:** v1.0 (Performance & Quality), v1.1 (Context Reduction & Tech Debt)
+**Total phases:** 9 (Phases 1-9) | **Total plans:** 24
 
-**Target features:**
-- Research and implement context reduction techniques across all layers (workflow prompts, doc loading, CLI output, research files)
-- Measurable token reduction (30%+ target) with before/after benchmarks
-- Fix broken `roadmap analyze` test (pre-existing failure)
-- Add missing `--help` text for remaining 36 commands
-- Create plan template files (deferred TMPL-01 from v1.0)
+All requirements validated. No known tech debt. 202 tests passing. Ready for next milestone.
 
 ## Requirements
 
@@ -48,20 +45,22 @@ Every improvement must make the plugin more reliable and faster for developers u
 - ✓ Temp file cleanup on exit — v1.0
 - ✓ AGENTS.md line count fix — v1.0
 - ✓ Parallel execution ASCII visualization — v1.0
-- ✓ Per-command --help support (43 entries) — v1.0
+- ✓ Per-command --help support (44 entries) — v1.0 + v1.1
 - ✓ Config migration command — v1.0
 - ✓ Batch grep in cmdCodebaseImpact() — v1.0
 - ✓ Configurable context window size — v1.0
-
-### Active
-
-<!-- v1.1 scope — details in REQUIREMENTS.md -->
-
-- [ ] Context reduction across workflow prompts, doc loading, CLI output, research files
-- [ ] Token usage measurement (before/after benchmarks)
-- [ ] Fix broken `roadmap analyze` test
-- [ ] Complete `--help` coverage (36 remaining commands)
-- [ ] Plan template files
+- ✓ Accurate BPE token estimation via tokenx — v1.1
+- ✓ --fields flag for selective JSON output — v1.1
+- ✓ Workflow baseline measurement (43 invocations) — v1.1
+- ✓ Before/after token comparison — v1.1
+- ✓ --compact flag (46.7% avg init output reduction) — v1.1
+- ✓ --manifest flag (opt-in context loading guidance) — v1.1
+- ✓ extract-sections CLI (dual-boundary parsing) — v1.1
+- ✓ Top 8 workflow compression (54.6% avg reduction) — v1.1
+- ✓ Research template summary/detail tiers — v1.1
+- ✓ 202 tests passing (zero failures) — v1.1
+- ✓ Complete --help coverage (44 commands) — v1.1
+- ✓ Plan templates (execute, tdd, discovery) — v1.1
 
 ### Out of Scope
 
@@ -71,19 +70,17 @@ Every improvement must make the plugin more reliable and faster for developers u
 - Multi-process file locking — Only one AI session runs per project, race conditions are theoretical
 - Full argument parsing library (commander/yargs) — Manual router is well-suited to subcommand-heavy pattern
 - ESM output format — CJS avoids __dirname/require rewriting, keep CJS
+- RAG / vector search — Wrong architecture for a CLI tool
+- LLM-based summarization — Deterministic compression outperforms (JetBrains NeurIPS 2025)
 
 ## Context
 
-Shipped v1.0 with 153+ tests, 15 src/ modules, esbuild bundler.
-Tech stack: Node.js 18+, node:test, esbuild, zero runtime dependencies.
+Shipped v1.0 + v1.1. 202 tests, 15 src/ modules, esbuild bundler.
+Tech stack: Node.js 18+, node:test, esbuild, tokenx (bundled), zero runtime dependencies.
 Source split into `src/lib/` (7 modules) and `src/commands/` (7 modules) + router + index.
 Deploy pipeline: `npm run build` → esbuild bundle → `deploy.sh` with smoke test and rollback.
-New Node.js dev dependencies are allowed for v1.1 if they improve context handling (must stay zero runtime deps in bundle).
 
-Known tech debt (v1.1 targets):
-- 1 pre-existing test failure (`roadmap analyze` expects 50%, gets 33%)
-- Plan template files not yet created (deferred from v1.0 as TMPL-01)
-- 36 of 79 commands missing --help text (deferred from v1.0 as DOC-02)
+No known tech debt.
 
 ## Constraints
 
@@ -97,14 +94,18 @@ Known tech debt (v1.1 targets):
 
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
-| Allow dev dependencies via bundler | Enables esbuild, proper test tooling while keeping single-file deploy | ✓ Good — esbuild bundles 15 modules to single file in <500ms |
-| In-memory Map cache over lru-cache | CLI is short-lived process (<5s); plain Map needs no eviction | ✓ Good — simpler, zero dependency |
-| Extend existing test file | `bin/gsd-tools.test.cjs` already has patterns; adding to it is simpler than new test infrastructure | ✓ Good — 153+ tests in single file |
-| Debug logging over error throwing for catches | Most silent catches are "optional data" patterns; throwing would break workflows | ✓ Good — 96 catch blocks instrumented, zero behavioral change when GSD_DEBUG unset |
-| Strip-shebang esbuild plugin | Monolith has shebang that breaks bundling; plugin strips on input, banner adds on output | ✓ Good — clean build pipeline |
-| 15-module split (6 lib + 7 commands + router + index) | Logical grouping by domain, strict dependency direction | ✓ Good — maintainable, no circular imports |
-| Config migration with .bak backup | Safe upgrade path for existing configs | ✓ Good — only creates backup when changes needed |
-| Batch grep: fixed-string vs regex split | Different grep flags needed; 1-2 calls max regardless of pattern count | ✓ Good — eliminates per-pattern spawn overhead |
+| Allow dev dependencies via bundler | Enables esbuild, proper test tooling while keeping single-file deploy | Good — esbuild bundles 15 modules to single file in <500ms |
+| In-memory Map cache over lru-cache | CLI is short-lived process (<5s); plain Map needs no eviction | Good — simpler, zero dependency |
+| Extend existing test file | `bin/gsd-tools.test.cjs` already has patterns; adding to it is simpler than new test infrastructure | Good — 202 tests in single file |
+| Debug logging over error throwing for catches | Most silent catches are "optional data" patterns; throwing would break workflows | Good — 96 catch blocks instrumented, zero behavioral change when GSD_DEBUG unset |
+| Strip-shebang esbuild plugin | Monolith has shebang that breaks bundling; plugin strips on input, banner adds on output | Good — clean build pipeline |
+| 15-module split (6 lib + 7 commands + router + index) | Logical grouping by domain, strict dependency direction | Good — maintainable, no circular imports |
+| Config migration with .bak backup | Safe upgrade path for existing configs | Good — only creates backup when changes needed |
+| Batch grep: fixed-string vs regex split | Different grep flags needed; 1-2 calls max regardless of pattern count | Good — eliminates per-pattern spawn overhead |
+| tokenx for token estimation | 4.5KB bundled, ~96% accuracy, zero deps, ESM→CJS via esbuild | Good — replaced broken lines*4 heuristic |
+| Split --compact/--manifest flags | Field reduction separate from guidance; eliminates manifest overhead from default path | Good — 46.7% avg reduction without manifest bloat |
+| HTML comment section markers | Invisible to markdown rendering, machine-parseable | Good — dual-boundary parsing for headers + markers |
+| Prose tightening over structural changes | AI agents don't need persuasion; imperative instructions are sufficient | Good — 54.6% avg workflow compression |
 
 ---
-*Last updated: 2026-02-22 after v1.1 milestone start*
+*Last updated: 2026-02-22 after v1.1 milestone completion*
