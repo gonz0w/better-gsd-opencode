@@ -97,48 +97,48 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| SVAL-01 | — | Pending |
-| SVAL-02 | — | Pending |
-| SVAL-03 | — | Pending |
-| SVAL-04 | — | Pending |
-| SVAL-05 | — | Pending |
-| SVAL-06 | — | Pending |
-| PLAN-01 | — | Pending |
-| PLAN-02 | — | Pending |
-| PLAN-03 | — | Pending |
-| PLAN-04 | — | Pending |
-| PLAN-05 | — | Pending |
-| PLAN-06 | — | Pending |
-| MEMO-01 | — | Pending |
-| MEMO-02 | — | Pending |
-| MEMO-03 | — | Pending |
-| MEMO-04 | — | Pending |
-| MEMO-05 | — | Pending |
-| MEMO-06 | — | Pending |
-| VRFY-01 | — | Pending |
-| VRFY-02 | — | Pending |
-| VRFY-03 | — | Pending |
-| VRFY-04 | — | Pending |
-| VRFY-05 | — | Pending |
-| VRFY-06 | — | Pending |
-| TEST-01 | — | Pending |
-| TEST-02 | — | Pending |
-| TEST-03 | — | Pending |
-| TEST-04 | — | Pending |
-| TEST-05 | — | Pending |
-| TEST-06 | — | Pending |
-| OPTM-01 | — | Pending |
-| OPTM-02 | — | Pending |
-| OPTM-03 | — | Pending |
-| OPTM-04 | — | Pending |
-| OPTM-05 | — | Pending |
-| MCPA-01 | — | Pending |
+| SVAL-01 | Phase 10 | Pending |
+| SVAL-02 | Phase 10 | Pending |
+| SVAL-03 | Phase 10 | Pending |
+| SVAL-04 | Phase 10 | Pending |
+| SVAL-05 | Phase 10 | Pending |
+| SVAL-06 | Phase 10 | Pending |
+| PLAN-01 | Phase 12 | Pending |
+| PLAN-02 | Phase 12 | Pending |
+| PLAN-03 | Phase 12 | Pending |
+| PLAN-04 | Phase 12 | Pending |
+| PLAN-05 | Phase 12 | Pending |
+| PLAN-06 | Phase 12 | Pending |
+| MEMO-01 | Phase 11 | Pending |
+| MEMO-02 | Phase 11 | Pending |
+| MEMO-03 | Phase 11 | Pending |
+| MEMO-04 | Phase 11 | Pending |
+| MEMO-05 | Phase 11 | Pending |
+| MEMO-06 | Phase 11 | Pending |
+| VRFY-01 | Phase 12 | Pending |
+| VRFY-02 | Phase 12 | Pending |
+| VRFY-03 | Phase 12 | Pending |
+| VRFY-04 | Phase 12 | Pending |
+| VRFY-05 | Phase 12 | Pending |
+| VRFY-06 | Phase 12 | Pending |
+| TEST-01 | Phase 13 | Pending |
+| TEST-02 | Phase 13 | Pending |
+| TEST-03 | Phase 13 | Pending |
+| TEST-04 | Phase 13 | Pending |
+| TEST-05 | Phase 13 | Pending |
+| TEST-06 | Phase 13 | Pending |
+| OPTM-01 | Phase 13 | Pending |
+| OPTM-02 | Phase 13 | Pending |
+| OPTM-03 | Phase 13 | Pending |
+| OPTM-04 | Phase 13 | Pending |
+| OPTM-05 | Phase 13 | Pending |
+| MCPA-01 | Phase 13 | Pending |
 
 **Coverage:**
 - v2.0 requirements: 36 total
-- Mapped to phases: 0
-- Unmapped: 36 ⚠️
+- Mapped to phases: 36
+- Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-02-22*
-*Last updated: 2026-02-22 after initial definition*
+*Last updated: 2026-02-22 after roadmap creation — all 36 requirements mapped to phases 10-13*
