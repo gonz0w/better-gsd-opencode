@@ -11,8 +11,8 @@ See: .planning/PROJECT.md (updated 2026-02-22)
 
 Phase: 8 of 9 (Workflow & Reference Compression)
 Plan: 3 of 3 — complete
-Status: Executing Phase 8
-Last activity: 2026-02-22 — Plan 08-03 executed (research template tiers + baseline comparison)
+Status: Phase 8 Complete
+Last activity: 2026-02-22 — Plan 08-02 executed (compress top 8 workflows — 54.6% avg token reduction)
 
 Progress: [████████░░] 75% (3/4 phases)
 
@@ -40,6 +40,9 @@ v1.1 decisions:
 - Case-insensitive section matching for ergonomic CLI usage
 - Research templates use compact XML tags (<research_compact>, <compact_summary>) as default planner view
 - Top 6 workflow avg reduction -35.7% exceeds 30% Phase 8 target
+- Top 8 workflow compression achieved 54.6% avg token reduction (39,426→15,542 tokens)
+- Replaced unconditional @-reference loading with conditional extract-sections instructions
+- Restored dropped Task() calls in verify-work.md and plan-phase.md during compression quality fix
 
 ### Pending Todos
 
@@ -56,5 +59,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-02-22
-Stopped at: Completed 08-03-PLAN.md (research template tiers + baseline comparison)
+Stopped at: Completed 08-02-PLAN.md (compress top 8 workflows) — Phase 8 complete
 Resume file: None

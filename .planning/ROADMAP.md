@@ -26,7 +26,7 @@ Full details: `.planning/milestones/v1.0-ROADMAP.md`
 
 - [x] **Phase 6: Token Measurement & Output Infrastructure** (3 plans) - Accurate token counting, workflow baselines, and `--fields` flag for all commands — completed 2026-02-22
 - [x] **Phase 7: Init Command Compaction** (3 plans) - `--compact` flag with 46.7% avg reduction, opt-in `--manifest` for context guidance — completed 2026-02-22
-- [ ] **Phase 8: Workflow & Reference Compression** - Rewrite workflows for 30%+ reduction, deduplicate shared content, add selective section loading
+- [x] **Phase 8: Workflow & Reference Compression** (3 plans) - Rewrite workflows for 30%+ reduction, deduplicate shared content, add selective section loading — completed 2026-02-22
 - [ ] **Phase 9: Tech Debt Cleanup** - Fix broken test, complete --help coverage, create plan templates
 
 ## Phase Details
@@ -69,10 +69,10 @@ Plans:
   3. Repeated boilerplate across workflow files is consolidated into shared references (measurable line-count reduction across 43 workflow files)
   4. Research output files support summary/detail tiers — agents load compact summaries by default, full detail on demand
   5. Before/after token measurement shows 30%+ reduction averaged across the top 6 workflows by size
-**Plans**: 3 plans
+**Plans**: 3/3 Complete
 Plans:
 - [x] 08-01-PLAN.md — extractSections CLI command + section markers on large reference files [WKFL-01, WKFL-02] — completed 2026-02-22
-- [ ] 08-02-PLAN.md — Compress top 8 workflows via deduplication, prose tightening, selective loading [WKFL-03]
+- [x] 08-02-PLAN.md — Compress top 8 workflows via deduplication, prose tightening, selective loading [WKFL-03] — completed 2026-02-22
 - [x] 08-03-PLAN.md — Research output summary/detail tiers + before/after baseline measurement [WKFL-04] — completed 2026-02-22
 
 ### Phase 9: Tech Debt Cleanup
@@ -96,5 +96,5 @@ Plans:
 | 5. Performance & Polish | v1.0 | 2/2 | Complete | 2026-02-22 |
 | 6. Token Measurement & Output Infrastructure | v1.1 | 3/3 | Complete | 2026-02-22 |
 | 7. Init Command Compaction | v1.1 | 3/3 | Complete | 2026-02-22 |
-| 8. Workflow & Reference Compression | v1.1 | 2/3 | In Progress | - |
+| 8. Workflow & Reference Compression | v1.1 | 3/3 | Complete | 2026-02-22 |
 | 9. Tech Debt Cleanup | v1.1 | 0/? | Not started | - |
