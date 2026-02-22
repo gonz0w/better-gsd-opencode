@@ -6,12 +6,44 @@ const { MODEL_PROFILES } = require('./constants');
 
 // ─── File Helpers ────────────────────────────────────────────────────────────
 
+/** Module-level file cache — lives for single CLI invocation, no TTL needed */
+const fileCache = new Map();
+
 function safeReadFile(filePath) {
   try {
     return fs.readFileSync(filePath, 'utf-8');
   } catch (e) {
     debugLog('file.read', 'read failed', e);
     return null;
+  }
+}
+
+/**
+ * Cached wrapper around safeReadFile. Returns cached content on repeated reads
+ * of the same path within a single CLI invocation. Use safeReadFile directly
+ * when you need a guaranteed fresh read.
+ */
+function cachedReadFile(filePath) {
+  if (fileCache.has(filePath)) {
+    debugLog('file.cache', `cache hit: ${filePath}`);
+    return fileCache.get(filePath);
+  }
+  const content = safeReadFile(filePath);
+  if (content !== null) {
+    fileCache.set(filePath, content);
+  }
+  return content;
+}
+
+/**
+ * Invalidate a specific file from cache, or clear entire cache if no path given.
+ * Call after writing a file to ensure subsequent reads get fresh content.
+ */
+function invalidateFileCache(filePath) {
+  if (filePath) {
+    fileCache.delete(filePath);
+  } else {
+    fileCache.clear();
   }
 }
 
@@ -371,6 +403,8 @@ function getMilestoneInfo(cwd) {
 
 module.exports = {
   safeReadFile,
+  cachedReadFile,
+  invalidateFileCache,
   normalizePhaseName,
   parseMustHavesBlock,
   sanitizeShellArg,
