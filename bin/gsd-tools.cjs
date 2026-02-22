@@ -3800,8 +3800,9 @@ var require_features = __commonJS({
       const executionTokens = taskCount * 3500;
       const testTokens = taskCount * 750;
       const totalEstimate = planTokens + fileReadTokens + executionTokens + testTokens;
-      const contextWindow = 2e5;
-      const targetPercent = 50;
+      const config = loadConfig(cwd);
+      const contextWindow = config.context_window || 2e5;
+      const targetPercent = config.context_target_percent || 50;
       const estimatedPercent = Math.round(totalEstimate / contextWindow * 100);
       let risk = "low";
       if (estimatedPercent > 60) risk = "high";
@@ -3835,6 +3836,7 @@ var require_features = __commonJS({
           execution_tokens: executionTokens,
           test_tokens: testTokens,
           total_tokens: totalEstimate,
+          context_window: contextWindow,
           context_percent: estimatedPercent,
           target_percent: targetPercent
         },

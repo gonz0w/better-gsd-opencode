@@ -136,9 +136,10 @@ function cmdContextBudget(cwd, planPath, raw) {
   const testTokens = taskCount * 750;
   const totalEstimate = planTokens + fileReadTokens + executionTokens + testTokens;
 
-  // Assume ~200K context window, 50% target
-  const contextWindow = 200000;
-  const targetPercent = 50;
+  // Read context window settings from config (defaults: 200K tokens, 50% target)
+  const config = loadConfig(cwd);
+  const contextWindow = config.context_window || 200000;
+  const targetPercent = config.context_target_percent || 50;
   const estimatedPercent = Math.round((totalEstimate / contextWindow) * 100);
 
   let risk = 'low';
@@ -175,6 +176,7 @@ function cmdContextBudget(cwd, planPath, raw) {
       execution_tokens: executionTokens,
       test_tokens: testTokens,
       total_tokens: totalEstimate,
+      context_window: contextWindow,
       context_percent: estimatedPercent,
       target_percent: targetPercent,
     },
