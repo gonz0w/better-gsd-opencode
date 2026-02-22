@@ -3659,3 +3659,71 @@ Progress: [████░░░░░░] 40%
     assert.ok(elapsed < 500, `Build took ${elapsed}ms, should be under 500ms`);
   });
 });
+
+// ─── Phase 5: Performance & Polish ───────────────────────────────────────────
+
+describe('file cache', () => {
+  test('init progress returns valid JSON with cache enabled', () => {
+    // cachedReadFile is used internally — test that compound commands
+    // (which read files multiple times) still produce valid output
+    const result = runGsdTools('init progress --raw');
+    assert.ok(result.success, 'init progress should succeed');
+    const data = JSON.parse(result.output);
+    assert.ok(data.phase_count >= 1, 'should have phases');
+    assert.ok(data.project_exists === true, 'should find project');
+  });
+
+  test('cachedReadFile and invalidateFileCache are exported', () => {
+    // Verify the build artifact exports these functions
+    const content = fs.readFileSync(TOOLS_PATH, 'utf-8');
+    assert.ok(content.includes('cachedReadFile'), 'build should contain cachedReadFile');
+    assert.ok(content.includes('invalidateFileCache'), 'build should contain invalidateFileCache');
+    assert.ok(content.includes('new Map'), 'build should contain Map for cache');
+  });
+});
+
+describe('codebase-impact batch grep', () => {
+  test('returns dependents for a known file', () => {
+    const result = runGsdTools('codebase-impact src/lib/helpers.js --raw');
+    assert.ok(result.success, 'codebase-impact should succeed');
+    const data = JSON.parse(result.output);
+    assert.strictEqual(data.files_analyzed, 1, 'should analyze 1 file');
+    assert.ok(data.total_dependents > 0, `helpers.js should have dependents, got ${data.total_dependents}`);
+    assert.ok(data.files[0].exists === true, 'file should exist');
+    assert.ok(Array.isArray(data.files[0].dependents), 'dependents should be array');
+  });
+
+  test('handles non-existent file', () => {
+    const result = runGsdTools('codebase-impact nonexistent-file-xyz.js --raw');
+    assert.ok(result.success, 'should succeed even for missing file');
+    const data = JSON.parse(result.output);
+    assert.strictEqual(data.files[0].exists, false, 'file should not exist');
+  });
+
+  test('handles file with no code dependents', () => {
+    const result = runGsdTools('codebase-impact package.json --raw');
+    assert.ok(result.success, 'should succeed for non-code file');
+    const data = JSON.parse(result.output);
+    assert.strictEqual(data.files_analyzed, 1, 'should analyze 1 file');
+    // package.json may have 0 dependents (not imported by JS files)
+    assert.ok(typeof data.total_dependents === 'number', 'should have numeric dependents count');
+  });
+
+  test('analyzes multiple files in single call', () => {
+    const result = runGsdTools('codebase-impact src/lib/helpers.js src/lib/output.js --raw');
+    assert.ok(result.success, 'should succeed for multiple files');
+    const data = JSON.parse(result.output);
+    assert.strictEqual(data.files_analyzed, 2, 'should analyze 2 files');
+    assert.ok(data.files.length === 2, 'should return 2 file results');
+  });
+
+  test('uses batched grep (source contains -e flag pattern)', () => {
+    // Verify the source implementation uses batched -e flags, not per-pattern loop
+    const content = fs.readFileSync(path.join(__dirname, '..', 'src', 'commands', 'features.js'), 'utf-8');
+    assert.ok(content.includes('grep -rl --fixed-strings'), 'should have fixed-strings grep');
+    // The batched pattern joins multiple -e flags
+    assert.ok(content.includes('-e ${sanitizeShellArg(p)}'), 'should batch -e flags with sanitization');
+    // Should NOT have the old per-pattern loop
+    assert.ok(!content.includes('for (const pattern of searchPatterns)'), 'should not have per-pattern loop');
+  });
+});
