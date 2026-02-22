@@ -15,7 +15,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 1: Foundation & Safety Nets** - Tests, package.json, config schema extraction — build the safety net before touching anything risky
 - [x] **Phase 2: Error Handling & Hardening** - Debug logging across 55 catch blocks, shell sanitization, temp file cleanup
 - [x] **Phase 3: Developer Experience & Discoverability** - --help support, 11 slash commands, config migration, workflow integrations
-- [ ] **Phase 4: Build System & Module Split** - esbuild bundler pipeline, source split into src/, deploy.sh updated atomically
+- [x] **Phase 4: Build System & Module Split** - esbuild bundler pipeline, source split into src/, deploy.sh updated atomically
 - [ ] **Phase 5: Performance & Polish** - In-memory file cache, batch grep optimization, configurable context window
 
 ## Phase Details
@@ -76,11 +76,11 @@ Plans:
   2. Source code in `src/` follows strict `router -> commands -> lib` dependency direction with no circular imports
   3. `deploy.sh` calls the build step before copying and runs a smoke test that verifies the deployed artifact can execute `current-timestamp --raw` successfully
   4. All existing tests pass against the bundled output with zero behavioral differences from the pre-split monolith
-**Plans**: 2/3 plans executed
+**Plans**: 3/3 plans executed
 Plans:
 - [x] 04-01-PLAN.md — esbuild pipeline setup (proof-of-concept bundling)
 - [x] 04-02-PLAN.md — Source module split into src/
-- [ ] 04-03-PLAN.md — Deploy script update with build + smoke test
+- [x] 04-03-PLAN.md — Deploy script update with build + smoke test
 
 ### Phase 5: Performance & Polish
 **Goal**: Repeated file reads within a single CLI invocation are eliminated by an in-memory cache, grep operations are batched for efficiency, and context budget calculations are configurable
@@ -102,5 +102,5 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5
 | 1. Foundation & Safety Nets | 4/4 | Complete | 2026-02-22 |
 | 2. Error Handling & Hardening | 2/2 | Complete | 2026-02-22 |
 | 3. Developer Experience & Discoverability | 3/3 | Complete | 2026-02-22 |
-| 4. Build System & Module Split | 2/3 | In Progress | - |
+| 4. Build System & Module Split | 3/3 | Complete | 2026-02-22 |
 | 5. Performance & Polish | 0/? | Not started | - |

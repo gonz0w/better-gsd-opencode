@@ -10,18 +10,18 @@ See: .planning/PROJECT.md (updated 2026-02-22)
 ## Current Position
 
 Phase: 4 of 5 (Build System & Module Split)
-Plan: 2 of 3 in current phase — EXECUTING
-Status: Phase 4 Executing
-Last activity: 2026-02-22 — Completed 04-02 (source module split into src/)
+Plan: 3 of 3 in current phase — COMPLETE
+Status: Phase 4 Complete — ready for Phase 5
+Last activity: 2026-02-22 — Completed 04-03 (deploy.sh with build step and smoke test)
 
-Progress: [██████░░░░] 60%
+Progress: [████████░░] 80%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 10
+- Total plans completed: 11
 - Average duration: 4 min
-- Total execution time: 0.60 hours
+- Total execution time: 0.62 hours
 
 **By Phase:**
 
@@ -30,10 +30,10 @@ Progress: [██████░░░░] 60%
 | 01-foundation | 4 | 13 min | 3 min |
 | 02-error-handling | 2 | 11 min | 5 min |
 | 03-developer-experience | 2 | 4 min | 2 min |
-| 04-build-system | 2 | 12 min | 6 min |
+| 04-build-system | 3 | 13 min | 4 min |
 
 **Recent Trend:**
-- Last 5 plans: 02-02 (5 min), 03-02 (2 min), 03-03 (2 min), 04-01 (4 min), 04-02 (8 min)
+- Last 5 plans: 03-02 (2 min), 03-03 (2 min), 04-01 (4 min), 04-02 (8 min), 04-03 (1 min)
 - Trend: Steady
 
 *Updated after each plan completion*
@@ -59,6 +59,7 @@ Recent decisions affecting current work:
 - [Phase 03]: Help text to stderr via COMMAND_HELP map; config-migrate uses CONFIG_SCHEMA.nested for correct key placement
 - [04-01]: Strip-shebang esbuild plugin for monolith bundling; packages:'external' keeps Node builtins as require(); bundle output to .bundle.cjs during proof-of-concept
 - [04-02]: 15-module split (6 lib + 7 commands + router + index); bin/gsd-tools.cjs now a build artifact from src/; variable shadowing fixes in extracted modules
+- [04-03]: Smoke test uses current-timestamp --raw; || true prevents set -e from aborting before rollback; src/ copied to dest for debug access
 
 ### Pending Todos
 
@@ -76,5 +77,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-22
-Stopped at: Completed 04-02-PLAN.md (source module split — 15 src/ modules, build from src/index.js)
+Stopped at: Completed 04-03-PLAN.md (deploy.sh with build step and smoke test — Phase 4 complete)
 Resume file: None
