@@ -2300,3 +2300,238 @@ describe('scaffold command', () => {
     assert.strictEqual(output.reason, 'already_exists');
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// state update command (mutation round-trip)
+// ─────────────────────────────────────────────────────────────────────────────
+
+const STATE_FIXTURE = `# Project State
+
+## Current Position
+
+**Phase:** 1 of 3 (Foundation)
+**Current Plan:** 1
+**Total Plans in Phase:** 3
+**Plan:** 01-01 — Setup
+**Status:** In progress
+**Last Activity:** 2026-01-01
+
+**Progress:** [░░░░░░░░░░] 0%
+
+## Performance Metrics
+
+**Velocity:**
+- Total plans completed: 0
+- Average duration: -
+- Total execution time: 0 hours
+
+**By Phase:**
+
+| Phase | Plans | Total | Avg/Plan |
+|-------|-------|-------|----------|
+| - | - | - | - |
+
+## Accumulated Context
+
+### Decisions
+
+None yet.
+
+### Blockers/Concerns
+
+None yet.
+
+## Session Continuity
+
+**Last session:** 2026-01-01
+**Stopped at:** Phase 1 setup
+**Resume file:** None
+`;
+
+function writeStateFixture(tmpDir) {
+  fs.writeFileSync(path.join(tmpDir, '.planning', 'STATE.md'), STATE_FIXTURE);
+}
+
+describe('state update command', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+    writeStateFixture(tmpDir);
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('updates a single field (Status)', () => {
+    const result = runGsdTools('state update Status Complete', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.updated, true, 'JSON should report updated: true');
+
+    const content = fs.readFileSync(path.join(tmpDir, '.planning', 'STATE.md'), 'utf-8');
+    assert.ok(content.includes('**Status:** Complete'), 'STATUS.md should contain **Status:** Complete');
+  });
+
+  test('updates Phase field with complex value', () => {
+    const result = runGsdTools('state update Phase "2 of 3 (API)"', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.updated, true, 'JSON should report updated: true');
+
+    const content = fs.readFileSync(path.join(tmpDir, '.planning', 'STATE.md'), 'utf-8');
+    assert.ok(content.includes('**Phase:** 2 of 3 (API)'), 'STATE.md should contain updated Phase field');
+  });
+
+  test('returns updated: false for nonexistent field', () => {
+    const result = runGsdTools('state update NonExistentField value', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.updated, false, 'JSON should report updated: false for nonexistent field');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// state patch command (mutation round-trip)
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('state patch command', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+    writeStateFixture(tmpDir);
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('updates multiple fields at once', () => {
+    const result = runGsdTools('state patch --Status Review --"Last Activity" 2026-02-01', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.ok(output.updated.length >= 2, 'Should report at least 2 updated fields');
+    assert.ok(output.updated.includes('Status'), 'Should include Status in updated list');
+    assert.ok(output.updated.includes('Last Activity'), 'Should include Last Activity in updated list');
+
+    const content = fs.readFileSync(path.join(tmpDir, '.planning', 'STATE.md'), 'utf-8');
+    assert.ok(content.includes('**Status:** Review'), 'STATE.md should contain **Status:** Review');
+    assert.ok(content.includes('**Last Activity:** 2026-02-01'), 'STATE.md should contain updated Last Activity');
+  });
+
+  test('reports failed fields that do not exist', () => {
+    const result = runGsdTools('state patch --Status Done --FakeField value', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.ok(output.updated.includes('Status'), 'Status should be updated');
+    assert.ok(output.failed.includes('FakeField'), 'FakeField should be in failed list');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// state add-decision command (mutation round-trip)
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('state add-decision command', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+    writeStateFixture(tmpDir);
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('appends decision and removes placeholder', () => {
+    const result = runGsdTools('state add-decision --phase 1 --summary "Use esbuild" --rationale "Fastest bundler"', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.added, true, 'JSON should report added: true');
+
+    const content = fs.readFileSync(path.join(tmpDir, '.planning', 'STATE.md'), 'utf-8');
+    assert.ok(content.includes('Use esbuild'), 'STATE.md should contain decision text');
+    assert.ok(content.includes('Fastest bundler'), 'STATE.md should contain rationale');
+    // Extract the Decisions section specifically to check placeholder removal
+    const decisionsMatch = content.match(/###?\s*Decisions\s*\n([\s\S]*?)(?=\n###?|\n##[^#]|$)/i);
+    assert.ok(decisionsMatch, 'Decisions section should exist');
+    assert.ok(!decisionsMatch[1].includes('None yet'), '"None yet" placeholder should be removed from Decisions section');
+  });
+
+  test('adds second decision without removing first', () => {
+    // Add first decision
+    runGsdTools('state add-decision --phase 1 --summary "Use esbuild" --rationale "Fastest bundler"', tmpDir);
+    // Add second decision
+    const result = runGsdTools('state add-decision --phase 2 --summary "Use Postgres" --rationale "Best for relational data"', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.added, true, 'JSON should report added: true for second decision');
+
+    const content = fs.readFileSync(path.join(tmpDir, '.planning', 'STATE.md'), 'utf-8');
+    assert.ok(content.includes('Use esbuild'), 'First decision should still be present');
+    assert.ok(content.includes('Use Postgres'), 'Second decision should be present');
+  });
+
+  test('returns added: false when section missing', () => {
+    // Write a STATE.md without a Decisions section
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'STATE.md'),
+      '# Project State\n\n**Status:** In progress\n'
+    );
+
+    const result = runGsdTools('state add-decision --phase 1 --summary "Test"', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.added, false, 'Should report added: false when section missing');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// state add-blocker command (mutation round-trip)
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('state add-blocker command', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+    writeStateFixture(tmpDir);
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('appends blocker and removes placeholder', () => {
+    const result = runGsdTools('state add-blocker --text "Config drift issue"', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.added, true, 'JSON should report added: true');
+
+    const content = fs.readFileSync(path.join(tmpDir, '.planning', 'STATE.md'), 'utf-8');
+    assert.ok(content.includes('Config drift issue'), 'STATE.md should contain blocker text');
+    // The fixture has "None yet." in Blockers section
+    assert.ok(!content.match(/###?\s*Blockers\/Concerns\s*\n[\s\S]*?None yet\./i), '"None yet." placeholder should be removed from Blockers section');
+  });
+
+  test('returns added: true in JSON output', () => {
+    const result = runGsdTools('state add-blocker --text "Missing API key"', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.added, true, 'JSON should report added: true');
+    assert.strictEqual(output.blocker, 'Missing API key', 'JSON should echo blocker text');
+  });
+});
