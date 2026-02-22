@@ -514,7 +514,25 @@ Arguments:
   --freshness    Time filter: day, week, or month
 
 Examples:
-  gsd-tools websearch "esbuild bundler plugins" --limit 5`
+  gsd-tools websearch "esbuild bundler plugins" --limit 5`,
+      "extract-sections": `Usage: gsd-tools extract-sections <file-path> [section1] [section2] ... [--raw]
+
+Extract specific named sections from a markdown file.
+Supports ## headers and <!-- section: name --> markers as section boundaries.
+
+Modes:
+  Discovery     No sections specified \u2192 list available sections
+  Extraction    Sections specified \u2192 return matching content
+
+Section matching is case-insensitive.
+
+Output (discovery):  { file, available_sections: [...] }
+Output (extraction): { file, sections_found, sections_missing, content }
+
+Examples:
+  gsd-tools extract-sections references/checkpoints.md --raw
+  gsd-tools extract-sections references/checkpoints.md "types" --raw
+  gsd-tools extract-sections references/checkpoints.md "types" "guidelines" --raw`
     };
     module2.exports = { MODEL_PROFILES, CONFIG_SCHEMA, COMMAND_HELP };
   }
@@ -5133,6 +5151,98 @@ var require_features = __commonJS({
         tasks: quickTasks
       }, raw);
     }
+    function extractSectionsFromFile(filePath, sectionNames) {
+      const content = safeReadFile(filePath);
+      if (content === null) {
+        return { error: "File not found", file: filePath };
+      }
+      const lines = content.split("\n");
+      const sections = [];
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        const markerMatch = line.match(/<!--\s*section:\s*(.+?)\s*-->/i);
+        if (markerMatch) {
+          const name = markerMatch[1].trim();
+          sections.push({ name, startLine: i, endLine: -1, type: "marker" });
+          continue;
+        }
+        const endMarkerMatch = line.match(/<!--\s*\/section\s*-->/i);
+        if (endMarkerMatch) {
+          for (let j = sections.length - 1; j >= 0; j--) {
+            if (sections[j].type === "marker" && sections[j].endLine === -1) {
+              sections[j].endLine = i;
+              break;
+            }
+          }
+          continue;
+        }
+        const headerMatch = line.match(/^(#{2,3})\s+(.+)/);
+        if (headerMatch) {
+          const level = headerMatch[1].length;
+          const name = headerMatch[2].trim();
+          sections.push({ name, startLine: i, endLine: -1, type: "header", level });
+        }
+      }
+      for (let i = 0; i < sections.length; i++) {
+        const sec = sections[i];
+        if (sec.endLine !== -1) continue;
+        if (sec.type === "header") {
+          let closed = false;
+          for (let j = i + 1; j < sections.length; j++) {
+            if (sections[j].type === "header" && sections[j].level <= sec.level) {
+              sec.endLine = sections[j].startLine - 1;
+              closed = true;
+              break;
+            }
+          }
+          if (!closed) {
+            sec.endLine = lines.length - 1;
+          }
+        } else if (sec.type === "marker" && sec.endLine === -1) {
+          sec.endLine = lines.length - 1;
+        }
+      }
+      const availableSections = sections.map((s) => s.name);
+      if (!sectionNames || sectionNames.length === 0) {
+        return {
+          file: filePath,
+          available_sections: availableSections
+        };
+      }
+      const found = [];
+      const missing = [];
+      const contentParts = [];
+      for (const requestedName of sectionNames) {
+        const requestedLower = requestedName.toLowerCase();
+        const match = sections.find((s) => s.name.toLowerCase() === requestedLower);
+        if (match) {
+          found.push(match.name);
+          const sectionLines = lines.slice(match.startLine, match.endLine + 1);
+          contentParts.push(sectionLines.join("\n"));
+        } else {
+          missing.push(requestedName);
+        }
+      }
+      return {
+        file: filePath,
+        sections_found: found,
+        sections_missing: missing,
+        content: contentParts.join("\n\n")
+      };
+    }
+    function cmdExtractSections(cwd, args, raw) {
+      const filePath = args[0];
+      if (!filePath) {
+        error("Usage: extract-sections <file-path> [section1] [section2] ...");
+      }
+      const resolvedPath = path.isAbsolute(filePath) ? filePath : path.join(cwd, filePath);
+      const sectionNames = args.slice(1);
+      const result = extractSectionsFromFile(resolvedPath, sectionNames);
+      if (result.error) {
+        error(`File not found: ${filePath}`);
+      }
+      output(result, raw);
+    }
     var { extractAtReferences } = require_helpers();
     function measureAllWorkflows(cwd) {
       let pluginDir = process.env.GSD_PLUGIN_DIR;
@@ -5368,7 +5478,9 @@ Improved: ${improved} | Unchanged: ${unchanged} | Worsened: ${worsened}
       cmdVelocity,
       cmdTraceRequirement,
       cmdValidateConfig,
-      cmdQuickTaskSummary
+      cmdQuickTaskSummary,
+      cmdExtractSections,
+      extractSectionsFromFile
     };
   }
 });
@@ -6743,7 +6855,8 @@ var require_router = __commonJS({
       cmdVelocity,
       cmdTraceRequirement,
       cmdValidateConfig,
-      cmdQuickTaskSummary
+      cmdQuickTaskSummary,
+      cmdExtractSections
     } = require_features();
     var {
       cmdGenerateSlug,
@@ -7235,6 +7348,10 @@ Available: execute-phase, plan-phase, new-project, new-milestone, quick, resume,
         }
         case "quick-summary": {
           cmdQuickTaskSummary(cwd, raw);
+          break;
+        }
+        case "extract-sections": {
+          cmdExtractSections(cwd, args.slice(1), raw);
           break;
         }
         default:

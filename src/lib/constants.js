@@ -536,6 +536,25 @@ Arguments:
 
 Examples:
   gsd-tools websearch "esbuild bundler plugins" --limit 5`,
+
+  'extract-sections': `Usage: gsd-tools extract-sections <file-path> [section1] [section2] ... [--raw]
+
+Extract specific named sections from a markdown file.
+Supports ## headers and <!-- section: name --> markers as section boundaries.
+
+Modes:
+  Discovery     No sections specified → list available sections
+  Extraction    Sections specified → return matching content
+
+Section matching is case-insensitive.
+
+Output (discovery):  { file, available_sections: [...] }
+Output (extraction): { file, sections_found, sections_missing, content }
+
+Examples:
+  gsd-tools extract-sections references/checkpoints.md --raw
+  gsd-tools extract-sections references/checkpoints.md "types" --raw
+  gsd-tools extract-sections references/checkpoints.md "types" "guidelines" --raw`,
 };
 
 module.exports = { MODEL_PROFILES, CONFIG_SCHEMA, COMMAND_HELP };

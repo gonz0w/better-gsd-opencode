@@ -39,7 +39,7 @@ const {
   cmdContextBudgetCompare, cmdTestRun, cmdSearchDecisions,
   cmdValidateDependencies, cmdSearchLessons, cmdCodebaseImpact,
   cmdRollbackInfo, cmdVelocity, cmdTraceRequirement, cmdValidateConfig,
-  cmdQuickTaskSummary,
+  cmdQuickTaskSummary, cmdExtractSections,
 } = require('./commands/features');
 
 const {
@@ -569,6 +569,11 @@ async function main() {
 
     case 'quick-summary': {
       cmdQuickTaskSummary(cwd, raw);
+      break;
+    }
+
+    case 'extract-sections': {
+      cmdExtractSections(cwd, args.slice(1), raw);
       break;
     }
 

@@ -1037,6 +1037,139 @@ function cmdQuickTaskSummary(cwd, raw) {
   }, raw);
 }
 
+// ─── Extract Sections ───────────────────────────────────────────────────────
+
+/**
+ * Extract named sections from a markdown file.
+ * Supports ## headers and <!-- section: name --> markers as boundaries.
+ * Discovery mode (no section names) returns available section list.
+ */
+function extractSectionsFromFile(filePath, sectionNames) {
+  const content = safeReadFile(filePath);
+  if (content === null) {
+    return { error: 'File not found', file: filePath };
+  }
+
+  const lines = content.split('\n');
+  const sections = []; // { name, startLine, endLine }
+
+  // First pass: find all section boundaries
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+
+    // Match <!-- section: name --> markers
+    const markerMatch = line.match(/<!--\s*section:\s*(.+?)\s*-->/i);
+    if (markerMatch) {
+      const name = markerMatch[1].trim();
+      sections.push({ name, startLine: i, endLine: -1, type: 'marker' });
+      continue;
+    }
+
+    // Match <!-- /section --> end markers — close the last open marker section
+    const endMarkerMatch = line.match(/<!--\s*\/section\s*-->/i);
+    if (endMarkerMatch) {
+      // Find the last unclosed marker section
+      for (let j = sections.length - 1; j >= 0; j--) {
+        if (sections[j].type === 'marker' && sections[j].endLine === -1) {
+          sections[j].endLine = i;
+          break;
+        }
+      }
+      continue;
+    }
+
+    // Match ## and ### headers
+    const headerMatch = line.match(/^(#{2,3})\s+(.+)/);
+    if (headerMatch) {
+      const level = headerMatch[1].length;
+      const name = headerMatch[2].trim();
+      sections.push({ name, startLine: i, endLine: -1, type: 'header', level });
+    }
+  }
+
+  // Second pass: close unclosed header sections
+  // A header section ends at the next header of equal or higher level, or EOF
+  for (let i = 0; i < sections.length; i++) {
+    const sec = sections[i];
+    if (sec.endLine !== -1) continue; // Already closed (marker sections)
+
+    if (sec.type === 'header') {
+      // Find next header at same or higher level
+      let closed = false;
+      for (let j = i + 1; j < sections.length; j++) {
+        if (sections[j].type === 'header' && sections[j].level <= sec.level) {
+          sec.endLine = sections[j].startLine - 1;
+          closed = true;
+          break;
+        }
+      }
+      if (!closed) {
+        sec.endLine = lines.length - 1;
+      }
+    } else if (sec.type === 'marker' && sec.endLine === -1) {
+      // Unclosed marker — extend to EOF
+      sec.endLine = lines.length - 1;
+    }
+  }
+
+  // Build available sections list
+  const availableSections = sections.map(s => s.name);
+
+  // Discovery mode: no section names requested
+  if (!sectionNames || sectionNames.length === 0) {
+    return {
+      file: filePath,
+      available_sections: availableSections,
+    };
+  }
+
+  // Extraction mode: find matching sections
+  const found = [];
+  const missing = [];
+  const contentParts = [];
+
+  for (const requestedName of sectionNames) {
+    const requestedLower = requestedName.toLowerCase();
+    const match = sections.find(s => s.name.toLowerCase() === requestedLower);
+
+    if (match) {
+      found.push(match.name);
+      const sectionLines = lines.slice(match.startLine, match.endLine + 1);
+      contentParts.push(sectionLines.join('\n'));
+    } else {
+      missing.push(requestedName);
+    }
+  }
+
+  return {
+    file: filePath,
+    sections_found: found,
+    sections_missing: missing,
+    content: contentParts.join('\n\n'),
+  };
+}
+
+function cmdExtractSections(cwd, args, raw) {
+  const filePath = args[0];
+  if (!filePath) {
+    error('Usage: extract-sections <file-path> [section1] [section2] ...');
+  }
+
+  // Resolve file path relative to cwd
+  const resolvedPath = path.isAbsolute(filePath)
+    ? filePath
+    : path.join(cwd, filePath);
+
+  const sectionNames = args.slice(1);
+  const result = extractSectionsFromFile(resolvedPath, sectionNames);
+
+  if (result.error) {
+    error(`File not found: ${filePath}`);
+  }
+
+  output(result, raw);
+}
+
 // ─── Workflow Measurement (Baseline & Compare) ──────────────────────────────
 
 const { extractAtReferences } = require('../lib/helpers');
@@ -1323,4 +1456,6 @@ module.exports = {
   cmdTraceRequirement,
   cmdValidateConfig,
   cmdQuickTaskSummary,
+  cmdExtractSections,
+  extractSectionsFromFile,
 };
