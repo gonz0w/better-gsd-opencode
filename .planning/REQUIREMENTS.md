@@ -9,11 +9,11 @@ Requirements for v2.0 Quality & Intelligence milestone. Each maps to roadmap pha
 
 ### State Validation
 
-- [ ] **SVAL-01**: Plugin can detect when ROADMAP.md plan-completion claims don't match actual SUMMARY.md files on disk (drift detection)
-- [ ] **SVAL-02**: Plugin can detect when STATE.md Current Position points to a non-existent or already-completed plan (position validation)
-- [ ] **SVAL-03**: Plugin can detect when STATE.md Last activity is older than recent git commits to .planning/ (stale activity detection)
-- [ ] **SVAL-04**: Plugin can auto-correct unambiguous drift with --fix flag when exactly one correct resolution exists (auto-repair)
-- [ ] **SVAL-05**: Plugin can detect blockers and todos that have been open for N plans without resolution (blocker staleness)
+- [x] **SVAL-01**: Plugin can detect when ROADMAP.md plan-completion claims don't match actual SUMMARY.md files on disk (drift detection)
+- [x] **SVAL-02**: Plugin can detect when STATE.md Current Position points to a non-existent or already-completed plan (position validation)
+- [x] **SVAL-03**: Plugin can detect when STATE.md Last activity is older than recent git commits to .planning/ (stale activity detection)
+- [x] **SVAL-04**: Plugin can auto-correct unambiguous drift with --fix flag when exactly one correct resolution exists (auto-repair)
+- [x] **SVAL-05**: Plugin can detect blockers and todos that have been open for N plans without resolution (blocker staleness)
 - [ ] **SVAL-06**: Plugin runs state validation automatically before execute-phase starts as pre-flight check (pre-execution validation)
 
 ### Atomic Plan Decomposition
@@ -97,11 +97,11 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| SVAL-01 | Phase 10 | Pending |
-| SVAL-02 | Phase 10 | Pending |
-| SVAL-03 | Phase 10 | Pending |
-| SVAL-04 | Phase 10 | Pending |
-| SVAL-05 | Phase 10 | Pending |
+| SVAL-01 | Phase 10 | Complete |
+| SVAL-02 | Phase 10 | Complete |
+| SVAL-03 | Phase 10 | Complete |
+| SVAL-04 | Phase 10 | Complete |
+| SVAL-05 | Phase 10 | Complete |
 | SVAL-06 | Phase 10 | Pending |
 | PLAN-01 | Phase 12 | Pending |
 | PLAN-02 | Phase 12 | Pending |
