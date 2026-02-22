@@ -2535,3 +2535,204 @@ describe('state add-blocker command', () => {
     assert.strictEqual(output.blocker, 'Missing API key', 'JSON should echo blocker text');
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// state resolve-blocker command (mutation round-trip)
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('state resolve-blocker command', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+    writeStateFixture(tmpDir);
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('resolves an existing blocker by text match', () => {
+    // First add a blocker
+    runGsdTools('state add-blocker --text "Config drift"', tmpDir);
+    // Verify it was added
+    let content = fs.readFileSync(path.join(tmpDir, '.planning', 'STATE.md'), 'utf-8');
+    assert.ok(content.includes('Config drift'), 'Blocker should be present before resolve');
+
+    // Now resolve it
+    const result = runGsdTools('state resolve-blocker --text "Config drift"', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.resolved, true, 'JSON should report resolved: true');
+
+    content = fs.readFileSync(path.join(tmpDir, '.planning', 'STATE.md'), 'utf-8');
+    assert.ok(!content.includes('Config drift'), 'Blocker text should be removed from STATE.md');
+  });
+
+  test('returns resolved: true even for nonexistent blocker', () => {
+    // The resolve-blocker command filters lines that match — if none match, it still writes back
+    const result = runGsdTools('state resolve-blocker --text "nonexistent blocker"', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.resolved, true, 'JSON should report resolved: true (no-op filter)');
+  });
+
+  test('restores None placeholder when last blocker resolved', () => {
+    // Add a blocker then resolve it — section should get "None" placeholder
+    runGsdTools('state add-blocker --text "Only blocker"', tmpDir);
+    runGsdTools('state resolve-blocker --text "Only blocker"', tmpDir);
+
+    const content = fs.readFileSync(path.join(tmpDir, '.planning', 'STATE.md'), 'utf-8');
+    const blockersMatch = content.match(/###?\s*Blockers\/Concerns\s*\n([\s\S]*?)(?=\n###?|\n##[^#]|$)/i);
+    assert.ok(blockersMatch, 'Blockers section should exist');
+    assert.ok(blockersMatch[1].includes('None'), 'Blockers section should have None placeholder after last blocker resolved');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// state record-session command (mutation round-trip)
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('state record-session command', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+    writeStateFixture(tmpDir);
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('updates all session continuity fields', () => {
+    const result = runGsdTools('state record-session --stopped-at "Phase 2 API work" --resume-file "None"', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.recorded, true, 'JSON should report recorded: true');
+    assert.ok(output.updated.length >= 2, 'Should report at least 2 updated fields');
+
+    const content = fs.readFileSync(path.join(tmpDir, '.planning', 'STATE.md'), 'utf-8');
+    // Last session should be updated to current ISO datetime (just check it changed from fixture)
+    assert.ok(!content.includes('**Last session:** 2026-01-01'), 'Last session should be updated from fixture value');
+    assert.ok(content.includes('**Stopped at:** Phase 2 API work'), 'Stopped at should be updated');
+    assert.ok(content.includes('**Resume file:** None'), 'Resume file should be present');
+  });
+
+  test('returns recorded: true in JSON output', () => {
+    const result = runGsdTools('state record-session --stopped-at "Test checkpoint"', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.recorded, true, 'JSON should report recorded: true');
+    assert.ok(Array.isArray(output.updated), 'updated should be an array of field names');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// state advance-plan command (mutation round-trip)
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('state advance-plan command', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+    writeStateFixture(tmpDir);
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('advances plan number from 1 to 2', () => {
+    const result = runGsdTools('state advance-plan', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.advanced, true, 'JSON should report advanced: true');
+    assert.strictEqual(output.previous_plan, 1, 'Previous plan should be 1');
+    assert.strictEqual(output.current_plan, 2, 'Current plan should be 2');
+
+    const content = fs.readFileSync(path.join(tmpDir, '.planning', 'STATE.md'), 'utf-8');
+    assert.ok(content.includes('**Current Plan:** 2'), 'STATE.md should contain **Current Plan:** 2');
+    assert.ok(content.includes('**Status:** Ready to execute'), 'Status should be updated to Ready to execute');
+  });
+
+  test('detects last plan in phase and sets phase complete', () => {
+    // Set Current Plan to 3 (equal to Total Plans in Phase: 3)
+    runGsdTools('state update "Current Plan" 3', tmpDir);
+
+    const result = runGsdTools('state advance-plan', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.advanced, false, 'Should NOT advance past last plan');
+    assert.strictEqual(output.reason, 'last_plan', 'Reason should be last_plan');
+
+    const content = fs.readFileSync(path.join(tmpDir, '.planning', 'STATE.md'), 'utf-8');
+    assert.ok(content.includes('Phase complete'), 'Status should indicate phase complete');
+  });
+
+  test('updates Last Activity date', () => {
+    const result = runGsdTools('state advance-plan', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const content = fs.readFileSync(path.join(tmpDir, '.planning', 'STATE.md'), 'utf-8');
+    // Last Activity should be updated from the fixture's 2026-01-01
+    assert.ok(!content.includes('**Last Activity:** 2026-01-01'), 'Last Activity should be updated from fixture value');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// state record-metric command (mutation round-trip)
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('state record-metric command', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+    writeStateFixture(tmpDir);
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('appends a row to the Performance Metrics table', () => {
+    const result = runGsdTools('state record-metric --phase 01 --plan 01 --duration 45m --tasks 3 --files 5', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.recorded, true, 'JSON should report recorded: true');
+
+    const content = fs.readFileSync(path.join(tmpDir, '.planning', 'STATE.md'), 'utf-8');
+    assert.ok(content.includes('Phase 01 P01'), 'STATE.md should contain the new metric row with phase info');
+    assert.ok(content.includes('45m'), 'STATE.md should contain the duration');
+    assert.ok(content.includes('3 tasks'), 'STATE.md should contain the task count');
+    assert.ok(content.includes('5 files'), 'STATE.md should contain the file count');
+  });
+
+  test('returns recorded: true with metric details', () => {
+    const result = runGsdTools('state record-metric --phase 02 --plan 03 --duration 12m --tasks 5 --files 8', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.recorded, true, 'JSON should report recorded: true');
+    assert.strictEqual(output.phase, '02', 'JSON should echo phase');
+    assert.strictEqual(output.plan, '03', 'JSON should echo plan');
+    assert.strictEqual(output.duration, '12m', 'JSON should echo duration');
+  });
+
+  test('returns error when required fields missing', () => {
+    const result = runGsdTools('state record-metric --phase 01', tmpDir);
+    assert.ok(result.success, `Command should succeed with error in JSON: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.ok(output.error, 'JSON should contain error when required fields missing');
+  });
+});
