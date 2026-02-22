@@ -26,9 +26,9 @@ Requirements for this improvement pass. Each maps to roadmap phases.
 ### Developer Experience
 
 - [ ] **DX-01**: Per-command `--help` support — `COMMAND_HELP` map at module level, `--help` check in router before dispatching, prints usage text to stderr
-- [ ] **DX-02**: Wire 11 unwired commands into slash commands — create `.md` command files in plugin `command/` directory for `session-diff`, `context-budget`, `test-run`, `search-decisions`, `validate-dependencies`, `search-lessons`, `codebase-impact`, `rollback-info`, `velocity`, `trace-requirement`, `validate-config`
+- [x] **DX-02**: Wire 11 unwired commands into slash commands — create `.md` command files in plugin `command/` directory for `session-diff`, `context-budget`, `test-run`, `search-decisions`, `validate-dependencies`, `search-lessons`, `codebase-impact`, `rollback-info`, `velocity`, `trace-requirement`, `validate-config`
 - [ ] **DX-03**: Config migration command — `cmdConfigMigrate()` reads existing config, merges with CONFIG_SCHEMA defaults for missing keys, writes back without overwriting existing values
-- [ ] **DX-04**: Parallel execution visualization — ASCII dependency/wave diagram in `execute-phase.md` workflow showing which plans can run simultaneously
+- [x] **DX-04**: Parallel execution visualization — ASCII dependency/wave diagram in `execute-phase.md` workflow showing which plans can run simultaneously
 
 ### Workflow Integration
 
@@ -93,9 +93,9 @@ Explicitly excluded. Documented to prevent scope creep.
 | PERF-02 | Phase 5 | Pending |
 | PERF-03 | Phase 5 | Pending |
 | DX-01 | Phase 3 | Pending |
-| DX-02 | Phase 3 | Pending |
+| DX-02 | Phase 3 | Complete |
 | DX-03 | Phase 3 | Pending |
-| DX-04 | Phase 3 | Pending |
+| DX-04 | Phase 3 | Complete |
 | WFLOW-01 | Phase 3 | Pending |
 | WFLOW-02 | Phase 3 | Pending |
 | WFLOW-03 | Phase 3 | Pending |
