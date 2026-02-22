@@ -127,6 +127,16 @@ const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
 
+// ─── Temp File Cleanup ───────────────────────────────────────────────────────
+
+const _tmpFiles = [];
+
+process.on('exit', () => {
+  for (const f of _tmpFiles) {
+    try { fs.unlinkSync(f); } catch {}
+  }
+});
+
 // ─── Model Profile Table ─────────────────────────────────────────────────────
 
 const MODEL_PROFILES = {
@@ -487,6 +497,7 @@ function output(result, raw, rawValue) {
     if (json.length > 50000) {
       const tmpPath = path.join(require('os').tmpdir(), `gsd-${Date.now()}.json`);
       fs.writeFileSync(tmpPath, json, 'utf-8');
+      _tmpFiles.push(tmpPath);
       process.stdout.write('@file:' + tmpPath);
     } else {
       process.stdout.write(json);

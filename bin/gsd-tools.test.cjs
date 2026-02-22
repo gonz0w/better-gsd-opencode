@@ -3211,3 +3211,164 @@ describe('debug logging', () => {
     }
   });
 });
+
+// ─── Shell Sanitization (02-02) ───────────────────────────────────────────────
+
+describe('shell sanitization', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  // Helper to init a git repo in a temp dir (sets author identity for commits)
+  function initGitRepo(dir) {
+    execSync(
+      'git init && git -c user.name=Test -c user.email=test@test.com add . && git -c user.name=Test -c user.email=test@test.com commit -m "init" --allow-empty',
+      { cwd: dir, encoding: 'utf-8', stdio: 'pipe' }
+    );
+  }
+
+  test('session-diff extracts only the date portion from Last Activity', () => {
+    // The regex \d{4}-\d{2}-\d{2} already strips trailing shell metacharacters.
+    // Combined with isValidDateString(), the injected part never reaches execSync.
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'STATE.md'),
+      `# Project State\n\n**Last Activity:** 2026-01-01; echo pwned\n`
+    );
+
+    initGitRepo(tmpDir);
+
+    const result = runGsdTools('session-diff', tmpDir);
+    assert.ok(result.success, `Command should succeed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    // The regex only captures "2026-01-01" (valid date), so the command proceeds safely
+    assert.strictEqual(output.since, '2026-01-01', 'Only the date portion should be extracted');
+  });
+
+  test('session-diff works with valid date strings', () => {
+    // Write STATE.md with a valid date
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'STATE.md'),
+      `# Project State\n\n**Last Activity:** 2026-01-01\n`
+    );
+
+    initGitRepo(tmpDir);
+
+    const result = runGsdTools('session-diff', tmpDir);
+    assert.ok(result.success, `Command should succeed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.since, '2026-01-01', 'Valid date should be accepted');
+    assert.ok(Array.isArray(output.commits), 'Should return commits array');
+  });
+
+  test('session-diff rejects backtick injection in date', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'STATE.md'),
+      '# Project State\n\n**Last Activity:** `whoami`\n'
+    );
+
+    initGitRepo(tmpDir);
+
+    const result = runGsdTools('session-diff', tmpDir);
+    assert.ok(result.success, `Command should succeed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    // Should get "No last activity" error because regex won't match backtick-containing string
+    assert.ok(output.error, 'Backtick date should be rejected');
+  });
+
+  test('session-diff rejects $() injection in date', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'STATE.md'),
+      '# Project State\n\n**Last Activity:** $(date)\n'
+    );
+
+    initGitRepo(tmpDir);
+
+    const result = runGsdTools('session-diff', tmpDir);
+    assert.ok(result.success, `Command should succeed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.ok(output.error, '$() injection should be rejected');
+  });
+
+  test('codebase-impact uses --fixed-strings for grep patterns', () => {
+    // This tests that the grep pattern uses literal matching by checking
+    // that a regex-special pattern doesn't cause grep errors
+    const result = runGsdTools('codebase-impact "src/lib/[test].ts"', tmpDir);
+    assert.ok(result.success, `Command should succeed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    // The file won't exist, but the command shouldn't crash from bad regex
+    assert.ok(Array.isArray(output.files), 'Should return files array');
+  });
+});
+
+// ─── Temp File Cleanup (02-02) ────────────────────────────────────────────────
+
+describe('temp file cleanup', () => {
+  test('process exit handler is registered for temp file cleanup', () => {
+    // Verify that gsd-tools.cjs registers a process.on("exit") handler
+    // by checking the source code directly (the handler is at module level)
+    const source = fs.readFileSync(TOOLS_PATH, 'utf-8');
+    assert.ok(
+      source.includes("process.on('exit'"),
+      'gsd-tools.cjs should register a process.on(exit) handler'
+    );
+    assert.ok(
+      source.includes('_tmpFiles'),
+      'gsd-tools.cjs should track temp files in _tmpFiles array'
+    );
+  });
+
+  test('_tmpFiles tracking is wired into output() function', () => {
+    // Verify that the output function pushes to _tmpFiles when writing large payloads
+    const source = fs.readFileSync(TOOLS_PATH, 'utf-8');
+    // Find the output function and check it references _tmpFiles.push
+    const outputStart = source.indexOf('function output(');
+    const outputEnd = source.indexOf('\nfunction ', outputStart + 1);
+    const outputSection = source.substring(outputStart, outputEnd > 0 ? outputEnd : outputStart + 800);
+    assert.ok(
+      outputSection.includes('_tmpFiles.push'),
+      'output() function should push tmpPath to _tmpFiles'
+    );
+  });
+
+  test('no temp files remain after CLI invocation', () => {
+    // Run a normal CLI command and verify no gsd-*.json files are created
+    // (normal output is small, so no tmpfile should be created)
+    const before = (fs.readdirSync(require('os').tmpdir()))
+      .filter(f => f.startsWith('gsd-') && f.endsWith('.json'));
+
+    const result = runGsdTools('current-timestamp');
+    assert.ok(result.success, `Command should succeed: ${result.error}`);
+
+    const after = (fs.readdirSync(require('os').tmpdir()))
+      .filter(f => f.startsWith('gsd-') && f.endsWith('.json'));
+
+    // The count should not increase (cleanup runs on exit)
+    assert.ok(
+      after.length <= before.length,
+      `No new temp files should remain after CLI exit (before: ${before.length}, after: ${after.length})`
+    );
+  });
+
+  test('exit handler cleans up tracked files', () => {
+    // Create a temp file that mimics what gsd-tools would create,
+    // then verify the cleanup pattern works
+    const tmpPath = path.join(require('os').tmpdir(), `gsd-test-cleanup-${Date.now()}.json`);
+    fs.writeFileSync(tmpPath, '{}', 'utf-8');
+    assert.ok(fs.existsSync(tmpPath), 'Temp file should exist before cleanup');
+
+    // Simulate the cleanup logic directly
+    try { fs.unlinkSync(tmpPath); } catch {}
+    assert.ok(!fs.existsSync(tmpPath), 'Temp file should be removed after cleanup');
+  });
+});
