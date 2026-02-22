@@ -80,7 +80,7 @@ Subcommands:
   resolve-blocker --text "..." Remove a blocker
   record-session            Update session continuity
     --stopped-at "..." [--resume-file path]
-  validate [--fix]          Validate state vs disk reality
+  validate [--fix]          Validate state vs disk reality (auto-runs as pre-flight in execute-phase)
 
 Examples:
   gsd-tools state load --raw
@@ -99,6 +99,10 @@ Checks:
 Options:
   --fix    Auto-correct plan count mismatches in ROADMAP.md
   --raw    JSON output
+
+Pre-flight: Execute-phase automatically runs state validate --fix before
+execution. Errors block, warnings display. Use --skip-validate to bypass.
+Disable permanently via config: gates.pre_flight_validation: false
 
 Examples:
   gsd-tools state validate --raw
@@ -3450,6 +3454,8 @@ var require_init = __commonJS({
         milestone_version: milestone.version,
         milestone_name: milestone.name,
         milestone_slug: generateSlugInternal(milestone.name),
+        // Gates
+        pre_flight_validation: config.gates?.pre_flight_validation !== false,
         // File existence
         state_exists: pathExistsInternal(cwd, ".planning/STATE.md"),
         roadmap_exists: pathExistsInternal(cwd, ".planning/ROADMAP.md"),
@@ -3471,7 +3477,8 @@ var require_init = __commonJS({
           plan_count: result.plan_count,
           incomplete_count: result.incomplete_count,
           branch_name: result.branch_name,
-          verifier_enabled: result.verifier_enabled
+          verifier_enabled: result.verifier_enabled,
+          pre_flight_validation: result.pre_flight_validation
         };
         if (global._gsdManifestMode) {
           compactResult._manifest = {

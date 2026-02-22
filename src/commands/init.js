@@ -61,6 +61,9 @@ function cmdInitExecutePhase(cwd, phase, raw) {
     milestone_name: milestone.name,
     milestone_slug: generateSlugInternal(milestone.name),
 
+    // Gates
+    pre_flight_validation: config.gates?.pre_flight_validation !== false,
+
     // File existence
     state_exists: pathExistsInternal(cwd, '.planning/STATE.md'),
     roadmap_exists: pathExistsInternal(cwd, '.planning/ROADMAP.md'),
@@ -84,6 +87,7 @@ function cmdInitExecutePhase(cwd, phase, raw) {
       incomplete_count: result.incomplete_count,
       branch_name: result.branch_name,
       verifier_enabled: result.verifier_enabled,
+      pre_flight_validation: result.pre_flight_validation,
     };
     if (global._gsdManifestMode) {
       compactResult._manifest = {
@@ -264,7 +268,7 @@ function cmdInitNewProject(cwd, raw) {
   if (global._gsdCompactMode) {
     const manifestFiles = [];
     if (result.project_exists) manifestFiles.push({ path: '.planning/PROJECT.md', required: false });
-    if (pathExistsInternal(cwd, 'CLAUDE.md')) manifestFiles.push({ path: 'CLAUDE.md', required: false });
+    if (pathExistsInternal(cwd, 'AGENTS.md')) manifestFiles.push({ path: 'AGENTS.md', required: false });
 
     const compactResult = {
       is_brownfield: result.is_brownfield,

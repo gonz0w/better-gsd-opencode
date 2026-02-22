@@ -17,7 +17,7 @@ Read STATE.md before any operation.
 INIT=$(node /home/cam/.config/opencode/get-shit-done/bin/gsd-tools.cjs init execute-phase "${PHASE_ARG}" --compact)
 ```
 
-Parse JSON for: `phase_found`, `phase_dir`, `phase_number`, `phase_name`, `plans`, `incomplete_plans`, `plan_count`, `incomplete_count`, `parallelization`, `branching_strategy`, `branch_name`, `executor_model`, `verifier_model`, `commit_docs`.
+Parse JSON for: `phase_found`, `phase_dir`, `phase_number`, `phase_name`, `plans`, `incomplete_plans`, `plan_count`, `incomplete_count`, `parallelization`, `branching_strategy`, `branch_name`, `executor_model`, `verifier_model`, `commit_docs`, `pre_flight_validation`.
 
 If `phase_found` false → error. If `plan_count` 0 → error. If no STATE.md but `.planning/` exists → offer reconstruct.
 When `parallelization` false, wave plans execute sequentially.
@@ -43,6 +43,36 @@ DEPS=$(node /home/cam/.config/opencode/get-shit-done/bin/gsd-tools.cjs validate-
 Parse for `valid` (bool) and `issues` (array). If valid or command fails: continue silently.
 
 If issues found — yolo/auto: log warning, proceed. Interactive: present issues, ask proceed/stop.
+</step>
+
+<step name="preflight_state_validation">
+If `pre_flight_validation` is false (from init JSON) or `--skip-validate` flag: skip silently.
+
+Otherwise, run auto-fix first, then validate:
+
+```bash
+# Auto-fix what we can
+FIX_RESULT=$(node /home/cam/.config/opencode/get-shit-done/bin/gsd-tools.cjs state validate --fix --raw 2>/dev/null)
+# Then check for remaining issues
+VALIDATE_RESULT=$(node /home/cam/.config/opencode/get-shit-done/bin/gsd-tools.cjs state validate --raw 2>/dev/null)
+```
+
+Parse `FIX_RESULT` for `fixes_applied` array. If non-empty: display "Pre-flight auto-fixed: {count} issue(s)".
+
+Parse `VALIDATE_RESULT` for `status` field:
+- `"clean"`: Display "Pre-flight: OK" and continue
+- `"warnings"`: Display warning table, continue execution
+- `"errors"`: Display error table. In yolo/auto mode: display errors but continue with warning banner. In interactive mode: ask user to fix or proceed with `--skip-validate`.
+
+Error classification:
+- position errors + count mismatches = "error" (blocking in interactive)
+- staleness = "warn" (non-blocking)
+
+Display format when issues exist:
+
+```
+| Type | Location | Expected | Actual | Severity |
+```
 </step>
 
 <step name="discover_and_group_plans">
@@ -105,7 +135,7 @@ Execute each wave in sequence. Within a wave: parallel if `PARALLELIZATION=true`
        - {phase_dir}/{plan_file} (Plan)
        - .planning/STATE.md (State)
        - .planning/config.json (Config, if exists)
-       - ./CLAUDE.md (Project instructions, if exists)
+       - ./AGENTS.md (Project instructions, if exists)
        </files_to_read>
 
        <success_criteria>

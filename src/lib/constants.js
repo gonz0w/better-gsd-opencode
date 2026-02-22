@@ -59,7 +59,7 @@ Subcommands:
   resolve-blocker --text "..." Remove a blocker
   record-session            Update session continuity
     --stopped-at "..." [--resume-file path]
-  validate [--fix]          Validate state vs disk reality
+  validate [--fix]          Validate state vs disk reality (auto-runs as pre-flight in execute-phase)
 
 Examples:
   gsd-tools state load --raw
@@ -79,6 +79,10 @@ Checks:
 Options:
   --fix    Auto-correct plan count mismatches in ROADMAP.md
   --raw    JSON output
+
+Pre-flight: Execute-phase automatically runs state validate --fix before
+execution. Errors block, warnings display. Use --skip-validate to bypass.
+Disable permanently via config: gates.pre_flight_validation: false
 
 Examples:
   gsd-tools state validate --raw
