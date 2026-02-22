@@ -33,6 +33,8 @@ const CONFIG_SCHEMA = {
   depth:                     { type: 'string',  default: 'standard',                      description: 'Planning depth',                                  aliases: [], nested: null },
   test_commands:             { type: 'object',  default: {},                              description: 'Test commands by framework',                      aliases: [], nested: null },
   test_gate:                 { type: 'boolean', default: true,                            description: 'Block plan completion on test failure',            aliases: [], nested: null },
+  context_window:            { type: 'number',  default: 200000,                          description: 'Context window size in tokens',                    aliases: [], nested: null },
+  context_target_percent:    { type: 'number',  default: 50,                              description: 'Target context utilization percent (1-100)',        aliases: [], nested: null },
 };
 
 // ─── Command Help ────────────────────────────────────────────────────────────

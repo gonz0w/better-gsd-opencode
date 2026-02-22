@@ -37,7 +37,9 @@ var require_constants = __commonJS({
       model_profiles: { type: "object", default: {}, description: "Model assignments per agent", aliases: [], nested: null },
       depth: { type: "string", default: "standard", description: "Planning depth", aliases: [], nested: null },
       test_commands: { type: "object", default: {}, description: "Test commands by framework", aliases: [], nested: null },
-      test_gate: { type: "boolean", default: true, description: "Block plan completion on test failure", aliases: [], nested: null }
+      test_gate: { type: "boolean", default: true, description: "Block plan completion on test failure", aliases: [], nested: null },
+      context_window: { type: "number", default: 2e5, description: "Context window size in tokens", aliases: [], nested: null },
+      context_target_percent: { type: "number", default: 50, description: "Target context utilization percent (1-100)", aliases: [], nested: null }
     };
     var COMMAND_HELP = {
       "state": `Usage: gsd-tools state <subcommand> [options] [--raw]
