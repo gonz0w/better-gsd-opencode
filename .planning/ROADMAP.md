@@ -46,7 +46,10 @@ Plans:
   2. With `GSD_DEBUG` unset, the tool behaves identically to before — no output changes, no behavioral changes
   3. Git command arguments containing shell metacharacters (quotes, semicolons, backticks) are safely escaped and do not execute arbitrary commands
   4. No `gsd-*.json` temp files remain in the system tmpdir after the CLI process exits (normal or error)
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+- [ ] 02-01-PLAN.md — Debug logging helper + instrument all catch blocks
+- [ ] 02-02-PLAN.md — Shell sanitization + temp file cleanup
 
 ### Phase 3: Developer Experience & Discoverability
 **Goal**: All 15 feature commands are discoverable and reachable — via slash commands in Claude Code, via --help in the CLI, and via automatic integration in planning/execution workflows
