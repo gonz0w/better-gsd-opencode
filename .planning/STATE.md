@@ -5,23 +5,23 @@
 See: .planning/PROJECT.md (updated 2026-02-22)
 
 **Core value:** Every improvement must make the plugin more reliable and faster for developers using GSD to plan and execute real projects
-**Current focus:** Phase 5: Performance & Polish
+**Current focus:** PROJECT COMPLETE — All 5 phases delivered
 
 ## Current Position
 
-Phase: 5 of 5 (Performance & Polish)
-Plan: 0 of ? in current phase — PLANNING
-Status: Phase 5 Planning
-Last activity: 2026-02-22 — Starting Phase 5 planning
+Phase: 5 of 5 (Performance & Polish) — COMPLETE
+Plan: 2 of 2 in current phase — ALL DONE
+Status: Project Complete
+Last activity: 2026-02-22 — Phase 5 complete, all requirements delivered
 
-Progress: [████████░░] 80%
+Progress: [██████████] 100%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 11
+- Total plans completed: 13
 - Average duration: 4 min
-- Total execution time: 0.62 hours
+- Total execution time: 0.73 hours
 
 **By Phase:**
 
@@ -31,9 +31,10 @@ Progress: [████████░░] 80%
 | 02-error-handling | 2 | 11 min | 5 min |
 | 03-developer-experience | 2 | 4 min | 2 min |
 | 04-build-system | 3 | 13 min | 4 min |
+| 05-performance-polish | 2 | 7 min | 3 min |
 
 **Recent Trend:**
-- Last 5 plans: 03-02 (2 min), 03-03 (2 min), 04-01 (4 min), 04-02 (8 min), 04-03 (1 min)
+- Last 5 plans: 04-01 (4 min), 04-02 (8 min), 04-03 (1 min), 05-01 (5 min), 05-02 (2 min)
 - Trend: Steady
 
 *Updated after each plan completion*
@@ -60,10 +61,13 @@ Recent decisions affecting current work:
 - [04-01]: Strip-shebang esbuild plugin for monolith bundling; packages:'external' keeps Node builtins as require(); bundle output to .bundle.cjs during proof-of-concept
 - [04-02]: 15-module split (6 lib + 7 commands + router + index); bin/gsd-tools.cjs now a build artifact from src/; variable shadowing fixes in extracted modules
 - [04-03]: Smoke test uses current-timestamp --raw; || true prevents set -e from aborting before rollback; src/ copied to dest for debug access
+- [05-01]: Plain Map cache instead of lru-cache — CLI processes are short-lived, no eviction needed; cachedReadFile is opt-in, safeReadFile unchanged
+- [05-01]: Batch grep splits fixed-string vs regex patterns into 1-2 calls max
+- [05-02]: context_window/context_target_percent as flat config keys with number type; CONFIG_SCHEMA single source of truth pattern continues
 
 ### Pending Todos
 
-None yet.
+None.
 
 ### Pre-existing Issues
 
@@ -77,5 +81,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-22
-Stopped at: Completed 04-03-PLAN.md (deploy.sh with build step and smoke test — Phase 4 complete)
+Stopped at: Project complete — all 5 phases delivered, 21 requirements satisfied, 153 tests passing
 Resume file: None

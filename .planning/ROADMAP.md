@@ -16,7 +16,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 2: Error Handling & Hardening** - Debug logging across 55 catch blocks, shell sanitization, temp file cleanup
 - [x] **Phase 3: Developer Experience & Discoverability** - --help support, 11 slash commands, config migration, workflow integrations
 - [x] **Phase 4: Build System & Module Split** - esbuild bundler pipeline, source split into src/, deploy.sh updated atomically
-- [ ] **Phase 5: Performance & Polish** - In-memory file cache, batch grep optimization, configurable context window
+- [x] **Phase 5: Performance & Polish** - In-memory file cache, batch grep optimization, configurable context window
 
 ## Phase Details
 
@@ -92,8 +92,8 @@ Plans:
   3. `cmdContextBudget()` reads `context_window` and `context_target_percent` from config.json, falling back to 200K/50% defaults when not configured
 **Plans**: 2/2 plans executed
 Plans:
-- [ ] 05-01-PLAN.md — In-memory file cache + batch grep optimization
-- [ ] 05-02-PLAN.md — Configurable context window
+- [x] 05-01-PLAN.md — In-memory file cache + batch grep optimization
+- [x] 05-02-PLAN.md — Configurable context window
 
 ## Progress
 
@@ -106,4 +106,4 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5
 | 2. Error Handling & Hardening | 2/2 | Complete | 2026-02-22 |
 | 3. Developer Experience & Discoverability | 3/3 | Complete | 2026-02-22 |
 | 4. Build System & Module Split | 3/3 | Complete | 2026-02-22 |
-| 5. Performance & Polish | 0/2 | Planned | - |
+| 5. Performance & Polish | 2/2 | Complete | 2026-02-22 |

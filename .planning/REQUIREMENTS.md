@@ -19,9 +19,9 @@ Requirements for this improvement pass. Each maps to roadmap phases.
 
 ### Performance
 
-- [ ] **PERF-01**: In-memory file cache — `Map`-based cache wrapping `safeRead()`, invalidated on write, lives for duration of single CLI invocation
-- [ ] **PERF-02**: Batch grep in `cmdCodebaseImpact()` — combine search patterns into single `grep -rl -e pat1 -e pat2` call instead of spawning per-pattern
-- [ ] **PERF-03**: Configurable context window — `cmdContextBudget()` reads `context_window` and `context_target_percent` from config.json with current 200K/50% as defaults
+- [x] **PERF-01**: In-memory file cache — `Map`-based cache wrapping `safeRead()`, invalidated on write, lives for duration of single CLI invocation
+- [x] **PERF-02**: Batch grep in `cmdCodebaseImpact()` — combine search patterns into single `grep -rl -e pat1 -e pat2` call instead of spawning per-pattern
+- [x] **PERF-03**: Configurable context window — `cmdContextBudget()` reads `context_window` and `context_target_percent` from config.json with current 200K/50% as defaults
 
 ### Developer Experience
 
@@ -89,9 +89,9 @@ Explicitly excluded. Documented to prevent scope creep.
 | FOUND-05 | Phase 1 | Complete |
 | FOUND-06 | Phase 2 | Complete |
 | FOUND-07 | Phase 2 | Complete |
-| PERF-01 | Phase 5 | Pending |
-| PERF-02 | Phase 5 | Pending |
-| PERF-03 | Phase 5 | Pending |
+| PERF-01 | Phase 5 | Complete |
+| PERF-02 | Phase 5 | Complete |
+| PERF-03 | Phase 5 | Complete |
 | DX-01 | Phase 3 | Complete |
 | DX-02 | Phase 3 | Complete |
 | DX-03 | Phase 3 | Complete |
