@@ -61,7 +61,11 @@ Plans:
   3. Running `execute-phase` workflow automatically validates phase dependencies before execution begins and warns on unmet dependencies
   4. Running `plan-phase` workflow automatically surfaces relevant lessons from previously completed phases
   5. Running `execute-plan` workflow warns agents when plan content exceeds the configured context window threshold
-**Plans**: TBD
+**Plans**: 3 plans
+Plans:
+- [ ] 03-01-PLAN.md — --help support + config migration command
+- [ ] 03-02-PLAN.md — 11 slash command files + execution visualization
+- [ ] 03-03-PLAN.md — Workflow integrations (validate-deps, search-lessons, context-budget)
 
 ### Phase 4: Build System & Module Split
 **Goal**: Source code lives in organized modules under src/ while the deployed artifact remains a single file — esbuild bundles everything, deploy.sh builds before copying, and a smoke test verifies the result
