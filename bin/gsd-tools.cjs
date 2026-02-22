@@ -1,9 +1,28 @@
 #!/usr/bin/env node
 "use strict";
+var __defProp = Object.defineProperty;
+var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
 var __getOwnPropNames = Object.getOwnPropertyNames;
+var __hasOwnProp = Object.prototype.hasOwnProperty;
+var __esm = (fn, res) => function __init() {
+  return fn && (res = (0, fn[__getOwnPropNames(fn)[0]])(fn = 0)), res;
+};
 var __commonJS = (cb, mod) => function __require() {
   return mod || (0, cb[__getOwnPropNames(cb)[0]])((mod = { exports: {} }).exports, mod), mod.exports;
 };
+var __export = (target, all) => {
+  for (var name in all)
+    __defProp(target, name, { get: all[name], enumerable: true });
+};
+var __copyProps = (to, from, except, desc) => {
+  if (from && typeof from === "object" || typeof from === "function") {
+    for (let key of __getOwnPropNames(from))
+      if (!__hasOwnProp.call(to, key) && key !== except)
+        __defProp(to, key, { get: () => from[key], enumerable: !(desc = __getOwnPropDesc(from, key)) || desc.enumerable });
+  }
+  return to;
+};
+var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
 
 // src/lib/constants.js
 var require_constants = __commonJS({
@@ -502,11 +521,52 @@ var require_output = __commonJS({
         }
       }
     });
+    function filterFields(obj, fields) {
+      if (obj === null || obj === void 0) return obj;
+      if (Array.isArray(obj)) {
+        return obj.map((item) => filterFields(item, fields));
+      }
+      if (typeof obj !== "object") return obj;
+      const result = {};
+      for (const field of fields) {
+        const parts = field.split(".");
+        if (parts.length === 1) {
+          result[field] = field in obj ? obj[field] : null;
+        } else {
+          const topKey = parts[0];
+          const rest = parts.slice(1).join(".");
+          if (!(topKey in obj)) {
+            result[topKey] = null;
+          } else {
+            const val = obj[topKey];
+            if (Array.isArray(val)) {
+              result[topKey] = val.map((item) => {
+                if (typeof item === "object" && item !== null) {
+                  return filterFields(item, [rest]);
+                }
+                return item;
+              });
+            } else if (typeof val === "object" && val !== null) {
+              const existing = result[topKey] || {};
+              const nested = filterFields(val, [rest]);
+              result[topKey] = typeof existing === "object" && !Array.isArray(existing) ? { ...existing, ...nested } : nested;
+            } else {
+              result[topKey] = val;
+            }
+          }
+        }
+      }
+      return result;
+    }
     function output(result, raw, rawValue) {
       if (raw && rawValue !== void 0) {
         process.stdout.write(String(rawValue));
       } else {
-        const json = JSON.stringify(result, null, 2);
+        let filtered = result;
+        if (global._gsdRequestedFields && typeof result === "object" && result !== null) {
+          filtered = filterFields(result, global._gsdRequestedFields);
+        }
+        const json = JSON.stringify(filtered, null, 2);
         if (json.length > 5e4) {
           const tmpPath = path.join(require("os").tmpdir(), `gsd-${Date.now()}.json`);
           fs.writeFileSync(tmpPath, json, "utf-8");
@@ -528,7 +588,7 @@ var require_output = __commonJS({
       if (err) line += ` | ${err.message || err}`;
       process.stderr.write(line + "\n");
     }
-    module2.exports = { _tmpFiles, output, error, debugLog };
+    module2.exports = { _tmpFiles, filterFields, output, error, debugLog };
   }
 });
 
@@ -1263,6 +1323,19 @@ var require_helpers = __commonJS({
         return { version: "v1.0", name: "milestone", phaseRange: null };
       }
     }
+    function extractAtReferences(content) {
+      if (!content || typeof content !== "string") return [];
+      const refs = /* @__PURE__ */ new Set();
+      const atPattern = /@((?:\/[\w.+\-/]+|\.[\w.+\-/]+|[\w][\w.+\-]*\/[\w.+\-/]+)(?:\.\w+)?)/g;
+      let match;
+      while ((match = atPattern.exec(content)) !== null) {
+        const ref = match[1];
+        if (ref.includes("/") && !ref.includes("@") && ref.length > 2) {
+          refs.add(ref);
+        }
+      }
+      return Array.from(refs);
+    }
     module2.exports = {
       safeReadFile,
       cachedReadFile,
@@ -1278,7 +1351,8 @@ var require_helpers = __commonJS({
       getRoadmapPhaseInternal,
       pathExistsInternal,
       generateSlugInternal,
-      getMilestoneInfo
+      getMilestoneInfo,
+      extractAtReferences
     };
   }
 });
@@ -3672,6 +3746,200 @@ var require_init = __commonJS({
   }
 });
 
+// node_modules/tokenx/dist/index.mjs
+var dist_exports = {};
+__export(dist_exports, {
+  approximateTokenSize: () => approximateTokenSize,
+  estimateTokenCount: () => estimateTokenCount,
+  isWithinTokenLimit: () => isWithinTokenLimit,
+  sliceByTokens: () => sliceByTokens,
+  splitByTokens: () => splitByTokens
+});
+function isWithinTokenLimit(text, tokenLimit, options) {
+  return estimateTokenCount(text, options) <= tokenLimit;
+}
+function estimateTokenCount(text, options = {}) {
+  if (!text) return 0;
+  const { defaultCharsPerToken = DEFAULT_CHARS_PER_TOKEN, languageConfigs = DEFAULT_LANGUAGE_CONFIGS } = options;
+  const segments = text.split(TOKEN_SPLIT_PATTERN).filter(Boolean);
+  let tokenCount = 0;
+  for (const segment of segments) tokenCount += estimateSegmentTokens(segment, languageConfigs, defaultCharsPerToken);
+  return tokenCount;
+}
+function sliceByTokens(text, start = 0, end, options = {}) {
+  if (!text) return "";
+  const { defaultCharsPerToken = DEFAULT_CHARS_PER_TOKEN, languageConfigs = DEFAULT_LANGUAGE_CONFIGS } = options;
+  let totalTokens = 0;
+  if (start < 0 || end !== void 0 && end < 0) totalTokens = estimateTokenCount(text, options);
+  const normalizedStart = start < 0 ? Math.max(0, totalTokens + start) : Math.max(0, start);
+  const normalizedEnd = end === void 0 ? Infinity : end < 0 ? Math.max(0, totalTokens + end) : end;
+  if (normalizedStart >= normalizedEnd) return "";
+  const segments = text.split(TOKEN_SPLIT_PATTERN).filter(Boolean);
+  const parts = [];
+  let currentTokenPos = 0;
+  for (const segment of segments) {
+    if (currentTokenPos >= normalizedEnd) break;
+    const tokenCount = estimateSegmentTokens(segment, languageConfigs, defaultCharsPerToken);
+    const extracted = extractSegmentPart(segment, currentTokenPos, tokenCount, normalizedStart, normalizedEnd);
+    if (extracted) parts.push(extracted);
+    currentTokenPos += tokenCount;
+  }
+  return parts.join("");
+}
+function splitByTokens(text, tokensPerChunk, options = {}) {
+  if (!text || tokensPerChunk <= 0) return [];
+  const { defaultCharsPerToken = DEFAULT_CHARS_PER_TOKEN, languageConfigs = DEFAULT_LANGUAGE_CONFIGS, overlap = 0 } = options;
+  const segments = text.split(TOKEN_SPLIT_PATTERN).filter(Boolean);
+  const chunks = [];
+  let currentChunk = [];
+  let currentTokenCount = 0;
+  for (const segment of segments) {
+    const tokenCount = estimateSegmentTokens(segment, languageConfigs, defaultCharsPerToken);
+    currentChunk.push(segment);
+    currentTokenCount += tokenCount;
+    if (currentTokenCount >= tokensPerChunk) {
+      chunks.push(currentChunk.join(""));
+      if (overlap > 0) {
+        const overlapSegments = [];
+        let overlapTokenCount = 0;
+        for (let i = currentChunk.length - 1; i >= 0 && overlapTokenCount < overlap; i--) {
+          const segmentValue = currentChunk[i];
+          const tokCount = estimateSegmentTokens(segmentValue, languageConfigs, defaultCharsPerToken);
+          overlapSegments.unshift(segmentValue);
+          overlapTokenCount += tokCount;
+        }
+        currentChunk = overlapSegments;
+        currentTokenCount = overlapTokenCount;
+      } else {
+        currentChunk = [];
+        currentTokenCount = 0;
+      }
+    }
+  }
+  if (currentChunk.length > 0) chunks.push(currentChunk.join(""));
+  return chunks;
+}
+function estimateSegmentTokens(segment, languageConfigs, defaultCharsPerToken) {
+  if (PATTERNS.whitespace.test(segment)) return 0;
+  if (PATTERNS.cjk.test(segment)) return getCharacterCount(segment);
+  if (PATTERNS.numeric.test(segment)) return 1;
+  if (segment.length <= SHORT_TOKEN_THRESHOLD) return 1;
+  if (PATTERNS.punctuation.test(segment)) return segment.length > 1 ? Math.ceil(segment.length / 2) : 1;
+  if (PATTERNS.alphanumeric.test(segment)) {
+    const charsPerToken$1 = getLanguageSpecificCharsPerToken(segment, languageConfigs) ?? defaultCharsPerToken;
+    return Math.ceil(segment.length / charsPerToken$1);
+  }
+  const charsPerToken = getLanguageSpecificCharsPerToken(segment, languageConfigs) ?? defaultCharsPerToken;
+  return Math.ceil(segment.length / charsPerToken);
+}
+function getLanguageSpecificCharsPerToken(segment, languageConfigs) {
+  for (const config of languageConfigs) if (config.pattern.test(segment)) return config.averageCharsPerToken;
+}
+function getCharacterCount(text) {
+  return Array.from(text).length;
+}
+function extractSegmentPart(segment, segmentTokenStart, segmentTokenCount, targetStart, targetEnd) {
+  if (segmentTokenCount === 0) return segmentTokenStart >= targetStart && segmentTokenStart < targetEnd ? segment : "";
+  const segmentTokenEnd = segmentTokenStart + segmentTokenCount;
+  if (segmentTokenStart >= targetEnd || segmentTokenEnd <= targetStart) return "";
+  const overlapStart = Math.max(0, targetStart - segmentTokenStart);
+  const overlapEnd = Math.min(segmentTokenCount, targetEnd - segmentTokenStart);
+  if (overlapStart === 0 && overlapEnd === segmentTokenCount) return segment;
+  const charStart = Math.floor(overlapStart / segmentTokenCount * segment.length);
+  const charEnd = Math.ceil(overlapEnd / segmentTokenCount * segment.length);
+  return segment.slice(charStart, charEnd);
+}
+var PATTERNS, TOKEN_SPLIT_PATTERN, DEFAULT_CHARS_PER_TOKEN, SHORT_TOKEN_THRESHOLD, DEFAULT_LANGUAGE_CONFIGS, approximateTokenSize;
+var init_dist = __esm({
+  "node_modules/tokenx/dist/index.mjs"() {
+    PATTERNS = {
+      whitespace: /^\s+$/,
+      cjk: /[\u4E00-\u9FFF\u3400-\u4DBF\u3000-\u303F\uFF00-\uFFEF\u30A0-\u30FF\u2E80-\u2EFF\u31C0-\u31EF\u3200-\u32FF\u3300-\u33FF\uAC00-\uD7AF\u1100-\u11FF\u3130-\u318F\uA960-\uA97F\uD7B0-\uD7FF]/,
+      numeric: /^\d+(?:[.,]\d+)*$/,
+      punctuation: /[.,!?;(){}[\]<>:/\\|@#$%^&*+=`~_-]/,
+      alphanumeric: /^[a-zA-Z0-9\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u00FF]+$/
+    };
+    TOKEN_SPLIT_PATTERN = /* @__PURE__ */ new RegExp(`(\\s+|${PATTERNS.punctuation.source}+)`);
+    DEFAULT_CHARS_PER_TOKEN = 6;
+    SHORT_TOKEN_THRESHOLD = 3;
+    DEFAULT_LANGUAGE_CONFIGS = [
+      {
+        pattern: /[äöüßẞ]/i,
+        averageCharsPerToken: 3
+      },
+      {
+        pattern: /[éèêëàâîïôûùüÿçœæáíóúñ]/i,
+        averageCharsPerToken: 3
+      },
+      {
+        pattern: /[ąćęłńóśźżěščřžýůúďťň]/i,
+        averageCharsPerToken: 3.5
+      }
+    ];
+    approximateTokenSize = estimateTokenCount;
+  }
+});
+
+// src/lib/context.js
+var require_context = __commonJS({
+  "src/lib/context.js"(exports2, module2) {
+    "use strict";
+    var { debugLog } = require_output();
+    var _estimateTokenCount = null;
+    function getTokenizer() {
+      if (_estimateTokenCount !== null) return _estimateTokenCount;
+      try {
+        const tokenx = (init_dist(), __toCommonJS(dist_exports));
+        _estimateTokenCount = tokenx.estimateTokenCount;
+        debugLog("context.tokenizer", "tokenx loaded successfully");
+      } catch (e) {
+        debugLog("context.tokenizer", "tokenx load failed, using fallback", e);
+        _estimateTokenCount = (text) => Math.ceil(String(text).length / 4);
+      }
+      return _estimateTokenCount;
+    }
+    function estimateTokens(text) {
+      if (!text || typeof text !== "string") return 0;
+      try {
+        const fn = getTokenizer();
+        return fn(text);
+      } catch (e) {
+        debugLog("context.estimateTokens", "estimation failed, using fallback", e);
+        return Math.ceil(text.length / 4);
+      }
+    }
+    function estimateJsonTokens(obj) {
+      if (obj === void 0 || obj === null) return 0;
+      try {
+        return estimateTokens(JSON.stringify(obj));
+      } catch (e) {
+        debugLog("context.estimateJsonTokens", "stringify failed", e);
+        return 0;
+      }
+    }
+    function checkBudget(tokens, config = {}) {
+      const contextWindow = config.context_window || 2e5;
+      const targetPercent = config.context_target_percent || 50;
+      const percent = Math.round(tokens / contextWindow * 100);
+      const warning = percent > targetPercent;
+      let recommendation = null;
+      if (percent > 80) {
+        recommendation = "Critical: exceeds 80% of context window. Split into smaller units.";
+      } else if (percent > 60) {
+        recommendation = "High: exceeds 60% of context window. Consider reducing scope.";
+      } else if (percent > targetPercent) {
+        recommendation = `Above target: exceeds ${targetPercent}% target. Monitor closely.`;
+      }
+      return { tokens, percent, warning, recommendation };
+    }
+    function isWithinBudget(text, config = {}) {
+      const tokens = estimateTokens(text);
+      return checkBudget(tokens, config);
+    }
+    module2.exports = { estimateTokens, estimateJsonTokens, checkBudget, isWithinBudget };
+  }
+});
+
 // src/commands/features.js
 var require_features = __commonJS({
   "src/commands/features.js"(exports2, module2) {
@@ -3685,6 +3953,7 @@ var require_features = __commonJS({
     var { safeReadFile, findPhaseInternal, getArchivedPhaseDirs, normalizePhaseName, isValidDateString, sanitizeShellArg, getMilestoneInfo } = require_helpers();
     var { extractFrontmatter } = require_frontmatter();
     var { execGit } = require_git();
+    var { estimateTokens, estimateJsonTokens, checkBudget } = require_context();
     function cmdSessionDiff(cwd, raw) {
       let since = null;
       try {
@@ -3772,6 +4041,8 @@ var require_features = __commonJS({
       const fm = extractFrontmatter(content);
       const filesModified = fm.files_modified || [];
       let totalLines = 0;
+      let fileReadTokens = 0;
+      let heuristicFileReadTokens = 0;
       let existingFiles = 0;
       let newFiles = 0;
       const fileDetails = [];
@@ -3782,24 +4053,28 @@ var require_features = __commonJS({
           try {
             const fileContent = fs.readFileSync(fullPath, "utf-8");
             const lines = fileContent.split("\n").length;
+            const tokens = estimateTokens(fileContent);
             totalLines += lines;
-            fileDetails.push({ path: file, lines, exists: true });
+            fileReadTokens += tokens;
+            heuristicFileReadTokens += lines * 4;
+            fileDetails.push({ path: file, lines, tokens, exists: true });
           } catch (e) {
             debugLog("feature.contextBudget", "read failed", e);
-            fileDetails.push({ path: file, lines: 0, exists: true, error: "unreadable" });
+            fileDetails.push({ path: file, lines: 0, tokens: 0, exists: true, error: "unreadable" });
           }
         } else {
           newFiles++;
-          fileDetails.push({ path: file, lines: 0, exists: false });
+          fileDetails.push({ path: file, lines: 0, tokens: 0, exists: false });
         }
       }
       const taskMatches = content.match(/<task\s/gi) || [];
       const taskCount = taskMatches.length;
-      const planTokens = content.split("\n").length * 4;
-      const fileReadTokens = totalLines * 4;
+      const planTokens = estimateTokens(content);
+      const heuristicPlanTokens = content.split("\n").length * 4;
       const executionTokens = taskCount * 3500;
       const testTokens = taskCount * 750;
       const totalEstimate = planTokens + fileReadTokens + executionTokens + testTokens;
+      const heuristicTotal = heuristicPlanTokens + heuristicFileReadTokens + executionTokens + testTokens;
       const config = loadConfig(cwd);
       const contextWindow = config.context_window || 2e5;
       const targetPercent = config.context_target_percent || 50;
@@ -3836,6 +4111,7 @@ var require_features = __commonJS({
           execution_tokens: executionTokens,
           test_tokens: testTokens,
           total_tokens: totalEstimate,
+          heuristic_tokens: heuristicTotal,
           context_window: contextWindow,
           context_percent: estimatedPercent,
           target_percent: targetPercent
@@ -4590,9 +4866,231 @@ var require_features = __commonJS({
         tasks: quickTasks
       }, raw);
     }
+    var { extractAtReferences } = require_helpers();
+    function measureAllWorkflows(cwd) {
+      let pluginDir = process.env.GSD_PLUGIN_DIR;
+      if (!pluginDir) {
+        pluginDir = path.resolve(__dirname, "..");
+      }
+      const workflowsDir = path.join(pluginDir, "workflows");
+      if (!fs.existsSync(workflowsDir)) {
+        return { error: `Workflows directory not found: ${workflowsDir}`, workflows: [] };
+      }
+      const workflowFiles = fs.readdirSync(workflowsDir).filter((f) => f.endsWith(".md")).sort();
+      const workflows = [];
+      let totalTokens = 0;
+      for (const file of workflowFiles) {
+        const filePath = path.join(workflowsDir, file);
+        let content;
+        try {
+          content = fs.readFileSync(filePath, "utf-8");
+        } catch (e) {
+          debugLog("baseline.measure", `read workflow failed: ${file}`, e);
+          continue;
+        }
+        const workflowTokens = estimateTokens(content);
+        const refs = extractAtReferences(content);
+        let refTokens = 0;
+        let resolvedRefs = 0;
+        for (const ref of refs) {
+          let refPath;
+          if (path.isAbsolute(ref)) {
+            refPath = ref;
+          } else {
+            const pluginRef = path.join(pluginDir, ref);
+            const cwdRef = path.join(cwd, ref);
+            if (fs.existsSync(pluginRef)) {
+              refPath = pluginRef;
+            } else if (fs.existsSync(cwdRef)) {
+              refPath = cwdRef;
+            } else {
+              continue;
+            }
+          }
+          try {
+            const refContent = fs.readFileSync(refPath, "utf-8");
+            refTokens += estimateTokens(refContent);
+            resolvedRefs++;
+          } catch (e) {
+            debugLog("baseline.measure", `read ref failed: ${ref}`, e);
+          }
+        }
+        const total = workflowTokens + refTokens;
+        totalTokens += total;
+        workflows.push({
+          name: file,
+          workflow_tokens: workflowTokens,
+          ref_count: resolvedRefs,
+          ref_tokens: refTokens,
+          total_tokens: total
+        });
+      }
+      workflows.sort((a, b) => b.total_tokens - a.total_tokens);
+      return {
+        timestamp: (/* @__PURE__ */ new Date()).toISOString(),
+        workflow_count: workflows.length,
+        total_tokens: totalTokens,
+        workflows
+      };
+    }
+    function cmdContextBudgetBaseline(cwd, raw) {
+      const measurement = measureAllWorkflows(cwd);
+      if (measurement.error) {
+        error(measurement.error);
+      }
+      const baselinesDir = path.join(cwd, ".planning", "baselines");
+      if (!fs.existsSync(baselinesDir)) {
+        fs.mkdirSync(baselinesDir, { recursive: true });
+      }
+      const timestamp = (/* @__PURE__ */ new Date()).toISOString().replace(/[:.]/g, "-");
+      const baselinePath = path.join(baselinesDir, `baseline-${timestamp}.json`);
+      fs.writeFileSync(baselinePath, JSON.stringify(measurement, null, 2), "utf-8");
+      const maxNameLen = Math.max(25, ...measurement.workflows.map((w) => w.name.length));
+      const header = `${"Workflow".padEnd(maxNameLen)} | Tokens  | Refs | Ref Tokens | Total`;
+      const sep = "-".repeat(maxNameLen) + "-|---------|------|------------|--------";
+      process.stderr.write("\n## Workflow Token Baseline\n\n");
+      process.stderr.write(header + "\n");
+      process.stderr.write(sep + "\n");
+      for (const w of measurement.workflows) {
+        const name = w.name.padEnd(maxNameLen);
+        const tokens = String(w.workflow_tokens).padStart(7);
+        const refs = String(w.ref_count).padStart(4);
+        const refTokens = String(w.ref_tokens).padStart(10);
+        const total = String(w.total_tokens).padStart(7);
+        process.stderr.write(`${name} | ${tokens} | ${refs} | ${refTokens} | ${total}
+`);
+      }
+      process.stderr.write(sep + "\n");
+      process.stderr.write(`${"TOTAL".padEnd(maxNameLen)} | ${String(measurement.total_tokens).padStart(7)} |      |            |
+`);
+      process.stderr.write(`
+Baseline saved: ${path.relative(cwd, baselinePath)}
+
+`);
+      output(measurement, raw);
+    }
+    function cmdContextBudgetCompare(cwd, baselinePath, raw) {
+      let baseline;
+      const baselinesDir = path.join(cwd, ".planning", "baselines");
+      if (baselinePath) {
+        const fullPath = path.isAbsolute(baselinePath) ? baselinePath : path.join(cwd, baselinePath);
+        if (!fs.existsSync(fullPath)) {
+          error(`Baseline file not found: ${baselinePath}`);
+        }
+        try {
+          baseline = JSON.parse(fs.readFileSync(fullPath, "utf-8"));
+        } catch (e) {
+          error(`Invalid baseline file: ${e.message}`);
+        }
+      } else {
+        if (!fs.existsSync(baselinesDir)) {
+          error("No baselines directory. Run `context-budget baseline` first.");
+        }
+        const files = fs.readdirSync(baselinesDir).filter((f) => f.startsWith("baseline-") && f.endsWith(".json")).sort().reverse();
+        if (files.length === 0) {
+          error("No baseline found. Run `context-budget baseline` first.");
+        }
+        const latestFile = path.join(baselinesDir, files[0]);
+        try {
+          baseline = JSON.parse(fs.readFileSync(latestFile, "utf-8"));
+          baselinePath = path.relative(cwd, latestFile);
+        } catch (e) {
+          error(`Invalid baseline file: ${e.message}`);
+        }
+      }
+      const current = measureAllWorkflows(cwd);
+      if (current.error) {
+        error(current.error);
+      }
+      const baselineMap = {};
+      for (const w of baseline.workflows || []) {
+        baselineMap[w.name] = w;
+      }
+      const currentMap = {};
+      for (const w of current.workflows) {
+        currentMap[w.name] = w;
+      }
+      const allNames = /* @__PURE__ */ new Set([...Object.keys(baselineMap), ...Object.keys(currentMap)]);
+      const comparisons = [];
+      let beforeTotal = 0;
+      let afterTotal = 0;
+      let improved = 0;
+      let unchanged = 0;
+      let worsened = 0;
+      for (const name of allNames) {
+        const before = baselineMap[name];
+        const after = currentMap[name];
+        if (before && after) {
+          const delta = after.total_tokens - before.total_tokens;
+          const pctChange = before.total_tokens > 0 ? Math.round(delta / before.total_tokens * 1e3) / 10 : 0;
+          beforeTotal += before.total_tokens;
+          afterTotal += after.total_tokens;
+          if (delta < 0) improved++;
+          else if (delta > 0) worsened++;
+          else unchanged++;
+          comparisons.push({ name, before: before.total_tokens, after: after.total_tokens, delta, percent_change: pctChange });
+        } else if (before && !after) {
+          beforeTotal += before.total_tokens;
+          comparisons.push({ name, before: before.total_tokens, after: 0, delta: -before.total_tokens, percent_change: -100, status: "removed" });
+          improved++;
+        } else if (!before && after) {
+          afterTotal += after.total_tokens;
+          comparisons.push({ name, before: 0, after: after.total_tokens, delta: after.total_tokens, percent_change: 100, status: "new" });
+          worsened++;
+        }
+      }
+      comparisons.sort((a, b) => a.delta - b.delta);
+      const totalDelta = afterTotal - beforeTotal;
+      const totalPctChange = beforeTotal > 0 ? Math.round(totalDelta / beforeTotal * 1e3) / 10 : 0;
+      const result = {
+        baseline_file: baselinePath || "unknown",
+        baseline_date: baseline.timestamp || "unknown",
+        current_date: current.timestamp,
+        summary: {
+          before_total: beforeTotal,
+          after_total: afterTotal,
+          delta: totalDelta,
+          percent_change: totalPctChange,
+          workflows_improved: improved,
+          workflows_unchanged: unchanged,
+          workflows_worsened: worsened
+        },
+        workflows: comparisons
+      };
+      const maxNameLen = Math.max(25, ...comparisons.map((c) => c.name.length));
+      const header = `${"Workflow".padEnd(maxNameLen)} | Before  | After   | Delta   | Change`;
+      const sep = "-".repeat(maxNameLen) + "-|---------|---------|---------|-------";
+      process.stderr.write("\n## Context Budget Comparison\n\n");
+      process.stderr.write(`Baseline: ${baselinePath} (${baseline.timestamp || "unknown"})
+
+`);
+      process.stderr.write(header + "\n");
+      process.stderr.write(sep + "\n");
+      for (const c of comparisons) {
+        const name = c.name.padEnd(maxNameLen);
+        const before = String(c.before).padStart(7);
+        const after = String(c.after).padStart(7);
+        const delta = (c.delta >= 0 ? "+" + c.delta : String(c.delta)).padStart(7);
+        const pct = (c.percent_change >= 0 ? "+" + c.percent_change : String(c.percent_change)) + "%";
+        process.stderr.write(`${name} | ${before} | ${after} | ${delta} | ${pct.padStart(6)}
+`);
+      }
+      process.stderr.write(sep + "\n");
+      const totalDeltaStr = (totalDelta >= 0 ? "+" + totalDelta : String(totalDelta)).padStart(7);
+      const totalPctStr = (totalPctChange >= 0 ? "+" + totalPctChange : String(totalPctChange)) + "%";
+      process.stderr.write(`${"TOTAL".padEnd(maxNameLen)} | ${String(beforeTotal).padStart(7)} | ${String(afterTotal).padStart(7)} | ${totalDeltaStr} | ${totalPctStr.padStart(6)}
+`);
+      process.stderr.write(`
+Improved: ${improved} | Unchanged: ${unchanged} | Worsened: ${worsened}
+
+`);
+      output(result, raw);
+    }
     module2.exports = {
       cmdSessionDiff,
       cmdContextBudget,
+      cmdContextBudgetBaseline,
+      cmdContextBudgetCompare,
       cmdTestRun,
       cmdSearchDecisions,
       cmdValidateDependencies,
@@ -5966,6 +6464,8 @@ var require_router = __commonJS({
     var {
       cmdSessionDiff,
       cmdContextBudget,
+      cmdContextBudgetBaseline,
+      cmdContextBudgetCompare,
       cmdTestRun,
       cmdSearchDecisions,
       cmdValidateDependencies,
@@ -6010,6 +6510,15 @@ var require_router = __commonJS({
       const rawIndex = args.indexOf("--raw");
       const raw = rawIndex !== -1;
       if (rawIndex !== -1) args.splice(rawIndex, 1);
+      const fieldsIdx = args.indexOf("--fields");
+      if (fieldsIdx !== -1) {
+        const fieldsValue = args[fieldsIdx + 1];
+        const requestedFields = fieldsValue ? fieldsValue.split(",") : null;
+        args.splice(fieldsIdx, 2);
+        if (requestedFields) {
+          global._gsdRequestedFields = requestedFields;
+        }
+      }
       const command = args[0];
       const cwd = process.cwd();
       if (!command) {
@@ -6122,14 +6631,14 @@ var require_router = __commonJS({
             const nameIdx = args.indexOf("--name");
             const typeIdx = args.indexOf("--type");
             const waveIdx = args.indexOf("--wave");
-            const fieldsIdx = args.indexOf("--fields");
+            const fieldsIdx2 = args.indexOf("--fields");
             cmdTemplateFill(cwd, templateType, {
               phase: phaseIdx !== -1 ? args[phaseIdx + 1] : null,
               plan: planIdx !== -1 ? args[planIdx + 1] : null,
               name: nameIdx !== -1 ? args[nameIdx + 1] : null,
               type: typeIdx !== -1 ? args[typeIdx + 1] : "execute",
               wave: waveIdx !== -1 ? args[waveIdx + 1] : "1",
-              fields: fieldsIdx !== -1 ? JSON.parse(args[fieldsIdx + 1]) : {}
+              fields: fieldsIdx2 !== -1 ? JSON.parse(args[fieldsIdx2 + 1]) : {}
             }, raw);
           } else {
             error("Unknown template subcommand. Available: select, fill");
@@ -6400,7 +6909,14 @@ Available: execute-phase, plan-phase, new-project, new-milestone, quick, resume,
           break;
         }
         case "context-budget": {
-          cmdContextBudget(cwd, args[1], raw);
+          const subcommand = args[1];
+          if (subcommand === "baseline") {
+            cmdContextBudgetBaseline(cwd, raw);
+          } else if (subcommand === "compare") {
+            cmdContextBudgetCompare(cwd, args[2], raw);
+          } else {
+            cmdContextBudget(cwd, subcommand, raw);
+          }
           break;
         }
         case "test-run": {
