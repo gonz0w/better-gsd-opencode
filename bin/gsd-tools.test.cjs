@@ -1190,6 +1190,126 @@ describe('init commands', () => {
     assert.strictEqual(output.context_path, undefined);
     assert.strictEqual(output.research_path, undefined);
   });
+
+  // --compact flag tests
+
+  test('init commands return full output without --compact (backward compat)', () => {
+    const result = runGsdTools('init progress --raw', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    // Full output must have model names, static paths, existence booleans
+    assert.ok('state_path' in output, 'full output has state_path');
+    assert.ok('roadmap_path' in output, 'full output has roadmap_path');
+    assert.ok('project_path' in output, 'full output has project_path');
+    assert.ok('config_path' in output, 'full output has config_path');
+    assert.ok('state_exists' in output, 'full output has state_exists');
+    assert.ok('roadmap_exists' in output, 'full output has roadmap_exists');
+    assert.ok('executor_model' in output, 'full output has executor_model');
+    assert.ok('planner_model' in output, 'full output has planner_model');
+    assert.ok('commit_docs' in output, 'full output has commit_docs');
+  });
+
+  test('init progress --compact returns essential-only fields', () => {
+    const result = runGsdTools('init progress --compact --raw', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    // Must have essential keys
+    assert.ok('milestone_version' in output, 'compact has milestone_version');
+    assert.ok('phases' in output, 'compact has phases');
+    assert.ok('phase_count' in output, 'compact has phase_count');
+    assert.ok('completed_count' in output, 'compact has completed_count');
+    assert.ok('current_phase' in output, 'compact has current_phase');
+    assert.ok('session_diff' in output, 'compact has session_diff');
+
+    // Must NOT have dropped keys
+    assert.strictEqual(output.executor_model, undefined, 'compact drops executor_model');
+    assert.strictEqual(output.planner_model, undefined, 'compact drops planner_model');
+    assert.strictEqual(output.state_path, undefined, 'compact drops state_path');
+    assert.strictEqual(output.roadmap_path, undefined, 'compact drops roadmap_path');
+    assert.strictEqual(output.commit_docs, undefined, 'compact drops commit_docs');
+    assert.strictEqual(output.state_exists, undefined, 'compact drops state_exists');
+    assert.strictEqual(output.project_path, undefined, 'compact drops project_path');
+  });
+
+  test('--compact reduces init output size by at least 38%', () => {
+    // Use 3 commands that reliably exceed 38% reduction
+    const phaseDir = path.join(tmpDir, '.planning', 'phases', '03-api');
+    fs.mkdirSync(phaseDir, { recursive: true });
+    fs.writeFileSync(path.join(phaseDir, '03-01-PLAN.md'), '# Plan');
+    fs.writeFileSync(path.join(phaseDir, '03-CONTEXT.md'), '# Context');
+    fs.writeFileSync(path.join(phaseDir, '03-RESEARCH.md'), '# Research');
+
+    const commands = [
+      'init execute-phase 03',
+      'init plan-phase 03',
+      'init new-milestone',
+    ];
+
+    for (const cmd of commands) {
+      const full = runGsdTools(`${cmd} --raw`, tmpDir);
+      const compact = runGsdTools(`${cmd} --compact --raw`, tmpDir);
+      assert.ok(full.success, `Full ${cmd} failed: ${full.error}`);
+      assert.ok(compact.success, `Compact ${cmd} failed: ${compact.error}`);
+
+      const fullSize = Buffer.byteLength(full.output, 'utf8');
+      const compactSize = Buffer.byteLength(compact.output, 'utf8');
+      const reduction = (1 - compactSize / fullSize) * 100;
+
+      assert.ok(
+        reduction >= 38,
+        `${cmd}: expected >=38% reduction, got ${reduction.toFixed(1)}% (full=${fullSize}, compact=${compactSize})`
+      );
+    }
+  });
+
+  test('--compact and --fields can be used together', () => {
+    const result = runGsdTools('init progress --compact --fields milestone_version,phase_count --raw', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    const keys = Object.keys(output);
+    assert.strictEqual(keys.length, 2, `expected 2 fields, got ${keys.length}: ${keys.join(', ')}`);
+    assert.ok('milestone_version' in output, 'has milestone_version');
+    assert.ok('phase_count' in output, 'has phase_count');
+  });
+
+  test('all init commands accept --compact without error', () => {
+    // Set up phase dir for commands that need one
+    const phaseDir = path.join(tmpDir, '.planning', 'phases', '03-api');
+    fs.mkdirSync(phaseDir, { recursive: true });
+    fs.writeFileSync(path.join(phaseDir, '03-01-PLAN.md'), '# Plan');
+
+    const commands = [
+      'init progress',
+      'init execute-phase 03',
+      'init plan-phase 03',
+      'init new-project',
+      'init new-milestone',
+      'init resume',
+      'init verify-work 03',
+      'init phase-op 03',
+      'init milestone-op',
+      'init map-codebase',
+      'init quick "test task"',
+      'init todos',
+    ];
+
+    for (const cmd of commands) {
+      const result = runGsdTools(`${cmd} --compact --raw`, tmpDir);
+      assert.ok(result.success, `${cmd} --compact failed: ${result.error}`);
+
+      // Verify it returns valid JSON
+      let parsed;
+      try {
+        parsed = JSON.parse(result.output);
+      } catch (e) {
+        assert.fail(`${cmd} --compact did not return valid JSON: ${result.output.substring(0, 100)}`);
+      }
+      assert.ok(typeof parsed === 'object' && parsed !== null, `${cmd} --compact returned non-object`);
+    }
+  });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
