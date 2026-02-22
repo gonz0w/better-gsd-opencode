@@ -32,7 +32,7 @@ async function build() {
     platform: 'node',
     format: 'cjs',
     target: 'node18',
-    packages: 'external',  // Don't bundle node built-ins
+    external: ['node:*', 'child_process', 'fs', 'path', 'os', 'crypto', 'util', 'stream', 'events', 'buffer', 'url', 'querystring', 'http', 'https', 'net', 'tls', 'zlib'],  // Bundle npm deps (tokenx), externalize Node.js built-ins only
     banner: {
       js: '#!/usr/bin/env node',
     },
