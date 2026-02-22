@@ -29,8 +29,8 @@ Requirements for context reduction and tech debt cleanup. Each maps to roadmap p
 ### Tech Debt
 
 - [ ] **DEBT-01**: `roadmap analyze` test passes (fix expected vs actual percentage)
-- [ ] **DEBT-02**: All 79 commands have `--help` text
-- [ ] **DEBT-03**: Plan template files exist in `templates/plans/` for common patterns
+- [ ] **DEBT-02**: All 44 top-level commands have `--help` text and no-command usage string is complete
+- [ ] **DEBT-03**: Generic plan template files exist in `templates/plans/` (execute, tdd, discovery)
 
 ## Future Requirements
 
