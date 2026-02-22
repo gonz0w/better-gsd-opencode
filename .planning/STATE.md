@@ -10,9 +10,9 @@ See: .planning/PROJECT.md (updated 2026-02-22)
 ## Current Position
 
 Phase: 7 of 9 (Init Command Compaction) — COMPLETE
-Plan: 2 of 2
-Status: Phase complete — all plans executed
-Last activity: 2026-02-22 — Plan 07-02 executed (context manifests for compact init)
+Plan: 3 of 3
+Status: Phase complete — all plans executed (including gap closure plan 03)
+Last activity: 2026-02-22 — Plan 07-03 executed (split --manifest flag, gap closure)
 
 Progress: [█████░░░░░] 50% (2/4 phases)
 
@@ -34,6 +34,7 @@ v1.1 decisions:
 - Compact profiles drop model names, commit_docs, static file paths, redundant existence booleans
 - Context manifests built dynamically — only reference files that exist on disk
 - Manifest entries use path/sections/required structure for selective section loading
+- Split --compact into --compact (fields only, 46.7% avg reduction) + --manifest (opt-in guidance) to fix manifest overhead gap
 
 ### Pending Todos
 
@@ -50,5 +51,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-02-22
-Stopped at: Completed 07-02-PLAN.md (context manifests for compact init)
+Stopped at: Completed 07-03-PLAN.md (split --manifest flag, gap closure)
 Resume file: None
