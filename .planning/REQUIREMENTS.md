@@ -17,7 +17,7 @@ Requirements for context reduction and tech debt cleanup. Each maps to roadmap p
 
 - [x] **CLIP-01**: User can pass `--fields` flag to any JSON command to return only specified fields
 - [x] **CLIP-02**: Init commands support `--compact` flag returning essential-only data (38-50% smaller)
-- [ ] **CLIP-03**: Init commands return context manifests telling agents which files/sections to load
+- [x] **CLIP-03**: Init commands return context manifests telling agents which files/sections to load
 
 ### Workflow Compression
 
@@ -66,7 +66,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | MEAS-03 | Phase 6: Token Measurement & Output Infrastructure | ✅ Complete |
 | CLIP-01 | Phase 6: Token Measurement & Output Infrastructure | ✅ Complete |
 | CLIP-02 | Phase 7: Init Command Compaction | ✅ Complete |
-| CLIP-03 | Phase 7: Init Command Compaction | Pending |
+| CLIP-03 | Phase 7: Init Command Compaction | Complete |
 | WKFL-01 | Phase 8: Workflow & Reference Compression | Pending |
 | WKFL-02 | Phase 8: Workflow & Reference Compression | Pending |
 | WKFL-03 | Phase 8: Workflow & Reference Compression | Pending |
