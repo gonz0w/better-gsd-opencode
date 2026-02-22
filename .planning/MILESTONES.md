@@ -1,6 +1,20 @@
 # Milestones
 
-## v1.0 Performance & Quality (Shipped: 2026-02-22)
+## 🔵 v1.1 Context Reduction & Tech Debt (Active)
+
+**Goal:** Reduce token/context consumption across all GSD layers by 30%+ while resolving remaining tech debt.
+**Phases:** 6-9 (4 phases)
+**Requirements:** 13 (MEAS-01–03, CLIP-01–03, WKFL-01–04, DEBT-01–03)
+
+**Phase overview:**
+- Phase 6: Token Measurement & Output Infrastructure
+- Phase 7: Init Command Compaction
+- Phase 8: Workflow & Reference Compression
+- Phase 9: Tech Debt Cleanup
+
+---
+
+## ✅ v1.0 Performance & Quality (Shipped: 2026-02-22)
 
 **Phases completed:** 5 phases, 14 plans
 **Commits:** 63 | **Files changed:** 86 | **Lines:** +24,142 / -5,143

@@ -61,25 +61,25 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| MEAS-01 | — | Pending |
-| MEAS-02 | — | Pending |
-| MEAS-03 | — | Pending |
-| CLIP-01 | — | Pending |
-| CLIP-02 | — | Pending |
-| CLIP-03 | — | Pending |
-| WKFL-01 | — | Pending |
-| WKFL-02 | — | Pending |
-| WKFL-03 | — | Pending |
-| WKFL-04 | — | Pending |
-| DEBT-01 | — | Pending |
-| DEBT-02 | — | Pending |
-| DEBT-03 | — | Pending |
+| MEAS-01 | Phase 6: Token Measurement & Output Infrastructure | Pending |
+| MEAS-02 | Phase 6: Token Measurement & Output Infrastructure | Pending |
+| MEAS-03 | Phase 6: Token Measurement & Output Infrastructure | Pending |
+| CLIP-01 | Phase 6: Token Measurement & Output Infrastructure | Pending |
+| CLIP-02 | Phase 7: Init Command Compaction | Pending |
+| CLIP-03 | Phase 7: Init Command Compaction | Pending |
+| WKFL-01 | Phase 8: Workflow & Reference Compression | Pending |
+| WKFL-02 | Phase 8: Workflow & Reference Compression | Pending |
+| WKFL-03 | Phase 8: Workflow & Reference Compression | Pending |
+| WKFL-04 | Phase 8: Workflow & Reference Compression | Pending |
+| DEBT-01 | Phase 9: Tech Debt Cleanup | Pending |
+| DEBT-02 | Phase 9: Tech Debt Cleanup | Pending |
+| DEBT-03 | Phase 9: Tech Debt Cleanup | Pending |
 
 **Coverage:**
 - v1.1 requirements: 13 total
-- Mapped to phases: 0
-- Unmapped: 13
+- Mapped to phases: 13
+- Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-02-22*
-*Last updated: 2026-02-22 after initial definition*
+*Last updated: 2026-02-22 after roadmap creation*
