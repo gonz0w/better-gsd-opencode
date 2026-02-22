@@ -2938,3 +2938,190 @@ describe('frontmatter round-trip', () => {
     assert.ok(content.includes(bodyContent), 'body content should be completely preserved after merge');
   });
 });
+
+// ---------------------------------------------------------------
+// frontmatter edge cases (fragility points from CONCERNS.md)
+// ---------------------------------------------------------------
+
+describe('frontmatter edge cases', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  // Helper: semantic round-trip (same as above, duplicated for test isolation)
+  function assertSemanticRoundTrip(filePath, description) {
+    const resultA = runGsdTools(`frontmatter get ${filePath} --raw`, tmpDir);
+    assert.ok(resultA.success, `First extract failed for ${description}: ${resultA.error}`);
+    const jsonA = JSON.parse(resultA.output);
+
+    const dataStr = JSON.stringify(jsonA);
+    const mergeResult = runGsdTools(`frontmatter merge ${filePath} --data '${dataStr}' --raw`, tmpDir);
+    assert.ok(mergeResult.success, `Merge failed for ${description}: ${mergeResult.error}`);
+
+    const resultB = runGsdTools(`frontmatter get ${filePath} --raw`, tmpDir);
+    assert.ok(resultB.success, `Second extract failed for ${description}: ${resultB.error}`);
+    const jsonB = JSON.parse(resultB.output);
+
+    assert.deepStrictEqual(jsonA, jsonB, `Semantic round-trip failed for ${description}`);
+    return jsonA;
+  }
+
+  test('real PLAN.md format with must_haves block round-trips', () => {
+    // The most complex real-world frontmatter format produced by the planner
+    const filePath = path.join('.planning', 'test-realplan.md');
+    fs.writeFileSync(path.join(tmpDir, filePath), [
+      '---',
+      'phase: 01-foundation',
+      'plan: 01',
+      'type: execute',
+      'wave: 1',
+      'depends_on: []',
+      'files_modified:',
+      '  - package.json',
+      '  - AGENTS.md',
+      'autonomous: true',
+      'requirements:',
+      '  - FOUND-05',
+      '  - DOC-01',
+      'must_haves:',
+      '  truths:',
+      '    - "npm test runs the existing test suite"',
+      '    - "AGENTS.md shows accurate line count"',
+      '  artifacts:',
+      '    - path: "package.json"',
+      '      provides: "Project manifest"',
+      '      contains: "engines"',
+      '  key_links:',
+      '    - from: "package.json"',
+      '      to: "bin/gsd-tools.test.cjs"',
+      '      via: "scripts.test"',
+      '      pattern: "node --test"',
+      '---',
+      '# Plan content',
+      '',
+    ].join('\n'));
+
+    const fm = assertSemanticRoundTrip(filePath, 'real PLAN.md format');
+
+    // Verify top-level fields
+    assert.strictEqual(fm.phase, '01-foundation', 'phase should be preserved');
+    assert.strictEqual(fm.plan, '01', 'plan should be preserved');
+    assert.strictEqual(fm.type, 'execute', 'type should be preserved');
+    assert.deepStrictEqual(fm.depends_on, [], 'empty depends_on should survive');
+    assert.deepStrictEqual(fm.files_modified, ['package.json', 'AGENTS.md'], 'files_modified array should be preserved');
+    assert.deepStrictEqual(fm.requirements, ['FOUND-05', 'DOC-01'], 'requirements array should be preserved');
+
+    // Verify nested must_haves structure
+    assert.ok(fm.must_haves, 'must_haves should exist');
+    assert.deepStrictEqual(fm.must_haves.truths, [
+      'npm test runs the existing test suite',
+      'AGENTS.md shows accurate line count',
+    ], 'must_haves.truths should be preserved');
+
+    // Note: Array-of-objects sub-keys (provides, contains, etc.) are a known parser limitation.
+    // The parser captures only the first key: value on the same line as "- ".
+    // This is stable through round-trips — what's extracted is what merges back.
+    assert.ok(Array.isArray(fm.must_haves.artifacts), 'must_haves.artifacts should be an array');
+    assert.ok(Array.isArray(fm.must_haves.key_links), 'must_haves.key_links should be an array');
+  });
+
+  test('array items with nested key-value pairs are stable through round-trips', () => {
+    // Known parser limitation: array items like "- path: value\n    provides: value"
+    // are parsed as string items containing only the first line's "key: value".
+    // The round-trip should be STABLE even if initial extraction is lossy.
+    const filePath = path.join('.planning', 'test-array-objects.md');
+    fs.writeFileSync(path.join(tmpDir, filePath), [
+      '---',
+      'artifacts:',
+      '  - path: "src/auth.ts"',
+      '    provides: "Auth module"',
+      '  - path: "src/api.ts"',
+      '    provides: "API routes"',
+      '---',
+      '# Body',
+      '',
+    ].join('\n'));
+
+    const fm = assertSemanticRoundTrip(filePath, 'array items with nested objects');
+
+    // The parser captures these as string items (known limitation)
+    assert.ok(Array.isArray(fm.artifacts), 'artifacts should be an array');
+    assert.ok(fm.artifacts.length > 0, 'artifacts should have items');
+    // Each item contains the key-value from the "- " line
+    assert.ok(fm.artifacts[0].includes('path'), 'first item should contain path info');
+  });
+
+  test('values that look like YAML special values stay as strings', () => {
+    // Quoted strings that look like booleans/numbers/null must remain strings
+    const filePath = path.join('.planning', 'test-special-values.md');
+    fs.writeFileSync(path.join(tmpDir, filePath), [
+      '---',
+      'status: "true"',
+      'count: "42"',
+      'name: "null"',
+      '---',
+      '# Body',
+      '',
+    ].join('\n'));
+
+    const fm = assertSemanticRoundTrip(filePath, 'YAML special value strings');
+    assert.strictEqual(fm.status, 'true', 'quoted "true" should stay as string "true"');
+    assert.strictEqual(fm.count, '42', 'quoted "42" should stay as string "42"');
+    assert.strictEqual(fm.name, 'null', 'quoted "null" should stay as string "null"');
+  });
+
+  test('frontmatter-merge adds new keys without removing existing ones (additive merge)', () => {
+    const filePath = path.join('.planning', 'test-additive.md');
+    fs.writeFileSync(path.join(tmpDir, filePath), [
+      '---',
+      'phase: 01',
+      'plan: 01',
+      '---',
+      '# Body content',
+      '',
+    ].join('\n'));
+
+    // Merge a new key
+    const mergeResult = runGsdTools(`frontmatter merge ${filePath} --data '{"wave":"1"}' --raw`, tmpDir);
+    assert.ok(mergeResult.success, `Merge failed: ${mergeResult.error}`);
+
+    // Extract and verify all keys present
+    const result = runGsdTools(`frontmatter get ${filePath} --raw`, tmpDir);
+    assert.ok(result.success, `Extract failed: ${result.error}`);
+    const fm = JSON.parse(result.output);
+
+    assert.strictEqual(fm.phase, '01', 'original key "phase" should be preserved');
+    assert.strictEqual(fm.plan, '01', 'original key "plan" should be preserved');
+    assert.strictEqual(fm.wave, '1', 'new key "wave" should be added');
+  });
+
+  test('frontmatter-merge updates existing keys (update merge)', () => {
+    const filePath = path.join('.planning', 'test-update.md');
+    fs.writeFileSync(path.join(tmpDir, filePath), [
+      '---',
+      'status: draft',
+      'phase: 01',
+      '---',
+      '# Body',
+      '',
+    ].join('\n'));
+
+    // Update status
+    const mergeResult = runGsdTools(`frontmatter merge ${filePath} --data '{"status":"active"}' --raw`, tmpDir);
+    assert.ok(mergeResult.success, `Merge failed: ${mergeResult.error}`);
+
+    // Extract and verify
+    const result = runGsdTools(`frontmatter get ${filePath} --raw`, tmpDir);
+    assert.ok(result.success, `Extract failed: ${result.error}`);
+    const fm = JSON.parse(result.output);
+
+    assert.strictEqual(fm.status, 'active', 'status should be updated from "draft" to "active"');
+    assert.strictEqual(fm.phase, '01', 'untouched key "phase" should be preserved');
+  });
+});
