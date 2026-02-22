@@ -401,6 +401,37 @@ function getMilestoneInfo(cwd) {
   }
 }
 
+// ─── Workflow Reference Parsing ──────────────────────────────────────────────
+
+/**
+ * Extract @-file-references from markdown content.
+ * Handles: @/absolute/path, @relative/path, @.planning/path
+ * Also extracts from <context>, <required_reading>, <execution_context> blocks.
+ * Skips email addresses, @mentions without paths, and too-short refs.
+ *
+ * @param {string} content - Markdown content to parse
+ * @returns {string[]} Array of unique file path references
+ */
+function extractAtReferences(content) {
+  if (!content || typeof content !== 'string') return [];
+
+  const refs = new Set();
+
+  // Match @-references: @ followed by a path-like string (contains / or starts with .)
+  // Patterns: @/home/user/file.md, @.planning/STATE.md, @src/lib/output.js
+  const atPattern = /@((?:\/[\w.+\-/]+|\.[\w.+\-/]+|[\w][\w.+\-]*\/[\w.+\-/]+)(?:\.\w+)?)/g;
+  let match;
+  while ((match = atPattern.exec(content)) !== null) {
+    const ref = match[1];
+    // Filter: must contain a / to be a path, skip email-like patterns
+    if (ref.includes('/') && !ref.includes('@') && ref.length > 2) {
+      refs.add(ref);
+    }
+  }
+
+  return Array.from(refs);
+}
+
 module.exports = {
   safeReadFile,
   cachedReadFile,
@@ -417,4 +448,5 @@ module.exports = {
   pathExistsInternal,
   generateSlugInternal,
   getMilestoneInfo,
+  extractAtReferences,
 };

@@ -1037,9 +1037,281 @@ function cmdQuickTaskSummary(cwd, raw) {
   }, raw);
 }
 
+// ─── Workflow Measurement (Baseline & Compare) ──────────────────────────────
+
+const { extractAtReferences } = require('../lib/helpers');
+
+/**
+ * Measure token consumption for all workflow files.
+ * Scans workflow directory, parses @-references, estimates tokens.
+ * Returns: { timestamp, workflow_count, total_tokens, workflows: [...] }
+ */
+function measureAllWorkflows(cwd) {
+  // Detect plugin path: bundled binary at bin/gsd-tools.cjs → ../workflows/
+  // Or use GSD_PLUGIN_DIR env var for testing
+  let pluginDir = process.env.GSD_PLUGIN_DIR;
+  if (!pluginDir) {
+    // __dirname is the dir of the bundled output (bin/), so go up one level
+    pluginDir = path.resolve(__dirname, '..');
+  }
+
+  const workflowsDir = path.join(pluginDir, 'workflows');
+  if (!fs.existsSync(workflowsDir)) {
+    return { error: `Workflows directory not found: ${workflowsDir}`, workflows: [] };
+  }
+
+  const workflowFiles = fs.readdirSync(workflowsDir).filter(f => f.endsWith('.md')).sort();
+  const workflows = [];
+  let totalTokens = 0;
+
+  for (const file of workflowFiles) {
+    const filePath = path.join(workflowsDir, file);
+    let content;
+    try {
+      content = fs.readFileSync(filePath, 'utf-8');
+    } catch (e) {
+      debugLog('baseline.measure', `read workflow failed: ${file}`, e);
+      continue;
+    }
+
+    const workflowTokens = estimateTokens(content);
+
+    // Extract @-references and measure their tokens
+    const refs = extractAtReferences(content);
+    let refTokens = 0;
+    let resolvedRefs = 0;
+
+    for (const ref of refs) {
+      // Resolve reference to absolute path
+      let refPath;
+      if (path.isAbsolute(ref)) {
+        refPath = ref;
+      } else {
+        // Try relative to plugin dir first, then CWD
+        const pluginRef = path.join(pluginDir, ref);
+        const cwdRef = path.join(cwd, ref);
+        if (fs.existsSync(pluginRef)) {
+          refPath = pluginRef;
+        } else if (fs.existsSync(cwdRef)) {
+          refPath = cwdRef;
+        } else {
+          continue; // Skip unresolvable references
+        }
+      }
+
+      try {
+        const refContent = fs.readFileSync(refPath, 'utf-8');
+        refTokens += estimateTokens(refContent);
+        resolvedRefs++;
+      } catch (e) {
+        debugLog('baseline.measure', `read ref failed: ${ref}`, e);
+      }
+    }
+
+    const total = workflowTokens + refTokens;
+    totalTokens += total;
+
+    workflows.push({
+      name: file,
+      workflow_tokens: workflowTokens,
+      ref_count: resolvedRefs,
+      ref_tokens: refTokens,
+      total_tokens: total,
+    });
+  }
+
+  // Sort by total_tokens descending (biggest first)
+  workflows.sort((a, b) => b.total_tokens - a.total_tokens);
+
+  return {
+    timestamp: new Date().toISOString(),
+    workflow_count: workflows.length,
+    total_tokens: totalTokens,
+    workflows,
+  };
+}
+
+function cmdContextBudgetBaseline(cwd, raw) {
+  const measurement = measureAllWorkflows(cwd);
+
+  if (measurement.error) {
+    error(measurement.error);
+  }
+
+  // Save baseline to .planning/baselines/
+  const baselinesDir = path.join(cwd, '.planning', 'baselines');
+  if (!fs.existsSync(baselinesDir)) {
+    fs.mkdirSync(baselinesDir, { recursive: true });
+  }
+
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+  const baselinePath = path.join(baselinesDir, `baseline-${timestamp}.json`);
+  fs.writeFileSync(baselinePath, JSON.stringify(measurement, null, 2), 'utf-8');
+
+  // Print table to stderr for humans
+  const maxNameLen = Math.max(25, ...measurement.workflows.map(w => w.name.length));
+  const header = `${'Workflow'.padEnd(maxNameLen)} | Tokens  | Refs | Ref Tokens | Total`;
+  const sep = '-'.repeat(maxNameLen) + '-|---------|------|------------|--------';
+  process.stderr.write('\n## Workflow Token Baseline\n\n');
+  process.stderr.write(header + '\n');
+  process.stderr.write(sep + '\n');
+  for (const w of measurement.workflows) {
+    const name = w.name.padEnd(maxNameLen);
+    const tokens = String(w.workflow_tokens).padStart(7);
+    const refs = String(w.ref_count).padStart(4);
+    const refTokens = String(w.ref_tokens).padStart(10);
+    const total = String(w.total_tokens).padStart(7);
+    process.stderr.write(`${name} | ${tokens} | ${refs} | ${refTokens} | ${total}\n`);
+  }
+  process.stderr.write(sep + '\n');
+  process.stderr.write(`${'TOTAL'.padEnd(maxNameLen)} | ${String(measurement.total_tokens).padStart(7)} |      |            |\n`);
+  process.stderr.write(`\nBaseline saved: ${path.relative(cwd, baselinePath)}\n\n`);
+
+  output(measurement, raw);
+}
+
+function cmdContextBudgetCompare(cwd, baselinePath, raw) {
+  // Resolve baseline file
+  let baseline;
+  const baselinesDir = path.join(cwd, '.planning', 'baselines');
+
+  if (baselinePath) {
+    // Explicit path provided
+    const fullPath = path.isAbsolute(baselinePath) ? baselinePath : path.join(cwd, baselinePath);
+    if (!fs.existsSync(fullPath)) {
+      error(`Baseline file not found: ${baselinePath}`);
+    }
+    try {
+      baseline = JSON.parse(fs.readFileSync(fullPath, 'utf-8'));
+    } catch (e) {
+      error(`Invalid baseline file: ${e.message}`);
+    }
+  } else {
+    // Find most recent baseline
+    if (!fs.existsSync(baselinesDir)) {
+      error('No baselines directory. Run `context-budget baseline` first.');
+    }
+    const files = fs.readdirSync(baselinesDir)
+      .filter(f => f.startsWith('baseline-') && f.endsWith('.json'))
+      .sort()
+      .reverse();
+    if (files.length === 0) {
+      error('No baseline found. Run `context-budget baseline` first.');
+    }
+    const latestFile = path.join(baselinesDir, files[0]);
+    try {
+      baseline = JSON.parse(fs.readFileSync(latestFile, 'utf-8'));
+      baselinePath = path.relative(cwd, latestFile);
+    } catch (e) {
+      error(`Invalid baseline file: ${e.message}`);
+    }
+  }
+
+  // Measure current state
+  const current = measureAllWorkflows(cwd);
+  if (current.error) {
+    error(current.error);
+  }
+
+  // Build lookup maps
+  const baselineMap = {};
+  for (const w of (baseline.workflows || [])) {
+    baselineMap[w.name] = w;
+  }
+  const currentMap = {};
+  for (const w of current.workflows) {
+    currentMap[w.name] = w;
+  }
+
+  // Compare
+  const allNames = new Set([...Object.keys(baselineMap), ...Object.keys(currentMap)]);
+  const comparisons = [];
+  let beforeTotal = 0;
+  let afterTotal = 0;
+  let improved = 0;
+  let unchanged = 0;
+  let worsened = 0;
+
+  for (const name of allNames) {
+    const before = baselineMap[name];
+    const after = currentMap[name];
+
+    if (before && after) {
+      const delta = after.total_tokens - before.total_tokens;
+      const pctChange = before.total_tokens > 0
+        ? Math.round((delta / before.total_tokens) * 1000) / 10
+        : 0;
+      beforeTotal += before.total_tokens;
+      afterTotal += after.total_tokens;
+      if (delta < 0) improved++;
+      else if (delta > 0) worsened++;
+      else unchanged++;
+      comparisons.push({ name, before: before.total_tokens, after: after.total_tokens, delta, percent_change: pctChange });
+    } else if (before && !after) {
+      beforeTotal += before.total_tokens;
+      comparisons.push({ name, before: before.total_tokens, after: 0, delta: -before.total_tokens, percent_change: -100, status: 'removed' });
+      improved++;
+    } else if (!before && after) {
+      afterTotal += after.total_tokens;
+      comparisons.push({ name, before: 0, after: after.total_tokens, delta: after.total_tokens, percent_change: 100, status: 'new' });
+      worsened++;
+    }
+  }
+
+  // Sort by delta ascending (biggest reductions first)
+  comparisons.sort((a, b) => a.delta - b.delta);
+
+  const totalDelta = afterTotal - beforeTotal;
+  const totalPctChange = beforeTotal > 0
+    ? Math.round((totalDelta / beforeTotal) * 1000) / 10
+    : 0;
+
+  const result = {
+    baseline_file: baselinePath || 'unknown',
+    baseline_date: baseline.timestamp || 'unknown',
+    current_date: current.timestamp,
+    summary: {
+      before_total: beforeTotal,
+      after_total: afterTotal,
+      delta: totalDelta,
+      percent_change: totalPctChange,
+      workflows_improved: improved,
+      workflows_unchanged: unchanged,
+      workflows_worsened: worsened,
+    },
+    workflows: comparisons,
+  };
+
+  // Print comparison table to stderr
+  const maxNameLen = Math.max(25, ...comparisons.map(c => c.name.length));
+  const header = `${'Workflow'.padEnd(maxNameLen)} | Before  | After   | Delta   | Change`;
+  const sep = '-'.repeat(maxNameLen) + '-|---------|---------|---------|-------';
+  process.stderr.write('\n## Context Budget Comparison\n\n');
+  process.stderr.write(`Baseline: ${baselinePath} (${baseline.timestamp || 'unknown'})\n\n`);
+  process.stderr.write(header + '\n');
+  process.stderr.write(sep + '\n');
+  for (const c of comparisons) {
+    const name = c.name.padEnd(maxNameLen);
+    const before = String(c.before).padStart(7);
+    const after = String(c.after).padStart(7);
+    const delta = (c.delta >= 0 ? '+' + c.delta : String(c.delta)).padStart(7);
+    const pct = (c.percent_change >= 0 ? '+' + c.percent_change : String(c.percent_change)) + '%';
+    process.stderr.write(`${name} | ${before} | ${after} | ${delta} | ${pct.padStart(6)}\n`);
+  }
+  process.stderr.write(sep + '\n');
+  const totalDeltaStr = (totalDelta >= 0 ? '+' + totalDelta : String(totalDelta)).padStart(7);
+  const totalPctStr = (totalPctChange >= 0 ? '+' + totalPctChange : String(totalPctChange)) + '%';
+  process.stderr.write(`${'TOTAL'.padEnd(maxNameLen)} | ${String(beforeTotal).padStart(7)} | ${String(afterTotal).padStart(7)} | ${totalDeltaStr} | ${totalPctStr.padStart(6)}\n`);
+  process.stderr.write(`\nImproved: ${improved} | Unchanged: ${unchanged} | Worsened: ${worsened}\n\n`);
+
+  output(result, raw);
+}
+
 module.exports = {
   cmdSessionDiff,
   cmdContextBudget,
+  cmdContextBudgetBaseline,
+  cmdContextBudgetCompare,
   cmdTestRun,
   cmdSearchDecisions,
   cmdValidateDependencies,

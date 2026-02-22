@@ -35,7 +35,8 @@ const {
 } = require('./commands/init');
 
 const {
-  cmdSessionDiff, cmdContextBudget, cmdTestRun, cmdSearchDecisions,
+  cmdSessionDiff, cmdContextBudget, cmdContextBudgetBaseline,
+  cmdContextBudgetCompare, cmdTestRun, cmdSearchDecisions,
   cmdValidateDependencies, cmdSearchLessons, cmdCodebaseImpact,
   cmdRollbackInfo, cmdVelocity, cmdTraceRequirement, cmdValidateConfig,
   cmdQuickTaskSummary,
@@ -495,7 +496,15 @@ async function main() {
     }
 
     case 'context-budget': {
-      cmdContextBudget(cwd, args[1], raw);
+      const subcommand = args[1];
+      if (subcommand === 'baseline') {
+        cmdContextBudgetBaseline(cwd, raw);
+      } else if (subcommand === 'compare') {
+        cmdContextBudgetCompare(cwd, args[2], raw);
+      } else {
+        // Existing behavior: treat args[1] as plan/file path
+        cmdContextBudget(cwd, subcommand, raw);
+      }
       break;
     }
 
