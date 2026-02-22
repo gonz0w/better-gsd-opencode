@@ -170,11 +170,13 @@ Workflows:
   progress                Progress overview
 
 Flags:
-  --compact  Return essential-only fields with context manifest (38-50% smaller)
+  --compact   Return essential-only fields (38-50% smaller)
+  --manifest  Include context manifest with --compact (adds file loading guidance)
 
 Examples:
   gsd-tools init execute-phase 03
-  gsd-tools init progress --compact --raw`,
+  gsd-tools init progress --compact --raw
+  gsd-tools init progress --compact --manifest --raw`,
       "commit": `Usage: gsd-tools commit <message> [--files f1 f2 ...] [--amend] [--raw]
 
 Commit planning documents to git.
@@ -3221,15 +3223,17 @@ var require_init = __commonJS({
           plan_count: result.plan_count,
           incomplete_count: result.incomplete_count,
           branch_name: result.branch_name,
-          verifier_enabled: result.verifier_enabled,
-          _manifest: {
+          verifier_enabled: result.verifier_enabled
+        };
+        if (global._gsdManifestMode) {
+          compactResult._manifest = {
             files: [
               ...planPaths.map((p) => ({ path: result.phase_dir ? `${result.phase_dir}/${p}` : p, required: true })),
               ...result.state_exists ? [{ path: ".planning/STATE.md", sections: ["Current Position"], required: true }] : [],
               ...result.roadmap_exists ? [{ path: ".planning/ROADMAP.md", sections: [`Phase ${result.phase_number || ""}`], required: true }] : []
             ]
-          }
-        };
+          };
+        }
         return output(compactResult, raw);
       }
       output(result, raw);
@@ -3312,15 +3316,17 @@ var require_init = __commonJS({
         if (result.research_path) compactResult.research_path = result.research_path;
         if (result.verification_path) compactResult.verification_path = result.verification_path;
         if (result.uat_path) compactResult.uat_path = result.uat_path;
-        const manifestFiles = [
-          { path: ".planning/STATE.md", sections: ["Current Position", "Accumulated Context"], required: true },
-          { path: ".planning/ROADMAP.md", sections: [`Phase ${result.phase_number || ""}`], required: true },
-          { path: ".planning/REQUIREMENTS.md", required: true }
-        ];
-        if (result.context_path) manifestFiles.push({ path: result.context_path, required: false });
-        if (result.research_path) manifestFiles.push({ path: result.research_path, required: false });
-        if (result.verification_path) manifestFiles.push({ path: result.verification_path, required: false });
-        compactResult._manifest = { files: manifestFiles };
+        if (global._gsdManifestMode) {
+          const manifestFiles = [
+            { path: ".planning/STATE.md", sections: ["Current Position", "Accumulated Context"], required: true },
+            { path: ".planning/ROADMAP.md", sections: [`Phase ${result.phase_number || ""}`], required: true },
+            { path: ".planning/REQUIREMENTS.md", required: true }
+          ];
+          if (result.context_path) manifestFiles.push({ path: result.context_path, required: false });
+          if (result.research_path) manifestFiles.push({ path: result.research_path, required: false });
+          if (result.verification_path) manifestFiles.push({ path: result.verification_path, required: false });
+          compactResult._manifest = { files: manifestFiles };
+        }
         return output(compactResult, raw);
       }
       output(result, raw);
@@ -3379,9 +3385,11 @@ var require_init = __commonJS({
           has_codebase_map: result.has_codebase_map,
           planning_exists: result.planning_exists,
           has_git: result.has_git,
-          brave_search_available: result.brave_search_available,
-          _manifest: { files: manifestFiles }
+          brave_search_available: result.brave_search_available
         };
+        if (global._gsdManifestMode) {
+          compactResult._manifest = { files: manifestFiles };
+        }
         return output(compactResult, raw);
       }
       output(result, raw);
@@ -3420,9 +3428,11 @@ var require_init = __commonJS({
           project_exists: result.project_exists,
           roadmap_exists: result.roadmap_exists,
           state_exists: result.state_exists,
-          research_enabled: result.research_enabled,
-          _manifest: { files: manifestFiles }
+          research_enabled: result.research_enabled
         };
+        if (global._gsdManifestMode) {
+          compactResult._manifest = { files: manifestFiles };
+        }
         return output(compactResult, raw);
       }
       output(result, raw);
@@ -3472,9 +3482,11 @@ var require_init = __commonJS({
           description: result.description,
           task_dir: result.task_dir,
           date: result.date,
-          planning_exists: result.planning_exists,
-          _manifest: { files: manifestFiles }
+          planning_exists: result.planning_exists
         };
+        if (global._gsdManifestMode) {
+          compactResult._manifest = { files: manifestFiles };
+        }
         return output(compactResult, raw);
       }
       output(result, raw);
@@ -3511,9 +3523,11 @@ var require_init = __commonJS({
           state_exists: result.state_exists,
           planning_exists: result.planning_exists,
           has_interrupted_agent: result.has_interrupted_agent,
-          interrupted_agent_id: result.interrupted_agent_id,
-          _manifest: { files: manifestFiles }
+          interrupted_agent_id: result.interrupted_agent_id
         };
+        if (global._gsdManifestMode) {
+          compactResult._manifest = { files: manifestFiles };
+        }
         return output(compactResult, raw);
       }
       output(result, raw);
@@ -3561,9 +3575,11 @@ var require_init = __commonJS({
           phase_dir: result.phase_dir,
           phase_number: result.phase_number,
           phase_name: result.phase_name,
-          has_verification: result.has_verification,
-          _manifest: { files: manifestFiles }
+          has_verification: result.has_verification
         };
+        if (global._gsdManifestMode) {
+          compactResult._manifest = { files: manifestFiles };
+        }
         return output(compactResult, raw);
       }
       output(result, raw);
@@ -3657,14 +3673,16 @@ var require_init = __commonJS({
         if (result.research_path) compactResult.research_path = result.research_path;
         if (result.verification_path) compactResult.verification_path = result.verification_path;
         if (result.uat_path) compactResult.uat_path = result.uat_path;
-        const manifestFiles = [
-          { path: ".planning/STATE.md", sections: ["Current Position"], required: true },
-          { path: ".planning/ROADMAP.md", sections: [`Phase ${result.phase_number || ""}`], required: true }
-        ];
-        if (pathExistsInternal(cwd, ".planning/REQUIREMENTS.md")) manifestFiles.push({ path: ".planning/REQUIREMENTS.md", required: false });
-        if (result.context_path) manifestFiles.push({ path: result.context_path, required: false });
-        if (result.research_path) manifestFiles.push({ path: result.research_path, required: false });
-        compactResult._manifest = { files: manifestFiles };
+        if (global._gsdManifestMode) {
+          const manifestFiles = [
+            { path: ".planning/STATE.md", sections: ["Current Position"], required: true },
+            { path: ".planning/ROADMAP.md", sections: [`Phase ${result.phase_number || ""}`], required: true }
+          ];
+          if (pathExistsInternal(cwd, ".planning/REQUIREMENTS.md")) manifestFiles.push({ path: ".planning/REQUIREMENTS.md", required: false });
+          if (result.context_path) manifestFiles.push({ path: result.context_path, required: false });
+          if (result.research_path) manifestFiles.push({ path: result.research_path, required: false });
+          compactResult._manifest = { files: manifestFiles };
+        }
         return output(compactResult, raw);
       }
       output(result, raw);
@@ -3725,9 +3743,11 @@ var require_init = __commonJS({
           todos: result.todos,
           area_filter: result.area_filter,
           date: result.date,
-          pending_dir_exists: result.pending_dir_exists,
-          _manifest: { files: manifestFiles }
+          pending_dir_exists: result.pending_dir_exists
         };
+        if (global._gsdManifestMode) {
+          compactResult._manifest = { files: manifestFiles };
+        }
         return output(compactResult, raw);
       }
       output(result, raw);
@@ -3793,9 +3813,11 @@ var require_init = __commonJS({
           completed_phases: result.completed_phases,
           all_phases_complete: result.all_phases_complete,
           archived_milestones: result.archived_milestones,
-          archive_count: result.archive_count,
-          _manifest: { files: manifestFiles }
+          archive_count: result.archive_count
         };
+        if (global._gsdManifestMode) {
+          compactResult._manifest = { files: manifestFiles };
+        }
         return output(compactResult, raw);
       }
       output(result, raw);
@@ -3833,9 +3855,11 @@ var require_init = __commonJS({
           has_maps: result.has_maps,
           planning_exists: result.planning_exists,
           codebase_dir_exists: result.codebase_dir_exists,
-          parallelization: result.parallelization,
-          _manifest: { files: manifestFiles }
+          parallelization: result.parallelization
         };
+        if (global._gsdManifestMode) {
+          compactResult._manifest = { files: manifestFiles };
+        }
         return output(compactResult, raw);
       }
       output(result, raw);
@@ -3937,9 +3961,11 @@ var require_init = __commonJS({
           current_phase: result.current_phase,
           next_phase: result.next_phase,
           has_work_in_progress: result.has_work_in_progress,
-          session_diff: result.session_diff,
-          _manifest: { files: manifestFiles }
+          session_diff: result.session_diff
         };
+        if (global._gsdManifestMode) {
+          compactResult._manifest = { files: manifestFiles };
+        }
         return output(compactResult, raw);
       }
       output(result, raw);
@@ -6765,6 +6791,11 @@ var require_router = __commonJS({
       if (compactIdx !== -1) {
         global._gsdCompactMode = true;
         args.splice(compactIdx, 1);
+      }
+      const manifestIdx = args.indexOf("--manifest");
+      if (manifestIdx !== -1) {
+        global._gsdManifestMode = true;
+        args.splice(manifestIdx, 1);
       }
       const command = args[0];
       const cwd = process.cwd();

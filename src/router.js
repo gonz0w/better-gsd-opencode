@@ -77,6 +77,13 @@ async function main() {
     args.splice(compactIdx, 1);
   }
 
+  // Parse --manifest global flag for context manifest in compact output
+  const manifestIdx = args.indexOf('--manifest');
+  if (manifestIdx !== -1) {
+    global._gsdManifestMode = true;
+    args.splice(manifestIdx, 1);
+  }
+
   const command = args[0];
   const cwd = process.cwd();
 

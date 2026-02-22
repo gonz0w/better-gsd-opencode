@@ -155,11 +155,13 @@ Workflows:
   progress                Progress overview
 
 Flags:
-  --compact  Return essential-only fields with context manifest (38-50% smaller)
+  --compact   Return essential-only fields (38-50% smaller)
+  --manifest  Include context manifest with --compact (adds file loading guidance)
 
 Examples:
   gsd-tools init execute-phase 03
-  gsd-tools init progress --compact --raw`,
+  gsd-tools init progress --compact --raw
+  gsd-tools init progress --compact --manifest --raw`,
 
   'commit': `Usage: gsd-tools commit <message> [--files f1 f2 ...] [--amend] [--raw]
 
