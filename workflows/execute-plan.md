@@ -53,6 +53,46 @@ PLAN_START_EPOCH=$(date +%s)
 ```
 </step>
 
+<step name="context_budget_check">
+Check whether the plan's content may exceed the agent's context window. This is a soft warning — it alerts but does not block execution.
+
+```bash
+BUDGET=$(node /home/cam/.config/opencode/get-shit-done/bin/gsd-tools.cjs context-budget "${PLAN_PATH}" --raw 2>/dev/null)
+```
+
+Parse the JSON result for `estimated_percent` (number) and `warning` (boolean or string).
+
+**If `warning` is truthy (estimated context usage exceeds threshold, typically 50%):**
+
+Display:
+```
+⚠️ Context Budget Warning
+
+Plan ${PLAN_PATH} may use ~{estimated_percent}% of the context window.
+Large plans risk degraded output quality in later tasks.
+Consider splitting into smaller plans if execution quality suffers.
+```
+
+**In yolo/auto mode:** Log the warning and continue execution:
+```
+⚠️ Proceeding with large plan (yolo mode) — {estimated_percent}% estimated context usage
+```
+
+**In interactive mode:** Present the warning and ask:
+```
+Plan may use {estimated_percent}% of context window. Options:
+1. Proceed — execute as-is
+2. Stop — consider splitting the plan first
+```
+
+If user selects "Stop": exit with recommendation to split.
+If user selects "Proceed": continue to next step.
+
+**If no warning (under threshold, command fails, or returns empty):** Continue silently.
+
+**Note:** The threshold is configurable via `context_window` and `context_target_percent` in config.json. Defaults: 200K tokens / 50%.
+</step>
+
 <step name="parse_segments">
 ```bash
 grep -n "type=\"checkpoint" .planning/phases/XX-name/{phase}-{plan}-PLAN.md

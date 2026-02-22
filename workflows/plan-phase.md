@@ -150,7 +150,36 @@ UAT_PATH=$(echo "$INIT" | jq -r '.uat_path // empty')
 CONTEXT_PATH=$(echo "$INIT" | jq -r '.context_path // empty')
 ```
 
-## 8. Spawn gsd-planner Agent
+## 8. Surface Relevant Lessons
+
+Before spawning the planner, check if previous phases produced lessons relevant to this phase. This gives the planner historical context about what worked and what didn't.
+
+```bash
+LESSONS=$(node /home/cam/.config/opencode/get-shit-done/bin/gsd-tools.cjs search-lessons "${PHASE_NAME}" --raw 2>/dev/null)
+```
+
+Parse the JSON result. The command searches `.planning/tasks/lessons.md` and SUMMARY files for matches.
+
+**If lessons are found (non-empty results array):**
+
+Display:
+```
+📚 Relevant lessons from previous phases:
+{For each lesson:}
+  • {lesson summary} (from: {source})
+```
+
+Include the lessons in the planner context (step 9) by appending to the `<planning_context>` block:
+```markdown
+**Lessons from previous phases:**
+{formatted lesson summaries}
+```
+
+**If no lessons found (empty results, command fails, or lessons file doesn't exist):** Skip silently — don't create noise for new projects or phases without relevant history.
+
+**Note:** This is informational only. The planner uses lessons as additional context but is not blocked by their absence.
+
+## 9. Spawn gsd-planner Agent
 
 Display banner:
 ```
@@ -211,13 +240,13 @@ Task(
 )
 ```
 
-## 9. Handle Planner Return
+## 10. Handle Planner Return
 
-- **`## PLANNING COMPLETE`:** Display plan count. If `--skip-verify` or `plan_checker_enabled` is false (from init): skip to step 13. Otherwise: step 10.
-- **`## CHECKPOINT REACHED`:** Present to user, get response, spawn continuation (step 12)
+- **`## PLANNING COMPLETE`:** Display plan count. If `--skip-verify` or `plan_checker_enabled` is false (from init): skip to step 14. Otherwise: step 11.
+- **`## CHECKPOINT REACHED`:** Present to user, get response, spawn continuation (step 13)
 - **`## PLANNING INCONCLUSIVE`:** Show attempts, offer: Add context / Retry / Manual
 
-## 10. Spawn gsd-plan-checker Agent
+## 11. Spawn gsd-plan-checker Agent
 
 Display banner:
 ```
@@ -263,12 +292,12 @@ Task(
 )
 ```
 
-## 11. Handle Checker Return
+## 12. Handle Checker Return
 
-- **`## VERIFICATION PASSED`:** Display confirmation, proceed to step 13.
-- **`## ISSUES FOUND`:** Display issues, check iteration count, proceed to step 12.
+- **`## VERIFICATION PASSED`:** Display confirmation, proceed to step 14.
+- **`## ISSUES FOUND`:** Display issues, check iteration count, proceed to step 13.
 
-## 12. Revision Loop (Max 3 Iterations)
+## 13. Revision Loop (Max 3 Iterations)
 
 Track `iteration_count` (starts at 1 after initial plan + check).
 
@@ -307,7 +336,7 @@ Task(
 )
 ```
 
-After planner returns -> spawn checker again (step 10), increment iteration_count.
+After planner returns -> spawn checker again (step 11), increment iteration_count.
 
 **If iteration_count >= 3:**
 
@@ -315,11 +344,11 @@ Display: `Max iterations reached. {N} issues remain:` + issue list
 
 Offer: 1) Force proceed, 2) Provide guidance and retry, 3) Abandon
 
-## 13. Present Final Status
+## 14. Present Final Status
 
 Route to `<offer_next>` OR `auto_advance` depending on flags/config.
 
-## 14. Auto-Advance Check
+## 15. Auto-Advance Check
 
 Check for auto-advance trigger:
 
