@@ -4577,4 +4577,14 @@ describe('extract-sections command', () => {
     assert.ok(sectionLines < fullLines, `types section (${sectionLines} lines) should be shorter than full file (${fullLines} lines)`);
     assert.ok(sectionLines > 10, `types section should have substantial content (got ${sectionLines} lines)`);
   });
+
+  test('extract-sections command is registered and responds', () => {
+    // Verify extract-sections command exists and works by running discovery on a real file
+    const projectRoot = path.join(__dirname, '..');
+    const result = runGsdTools('extract-sections references/checkpoints.md --raw', projectRoot);
+    assert.ok(result.success, `extract-sections discovery should succeed: ${result.error}`);
+    const data = JSON.parse(result.output);
+    assert.ok(Array.isArray(data.available_sections), 'should return available_sections array');
+    assert.ok(data.available_sections.length > 0, 'should find sections in checkpoints.md');
+  });
 });
