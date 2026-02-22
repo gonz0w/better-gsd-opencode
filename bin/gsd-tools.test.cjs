@@ -4589,3 +4589,488 @@ describe('extract-sections command', () => {
     assert.ok(data.available_sections.length > 0, 'should find sections in checkpoints.md');
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// state validate command
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('state validate', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('clean state returns "clean" status', () => {
+    // Set up matching ROADMAP + disk: 2 plans, 1 complete, 1 in progress
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'ROADMAP.md'),
+      `# Roadmap
+
+### Phase 1: Foundation
+**Goal:** Set up basics
+**Plans:** 2 plans
+`
+    );
+    const phaseDir = path.join(tmpDir, '.planning', 'phases', '01-foundation');
+    fs.mkdirSync(phaseDir, { recursive: true });
+    fs.writeFileSync(path.join(phaseDir, '01-01-PLAN.md'), '# Plan 1\n');
+    fs.writeFileSync(path.join(phaseDir, '01-02-PLAN.md'), '# Plan 2\n');
+    fs.writeFileSync(path.join(phaseDir, '01-01-SUMMARY.md'), '# Summary 1\n');
+
+    // STATE.md pointing to phase 1 which is still in progress (not all complete)
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'STATE.md'),
+      `# Project State
+
+## Current Position
+
+**Phase:** 1 of 1 (Foundation)
+**Current Plan:** 2
+**Total Plans in Phase:** 2
+**Status:** In progress
+**Last Activity:** ${new Date().toISOString().split('T')[0]}
+
+## Accumulated Context
+
+### Blockers/Concerns
+
+None.
+`
+    );
+
+    const result = runGsdTools('state validate --raw', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.status, 'clean', 'should be clean');
+    assert.deepStrictEqual(output.issues, [], 'should have no issues');
+    assert.strictEqual(output.summary, 'State validation passed — no issues found');
+  });
+
+  test('detects plan count drift', () => {
+    // ROADMAP says 2 plans but disk only has 1
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'ROADMAP.md'),
+      `# Roadmap
+
+### Phase 1: Foundation
+**Goal:** Set up basics
+**Plans:** 2 plans
+`
+    );
+    const phaseDir = path.join(tmpDir, '.planning', 'phases', '01-foundation');
+    fs.mkdirSync(phaseDir, { recursive: true });
+    fs.writeFileSync(path.join(phaseDir, '01-01-PLAN.md'), '# Plan 1\n');
+
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'STATE.md'),
+      `# Project State
+
+## Current Position
+
+**Phase:** 1 of 1 (Foundation)
+**Status:** In progress
+**Last Activity:** ${new Date().toISOString().split('T')[0]}
+`
+    );
+
+    const result = runGsdTools('state validate --raw', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.status, 'errors', 'should report errors');
+    const driftIssue = output.issues.find(i => i.type === 'plan_count_drift');
+    assert.ok(driftIssue, 'should have plan_count_drift issue');
+    assert.strictEqual(driftIssue.severity, 'error');
+    assert.ok(driftIssue.expected.includes('1'), 'expected should mention disk count');
+    assert.ok(driftIssue.actual.includes('2'), 'actual should mention ROADMAP count');
+  });
+
+  test('detects completion drift', () => {
+    // ROADMAP checkbox marked [x] but disk has 2 plans and only 1 summary
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'ROADMAP.md'),
+      `# Roadmap
+
+- [x] **Phase 1: Foundation** (completed)
+
+### Phase 1: Foundation
+**Goal:** Set up basics
+**Plans:** 1/2 plans
+`
+    );
+    const phaseDir = path.join(tmpDir, '.planning', 'phases', '01-foundation');
+    fs.mkdirSync(phaseDir, { recursive: true });
+    fs.writeFileSync(path.join(phaseDir, '01-01-PLAN.md'), '# Plan 1\n');
+    fs.writeFileSync(path.join(phaseDir, '01-02-PLAN.md'), '# Plan 2\n');
+    fs.writeFileSync(path.join(phaseDir, '01-01-SUMMARY.md'), '# Summary 1\n');
+
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'STATE.md'),
+      `# Project State
+
+## Current Position
+
+**Phase:** 1 of 1 (Foundation)
+**Status:** In progress
+**Last Activity:** ${new Date().toISOString().split('T')[0]}
+`
+    );
+
+    const result = runGsdTools('state validate --raw', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    const completionIssue = output.issues.find(i => i.type === 'completion_drift');
+    assert.ok(completionIssue, 'should have completion_drift issue');
+    assert.strictEqual(completionIssue.severity, 'error');
+    assert.ok(completionIssue.expected.includes('2'), 'expected should mention total plan count');
+    assert.ok(completionIssue.actual.includes('1'), 'actual should mention summary count');
+  });
+
+  test('detects missing position', () => {
+    // STATE.md says "Phase: 99 of 13" but phase 99 directory doesn't exist
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'ROADMAP.md'),
+      `# Roadmap
+
+### Phase 1: Foundation
+**Goal:** Set up basics
+`
+    );
+
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'STATE.md'),
+      `# Project State
+
+## Current Position
+
+**Phase:** 99 of 13 (Nonexistent)
+**Current Plan:** 1
+**Status:** In progress
+**Last Activity:** ${new Date().toISOString().split('T')[0]}
+`
+    );
+
+    const result = runGsdTools('state validate --raw', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    const posIssue = output.issues.find(i => i.type === 'position_missing');
+    assert.ok(posIssue, 'should have position_missing issue');
+    assert.strictEqual(posIssue.severity, 'error');
+  });
+
+  test('detects completed position', () => {
+    // STATE.md points to phase 1, but phase 1 has equal PLANs and SUMMARYs
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'ROADMAP.md'),
+      `# Roadmap
+
+### Phase 1: Foundation
+**Goal:** Set up basics
+**Plans:** 1 plans
+`
+    );
+    const phaseDir = path.join(tmpDir, '.planning', 'phases', '01-foundation');
+    fs.mkdirSync(phaseDir, { recursive: true });
+    fs.writeFileSync(path.join(phaseDir, '01-01-PLAN.md'), '# Plan 1\n');
+    fs.writeFileSync(path.join(phaseDir, '01-01-SUMMARY.md'), '# Summary 1\n');
+
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'STATE.md'),
+      `# Project State
+
+## Current Position
+
+**Phase:** 1 of 1 (Foundation)
+**Current Plan:** 1
+**Status:** In progress
+**Last Activity:** ${new Date().toISOString().split('T')[0]}
+
+## Accumulated Context
+
+### Blockers/Concerns
+
+None.
+`
+    );
+
+    const result = runGsdTools('state validate --raw', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    const posIssue = output.issues.find(i => i.type === 'position_completed');
+    assert.ok(posIssue, 'should have position_completed issue');
+    assert.strictEqual(posIssue.severity, 'warn');
+    assert.ok(posIssue.actual.includes('1/1'), 'should mention summary/plan counts');
+  });
+
+  test('detects stale activity via git', () => {
+    // Initialize a git repo in the temp directory, make a recent commit,
+    // but set STATE.md Last Activity to an old date
+    try {
+      execSync('git init', { cwd: tmpDir, stdio: 'pipe' });
+      execSync('git config user.email "test@test.com"', { cwd: tmpDir, stdio: 'pipe' });
+      execSync('git config user.name "Test"', { cwd: tmpDir, stdio: 'pipe' });
+    } catch (e) {
+      // Git not available, skip test
+      return;
+    }
+
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'ROADMAP.md'),
+      `# Roadmap\n`
+    );
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'STATE.md'),
+      `# Project State
+
+## Current Position
+
+**Phase:** 1 of 1 (Foundation)
+**Status:** In progress
+**Last Activity:** 2025-01-01
+`
+    );
+
+    // Commit the planning files to create git history
+    try {
+      execSync('git add .planning/', { cwd: tmpDir, stdio: 'pipe' });
+      execSync('git commit -m "initial"', { cwd: tmpDir, stdio: 'pipe' });
+    } catch (e) {
+      // Git commit failed, skip test
+      return;
+    }
+
+    const result = runGsdTools('state validate --raw', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    const staleIssue = output.issues.find(i => i.type === 'activity_stale');
+    assert.ok(staleIssue, 'should have activity_stale issue');
+    assert.strictEqual(staleIssue.severity, 'warn');
+    assert.ok(staleIssue.actual.includes('2025-01-01'), 'should mention declared date');
+  });
+
+  test('--fix corrects plan count drift', () => {
+    // Initialize git repo for auto-commit
+    try {
+      execSync('git init', { cwd: tmpDir, stdio: 'pipe' });
+      execSync('git config user.email "test@test.com"', { cwd: tmpDir, stdio: 'pipe' });
+      execSync('git config user.name "Test"', { cwd: tmpDir, stdio: 'pipe' });
+    } catch (e) {
+      return; // Git not available, skip
+    }
+
+    // ROADMAP says 3 plans but disk has 2
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'ROADMAP.md'),
+      `# Roadmap
+
+### Phase 1: Foundation
+**Goal:** Set up basics
+**Plans:** 3 plans
+`
+    );
+    const phaseDir = path.join(tmpDir, '.planning', 'phases', '01-foundation');
+    fs.mkdirSync(phaseDir, { recursive: true });
+    fs.writeFileSync(path.join(phaseDir, '01-01-PLAN.md'), '# Plan 1\n');
+    fs.writeFileSync(path.join(phaseDir, '01-02-PLAN.md'), '# Plan 2\n');
+
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'STATE.md'),
+      `# Project State
+
+## Current Position
+
+**Phase:** 1 of 1 (Foundation)
+**Status:** In progress
+**Last Activity:** ${new Date().toISOString().split('T')[0]}
+`
+    );
+
+    // Initial commit so git add/commit works
+    try {
+      execSync('git add .', { cwd: tmpDir, stdio: 'pipe' });
+      execSync('git commit -m "initial"', { cwd: tmpDir, stdio: 'pipe' });
+    } catch (e) {
+      return;
+    }
+
+    const result = runGsdTools('state validate --fix --raw', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.ok(output.fixes_applied.length > 0, 'should have fixes applied');
+    assert.strictEqual(output.fixes_applied[0].phase, '1');
+    assert.strictEqual(output.fixes_applied[0].old, '3');
+    assert.strictEqual(output.fixes_applied[0].new, '2');
+
+    // Verify ROADMAP.md was updated on disk
+    const roadmap = fs.readFileSync(path.join(tmpDir, '.planning', 'ROADMAP.md'), 'utf-8');
+    assert.ok(roadmap.includes('2 plan'), 'ROADMAP should now say 2 plans');
+    assert.ok(!roadmap.includes('3 plan'), 'ROADMAP should not say 3 plans anymore');
+  });
+
+  test('no blocker staleness when blockers section is empty', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'ROADMAP.md'),
+      `# Roadmap
+
+### Phase 1: Foundation
+**Goal:** Set up basics
+**Plans:** 1 plans
+`
+    );
+    const phaseDir = path.join(tmpDir, '.planning', 'phases', '01-foundation');
+    fs.mkdirSync(phaseDir, { recursive: true });
+    fs.writeFileSync(path.join(phaseDir, '01-01-PLAN.md'), '# Plan 1\n');
+    fs.writeFileSync(path.join(phaseDir, '01-01-SUMMARY.md'), '# Summary 1\n');
+
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'STATE.md'),
+      `# Project State
+
+## Current Position
+
+**Phase:** 2 of 2 (API)
+**Status:** In progress
+**Last Activity:** ${new Date().toISOString().split('T')[0]}
+
+## Accumulated Context
+
+### Blockers/Concerns
+
+None.
+
+### Pending Todos
+
+None yet.
+`
+    );
+
+    const result = runGsdTools('state validate --raw', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    const blockerIssues = output.issues.filter(i => i.type === 'stale_blocker' || i.type === 'stale_todo');
+    assert.strictEqual(blockerIssues.length, 0, 'should have no stale blocker/todo issues');
+  });
+
+  test('detects stale blockers after completed plans', () => {
+    // Create 3 completed plans (summaries) to trigger staleness
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'ROADMAP.md'),
+      `# Roadmap
+
+### Phase 1: Foundation
+**Goal:** Set up basics
+**Plans:** 3 plans
+`
+    );
+    const phaseDir = path.join(tmpDir, '.planning', 'phases', '01-foundation');
+    fs.mkdirSync(phaseDir, { recursive: true });
+    fs.writeFileSync(path.join(phaseDir, '01-01-PLAN.md'), '# Plan 1\n');
+    fs.writeFileSync(path.join(phaseDir, '01-02-PLAN.md'), '# Plan 2\n');
+    fs.writeFileSync(path.join(phaseDir, '01-03-PLAN.md'), '# Plan 3\n');
+    fs.writeFileSync(path.join(phaseDir, '01-01-SUMMARY.md'), '# Summary 1\n');
+    fs.writeFileSync(path.join(phaseDir, '01-02-SUMMARY.md'), '# Summary 2\n');
+    fs.writeFileSync(path.join(phaseDir, '01-03-SUMMARY.md'), '# Summary 3\n');
+
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'STATE.md'),
+      `# Project State
+
+## Current Position
+
+**Phase:** 2 of 2 (API)
+**Status:** In progress
+**Last Activity:** ${new Date().toISOString().split('T')[0]}
+
+## Accumulated Context
+
+### Blockers/Concerns
+
+- Need to investigate memory leak in worker pool
+- CI pipeline is flaky on Mondays
+
+### Pending Todos
+
+None.
+`
+    );
+
+    const result = runGsdTools('state validate --raw', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    const staleBlockers = output.issues.filter(i => i.type === 'stale_blocker');
+    assert.strictEqual(staleBlockers.length, 2, 'should detect 2 stale blockers');
+    assert.strictEqual(staleBlockers[0].severity, 'warn');
+    assert.ok(staleBlockers[0].actual.includes('memory leak'), 'should reference the blocker text');
+  });
+
+  test('returns error status when both ROADMAP.md and STATE.md are missing', () => {
+    // Remove the files (createTempProject only creates the dirs)
+    const result = runGsdTools('state validate --raw', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.status, 'errors', 'should report errors');
+    assert.ok(output.issues.some(i => i.type === 'missing_files'), 'should have missing_files issue');
+  });
+
+  test('multiple issue types combine correctly', () => {
+    // Set up drift + missing position
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'ROADMAP.md'),
+      `# Roadmap
+
+### Phase 1: Foundation
+**Goal:** Set up basics
+**Plans:** 5 plans
+`
+    );
+    const phaseDir = path.join(tmpDir, '.planning', 'phases', '01-foundation');
+    fs.mkdirSync(phaseDir, { recursive: true });
+    fs.writeFileSync(path.join(phaseDir, '01-01-PLAN.md'), '# Plan 1\n');
+
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'STATE.md'),
+      `# Project State
+
+## Current Position
+
+**Phase:** 77 of 99 (Ghost)
+**Status:** In progress
+**Last Activity:** ${new Date().toISOString().split('T')[0]}
+
+## Accumulated Context
+
+### Blockers/Concerns
+
+None.
+`
+    );
+
+    const result = runGsdTools('state validate --raw', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.status, 'errors', 'should report errors');
+    assert.ok(output.issues.length >= 2, `should have at least 2 issues, got ${output.issues.length}`);
+
+    const issueTypes = output.issues.map(i => i.type);
+    assert.ok(issueTypes.includes('plan_count_drift'), 'should include plan_count_drift');
+    assert.ok(issueTypes.includes('position_missing'), 'should include position_missing');
+
+    // Summary should reflect counts
+    assert.ok(output.summary.includes('error'), 'summary should mention errors');
+  });
+});
