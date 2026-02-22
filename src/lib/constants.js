@@ -59,11 +59,30 @@ Subcommands:
   resolve-blocker --text "..." Remove a blocker
   record-session            Update session continuity
     --stopped-at "..." [--resume-file path]
+  validate [--fix]          Validate state vs disk reality
 
 Examples:
   gsd-tools state load --raw
   gsd-tools state advance-plan
   gsd-tools state add-decision --phase 03 --summary "Chose esbuild"`,
+
+  'state validate': `Usage: gsd-tools state validate [--fix] [--raw]
+
+Validate state consistency between declared state and disk reality.
+
+Checks:
+  Plan count drift     ROADMAP.md claims vs actual files
+  Position validity    STATE.md position vs existing phases
+  Activity staleness   Last activity timestamp vs git history
+  Blocker/todo age     Items open through 2+ completed plans
+
+Options:
+  --fix    Auto-correct plan count mismatches in ROADMAP.md
+  --raw    JSON output
+
+Examples:
+  gsd-tools state validate --raw
+  gsd-tools state validate --fix`,
 
   'frontmatter': `Usage: gsd-tools frontmatter <subcommand> <file> [options] [--raw]
 

@@ -2,6 +2,8 @@ const fs = require('fs');
 const path = require('path');
 const { output, error, debugLog } = require('../lib/output');
 const { loadConfig } = require('../lib/config');
+const { safeReadFile, normalizePhaseName, findPhaseInternal } = require('../lib/helpers');
+const { execGit } = require('../lib/git');
 
 // ─── State Commands ──────────────────────────────────────────────────────────
 
@@ -373,6 +375,266 @@ function cmdStateRecordSession(cwd, options, raw) {
   }
 }
 
+// ─── State Validation Engine ─────────────────────────────────────────────────
+
+function cmdStateValidate(cwd, options, raw) {
+  const planningDir = path.join(cwd, '.planning');
+  const roadmapPath = path.join(planningDir, 'ROADMAP.md');
+  const statePath = path.join(planningDir, 'STATE.md');
+  const phasesDir = path.join(planningDir, 'phases');
+
+  const issues = [];
+  const fixesApplied = [];
+
+  const roadmapContent = safeReadFile(roadmapPath);
+  const stateContent = safeReadFile(statePath);
+
+  if (!roadmapContent && !stateContent) {
+    output({
+      status: 'errors',
+      issues: [{ type: 'missing_files', location: '.planning/', expected: 'ROADMAP.md and STATE.md', actual: 'Neither found', severity: 'error' }],
+      fixes_applied: [],
+      summary: 'Found 1 error and 0 warnings',
+    }, raw);
+    return;
+  }
+
+  // ─── Check 1: Plan count drift (SVAL-01) ────────────────────────────────
+  if (roadmapContent) {
+    const phasePattern = /#{2,4}\s*Phase\s+(\d+(?:\.\d+)?)\s*:\s*([^\n]+)/gi;
+    let phaseMatch;
+
+    while ((phaseMatch = phasePattern.exec(roadmapContent)) !== null) {
+      const phaseNum = phaseMatch[1];
+      const normalized = normalizePhaseName(phaseNum);
+
+      // Find the phase section to extract plan count claims
+      const sectionStart = phaseMatch.index;
+      const restOfContent = roadmapContent.slice(sectionStart);
+      const nextHeader = restOfContent.match(/\n#{2,4}\s+Phase\s+\d/i);
+      const sectionEnd = nextHeader ? sectionStart + nextHeader.index : roadmapContent.length;
+      const section = roadmapContent.slice(sectionStart, sectionEnd);
+
+      // Extract claimed plan count from "**Plans:** N/M plans" or "**Plans:** N plans"
+      const plansMatch = section.match(/\*\*Plans:?\*\*:?\s*(?:(\d+)\/)?(\d+)\s*plan/i);
+      const claimedPlanCount = plansMatch ? parseInt(plansMatch[2], 10) : null;
+      const claimedSummaryCount = plansMatch && plansMatch[1] ? parseInt(plansMatch[1], 10) : null;
+
+      // Count actual files on disk
+      let diskPlanCount = 0;
+      let diskSummaryCount = 0;
+      let phaseDirName = null;
+
+      try {
+        if (fs.existsSync(phasesDir)) {
+          const dirs = fs.readdirSync(phasesDir, { withFileTypes: true })
+            .filter(e => e.isDirectory()).map(e => e.name);
+          phaseDirName = dirs.find(d => d.startsWith(normalized + '-') || d === normalized);
+
+          if (phaseDirName) {
+            const phaseFiles = fs.readdirSync(path.join(phasesDir, phaseDirName));
+            diskPlanCount = phaseFiles.filter(f => f.endsWith('-PLAN.md') || f === 'PLAN.md').length;
+            diskSummaryCount = phaseFiles.filter(f => f.endsWith('-SUMMARY.md') || f === 'SUMMARY.md').length;
+          }
+        }
+      } catch (e) { debugLog('state.validate', 'readdir failed for phase ' + phaseNum, e); }
+
+      // Compare plan count
+      if (claimedPlanCount !== null && claimedPlanCount !== diskPlanCount && phaseDirName) {
+        issues.push({
+          type: 'plan_count_drift',
+          location: `ROADMAP.md Phase ${phaseNum}`,
+          expected: `${diskPlanCount} plans on disk`,
+          actual: `ROADMAP claims ${claimedPlanCount} plans`,
+          severity: 'error',
+        });
+
+        // Auto-fix if requested
+        if (options.fix) {
+          try {
+            let updatedRoadmap = fs.readFileSync(roadmapPath, 'utf-8');
+            const phaseEscaped = phaseNum.replace(/\./g, '\\.');
+
+            // Fix plan count in "**Plans:** X/Y plans" or "**Plans:** Y plans"
+            const fixPattern = new RegExp(
+              `(#{2,4}\\s*Phase\\s+${phaseEscaped}[\\s\\S]*?\\*\\*Plans:?\\*\\*:?\\s*)(?:\\d+\\/)?\\d+(\\s*plan)`,
+              'i'
+            );
+            const fixMatch = updatedRoadmap.match(fixPattern);
+            if (fixMatch) {
+              const newText = claimedSummaryCount !== null
+                ? `${fixMatch[1]}${diskSummaryCount}/${diskPlanCount}${fixMatch[2]}`
+                : `${fixMatch[1]}${diskPlanCount}${fixMatch[2]}`;
+              updatedRoadmap = updatedRoadmap.replace(fixPattern, newText);
+              fs.writeFileSync(roadmapPath, updatedRoadmap, 'utf-8');
+
+              // Auto-commit the fix
+              execGit(cwd, ['add', roadmapPath]);
+              execGit(cwd, ['commit', '-m', `fix(state): correct phase ${phaseNum} plan count ${claimedPlanCount} → ${diskPlanCount}`]);
+
+              fixesApplied.push({
+                phase: phaseNum,
+                field: 'plan_count',
+                old: String(claimedPlanCount),
+                new: String(diskPlanCount),
+              });
+            }
+          } catch (e) { debugLog('state.validate', 'auto-fix failed for phase ' + phaseNum, e); }
+        }
+      }
+
+      // Compare completion status: checkbox checked but not all summaries present
+      if (phaseDirName && diskPlanCount > 0) {
+        const checkboxPattern = new RegExp(`-\\s*\\[x\\]\\s*.*Phase\\s+${phaseNum.replace(/\./g, '\\.')}`, 'i');
+        const isMarkedComplete = checkboxPattern.test(roadmapContent);
+
+        if (isMarkedComplete && diskSummaryCount < diskPlanCount) {
+          issues.push({
+            type: 'completion_drift',
+            location: `ROADMAP.md Phase ${phaseNum}`,
+            expected: `${diskPlanCount} summaries for completion`,
+            actual: `${diskSummaryCount} summaries on disk`,
+            severity: 'error',
+          });
+        }
+      }
+    }
+  }
+
+  // ─── Check 2: Position validation (SVAL-02) ─────────────────────────────
+  if (stateContent) {
+    const phaseFieldMatch = stateContent.match(/\*\*Phase:\*\*\s*(\d+(?:\.\d+)?)\s+of\s+(\d+)/i);
+    if (phaseFieldMatch) {
+      const currentPhaseNum = phaseFieldMatch[1];
+      const phaseInfo = findPhaseInternal(cwd, currentPhaseNum);
+
+      if (!phaseInfo) {
+        issues.push({
+          type: 'position_missing',
+          location: 'STATE.md Phase field',
+          expected: `Phase ${currentPhaseNum} directory exists`,
+          actual: 'Phase directory not found',
+          severity: 'error',
+        });
+      } else if (phaseInfo.plans.length > 0 && phaseInfo.summaries.length >= phaseInfo.plans.length) {
+        issues.push({
+          type: 'position_completed',
+          location: 'STATE.md Phase field',
+          expected: 'Active phase with incomplete plans',
+          actual: `Phase ${currentPhaseNum} is fully complete (${phaseInfo.summaries.length}/${phaseInfo.plans.length})`,
+          severity: 'warn',
+        });
+      }
+    }
+  }
+
+  // ─── Check 3: Activity staleness (SVAL-03) ──────────────────────────────
+  if (stateContent) {
+    const activityMatch = stateContent.match(/\*\*Last Activity:\*\*\s*(\S+)/i);
+    if (activityMatch) {
+      const declaredDate = activityMatch[1];
+      const declaredTime = new Date(declaredDate).getTime();
+
+      // Get most recent .planning/ commit date
+      const gitResult = execGit(cwd, ['log', '-1', '--format=%ci', '--', '.planning/']);
+      if (gitResult.exitCode === 0 && gitResult.stdout) {
+        const gitDate = gitResult.stdout.split(' ')[0]; // Extract YYYY-MM-DD from git date
+        const gitTime = new Date(gitDate).getTime();
+
+        // Stale if declared timestamp is >24 hours older than most recent git commit
+        const dayMs = 24 * 60 * 60 * 1000;
+        if (!isNaN(declaredTime) && !isNaN(gitTime) && (gitTime - declaredTime) > dayMs) {
+          issues.push({
+            type: 'activity_stale',
+            location: 'STATE.md Last Activity',
+            expected: `Recent date near ${gitDate}`,
+            actual: `Declared ${declaredDate}`,
+            severity: 'warn',
+          });
+        }
+      }
+    }
+  }
+
+  // ─── Check 5: Blocker/todo staleness (SVAL-05) ──────────────────────────
+  if (stateContent) {
+    const config = loadConfig(cwd);
+    const stalenessThreshold = config.staleness_threshold || 2;
+
+    // Count completed plans across all phases
+    let totalCompletedPlans = 0;
+    try {
+      if (fs.existsSync(phasesDir)) {
+        const dirs = fs.readdirSync(phasesDir, { withFileTypes: true })
+          .filter(e => e.isDirectory()).map(e => e.name);
+        for (const dir of dirs) {
+          const files = fs.readdirSync(path.join(phasesDir, dir));
+          totalCompletedPlans += files.filter(f => f.endsWith('-SUMMARY.md') || f === 'SUMMARY.md').length;
+        }
+      }
+    } catch (e) { debugLog('state.validate', 'count completed plans failed', e); }
+
+    // Check blockers section
+    const blockerSection = stateContent.match(/###?\s*(?:Blockers|Blockers\/Concerns|Concerns)\s*\n([\s\S]*?)(?=\n###?|\n##[^#]|$)/i);
+    if (blockerSection) {
+      const blockerBody = blockerSection[1].trim();
+      if (blockerBody && !/^none\.?$/i.test(blockerBody) && !/^none yet\.?$/i.test(blockerBody)) {
+        const blockerLines = blockerBody.split('\n').filter(l => l.startsWith('- '));
+        if (blockerLines.length > 0 && totalCompletedPlans >= stalenessThreshold) {
+          for (const line of blockerLines) {
+            issues.push({
+              type: 'stale_blocker',
+              location: 'STATE.md Blockers',
+              expected: `Resolved within ${stalenessThreshold} completed plans`,
+              actual: `"${line.slice(2).trim()}" still open after ${totalCompletedPlans} completed plans`,
+              severity: 'warn',
+            });
+          }
+        }
+      }
+    }
+
+    // Check pending todos section
+    const todoSection = stateContent.match(/###?\s*(?:Pending Todos|Todos|Open Todos)\s*\n([\s\S]*?)(?=\n###?|\n##[^#]|$)/i);
+    if (todoSection) {
+      const todoBody = todoSection[1].trim();
+      if (todoBody && !/^none\.?$/i.test(todoBody) && !/^none yet\.?$/i.test(todoBody)) {
+        const todoLines = todoBody.split('\n').filter(l => l.startsWith('- '));
+        if (todoLines.length > 0 && totalCompletedPlans >= stalenessThreshold) {
+          for (const line of todoLines) {
+            issues.push({
+              type: 'stale_todo',
+              location: 'STATE.md Pending Todos',
+              expected: `Resolved within ${stalenessThreshold} completed plans`,
+              actual: `"${line.slice(2).trim()}" still open after ${totalCompletedPlans} completed plans`,
+              severity: 'warn',
+            });
+          }
+        }
+      }
+    }
+  }
+
+  // ─── Build result ───────────────────────────────────────────────────────
+  const errorCount = issues.filter(i => i.severity === 'error').length;
+  const warnCount = issues.filter(i => i.severity === 'warn').length;
+
+  let status = 'clean';
+  if (errorCount > 0) status = 'errors';
+  else if (warnCount > 0) status = 'warnings';
+
+  const summary = status === 'clean'
+    ? 'State validation passed — no issues found'
+    : `Found ${errorCount} error${errorCount !== 1 ? 's' : ''} and ${warnCount} warning${warnCount !== 1 ? 's' : ''}`;
+
+  output({
+    status,
+    issues,
+    fixes_applied: fixesApplied,
+    summary,
+  }, raw);
+}
+
 module.exports = {
   cmdStateLoad,
   cmdStateGet,
@@ -387,4 +649,5 @@ module.exports = {
   cmdStateAddBlocker,
   cmdStateResolveBlocker,
   cmdStateRecordSession,
+  cmdStateValidate,
 };

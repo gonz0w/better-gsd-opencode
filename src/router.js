@@ -8,7 +8,7 @@ const {
   cmdStateLoad, cmdStateGet, cmdStatePatch, cmdStateUpdate,
   cmdStateAdvancePlan, cmdStateRecordMetric, cmdStateUpdateProgress,
   cmdStateAddDecision, cmdStateAddBlocker, cmdStateResolveBlocker,
-  cmdStateRecordSession,
+  cmdStateRecordSession, cmdStateValidate,
 } = require('./commands/state');
 
 const {
@@ -160,6 +160,9 @@ async function main() {
           stopped_at: stoppedIdx !== -1 ? args[stoppedIdx + 1] : null,
           resume_file: resumeIdx !== -1 ? args[resumeIdx + 1] : 'None',
         }, raw);
+      } else if (subcommand === 'validate') {
+        const fix = args.includes('--fix');
+        cmdStateValidate(cwd, { fix }, raw);
       } else {
         cmdStateLoad(cwd, raw);
       }
