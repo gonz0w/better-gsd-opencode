@@ -3125,3 +3125,89 @@ describe('frontmatter edge cases', () => {
     assert.strictEqual(fm.phase, '01', 'untouched key "phase" should be preserved');
   });
 });
+
+// ─── Debug Logging (02-01) ────────────────────────────────────────────────────
+
+describe('debug logging', () => {
+  // Helper that captures both stdout and stderr separately
+  function runWithStderr(args, opts = {}) {
+    const env = { ...process.env, ...opts.env };
+    const { spawnSync } = require('child_process');
+    const result = spawnSync('node', [TOOLS_PATH, ...args.split(/\s+/)], {
+      cwd: opts.cwd || process.cwd(),
+      encoding: 'utf-8',
+      env,
+      stdio: ['pipe', 'pipe', 'pipe'],
+    });
+    return {
+      success: result.status === 0,
+      stdout: (result.stdout || '').trim(),
+      stderr: (result.stderr || '').trim(),
+      error: result.status !== 0 ? `exit code ${result.status}` : '',
+    };
+  }
+
+  test('produces debug output on stderr when GSD_DEBUG=1', () => {
+    // Use a command that triggers catch blocks (e.g., state read with no .planning)
+    const tmpDir = fs.mkdtempSync(path.join(require('os').tmpdir(), 'gsd-debug-'));
+    try {
+      const result = runWithStderr('init progress --raw', {
+        cwd: tmpDir,
+        env: { ...process.env, GSD_DEBUG: '1' },
+      });
+      // The command may fail (no .planning), but stderr should have debug lines
+      const debugLines = (result.stderr || '').split('\n').filter(l => l.includes('[GSD_DEBUG]'));
+      assert.ok(debugLines.length > 0, `Expected debug output on stderr, got: ${result.stderr.slice(0, 200)}`);
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  test('no debug output when GSD_DEBUG is unset', () => {
+    const tmpDir = fs.mkdtempSync(path.join(require('os').tmpdir(), 'gsd-debug-'));
+    try {
+      // Explicitly remove GSD_DEBUG from env
+      const cleanEnv = { ...process.env };
+      delete cleanEnv.GSD_DEBUG;
+      const result = runWithStderr('init progress --raw', {
+        cwd: tmpDir,
+        env: cleanEnv,
+      });
+      const debugLines = (result.stderr || '').split('\n').filter(l => l.includes('[GSD_DEBUG]'));
+      assert.strictEqual(debugLines.length, 0, `Expected no debug output, but got: ${debugLines.join('; ')}`);
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  test('stdout JSON remains valid when GSD_DEBUG=1', () => {
+    // current-timestamp (without --raw) always succeeds and returns JSON
+    const result = runWithStderr('current-timestamp', {
+      env: { ...process.env, GSD_DEBUG: '1' },
+    });
+    assert.ok(result.success, `Command should succeed: ${result.error}`);
+    // stdout must be valid JSON (no debug pollution)
+    let parsed;
+    assert.doesNotThrow(() => {
+      parsed = JSON.parse(result.stdout);
+    }, `stdout should be valid JSON, got: ${result.stdout.slice(0, 200)}`);
+    assert.ok(parsed.timestamp, 'Parsed JSON should contain a timestamp field');
+  });
+
+  test('debug output includes context strings with [GSD_DEBUG] prefix', () => {
+    const tmpDir = fs.mkdtempSync(path.join(require('os').tmpdir(), 'gsd-debug-'));
+    try {
+      const result = runWithStderr('init progress --raw', {
+        cwd: tmpDir,
+        env: { ...process.env, GSD_DEBUG: '1' },
+      });
+      const debugLines = (result.stderr || '').split('\n').filter(l => l.includes('[GSD_DEBUG]'));
+      // Each debug line should match the format: [GSD_DEBUG] context.subcontext: message
+      for (const line of debugLines) {
+        assert.match(line, /\[GSD_DEBUG\] [\w.-]+:/, `Debug line should have context format: ${line}`);
+      }
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+});
