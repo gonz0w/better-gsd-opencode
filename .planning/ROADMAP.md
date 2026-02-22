@@ -24,7 +24,7 @@ Full details: `.planning/milestones/v1.0-ROADMAP.md`
 
 **Milestone Goal:** Reduce token/context consumption across all GSD layers (workflows, CLI output, planning docs, research files) by 30%+ while resolving remaining tech debt.
 
-- [ ] **Phase 6: Token Measurement & Output Infrastructure** - Accurate token counting, workflow baselines, and `--fields` flag for all commands
+- [ ] **Phase 6: Token Measurement & Output Infrastructure** (3 plans) - Accurate token counting, workflow baselines, and `--fields` flag for all commands
 - [ ] **Phase 7: Init Command Compaction** - `--compact` flag for init commands and context manifests for agent loading
 - [ ] **Phase 8: Workflow & Reference Compression** - Rewrite workflows for 30%+ reduction, deduplicate shared content, add selective section loading
 - [ ] **Phase 9: Tech Debt Cleanup** - Fix broken test, complete --help coverage, create plan templates
@@ -40,7 +40,10 @@ Full details: `.planning/milestones/v1.0-ROADMAP.md`
   2. User can run a baseline measurement command that reports token counts for all 32 workflow invocations
   3. User can run a before/after comparison showing token delta per workflow (enabling proof of 30% target)
   4. Any JSON-outputting command accepts `--fields name,status,phase` and returns only those fields
-**Plans**: TBD
+**Plans**:
+  1. Plan 01 (Wave 1): Token estimation library + --fields flag [MEAS-01, CLIP-01]
+  2. Plan 02 (Wave 2): Workflow baseline measurement [MEAS-02]
+  3. Plan 03 (Wave 2): Before/after comparison [MEAS-03]
 
 ### Phase 7: Init Command Compaction
 **Goal**: Init commands return significantly smaller payloads when agents don't need full data, with manifests guiding what to load
@@ -83,7 +86,7 @@ Full details: `.planning/milestones/v1.0-ROADMAP.md`
 | 3. Developer Experience & Discoverability | v1.0 | 3/3 | Complete | 2026-02-22 |
 | 4. Build System & Module Split | v1.0 | 3/3 | Complete | 2026-02-22 |
 | 5. Performance & Polish | v1.0 | 2/2 | Complete | 2026-02-22 |
-| 6. Token Measurement & Output Infrastructure | v1.1 | 0/? | Not started | - |
+| 6. Token Measurement & Output Infrastructure | v1.1 | 0/3 | Planned | - |
 | 7. Init Command Compaction | v1.1 | 0/? | Not started | - |
 | 8. Workflow & Reference Compression | v1.1 | 0/? | Not started | - |
 | 9. Tech Debt Cleanup | v1.1 | 0/? | Not started | - |
