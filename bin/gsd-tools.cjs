@@ -4218,22 +4218,49 @@ var require_features = __commonJS({
           searchPatterns.push(`from.*${basename}`);
           searchPatterns.push(`import.*${basename}`);
         }
-        for (const pattern of searchPatterns) {
-          try {
-            const grepResult = execSync(
-              `grep -rl --fixed-strings ${sanitizeShellArg(pattern)} --include="*.ex" --include="*.exs" --include="*.go" --include="*.py" --include="*.ts" --include="*.tsx" --include="*.js" . 2>/dev/null | grep -v node_modules | grep -v _build | grep -v deps | head -30`,
-              { cwd, encoding: "utf-8", timeout: 15e3 }
-            ).trim();
-            if (grepResult) {
-              for (const dep of grepResult.split("\n")) {
-                const relative = dep.replace(/^\.\//, "");
-                if (relative !== filePath && !dependents.includes(relative)) {
-                  dependents.push(relative);
+        if (searchPatterns.length > 0) {
+          const regexMeta = /[.*+?[\]{}()|^$\\]/;
+          const fixedPatterns = searchPatterns.filter((p) => !regexMeta.test(p));
+          const regexPatterns = searchPatterns.filter((p) => regexMeta.test(p));
+          const includeFlags = '--include="*.ex" --include="*.exs" --include="*.go" --include="*.py" --include="*.ts" --include="*.tsx" --include="*.js"';
+          const filterPipe = "grep -v node_modules | grep -v _build | grep -v deps | head -30";
+          if (fixedPatterns.length > 0) {
+            const eArgs = fixedPatterns.map((p) => `-e ${sanitizeShellArg(p)}`).join(" ");
+            try {
+              const grepResult = execSync(
+                `grep -rl --fixed-strings ${eArgs} ${includeFlags} . 2>/dev/null | ${filterPipe}`,
+                { cwd, encoding: "utf-8", timeout: 15e3 }
+              ).trim();
+              if (grepResult) {
+                for (const dep of grepResult.split("\n")) {
+                  const relative = dep.replace(/^\.\//, "");
+                  if (relative !== filePath && !dependents.includes(relative)) {
+                    dependents.push(relative);
+                  }
                 }
               }
+            } catch (e) {
+              debugLog("feature.codebaseImpact", "fixed grep failed", e);
             }
-          } catch (e) {
-            debugLog("feature.codebaseImpact", "exec failed", e);
+          }
+          if (regexPatterns.length > 0) {
+            const eArgs = regexPatterns.map((p) => `-e ${sanitizeShellArg(p)}`).join(" ");
+            try {
+              const grepResult = execSync(
+                `grep -rl ${eArgs} ${includeFlags} . 2>/dev/null | ${filterPipe}`,
+                { cwd, encoding: "utf-8", timeout: 15e3 }
+              ).trim();
+              if (grepResult) {
+                for (const dep of grepResult.split("\n")) {
+                  const relative = dep.replace(/^\.\//, "");
+                  if (relative !== filePath && !dependents.includes(relative)) {
+                    dependents.push(relative);
+                  }
+                }
+              }
+            } catch (e) {
+              debugLog("feature.codebaseImpact", "regex grep failed", e);
+            }
           }
         }
         results.push({
