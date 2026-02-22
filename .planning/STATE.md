@@ -54,6 +54,7 @@ Recent decisions affecting current work:
 - [02-01]: debugLog(context, message, err) helper with GSD_DEBUG=1 gating; all 55 catch blocks instrumented
 - [02-02]: sanitizeShellArg() and isValidDateString() helpers; --fixed-strings for grep; _tmpFiles cleanup on exit
 - [03-02]: Slash commands follow existing workflow pattern with <process>/<step> structure; visualization uses box-drawing chars, reads pre-computed data
+- [Phase 03]: Help text to stderr via COMMAND_HELP map; config-migrate uses CONFIG_SCHEMA.nested for correct key placement
 
 ### Pending Todos
 
