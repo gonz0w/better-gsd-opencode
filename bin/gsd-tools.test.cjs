@@ -3522,6 +3522,8 @@ describe('config-migrate command', () => {
       depth: 'standard',
       test_commands: {},
       test_gate: true,
+      context_window: 200000,
+      context_target_percent: 50,
       planning: { commit_docs: true, search_gitignored: false },
       git: { branching_strategy: 'none', phase_branch_template: 'gsd/phase-{phase}-{slug}', milestone_branch_template: 'gsd/{milestone}-{slug}' },
       workflow: { research: true, plan_check: true, verifier: true },
@@ -3725,5 +3727,43 @@ describe('codebase-impact batch grep', () => {
     assert.ok(content.includes('-e ${sanitizeShellArg(p)}'), 'should batch -e flags with sanitization');
     // Should NOT have the old per-pattern loop
     assert.ok(!content.includes('for (const pattern of searchPatterns)'), 'should not have per-pattern loop');
+  });
+});
+
+describe('configurable context window', () => {
+  test('context-budget uses default context window (200K)', () => {
+    // Our config.json does not set context_window, so defaults should apply
+    const result = runGsdTools('context-budget .planning/phases/05-performance-polish/05-01-PLAN.md --raw');
+    assert.ok(result.success, `context-budget should succeed: ${result.error}`);
+    const data = JSON.parse(result.output);
+    assert.strictEqual(data.estimates.context_window, 200000, 'should default to 200K context window');
+    assert.strictEqual(data.estimates.target_percent, 50, 'should default to 50% target');
+  });
+
+  test('context-budget output includes context_window field', () => {
+    const result = runGsdTools('context-budget .planning/phases/05-performance-polish/05-02-PLAN.md --raw');
+    assert.ok(result.success, `context-budget should succeed: ${result.error}`);
+    const data = JSON.parse(result.output);
+    assert.ok('context_window' in data.estimates, 'estimates should contain context_window');
+    assert.ok(typeof data.estimates.context_window === 'number', 'context_window should be a number');
+  });
+
+  test('validate-config recognizes context_window as known key', () => {
+    const result = runGsdTools('validate-config --raw');
+    assert.ok(result.success, 'validate-config should succeed');
+    const data = JSON.parse(result.output);
+    // context_window should be in effective config (not in warnings as unknown)
+    assert.ok('context_window' in data.effective_config, 'should recognize context_window');
+    assert.strictEqual(data.effective_config.context_window.value, 200000, 'default should be 200000');
+    assert.strictEqual(data.effective_config.context_window.source, 'default', 'should come from defaults');
+  });
+
+  test('validate-config recognizes context_target_percent as known key', () => {
+    const result = runGsdTools('validate-config --raw');
+    assert.ok(result.success, 'validate-config should succeed');
+    const data = JSON.parse(result.output);
+    assert.ok('context_target_percent' in data.effective_config, 'should recognize context_target_percent');
+    assert.strictEqual(data.effective_config.context_target_percent.value, 50, 'default should be 50');
+    assert.strictEqual(data.effective_config.context_target_percent.source, 'default', 'should come from defaults');
   });
 });
