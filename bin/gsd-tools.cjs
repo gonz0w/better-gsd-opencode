@@ -170,7 +170,7 @@ Workflows:
   progress                Progress overview
 
 Flags:
-  --compact  Return essential-only fields (38-50% smaller)
+  --compact  Return essential-only fields with context manifest (38-50% smaller)
 
 Examples:
   gsd-tools init execute-phase 03
