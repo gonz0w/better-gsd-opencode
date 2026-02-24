@@ -1,5 +1,26 @@
 # Milestones
 
+## ✅ v2.0 Quality & Intelligence (Shipped: 2026-02-24)
+
+**Phases completed:** 4 phases, 13 plans
+**Commits:** 25 | **Files changed:** 61 | **Lines:** +14,172 / -2,553
+**Timeline:** 3 days (2026-02-22 → 2026-02-24)
+**Tests:** 297 passing (0 failures)
+**Bundle:** 373KB / 400KB budget
+
+**Key accomplishments:**
+- Built state validation engine with 5 drift-detection checks (plan count, position, stale activity, blocker staleness, plan claims) and auto-fix for unambiguous corrections
+- Implemented cross-session memory system with dual-store pattern (STATE.md authority + memory.json cache), sacred data protection, bookmark auto-save, and deterministic compaction
+- Added comprehensive quality gates: test gating, requirement checking, regression detection, multi-dimensional quality scoring (A-F grades), and plan single-responsibility analysis with union-find concern grouping
+- Created integration test infrastructure: workflow sequence tests, state round-trips, E2E simulation, snapshot tests, and test coverage tracking across 297 tests
+- Added bundle size tracking (400KB budget), token budgets for workflows, compact-as-default for all init commands, and MCP server discovery
+
+**Archives:**
+- `.planning/milestones/v2.0-ROADMAP.md`
+- `.planning/milestones/v2.0-REQUIREMENTS.md`
+
+---
+
 ## ✅ v1.1 Context Reduction & Tech Debt (Shipped: 2026-02-22)
 
 **Phases completed:** 4 phases, 10 plans

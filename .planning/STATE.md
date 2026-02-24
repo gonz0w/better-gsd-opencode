@@ -2,43 +2,29 @@
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-02-22)
+See: .planning/PROJECT.md (updated 2026-02-24)
 
 **Core value:** Manage and deliver high-quality software with high-quality documentation, while continuously reducing token usage and improving performance
-**Current focus:** v2.0 Quality & Intelligence — COMPLETE (all 13 phases shipped)
+**Current focus:** Between milestones — v2.0 shipped, next milestone not yet started
 
 ## Current Position
 
-Phase: 13 of 13 (Test Infrastructure & Polish)
-Plan: 13-04 — MCP Discovery (complete)
-Status: Milestone v2.0 complete
-Last activity: 2026-02-24 — Finalized v2.0 milestone: all 36 requirements complete, 297 tests passing
+Phase: N/A (between milestones)
+Plan: N/A
+Status: All milestones complete (v1.0, v1.1, v2.0)
+Last activity: 2026-02-24 — Archived v2.0 milestone
 
-Progress: [████████████████████████████] 100% (13/13 phases complete)
+Progress: All 13 phases across 3 milestones shipped.
 
 ## Accumulated Context
 
 ### Decisions
 
-All v1.0 and v1.1 decisions recorded in PROJECT.md Key Decisions table with outcomes.
-v2.0 decision: Platform target is OpenCode only (Claude Code version stays as-is).
-v2.0 decision: May introduce bundled dependencies if they demonstrably reduce tokens or improve quality.
-v2.0 decision: Zero new npm runtime dependencies — all v2.0 features use Node.js built-ins only.
-v2.0 decision: Dual-store pattern — STATE.md (human-readable, authoritative) + memory.json (machine-optimized, advisory).
-v2.0 decision: Advisory-only state validation first — never blocks workflows, warns only.
-- [Phase 10]: Issue structure uses { type, location, expected, actual, severity } for machine-readable validation output
-- [Phase 10]: Auto-fix only corrects plan count drift, not timestamps or position (needs human judgment)
-- [Phase 10]: Raw config read for gates.* keys since loadConfig only returns CONFIG_SCHEMA keys
-- [Phase 11]: Sacred data protection — decisions and lessons never pruned during compaction
-- [Phase 11]: Bookmark drift detection warns when filesystem doesn't match saved position
-- [Phase 12]: Quality scoring uses 4 dimensions: tests 30%, must_haves 30%, requirements 20%, regression 20%
-- [Phase 12]: SR scoring uses union-find for concern grouping with split suggestions
-- [Phase 13]: Bundle size tracked in build.js with 400KB budget ceiling
-- [Phase 13]: --compact is now the default; --verbose is opt-out
+All v1.0, v1.1, and v2.0 decisions recorded in PROJECT.md Key Decisions table with outcomes.
 
 ### Pending Todos
 
-None — v2.0 milestone complete.
+None — between milestones.
 
 ### Blockers/Concerns
 
@@ -47,5 +33,6 @@ None.
 ## Session Continuity
 
 Last session: 2026-02-24
-Stopped at: Completed v2.0 milestone finalization
+Stopped at: Completed v2.0 milestone archival
 Resume file: None
+Next action: /gsd-new-milestone to start next milestone

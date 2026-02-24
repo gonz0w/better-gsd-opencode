@@ -2,23 +2,18 @@
 
 ## What This Is
 
-A zero-dependency, single-file Node.js CLI built from 15 organized `src/` modules via esbuild, producing `bin/gsd-tools.cjs`. It provides structured data operations for AI-driven project planning workflows running in OpenCode. v1.0 established the test suite, module split, and observability layer. v1.1 added context reduction across all workflow layers (46.7% CLI output reduction, 54.6% workflow compression, 67% reference file reduction). v2.0 targets smarter state management, atomic planning, cross-session memory, comprehensive verification, integration testing, and dependency optimization.
+A zero-dependency, single-file Node.js CLI built from 16 organized `src/` modules via esbuild, producing `bin/gsd-tools.cjs`. It provides structured data operations for AI-driven project planning workflows running in OpenCode. v1.0 established the test suite, module split, and observability layer. v1.1 added context reduction across all workflow layers (46.7% CLI output reduction, 54.6% workflow compression, 67% reference file reduction). v2.0 added state validation, atomic plan decomposition, cross-session memory, comprehensive verification (quality scoring, regression detection), integration testing (297 tests), and dependency/token optimization.
 
 ## Core Value
 
 Manage and deliver high-quality software with high-quality documentation, while continuously reducing token usage and improving performance.
 
-## Current Milestone: v2.0 Quality & Intelligence
+## Current State
 
-**Goal:** Make the GSD plugin smarter — validate its own state, decompose plans atomically, remember across sessions, verify deliverables comprehensively, and optimize its dependency/token footprint.
+All milestones shipped: v1.0 (Performance & Quality), v1.1 (Context Reduction & Tech Debt), v2.0 (Quality & Intelligence).
+297 tests passing, 373KB bundle (400KB budget), 79+ CLI commands, 16 src/ modules.
 
-**Target features:**
-- State validation (detect drift between STATE.md and reality)
-- Atomic plan decomposition (single-responsibility plans, not 3+ things bundled)
-- Cross-session memory (preserve decisions, position, codebase knowledge across /clear)
-- Comprehensive verification (auto-test, requirement checking, regression detection)
-- Integration test suite (end-to-end workflow tests: init → plan → execute → verify)
-- Dependency & token optimization (evaluate Node.js modules for performance/context gains)
+Ready for next milestone planning via `/gsd-new-milestone`.
 
 ## Requirements
 
@@ -65,17 +60,19 @@ Manage and deliver high-quality software with high-quality documentation, while 
 - ✓ 202 tests passing (zero failures) — v1.1
 - ✓ Complete --help coverage (44 commands) — v1.1
 - ✓ Plan templates (execute, tdd, discovery) — v1.1
+- ✓ State validation with 5 drift-detection checks and auto-fix — v2.0
+- ✓ Atomic plan decomposition with SR scoring (1-5) and split suggestions — v2.0
+- ✓ Cross-session memory with dual-store pattern and sacred data protection — v2.0
+- ✓ Comprehensive verification (test gating, requirement checking, regression detection) — v2.0
+- ✓ Multi-dimensional quality scoring with A-F grades and trend tracking — v2.0
+- ✓ Integration test suite: 297 tests, E2E simulation, snapshot tests — v2.0
+- ✓ Bundle size tracking (400KB budget) and token budgets for workflows — v2.0
+- ✓ --compact as default for all init commands — v2.0
+- ✓ MCP server discovery from .mcp.json configs — v2.0
 
 ### Active
 
-<!-- Current scope for v2.0. Building toward these. -->
-
-- [ ] State validation — detect when STATE.md drifts from git/filesystem reality
-- [ ] Atomic plan decomposition — enforce single-responsibility per plan
-- [ ] Cross-session memory — persist decisions, position, codebase knowledge across /clear
-- [ ] Comprehensive verification — auto-test execution, requirement delivery checks, regression detection
-- [ ] Integration tests — end-to-end workflow tests (init → plan → execute → verify)
-- [ ] Dependency & token optimization — evaluate modules for performance/context reduction
+<!-- No active requirements — between milestones. Run /gsd-new-milestone to define next. -->
 
 ### Out of Scope
 
@@ -88,12 +85,11 @@ Manage and deliver high-quality software with high-quality documentation, while 
 
 ## Context
 
-Shipped v1.0 + v1.1. 202 tests, 15 src/ modules, esbuild bundler. Now targeting v2.0.
+Shipped v1.0, v1.1, and v2.0. 297 tests passing, 16 src/ modules, 373KB bundle, esbuild bundler.
 Platform: OpenCode (no longer targeting Claude Code).
 Tech stack: Node.js 18+, node:test, esbuild, tokenx (bundled), zero runtime dependencies.
-Source split into `src/lib/` (7 modules) and `src/commands/` (7 modules) + router + index.
+Source: 10,519 lines across 16 modules — `src/lib/` (7 modules) and `src/commands/` (8 modules) + router + index.
 Deploy pipeline: `npm run build` → esbuild bundle → `deploy.sh` with smoke test and rollback.
-v2.0 may introduce bundled dependencies if they demonstrably reduce tokens or improve quality.
 
 No known tech debt.
 
@@ -121,6 +117,13 @@ No known tech debt.
 | Split --compact/--manifest flags | Field reduction separate from guidance; eliminates manifest overhead from default path | Good — 46.7% avg reduction without manifest bloat |
 | HTML comment section markers | Invisible to markdown rendering, machine-parseable | Good — dual-boundary parsing for headers + markers |
 | Prose tightening over structural changes | AI agents don't need persuasion; imperative instructions are sufficient | Good — 54.6% avg workflow compression |
+| Advisory-only state validation | Never block workflows; warn and let user decide | Good — catches drift without disrupting execution |
+| Dual-store pattern (STATE.md + memory.json) | Human-readable authority + machine-optimized caching | Good — decisions/bookmarks survive sessions |
+| Sacred data protection in compaction | Decisions and lessons too valuable to prune | Good — no information loss during cleanup |
+| 4-dimension quality scoring | Balanced weight: tests 30%, must_haves 30%, requirements 20%, regression 20% | Good — comprehensive deliverable verification |
+| Union-find for concern grouping | Efficient clustering for single-responsibility analysis | Good — O(n) plan analysis |
+| 400KB bundle budget | Ceiling prevents accidental bloat from new dependencies | Good — 373KB actual, 7% headroom |
+| Compact-as-default | Most consumers are AI agents that need compact output | Good — saves ~47% tokens per invocation |
 
 ---
-*Last updated: 2026-02-22 after v2.0 milestone started*
+*Last updated: 2026-02-24 after v2.0 milestone completed*
