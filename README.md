@@ -1,6 +1,8 @@
 # GSD (Get Shit Done) — Planning Plugin for OpenCode
 
-A structured project planning and execution plugin for [OpenCode](https://github.com/opencode-ai/opencode). GSD brings milestone-driven planning, phase execution, progress tracking, and developer workflow automation to AI-assisted coding sessions.
+A structured project planning and execution plugin for [OpenCode](https://github.com/opencode-ai/opencode). GSD brings milestone-driven planning, phase execution, progress tracking, quality verification, and developer workflow automation to AI-assisted coding sessions.
+
+**297 tests** | **373KB bundle** | **Zero runtime dependencies** | **10,500+ lines of source**
 
 ## What It Does
 
@@ -8,18 +10,27 @@ GSD turns chaotic development into structured execution:
 
 - **Milestone & Phase Planning** — Break projects into milestones with phases, goals, dependencies, and requirements
 - **Execution Tracking** — Track progress at milestone, phase, and plan level with automatic state management
+- **Quality Gates** — Test gating, requirement verification, regression detection, and multi-dimensional quality scoring
+- **Session Memory** — Decisions, bookmarks, lessons, and codebase knowledge persist across sessions
+- **State Intelligence** — Drift detection between declared state and filesystem/git reality with auto-fix
+- **Plan Analysis** — Single-responsibility scoring, dependency cycle detection, wave conflict validation
 - **Git-Aware** — Session diffs, commit tracking, rollback info, and velocity metrics
-- **Context Management** — Token budget estimation, codebase impact analysis, requirement tracing
-- **Decision & Lesson Search** — Search past decisions and lessons learned across archived milestones
+- **Context Management** — Token budget estimation, bundle size tracking, codebase impact analysis
+- **MCP Discovery** — Discover available MCP servers and surface their capabilities to workflows
 
 ## Project Structure
 
 ```
-bin/gsd-tools.cjs          # Main CLI tool (single file, zero runtime deps)
-src/                       # Source modules (compiled to bin/ via esbuild)
+bin/gsd-tools.cjs          # Built CLI (373KB, single file, zero runtime deps)
+src/
+  commands/                # 8 command modules (init, state, phase, roadmap, verify, memory, features, misc)
+  lib/                     # 7 library modules (config, constants, context, frontmatter, git, helpers, output)
+  router.js                # Command routing with --verbose/--compact/--fields flags
+  index.js                 # Entry point
 workflows/*.md             # 43 workflow definitions (invoked by slash commands)
-templates/*.md             # Document templates (PLAN.md, STATE.md, ROADMAP.md, etc.)
+templates/*.md             # 25 document templates (plans, summaries, roadmaps, dependency eval, etc.)
 references/*.md            # Reference docs loaded by agents
+build.js                   # esbuild pipeline with bundle size tracking (400KB budget)
 deploy.sh                  # Deploy to ~/.config/opencode/get-shit-done/
 ```
 
@@ -27,10 +38,10 @@ deploy.sh                  # Deploy to ~/.config/opencode/get-shit-done/
 
 ```bash
 # Clone the repo
-git clone https://github.com/gonz0w/better-gsd-opencode.git
+git clone https://github.com/gonz0w/gsd-opencode.git
 
 # Install dev dependencies
-cd better-gsd-opencode
+cd gsd-opencode
 npm install
 
 # Build the CLI
@@ -44,23 +55,41 @@ npm run build
 
 GSD is used through slash commands inside OpenCode sessions:
 
+### Core Workflow
+
 ```
 /gsd-new-project          # Start a new project with milestone planning
-/gsd-progress             # View current milestone/phase progress
-/gsd-plan-phase           # Plan the next phase
+/gsd-plan-phase           # Plan the next phase with task breakdown
 /gsd-execute-phase        # Execute a planned phase
+/gsd-progress             # View current milestone/phase progress
 /gsd-quick                # Quick summary of where things stand
-/gsd-velocity             # Plans/day + completion forecast
+```
+
+### Quality & Verification
+
+```
+/gsd-verify-phase         # Run full phase verification suite
+/gsd-test-run             # Parse test output with pass/fail gating
+/gsd-validate-deps        # Validate phase dependency graph
+/gsd-validate-config      # Schema validation for config.json
+/gsd-trace-requirement    # Trace requirement to files on disk
+```
+
+### Session & Memory
+
+```
 /gsd-session-diff         # Git commits since last activity
 /gsd-search-decisions     # Search past decisions
 /gsd-search-lessons       # Search lessons learned
-/gsd-context-budget       # Token estimation for a plan
-/gsd-validate-deps        # Validate phase dependency graph
-/gsd-codebase-impact      # Show module dependencies
-/gsd-trace-requirement    # Trace requirement to files on disk
+/gsd-velocity             # Plans/day + completion forecast
 /gsd-rollback-info        # Show commits + revert command
-/gsd-test-run             # Parse test output with pass/fail gating
-/gsd-validate-config      # Schema validation for config.json
+```
+
+### Analysis & Budget
+
+```
+/gsd-context-budget       # Token estimation for a plan
+/gsd-codebase-impact      # Show module dependencies
 ```
 
 Or run the CLI directly:
@@ -69,19 +98,90 @@ Or run the CLI directly:
 node bin/gsd-tools.cjs <command> [args] --raw
 ```
 
-## Key Features (v1.1)
+## CLI Commands
+
+The CLI exposes 70+ commands organized by domain:
+
+| Domain | Commands | Description |
+|--------|----------|-------------|
+| **init** | `init progress`, `init plan-phase`, `init execute-phase`, `init memory`, ... | Context injection for workflow sessions |
+| **state** | `state validate`, `state validate --fix`, `state-snapshot` | State drift detection and auto-repair |
+| **memory** | `memory write`, `memory read`, `memory list`, `memory compact` | Cross-session persistence (decisions, bookmarks, lessons, todos) |
+| **verify** | `verify deliverables`, `verify requirements`, `verify regression`, `verify quality` | Quality gates with A-F grading and trend tracking |
+| **analyze** | `analyze plan`, `verify plan-wave`, `verify plan-deps`, `verify plan-structure` | Plan decomposition analysis and validation |
+| **roadmap** | `roadmap analyze`, `roadmap phase-status`, `requirements` | Roadmap parsing and requirement tracking |
+| **features** | `test-coverage`, `token-budget`, `mcp discover` | Test coverage, token budgets, MCP discovery |
+| **misc** | `velocity`, `session-diff`, `search-decisions`, `search-lessons`, `codebase-impact`, `rollback-info`, `trace-requirement` | Developer productivity tools |
+
+## Key Features by Version
+
+### v2.0 — Quality & Intelligence (current)
+
+- **State Intelligence** — `state validate` detects drift between ROADMAP.md claims and actual files on disk, with `--fix` for auto-correction. Pre-flight validation runs automatically before phase execution.
+- **Session Memory** — Dual-store pattern (STATE.md + memory.json) with sacred data protection. Decisions and lessons are never pruned. Bookmarks record exact position for seamless resume.
+- **Quality Gates** — `verify deliverables` runs tests and fails on failure. `verify requirements` checks REQUIREMENTS.md coverage. `verify regression` detects new test failures. `verify quality` produces A-F scores across 4 dimensions (tests 30%, must_haves 30%, requirements 20%, regression 20%) with trend tracking.
+- **Plan Analysis** — `analyze plan` scores plans 1-5 on single-responsibility using union-find concern grouping. `verify plan-wave` detects file conflicts in parallel execution. `verify plan-deps` finds dependency cycles via DFS.
+- **Test Infrastructure** — 297 tests across 65 suites. Integration tests cover workflow sequences, state round-trips, config migration, and E2E simulation. Snapshot tests for init output stability.
+- **Build Pipeline** — Bundle size tracked on every build (373KB / 400KB budget). Token budgets assigned per workflow with overage flagging.
+- **Compact Default** — `--compact` output is now the default for all init commands (optimized for AI consumers). Use `--verbose` for full output.
+- **MCP Discovery** — `mcp discover` scans .mcp.json configs and surfaces server capabilities.
+
+### v1.1 — Context Reduction & Tech Debt
+
+- **Token Measurement** — BPE-based token estimation via tokenx (~96% accuracy)
+- **Output Compaction** — `--compact` profiles reduce init output by 40-60%
+- **Context Manifests** — `--manifest` flag for structured context loading
+- **Workflow Compression** — All 43 workflows compressed for token efficiency
+- **`--fields` Flag** — Filter any JSON output with dot-notation (e.g., `--fields phase_count,phases.name`)
+- **Section Extraction** — `extract-sections` pulls specific sections from markdown files
+
+### v1.0 — Performance & Quality
 
 - **Multi-strategy milestone detection** — Finds active milestone via markers, tags, sections, or fallback
-- **Phase-scoped progress** — Progress calculated per-milestone, not globally
-- **Session diff tracking** — Git commits since last activity included in progress reports
-- **Context budget estimation** — Token estimation with warnings when plans exceed 50% of context
-- **Test run gating** — Parse ExUnit/Go/pytest output with pass/fail gating
-- **Decision & lesson search** — Full-text search across STATE.md and archives
-- **Dependency validation** — Validates phase dependency graphs
-- **Velocity metrics** — Plans/day calculation with completion forecasting
-- **Requirement tracing** — Trace from requirement ID to files on disk
-- **Config validation** — Schema validation with typo detection
-- **Generic plan templates** — Reusable templates for common plan types
+- **esbuild pipeline** — Source split into 16 modules, bundled to single CJS file
+- **In-memory file cache** — `cachedReadFile` eliminates redundant disk reads
+- **Session diff tracking** — Git commits since last activity in progress reports
+- **Config validation** — Schema validation with typo detection for config.json
+
+## Development
+
+```bash
+# Build (includes bundle size check)
+npm run build
+
+# Run tests (node:test runner, 297 tests)
+npm test
+
+# Test a specific command
+node bin/gsd-tools.cjs state validate --raw
+
+# Deploy to live config
+./deploy.sh
+```
+
+### Source Architecture
+
+```
+src/index.js           # Entry point, CLI argument parsing
+src/router.js          # Command routing, global flags (--raw, --verbose, --fields)
+src/commands/
+  init.js              # 12 init subcommands + init memory
+  state.js             # State management, validation, snapshots
+  phase.js             # Phase operations, plan indexing
+  roadmap.js           # Roadmap analysis, requirement tracking
+  verify.js            # Quality gates, plan analysis, deliverable verification
+  memory.js            # Memory store CRUD (decisions, bookmarks, lessons, todos)
+  features.js          # Test coverage, token budgets, MCP discovery
+  misc.js              # Velocity, search, impact, rollback, tracing
+src/lib/
+  config.js            # Config loading, migration, schema validation
+  constants.js         # Command help text, schemas, defaults
+  context.js           # Token estimation (tokenx integration)
+  frontmatter.js       # YAML frontmatter parsing and validation
+  git.js               # Git operations (log, diff, status, commit)
+  helpers.js           # File I/O, caching, path resolution
+  output.js            # JSON output formatting, field filtering
+```
 
 ## Requirements
 
