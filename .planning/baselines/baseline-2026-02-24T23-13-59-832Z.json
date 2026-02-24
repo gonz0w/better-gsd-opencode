@@ -1,14 +1,14 @@
 {
-  "timestamp": "2026-02-22T20:15:53.980Z",
+  "timestamp": "2026-02-24T23:13:59.831Z",
   "workflow_count": 43,
-  "total_tokens": 71601,
+  "total_tokens": 72163,
   "workflows": [
     {
       "name": "execute-phase.md",
-      "workflow_tokens": 2314,
+      "workflow_tokens": 2661,
       "ref_count": 2,
       "ref_tokens": 4765,
-      "total_tokens": 7079
+      "total_tokens": 7426
     },
     {
       "name": "discuss-phase.md",
@@ -54,10 +54,10 @@
     },
     {
       "name": "execute-plan.md",
-      "workflow_tokens": 2671,
+      "workflow_tokens": 2767,
       "ref_count": 0,
       "ref_tokens": 0,
-      "total_tokens": 2671
+      "total_tokens": 2767
     },
     {
       "name": "progress.md",
@@ -193,6 +193,13 @@
       "total_tokens": 1097
     },
     {
+      "name": "pause-work.md",
+      "workflow_tokens": 1003,
+      "ref_count": 0,
+      "ref_tokens": 0,
+      "total_tokens": 1003
+    },
+    {
       "name": "insert-phase.md",
       "workflow_tokens": 979,
       "ref_count": 0,
@@ -205,13 +212,6 @@
       "ref_count": 0,
       "ref_tokens": 0,
       "total_tokens": 968
-    },
-    {
-      "name": "pause-work.md",
-      "workflow_tokens": 884,
-      "ref_count": 0,
-      "ref_tokens": 0,
-      "total_tokens": 884
     },
     {
       "name": "add-phase.md",
