@@ -31,7 +31,7 @@ const {
   cmdInitExecutePhase, cmdInitPlanPhase, cmdInitNewProject,
   cmdInitNewMilestone, cmdInitQuick, cmdInitResume, cmdInitVerifyWork,
   cmdInitPhaseOp, cmdInitTodos, cmdInitMilestoneOp, cmdInitMapCodebase,
-  cmdInitProgress,
+  cmdInitProgress, cmdInitMemory,
 } = require('./commands/init');
 
 const {
@@ -51,6 +51,10 @@ const {
   cmdFrontmatterSet, cmdFrontmatterMerge, cmdFrontmatterValidate,
   cmdProgressRender, cmdTodoComplete, cmdScaffold,
 } = require('./commands/misc');
+
+const {
+  cmdMemoryWrite, cmdMemoryRead, cmdMemoryList, cmdMemoryEnsureDir, cmdMemoryCompact,
+} = require('./commands/memory');
 
 
 async function main() {
@@ -88,7 +92,7 @@ async function main() {
   const cwd = process.cwd();
 
   if (!command) {
-    error('Usage: gsd-tools <command> [args] [--raw]\nCommands: codebase-impact, commit, config-ensure-section, config-get, config-migrate, config-set, context-budget, current-timestamp, extract-sections, find-phase, frontmatter, generate-slug, history-digest, init, list-todos, milestone, phase, phase-plan-index, phases, progress, quick-summary, requirements, resolve-model, roadmap, rollback-info, scaffold, search-decisions, search-lessons, session-diff, state, state-snapshot, summary-extract, template, test-run, todo, trace-requirement, validate, validate-config, validate-dependencies, velocity, verify, verify-path-exists, verify-summary, websearch');
+    error('Usage: gsd-tools <command> [args] [--raw]\nCommands: codebase-impact, commit, config-ensure-section, config-get, config-migrate, config-set, context-budget, current-timestamp, extract-sections, find-phase, frontmatter, generate-slug, history-digest, init, list-todos, memory, milestone, phase, phase-plan-index, phases, progress, quick-summary, requirements, resolve-model, roadmap, rollback-info, scaffold, search-decisions, search-lessons, session-diff, state, state-snapshot, summary-extract, template, test-run, todo, trace-requirement, validate, validate-config, validate-dependencies, velocity, verify, verify-path-exists, verify-summary, websearch');
   }
 
   // --help / -h: print command help to stderr (never contaminates JSON stdout)
@@ -472,8 +476,11 @@ async function main() {
         case 'progress':
           cmdInitProgress(cwd, raw);
           break;
+        case 'memory':
+          cmdInitMemory(cwd, args.slice(2), raw);
+          break;
         default:
-          error(`Unknown init workflow: ${workflow}\nAvailable: execute-phase, plan-phase, new-project, new-milestone, quick, resume, verify-work, phase-op, todos, milestone-op, map-codebase, progress`);
+          error(`Unknown init workflow: ${workflow}\nAvailable: execute-phase, plan-phase, new-project, new-milestone, quick, resume, verify-work, phase-op, todos, milestone-op, map-codebase, progress, memory`);
       }
       break;
     }
@@ -577,6 +584,45 @@ async function main() {
 
     case 'extract-sections': {
       cmdExtractSections(cwd, args.slice(1), raw);
+      break;
+    }
+
+    case 'memory': {
+      const subcommand = args[1];
+      if (subcommand === 'write') {
+        const storeIdx = args.indexOf('--store');
+        const entryIdx = args.indexOf('--entry');
+        cmdMemoryWrite(cwd, {
+          store: storeIdx !== -1 ? args[storeIdx + 1] : null,
+          entry: entryIdx !== -1 ? args[entryIdx + 1] : null,
+        }, raw);
+      } else if (subcommand === 'read') {
+        const storeIdx = args.indexOf('--store');
+        const limitIdx = args.indexOf('--limit');
+        const queryIdx = args.indexOf('--query');
+        const phaseIdx = args.indexOf('--phase');
+        cmdMemoryRead(cwd, {
+          store: storeIdx !== -1 ? args[storeIdx + 1] : null,
+          limit: limitIdx !== -1 ? args[limitIdx + 1] : null,
+          query: queryIdx !== -1 ? args[queryIdx + 1] : null,
+          phase: phaseIdx !== -1 ? args[phaseIdx + 1] : null,
+        }, raw);
+      } else if (subcommand === 'list') {
+        cmdMemoryList(cwd, {}, raw);
+      } else if (subcommand === 'ensure-dir') {
+        cmdMemoryEnsureDir(cwd);
+      } else if (subcommand === 'compact') {
+        const storeIdx = args.indexOf('--store');
+        const thresholdIdx = args.indexOf('--threshold');
+        const dryRun = args.includes('--dry-run');
+        cmdMemoryCompact(cwd, {
+          store: storeIdx !== -1 ? args[storeIdx + 1] : null,
+          threshold: thresholdIdx !== -1 ? args[thresholdIdx + 1] : null,
+          dryRun,
+        }, raw);
+      } else {
+        error('Unknown memory subcommand. Available: write, read, list, ensure-dir, compact');
+      }
       break;
     }
 

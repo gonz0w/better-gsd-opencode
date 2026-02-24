@@ -976,6 +976,224 @@ function cmdInitProgress(cwd, raw) {
   output(result, raw);
 }
 
+function cmdInitMemory(cwd, args, raw) {
+  // Parse flags from args array
+  const workflowIdx = args.indexOf('--workflow');
+  const workflow = workflowIdx !== -1 ? args[workflowIdx + 1] : null;
+  const phaseIdx = args.indexOf('--phase');
+  const phaseFilter = phaseIdx !== -1 ? args[phaseIdx + 1] : null;
+  const compact = args.includes('--compact') || global._gsdCompactMode;
+
+  const maxChars = compact ? 4000 : 8000;
+  const trimmed = [];
+
+  // 1. Position — parse STATE.md
+  const statePath = path.join(cwd, '.planning', 'STATE.md');
+  const stateContent = safeReadFile(statePath);
+  const position = {};
+  if (stateContent) {
+    const phaseMatch = stateContent.match(/\*\*Phase:?\*\*:?\s*(.+)/i);
+    if (phaseMatch) position.phase = phaseMatch[1].trim();
+    const nameMatch = stateContent.match(/\*\*Phase Name:?\*\*:?\s*(.+)/i);
+    if (nameMatch) position.phase_name = nameMatch[1].trim();
+    const planMatch = stateContent.match(/\*\*Plan:?\*\*:?\s*(.+)/i);
+    if (planMatch) position.plan = planMatch[1].trim();
+    const statusMatch = stateContent.match(/\*\*Status:?\*\*:?\s*(.+)/i);
+    if (statusMatch) position.status = statusMatch[1].trim();
+    const lastMatch = stateContent.match(/\*\*Last [Aa]ctivity:?\*\*:?\s*(.+)/i);
+    if (lastMatch) position.last_activity = lastMatch[1].trim();
+    const stoppedMatch = stateContent.match(/\*\*Stopped [Aa]t:?\*\*:?\s*(.+)/i);
+    if (stoppedMatch) position.stopped_at = stoppedMatch[1].trim();
+  }
+
+  // 2. Bookmark — read from memory store
+  let bookmark = null;
+  const bookmarksPath = path.join(cwd, '.planning', 'memory', 'bookmarks.json');
+  const bookmarksContent = safeReadFile(bookmarksPath);
+  if (bookmarksContent) {
+    try {
+      const bookmarks = JSON.parse(bookmarksContent);
+      if (Array.isArray(bookmarks) && bookmarks.length > 0) {
+        bookmark = bookmarks[0];
+        // Drift warning: check if git HEAD changed since bookmark's git_head
+        if (bookmark.git_head && phaseFilter && String(bookmark.phase) === String(phaseFilter)) {
+          try {
+            const headResult = execGit(cwd, ['rev-parse', 'HEAD']);
+            if (headResult.exitCode === 0 && headResult.stdout !== bookmark.git_head) {
+              // Check if relevant files changed
+              const diffResult = execGit(cwd, ['diff', '--name-only', bookmark.git_head, 'HEAD']);
+              if (diffResult.exitCode === 0 && diffResult.stdout) {
+                const changedFiles = diffResult.stdout.split('\n').filter(Boolean);
+                const relevantChanges = changedFiles.filter(f =>
+                  (bookmark.last_file && f === bookmark.last_file) ||
+                  f.startsWith('.planning/')
+                );
+                if (relevantChanges.length > 0) {
+                  bookmark.drift_warning = `${relevantChanges.length} relevant file(s) changed since bookmark`;
+                } else {
+                  bookmark.drift_warning = null;
+                }
+              } else {
+                bookmark.drift_warning = null;
+              }
+            } else {
+              bookmark.drift_warning = null;
+            }
+          } catch (e) {
+            debugLog('init.memory', 'git drift check failed', e);
+            bookmark.drift_warning = null;
+          }
+        } else {
+          bookmark.drift_warning = null;
+        }
+      }
+    } catch (e) { debugLog('init.memory', 'parse bookmarks failed', e); }
+  }
+
+  // 3. Decisions — read from memory store
+  let decisions = [];
+  const decisionsPath = path.join(cwd, '.planning', 'memory', 'decisions.json');
+  const decisionsContent = safeReadFile(decisionsPath);
+  if (decisionsContent) {
+    try {
+      let all = JSON.parse(decisionsContent);
+      if (Array.isArray(all)) {
+        if (phaseFilter) {
+          all = all.filter(d => d.phase && String(d.phase) === String(phaseFilter));
+        }
+        const limit = compact ? 5 : 10;
+        decisions = all.slice(-limit).reverse();
+      }
+    } catch (e) { debugLog('init.memory', 'parse decisions failed', e); }
+  }
+
+  // 4. Blockers/Todos — parse STATE.md sections
+  let blockers = [];
+  let todos = [];
+  if (stateContent) {
+    // Extract blockers
+    const blockerMatch = stateContent.match(/###\s*Blockers\/Concerns\s*\n([\s\S]*?)(?=\n##|\n###|$)/i);
+    if (blockerMatch) {
+      blockers = blockerMatch[1].split('\n')
+        .filter(l => /^\s*[-*]\s+/.test(l))
+        .map(l => l.replace(/^\s*[-*]\s+/, '').trim())
+        .filter(Boolean);
+    }
+    // Extract todos
+    const todoMatch = stateContent.match(/###\s*Pending Todos\s*\n([\s\S]*?)(?=\n##|\n###|$)/i);
+    if (todoMatch) {
+      todos = todoMatch[1].split('\n')
+        .filter(l => /^\s*[-*]\s+/.test(l))
+        .map(l => l.replace(/^\s*[-*]\s+/, '').trim())
+        .filter(Boolean);
+    }
+  }
+
+  // 5. Lessons — read from memory store
+  let lessons = [];
+  const lessonsPath = path.join(cwd, '.planning', 'memory', 'lessons.json');
+  const lessonsContent = safeReadFile(lessonsPath);
+  if (lessonsContent) {
+    try {
+      let all = JSON.parse(lessonsContent);
+      if (Array.isArray(all)) {
+        if (phaseFilter) {
+          all = all.filter(l => l.phase && String(l.phase) === String(phaseFilter));
+        }
+        lessons = all.slice(-5);
+      }
+    } catch (e) { debugLog('init.memory', 'parse lessons failed', e); }
+  }
+
+  // 6. Codebase knowledge — based on workflow
+  const codebaseDir = path.join(cwd, '.planning', 'codebase');
+  let sectionsToLoad = [];
+  switch (workflow) {
+    case 'execute-phase':
+    case 'execute-plan':
+      sectionsToLoad = ['CONVENTIONS.md', 'ARCHITECTURE.md'];
+      break;
+    case 'plan-phase':
+      sectionsToLoad = ['ARCHITECTURE.md', 'STACK.md', 'CONCERNS.md'];
+      break;
+    case 'verify-work':
+      sectionsToLoad = ['TESTING.md', 'CONVENTIONS.md'];
+      break;
+    case 'quick':
+      sectionsToLoad = ['CONVENTIONS.md'];
+      break;
+    default:
+      sectionsToLoad = ['ARCHITECTURE.md'];
+      break;
+  }
+
+  const codebaseContent = {};
+  const sectionsLoaded = [];
+  for (const section of sectionsToLoad) {
+    const filePath = path.join(codebaseDir, section);
+    const content = safeReadFile(filePath);
+    if (content) {
+      // Read first 50 lines
+      const lines = content.split('\n').slice(0, 50).join('\n');
+      const key = section.replace('.md', '').toLowerCase();
+      codebaseContent[key] = lines;
+      sectionsLoaded.push(section);
+    }
+  }
+
+  const codebase = {
+    sections_loaded: sectionsLoaded,
+    content: codebaseContent,
+  };
+
+  // Build result
+  const result = {
+    position,
+    bookmark,
+    decisions,
+    blockers,
+    todos,
+    lessons,
+    codebase,
+    digest_lines: decisions.length + blockers.length + todos.length + lessons.length,
+    workflow: workflow || null,
+    trimmed,
+  };
+
+  // 7. Priority trimming — if JSON exceeds maxChars
+  let jsonStr = JSON.stringify(result);
+  if (jsonStr.length > maxChars) {
+    // First cut: codebase.content → {}
+    result.codebase.content = {};
+    result.codebase.sections_loaded = [];
+    trimmed.push('codebase');
+    jsonStr = JSON.stringify(result);
+  }
+  if (jsonStr.length > maxChars) {
+    // Second: lessons to 2
+    result.lessons = result.lessons.slice(0, 2);
+    trimmed.push('lessons');
+    jsonStr = JSON.stringify(result);
+  }
+  if (jsonStr.length > maxChars) {
+    // Third: decisions to 3
+    result.decisions = result.decisions.slice(0, 3);
+    trimmed.push('decisions');
+    jsonStr = JSON.stringify(result);
+  }
+  if (jsonStr.length > maxChars) {
+    // Fourth: todos to 2
+    result.todos = result.todos.slice(0, 2);
+    trimmed.push('todos');
+    jsonStr = JSON.stringify(result);
+  }
+
+  // Update digest_lines after trimming
+  result.digest_lines = result.decisions.length + result.blockers.length + result.todos.length + result.lessons.length;
+
+  output(result, raw);
+}
+
 function getSessionDiffSummary(cwd) {
   try {
     const state = fs.readFileSync(path.join(cwd, '.planning', 'STATE.md'), 'utf-8');
@@ -1014,5 +1232,6 @@ module.exports = {
   cmdInitMilestoneOp,
   cmdInitMapCodebase,
   cmdInitProgress,
+  cmdInitMemory,
   getSessionDiffSummary,
 };

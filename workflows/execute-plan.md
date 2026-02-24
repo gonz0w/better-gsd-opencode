@@ -119,6 +119,11 @@ See references/tdd.md for structure.
 After each task: `git status --short` → stage individually (NEVER `git add .`) → commit as `{type}({phase}-{plan}): {description}` → record hash.
 
 Types: feat, fix, test, refactor, perf, docs, style, chore.
+
+After committing task work, save a bookmark:
+```bash
+node /home/cam/.config/opencode/get-shit-done/bin/gsd-tools.cjs memory write --store bookmarks --entry '{"phase":"${PHASE}","plan":"${PLAN}","task":${TASK_NUM},"total_tasks":${TOTAL_TASKS},"git_head":"'$(git rev-parse --short HEAD)'"}'
+```
 </task_commit>
 
 <step name="checkpoint_protocol">

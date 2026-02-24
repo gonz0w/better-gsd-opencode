@@ -176,6 +176,7 @@ Workflows:
   milestone-op            Milestone operation context
   map-codebase            Codebase mapping context
   progress                Progress overview
+  memory [options]        Session memory digest with codebase knowledge
 
 Flags:
   --compact   Return essential-only fields (38-50% smaller)
@@ -185,6 +186,33 @@ Examples:
   gsd-tools init execute-phase 03
   gsd-tools init progress --compact --raw
   gsd-tools init progress --compact --manifest --raw`,
+
+  'init memory': `Usage: gsd-tools init memory [options] [--raw]
+
+Session memory digest with workflow-aware codebase knowledge surfacing.
+Reads position from STATE.md, bookmarks/decisions/lessons from memory stores,
+and loads relevant codebase docs based on the active workflow.
+
+Options:
+  --workflow <name>   Workflow context: execute-phase, plan-phase, execute-plan,
+                      quick, resume, verify-work, progress
+  --phase <N>         Filter decisions/lessons by phase number
+  --compact           Reduced output (5 decisions, 4000 char limit)
+
+Output includes: position, bookmark (with drift warning), decisions, blockers,
+todos, lessons, codebase knowledge sections, and trimming metadata.
+
+Priority trimming (when output exceeds size limit):
+  1. codebase content removed
+  2. lessons reduced to 2
+  3. decisions reduced to 3
+  4. todos reduced to 2
+  Position is never trimmed.
+
+Examples:
+  gsd-tools init memory --workflow execute-phase --phase 11 --raw
+  gsd-tools init memory --workflow plan-phase --compact --raw
+  gsd-tools init memory --raw`,
 
   'commit': `Usage: gsd-tools commit <message> [--files f1 f2 ...] [--amend] [--raw]
 
@@ -559,6 +587,98 @@ Arguments:
 
 Examples:
   gsd-tools websearch "esbuild bundler plugins" --limit 5`,
+
+  'memory': `Usage: gsd-tools memory <subcommand> [options] [--raw]
+
+Persistent memory store for decisions, bookmarks, lessons, and todos.
+
+Subcommands:
+  write --store <name> --entry '{json}'   Write entry to a store
+  read --store <name> [options]           Read entries from a store
+  list                                    List stores with stats
+  ensure-dir                              Create .planning/memory/ directory
+  compact [--store <name>] [--threshold N] [--dry-run]  Compact old entries
+
+Stores: decisions, bookmarks, lessons, todos
+
+Options (read):
+  --limit N          Max entries to return
+  --query "text"     Case-insensitive text search across values
+  --phase N          Filter by phase field
+
+Examples:
+  gsd-tools memory write --store decisions --entry '{"summary":"Chose esbuild","phase":"03"}'
+  gsd-tools memory read --store decisions --query "esbuild"
+  gsd-tools memory list --raw`,
+
+  'memory write': `Usage: gsd-tools memory write --store <name> --entry '{json}' [--raw]
+
+Write an entry to a memory store.
+
+Arguments:
+  --store <name>    Store name: decisions, bookmarks, lessons, todos
+  --entry '{json}'  JSON object to store
+
+Behavior:
+  decisions/lessons  Append only, NEVER pruned (sacred data)
+  bookmarks          Prepend (newest first), trim to max 20
+  todos              Simple append
+
+Auto-adds "timestamp" field (ISO date) if not present.
+
+Examples:
+  gsd-tools memory write --store decisions --entry '{"summary":"Use esbuild","phase":"03"}'
+  gsd-tools memory write --store bookmarks --entry '{"file":"src/router.js","line":42}'`,
+
+  'memory read': `Usage: gsd-tools memory read --store <name> [options] [--raw]
+
+Read entries from a memory store with optional filtering.
+
+Arguments:
+  --store <name>    Store name: decisions, bookmarks, lessons, todos
+
+Options:
+  --limit N         Max entries to return
+  --query "text"    Case-insensitive text search across all string values
+  --phase N         Filter by entry.phase field
+
+Output: { entries, count, store, total }
+
+Examples:
+  gsd-tools memory read --store decisions --raw
+  gsd-tools memory read --store lessons --query "frontmatter" --limit 5
+  gsd-tools memory read --store decisions --phase 03`,
+
+  'memory list': `Usage: gsd-tools memory list [--raw]
+
+List all memory stores with entry counts and file sizes.
+
+Output: { stores: [{name, entry_count, size_bytes, last_modified}], memory_dir }
+
+Examples:
+  gsd-tools memory list --raw`,
+
+  'memory compact': `Usage: gsd-tools memory compact [--store <name>] [--threshold N] [--dry-run] [--raw]
+
+Compact memory stores by summarizing old entries.
+
+Options:
+  --store <name>     Specific store to compact (default: all non-sacred)
+  --threshold N      Entry count threshold to trigger compaction (default: 50)
+  --dry-run          Preview compaction without modifying files
+
+Sacred data (decisions, lessons) is NEVER compacted.
+
+Compaction rules:
+  bookmarks    Keep 10 most recent, summarize older entries
+  todos        Keep active todos, summarize completed ones
+
+Output: { compacted, stores_processed, entries_before, entries_after, summaries_created, sacred_skipped }
+
+Examples:
+  gsd-tools memory compact --raw
+  gsd-tools memory compact --store bookmarks --dry-run --raw
+  gsd-tools memory compact --threshold 30 --raw`,
 
   'extract-sections': `Usage: gsd-tools extract-sections <file-path> [section1] [section2] ... [--raw]
 

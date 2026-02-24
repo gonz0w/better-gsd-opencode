@@ -190,6 +190,7 @@ Workflows:
   milestone-op            Milestone operation context
   map-codebase            Codebase mapping context
   progress                Progress overview
+  memory [options]        Session memory digest with codebase knowledge
 
 Flags:
   --compact   Return essential-only fields (38-50% smaller)
@@ -199,6 +200,32 @@ Examples:
   gsd-tools init execute-phase 03
   gsd-tools init progress --compact --raw
   gsd-tools init progress --compact --manifest --raw`,
+      "init memory": `Usage: gsd-tools init memory [options] [--raw]
+
+Session memory digest with workflow-aware codebase knowledge surfacing.
+Reads position from STATE.md, bookmarks/decisions/lessons from memory stores,
+and loads relevant codebase docs based on the active workflow.
+
+Options:
+  --workflow <name>   Workflow context: execute-phase, plan-phase, execute-plan,
+                      quick, resume, verify-work, progress
+  --phase <N>         Filter decisions/lessons by phase number
+  --compact           Reduced output (5 decisions, 4000 char limit)
+
+Output includes: position, bookmark (with drift warning), decisions, blockers,
+todos, lessons, codebase knowledge sections, and trimming metadata.
+
+Priority trimming (when output exceeds size limit):
+  1. codebase content removed
+  2. lessons reduced to 2
+  3. decisions reduced to 3
+  4. todos reduced to 2
+  Position is never trimmed.
+
+Examples:
+  gsd-tools init memory --workflow execute-phase --phase 11 --raw
+  gsd-tools init memory --workflow plan-phase --compact --raw
+  gsd-tools init memory --raw`,
       "commit": `Usage: gsd-tools commit <message> [--files f1 f2 ...] [--amend] [--raw]
 
 Commit planning documents to git.
@@ -537,6 +564,93 @@ Arguments:
 
 Examples:
   gsd-tools websearch "esbuild bundler plugins" --limit 5`,
+      "memory": `Usage: gsd-tools memory <subcommand> [options] [--raw]
+
+Persistent memory store for decisions, bookmarks, lessons, and todos.
+
+Subcommands:
+  write --store <name> --entry '{json}'   Write entry to a store
+  read --store <name> [options]           Read entries from a store
+  list                                    List stores with stats
+  ensure-dir                              Create .planning/memory/ directory
+  compact [--store <name>] [--threshold N] [--dry-run]  Compact old entries
+
+Stores: decisions, bookmarks, lessons, todos
+
+Options (read):
+  --limit N          Max entries to return
+  --query "text"     Case-insensitive text search across values
+  --phase N          Filter by phase field
+
+Examples:
+  gsd-tools memory write --store decisions --entry '{"summary":"Chose esbuild","phase":"03"}'
+  gsd-tools memory read --store decisions --query "esbuild"
+  gsd-tools memory list --raw`,
+      "memory write": `Usage: gsd-tools memory write --store <name> --entry '{json}' [--raw]
+
+Write an entry to a memory store.
+
+Arguments:
+  --store <name>    Store name: decisions, bookmarks, lessons, todos
+  --entry '{json}'  JSON object to store
+
+Behavior:
+  decisions/lessons  Append only, NEVER pruned (sacred data)
+  bookmarks          Prepend (newest first), trim to max 20
+  todos              Simple append
+
+Auto-adds "timestamp" field (ISO date) if not present.
+
+Examples:
+  gsd-tools memory write --store decisions --entry '{"summary":"Use esbuild","phase":"03"}'
+  gsd-tools memory write --store bookmarks --entry '{"file":"src/router.js","line":42}'`,
+      "memory read": `Usage: gsd-tools memory read --store <name> [options] [--raw]
+
+Read entries from a memory store with optional filtering.
+
+Arguments:
+  --store <name>    Store name: decisions, bookmarks, lessons, todos
+
+Options:
+  --limit N         Max entries to return
+  --query "text"    Case-insensitive text search across all string values
+  --phase N         Filter by entry.phase field
+
+Output: { entries, count, store, total }
+
+Examples:
+  gsd-tools memory read --store decisions --raw
+  gsd-tools memory read --store lessons --query "frontmatter" --limit 5
+  gsd-tools memory read --store decisions --phase 03`,
+      "memory list": `Usage: gsd-tools memory list [--raw]
+
+List all memory stores with entry counts and file sizes.
+
+Output: { stores: [{name, entry_count, size_bytes, last_modified}], memory_dir }
+
+Examples:
+  gsd-tools memory list --raw`,
+      "memory compact": `Usage: gsd-tools memory compact [--store <name>] [--threshold N] [--dry-run] [--raw]
+
+Compact memory stores by summarizing old entries.
+
+Options:
+  --store <name>     Specific store to compact (default: all non-sacred)
+  --threshold N      Entry count threshold to trigger compaction (default: 50)
+  --dry-run          Preview compaction without modifying files
+
+Sacred data (decisions, lessons) is NEVER compacted.
+
+Compaction rules:
+  bookmarks    Keep 10 most recent, summarize older entries
+  todos        Keep active todos, summarize completed ones
+
+Output: { compacted, stores_processed, entries_before, entries_after, summaries_created, sacred_skipped }
+
+Examples:
+  gsd-tools memory compact --raw
+  gsd-tools memory compact --store bookmarks --dry-run --raw
+  gsd-tools memory compact --threshold 30 --raw`,
       "extract-sections": `Usage: gsd-tools extract-sections <file-path> [section1] [section2] ... [--raw]
 
 Extract specific named sections from a markdown file.
@@ -4231,6 +4345,190 @@ var require_init = __commonJS({
       }
       output(result, raw);
     }
+    function cmdInitMemory(cwd, args, raw) {
+      const workflowIdx = args.indexOf("--workflow");
+      const workflow = workflowIdx !== -1 ? args[workflowIdx + 1] : null;
+      const phaseIdx = args.indexOf("--phase");
+      const phaseFilter = phaseIdx !== -1 ? args[phaseIdx + 1] : null;
+      const compact = args.includes("--compact") || global._gsdCompactMode;
+      const maxChars = compact ? 4e3 : 8e3;
+      const trimmed = [];
+      const statePath = path.join(cwd, ".planning", "STATE.md");
+      const stateContent = safeReadFile(statePath);
+      const position = {};
+      if (stateContent) {
+        const phaseMatch = stateContent.match(/\*\*Phase:?\*\*:?\s*(.+)/i);
+        if (phaseMatch) position.phase = phaseMatch[1].trim();
+        const nameMatch = stateContent.match(/\*\*Phase Name:?\*\*:?\s*(.+)/i);
+        if (nameMatch) position.phase_name = nameMatch[1].trim();
+        const planMatch = stateContent.match(/\*\*Plan:?\*\*:?\s*(.+)/i);
+        if (planMatch) position.plan = planMatch[1].trim();
+        const statusMatch = stateContent.match(/\*\*Status:?\*\*:?\s*(.+)/i);
+        if (statusMatch) position.status = statusMatch[1].trim();
+        const lastMatch = stateContent.match(/\*\*Last [Aa]ctivity:?\*\*:?\s*(.+)/i);
+        if (lastMatch) position.last_activity = lastMatch[1].trim();
+        const stoppedMatch = stateContent.match(/\*\*Stopped [Aa]t:?\*\*:?\s*(.+)/i);
+        if (stoppedMatch) position.stopped_at = stoppedMatch[1].trim();
+      }
+      let bookmark = null;
+      const bookmarksPath = path.join(cwd, ".planning", "memory", "bookmarks.json");
+      const bookmarksContent = safeReadFile(bookmarksPath);
+      if (bookmarksContent) {
+        try {
+          const bookmarks = JSON.parse(bookmarksContent);
+          if (Array.isArray(bookmarks) && bookmarks.length > 0) {
+            bookmark = bookmarks[0];
+            if (bookmark.git_head && phaseFilter && String(bookmark.phase) === String(phaseFilter)) {
+              try {
+                const headResult = execGit(cwd, ["rev-parse", "HEAD"]);
+                if (headResult.exitCode === 0 && headResult.stdout !== bookmark.git_head) {
+                  const diffResult = execGit(cwd, ["diff", "--name-only", bookmark.git_head, "HEAD"]);
+                  if (diffResult.exitCode === 0 && diffResult.stdout) {
+                    const changedFiles = diffResult.stdout.split("\n").filter(Boolean);
+                    const relevantChanges = changedFiles.filter(
+                      (f) => bookmark.last_file && f === bookmark.last_file || f.startsWith(".planning/")
+                    );
+                    if (relevantChanges.length > 0) {
+                      bookmark.drift_warning = `${relevantChanges.length} relevant file(s) changed since bookmark`;
+                    } else {
+                      bookmark.drift_warning = null;
+                    }
+                  } else {
+                    bookmark.drift_warning = null;
+                  }
+                } else {
+                  bookmark.drift_warning = null;
+                }
+              } catch (e) {
+                debugLog("init.memory", "git drift check failed", e);
+                bookmark.drift_warning = null;
+              }
+            } else {
+              bookmark.drift_warning = null;
+            }
+          }
+        } catch (e) {
+          debugLog("init.memory", "parse bookmarks failed", e);
+        }
+      }
+      let decisions = [];
+      const decisionsPath = path.join(cwd, ".planning", "memory", "decisions.json");
+      const decisionsContent = safeReadFile(decisionsPath);
+      if (decisionsContent) {
+        try {
+          let all = JSON.parse(decisionsContent);
+          if (Array.isArray(all)) {
+            if (phaseFilter) {
+              all = all.filter((d) => d.phase && String(d.phase) === String(phaseFilter));
+            }
+            const limit = compact ? 5 : 10;
+            decisions = all.slice(-limit).reverse();
+          }
+        } catch (e) {
+          debugLog("init.memory", "parse decisions failed", e);
+        }
+      }
+      let blockers = [];
+      let todos = [];
+      if (stateContent) {
+        const blockerMatch = stateContent.match(/###\s*Blockers\/Concerns\s*\n([\s\S]*?)(?=\n##|\n###|$)/i);
+        if (blockerMatch) {
+          blockers = blockerMatch[1].split("\n").filter((l) => /^\s*[-*]\s+/.test(l)).map((l) => l.replace(/^\s*[-*]\s+/, "").trim()).filter(Boolean);
+        }
+        const todoMatch = stateContent.match(/###\s*Pending Todos\s*\n([\s\S]*?)(?=\n##|\n###|$)/i);
+        if (todoMatch) {
+          todos = todoMatch[1].split("\n").filter((l) => /^\s*[-*]\s+/.test(l)).map((l) => l.replace(/^\s*[-*]\s+/, "").trim()).filter(Boolean);
+        }
+      }
+      let lessons = [];
+      const lessonsPath = path.join(cwd, ".planning", "memory", "lessons.json");
+      const lessonsContent = safeReadFile(lessonsPath);
+      if (lessonsContent) {
+        try {
+          let all = JSON.parse(lessonsContent);
+          if (Array.isArray(all)) {
+            if (phaseFilter) {
+              all = all.filter((l) => l.phase && String(l.phase) === String(phaseFilter));
+            }
+            lessons = all.slice(-5);
+          }
+        } catch (e) {
+          debugLog("init.memory", "parse lessons failed", e);
+        }
+      }
+      const codebaseDir = path.join(cwd, ".planning", "codebase");
+      let sectionsToLoad = [];
+      switch (workflow) {
+        case "execute-phase":
+        case "execute-plan":
+          sectionsToLoad = ["CONVENTIONS.md", "ARCHITECTURE.md"];
+          break;
+        case "plan-phase":
+          sectionsToLoad = ["ARCHITECTURE.md", "STACK.md", "CONCERNS.md"];
+          break;
+        case "verify-work":
+          sectionsToLoad = ["TESTING.md", "CONVENTIONS.md"];
+          break;
+        case "quick":
+          sectionsToLoad = ["CONVENTIONS.md"];
+          break;
+        default:
+          sectionsToLoad = ["ARCHITECTURE.md"];
+          break;
+      }
+      const codebaseContent = {};
+      const sectionsLoaded = [];
+      for (const section of sectionsToLoad) {
+        const filePath = path.join(codebaseDir, section);
+        const content = safeReadFile(filePath);
+        if (content) {
+          const lines = content.split("\n").slice(0, 50).join("\n");
+          const key = section.replace(".md", "").toLowerCase();
+          codebaseContent[key] = lines;
+          sectionsLoaded.push(section);
+        }
+      }
+      const codebase = {
+        sections_loaded: sectionsLoaded,
+        content: codebaseContent
+      };
+      const result = {
+        position,
+        bookmark,
+        decisions,
+        blockers,
+        todos,
+        lessons,
+        codebase,
+        digest_lines: decisions.length + blockers.length + todos.length + lessons.length,
+        workflow: workflow || null,
+        trimmed
+      };
+      let jsonStr = JSON.stringify(result);
+      if (jsonStr.length > maxChars) {
+        result.codebase.content = {};
+        result.codebase.sections_loaded = [];
+        trimmed.push("codebase");
+        jsonStr = JSON.stringify(result);
+      }
+      if (jsonStr.length > maxChars) {
+        result.lessons = result.lessons.slice(0, 2);
+        trimmed.push("lessons");
+        jsonStr = JSON.stringify(result);
+      }
+      if (jsonStr.length > maxChars) {
+        result.decisions = result.decisions.slice(0, 3);
+        trimmed.push("decisions");
+        jsonStr = JSON.stringify(result);
+      }
+      if (jsonStr.length > maxChars) {
+        result.todos = result.todos.slice(0, 2);
+        trimmed.push("todos");
+        jsonStr = JSON.stringify(result);
+      }
+      result.digest_lines = result.decisions.length + result.blockers.length + result.todos.length + result.lessons.length;
+      output(result, raw);
+    }
     function getSessionDiffSummary(cwd) {
       try {
         const state = fs.readFileSync(path.join(cwd, ".planning", "STATE.md"), "utf-8");
@@ -4269,6 +4567,7 @@ var require_init = __commonJS({
       cmdInitMilestoneOp,
       cmdInitMapCodebase,
       cmdInitProgress,
+      cmdInitMemory,
       getSessionDiffSummary
     };
   }
@@ -7026,6 +7325,234 @@ _Pending verification_
   }
 });
 
+// src/commands/memory.js
+var require_memory = __commonJS({
+  "src/commands/memory.js"(exports2, module2) {
+    var fs = require("fs");
+    var path = require("path");
+    var { output, error, debugLog } = require_output();
+    var VALID_STORES = ["decisions", "bookmarks", "lessons", "todos"];
+    var SACRED_STORES = ["decisions", "lessons"];
+    var BOOKMARKS_MAX = 20;
+    var COMPACT_THRESHOLD = 50;
+    var COMPACT_KEEP_RECENT = 10;
+    function cmdMemoryEnsureDir(cwd) {
+      const dir = path.join(cwd, ".planning", "memory");
+      fs.mkdirSync(dir, { recursive: true });
+      output({ ensured: true, memory_dir: dir });
+    }
+    function cmdMemoryWrite(cwd, options, raw) {
+      const { store, entry: entryJson } = options;
+      if (!store || !VALID_STORES.includes(store)) {
+        error(`Invalid or missing store. Must be one of: ${VALID_STORES.join(", ")}`);
+      }
+      if (!entryJson) {
+        error("Missing --entry (JSON string)");
+      }
+      let entry;
+      try {
+        entry = JSON.parse(entryJson);
+      } catch (e) {
+        error(`Invalid JSON in --entry: ${e.message}`);
+      }
+      const memDir = path.join(cwd, ".planning", "memory");
+      fs.mkdirSync(memDir, { recursive: true });
+      const filePath = path.join(memDir, `${store}.json`);
+      let entries = [];
+      try {
+        const raw2 = fs.readFileSync(filePath, "utf-8");
+        entries = JSON.parse(raw2);
+        if (!Array.isArray(entries)) entries = [];
+      } catch (e) {
+        debugLog("memory.write", "read failed, starting fresh", e);
+        entries = [];
+      }
+      if (!entry.timestamp) {
+        entry.timestamp = (/* @__PURE__ */ new Date()).toISOString();
+      }
+      if (store === "bookmarks") {
+        entries.unshift(entry);
+        if (entries.length > BOOKMARKS_MAX) {
+          entries = entries.slice(0, BOOKMARKS_MAX);
+        }
+      } else {
+        entries.push(entry);
+      }
+      fs.writeFileSync(filePath, JSON.stringify(entries, null, 2), "utf-8");
+      const result = { written: true, store, entry_count: entries.length };
+      if (!SACRED_STORES.includes(store) && entries.length > COMPACT_THRESHOLD) {
+        result.compact_needed = true;
+        result.threshold = COMPACT_THRESHOLD;
+      }
+      output(result);
+    }
+    function cmdMemoryRead(cwd, options, raw) {
+      const { store, limit, query, phase } = options;
+      if (!store || !VALID_STORES.includes(store)) {
+        error(`Invalid or missing store. Must be one of: ${VALID_STORES.join(", ")}`);
+      }
+      const filePath = path.join(cwd, ".planning", "memory", `${store}.json`);
+      let entries = [];
+      try {
+        const raw2 = fs.readFileSync(filePath, "utf-8");
+        entries = JSON.parse(raw2);
+        if (!Array.isArray(entries)) entries = [];
+      } catch (e) {
+        debugLog("memory.read", "read failed", e);
+        entries = [];
+      }
+      const total = entries.length;
+      if (phase) {
+        entries = entries.filter((e) => e.phase && String(e.phase) === String(phase));
+      }
+      if (query) {
+        const q = query.toLowerCase();
+        entries = entries.filter((e) => {
+          return Object.values(e).some((v) => {
+            if (typeof v === "string") return v.toLowerCase().includes(q);
+            return false;
+          });
+        });
+      }
+      if (limit && parseInt(limit, 10) > 0) {
+        entries = entries.slice(0, parseInt(limit, 10));
+      }
+      output({ entries, count: entries.length, store, total });
+    }
+    function cmdMemoryList(cwd, options, raw) {
+      const memDir = path.join(cwd, ".planning", "memory");
+      const stores = [];
+      try {
+        const files = fs.readdirSync(memDir);
+        for (const file of files) {
+          if (!file.endsWith(".json")) continue;
+          const filePath = path.join(memDir, file);
+          const stat = fs.statSync(filePath);
+          let entryCount = 0;
+          try {
+            const data = JSON.parse(fs.readFileSync(filePath, "utf-8"));
+            if (Array.isArray(data)) entryCount = data.length;
+          } catch (e) {
+            debugLog("memory.list", `parse failed for ${file}`, e);
+          }
+          stores.push({
+            name: file.replace(".json", ""),
+            entry_count: entryCount,
+            size_bytes: stat.size,
+            last_modified: stat.mtime.toISOString()
+          });
+        }
+      } catch (e) {
+        debugLog("memory.list", "readdir failed", e);
+      }
+      output({ stores, memory_dir: memDir });
+    }
+    function cmdMemoryCompact(cwd, options, raw) {
+      const { store, threshold: thresholdStr, dryRun } = options;
+      const threshold = thresholdStr ? parseInt(thresholdStr, 10) : COMPACT_THRESHOLD;
+      if (store && !VALID_STORES.includes(store)) {
+        error(`Invalid store. Must be one of: ${VALID_STORES.join(", ")}`);
+      }
+      const memDir = path.join(cwd, ".planning", "memory");
+      const storesToProcess = store ? [store] : VALID_STORES;
+      const result = {
+        compacted: false,
+        stores_processed: [],
+        entries_before: {},
+        entries_after: {},
+        summaries_created: {},
+        sacred_skipped: []
+      };
+      for (const s of storesToProcess) {
+        if (SACRED_STORES.includes(s)) {
+          result.sacred_skipped.push(s);
+          continue;
+        }
+        const filePath = path.join(memDir, `${s}.json`);
+        let entries = [];
+        try {
+          const rawData = fs.readFileSync(filePath, "utf-8");
+          entries = JSON.parse(rawData);
+          if (!Array.isArray(entries)) entries = [];
+        } catch (e) {
+          debugLog("memory.compact", `read failed for ${s}`, e);
+          continue;
+        }
+        const beforeCount = entries.length;
+        result.entries_before[s] = beforeCount;
+        if (beforeCount <= threshold) {
+          result.entries_after[s] = beforeCount;
+          result.summaries_created[s] = 0;
+          result.stores_processed.push(s);
+          continue;
+        }
+        let compactedEntries;
+        let summariesCreated = 0;
+        if (s === "bookmarks") {
+          const kept = entries.slice(0, COMPACT_KEEP_RECENT);
+          const old = entries.slice(COMPACT_KEEP_RECENT);
+          const summarized = old.map((e) => {
+            const ts = e.timestamp || "";
+            const date = ts ? ts.split("T")[0] : "unknown";
+            const phase = e.phase || "?";
+            const plan = e.plan || "?";
+            const task = e.task !== void 0 ? e.task : "?";
+            return {
+              summary: `${date}: Phase ${phase}, Plan ${plan}, Task ${task}`,
+              original_timestamp: ts
+            };
+          });
+          summariesCreated = summarized.length;
+          compactedEntries = [...kept, ...summarized];
+        } else if (s === "todos") {
+          const active = [];
+          const completedSummaries = [];
+          for (const e of entries) {
+            const isCompleted = e.completed === true || e.status === "completed" || e.status === "done";
+            if (isCompleted) {
+              const ts = e.timestamp || "";
+              const date = ts ? ts.split("T")[0] : "unknown";
+              const text = e.text || e.summary || e.title || "todo";
+              completedSummaries.push({
+                summary: `${date}: [completed] ${text}`,
+                original_timestamp: ts
+              });
+            } else {
+              active.push(e);
+            }
+          }
+          summariesCreated = completedSummaries.length;
+          compactedEntries = [...active, ...completedSummaries];
+        } else {
+          result.entries_after[s] = beforeCount;
+          result.summaries_created[s] = 0;
+          result.stores_processed.push(s);
+          continue;
+        }
+        result.entries_after[s] = compactedEntries.length;
+        result.summaries_created[s] = summariesCreated;
+        result.stores_processed.push(s);
+        if (summariesCreated > 0) {
+          result.compacted = true;
+        }
+        if (!dryRun) {
+          fs.mkdirSync(memDir, { recursive: true });
+          fs.writeFileSync(filePath, JSON.stringify(compactedEntries, null, 2), "utf-8");
+        }
+      }
+      if (store && SACRED_STORES.includes(store)) {
+        output({ compacted: false, reason: "sacred_data" });
+        return;
+      }
+      if (dryRun) {
+        result.dry_run = true;
+      }
+      output(result);
+    }
+    module2.exports = { cmdMemoryWrite, cmdMemoryRead, cmdMemoryList, cmdMemoryEnsureDir, cmdMemoryCompact };
+  }
+});
+
 // src/router.js
 var require_router = __commonJS({
   "src/router.js"(exports2, module2) {
@@ -7083,7 +7610,8 @@ var require_router = __commonJS({
       cmdInitTodos,
       cmdInitMilestoneOp,
       cmdInitMapCodebase,
-      cmdInitProgress
+      cmdInitProgress,
+      cmdInitMemory
     } = require_init();
     var {
       cmdSessionDiff,
@@ -7130,6 +7658,13 @@ var require_router = __commonJS({
       cmdTodoComplete,
       cmdScaffold
     } = require_misc();
+    var {
+      cmdMemoryWrite,
+      cmdMemoryRead,
+      cmdMemoryList,
+      cmdMemoryEnsureDir,
+      cmdMemoryCompact
+    } = require_memory();
     async function main2() {
       const args = process.argv.slice(2);
       const rawIndex = args.indexOf("--raw");
@@ -7157,7 +7692,7 @@ var require_router = __commonJS({
       const command = args[0];
       const cwd = process.cwd();
       if (!command) {
-        error("Usage: gsd-tools <command> [args] [--raw]\nCommands: codebase-impact, commit, config-ensure-section, config-get, config-migrate, config-set, context-budget, current-timestamp, extract-sections, find-phase, frontmatter, generate-slug, history-digest, init, list-todos, milestone, phase, phase-plan-index, phases, progress, quick-summary, requirements, resolve-model, roadmap, rollback-info, scaffold, search-decisions, search-lessons, session-diff, state, state-snapshot, summary-extract, template, test-run, todo, trace-requirement, validate, validate-config, validate-dependencies, velocity, verify, verify-path-exists, verify-summary, websearch");
+        error("Usage: gsd-tools <command> [args] [--raw]\nCommands: codebase-impact, commit, config-ensure-section, config-get, config-migrate, config-set, context-budget, current-timestamp, extract-sections, find-phase, frontmatter, generate-slug, history-digest, init, list-todos, memory, milestone, phase, phase-plan-index, phases, progress, quick-summary, requirements, resolve-model, roadmap, rollback-info, scaffold, search-decisions, search-lessons, session-diff, state, state-snapshot, summary-extract, template, test-run, todo, trace-requirement, validate, validate-config, validate-dependencies, velocity, verify, verify-path-exists, verify-summary, websearch");
       }
       if (args.includes("--help") || args.includes("-h")) {
         const helpKey = command || "";
@@ -7511,9 +8046,12 @@ var require_router = __commonJS({
             case "progress":
               cmdInitProgress(cwd, raw);
               break;
+            case "memory":
+              cmdInitMemory(cwd, args.slice(2), raw);
+              break;
             default:
               error(`Unknown init workflow: ${workflow}
-Available: execute-phase, plan-phase, new-project, new-milestone, quick, resume, verify-work, phase-op, todos, milestone-op, map-codebase, progress`);
+Available: execute-phase, plan-phase, new-project, new-milestone, quick, resume, verify-work, phase-op, todos, milestone-op, map-codebase, progress, memory`);
           }
           break;
         }
@@ -7599,6 +8137,44 @@ Available: execute-phase, plan-phase, new-project, new-milestone, quick, resume,
         }
         case "extract-sections": {
           cmdExtractSections(cwd, args.slice(1), raw);
+          break;
+        }
+        case "memory": {
+          const subcommand = args[1];
+          if (subcommand === "write") {
+            const storeIdx = args.indexOf("--store");
+            const entryIdx = args.indexOf("--entry");
+            cmdMemoryWrite(cwd, {
+              store: storeIdx !== -1 ? args[storeIdx + 1] : null,
+              entry: entryIdx !== -1 ? args[entryIdx + 1] : null
+            }, raw);
+          } else if (subcommand === "read") {
+            const storeIdx = args.indexOf("--store");
+            const limitIdx = args.indexOf("--limit");
+            const queryIdx = args.indexOf("--query");
+            const phaseIdx = args.indexOf("--phase");
+            cmdMemoryRead(cwd, {
+              store: storeIdx !== -1 ? args[storeIdx + 1] : null,
+              limit: limitIdx !== -1 ? args[limitIdx + 1] : null,
+              query: queryIdx !== -1 ? args[queryIdx + 1] : null,
+              phase: phaseIdx !== -1 ? args[phaseIdx + 1] : null
+            }, raw);
+          } else if (subcommand === "list") {
+            cmdMemoryList(cwd, {}, raw);
+          } else if (subcommand === "ensure-dir") {
+            cmdMemoryEnsureDir(cwd);
+          } else if (subcommand === "compact") {
+            const storeIdx = args.indexOf("--store");
+            const thresholdIdx = args.indexOf("--threshold");
+            const dryRun = args.includes("--dry-run");
+            cmdMemoryCompact(cwd, {
+              store: storeIdx !== -1 ? args[storeIdx + 1] : null,
+              threshold: thresholdIdx !== -1 ? args[thresholdIdx + 1] : null,
+              dryRun
+            }, raw);
+          } else {
+            error("Unknown memory subcommand. Available: write, read, list, ensure-dir, compact");
+          }
           break;
         }
         default:
