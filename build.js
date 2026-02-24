@@ -55,6 +55,37 @@ async function build() {
     console.error('Smoke test FAILED:', err.message);
     process.exit(1);
   }
+
+  // Bundle size tracking
+  const BUNDLE_BUDGET_KB = 400;
+  const bundlePath = 'bin/gsd-tools.cjs';
+  const stat = fs.statSync(bundlePath);
+  const sizeKB = Math.round(stat.size / 1024);
+  const withinBudget = sizeKB <= BUNDLE_BUDGET_KB;
+
+  console.log(`Bundle size: ${sizeKB}KB / ${BUNDLE_BUDGET_KB}KB budget${withinBudget ? '' : ' ⚠ OVER BUDGET'}`);
+
+  // Write size record
+  const baselinesDir = '.planning/baselines';
+  if (!fs.existsSync(baselinesDir)) {
+    fs.mkdirSync(baselinesDir, { recursive: true });
+  }
+  const sizeRecord = {
+    timestamp: new Date().toISOString(),
+    bundle_size_bytes: stat.size,
+    bundle_size_kb: sizeKB,
+    budget_kb: BUNDLE_BUDGET_KB,
+    within_budget: withinBudget,
+  };
+  fs.writeFileSync(
+    `${baselinesDir}/bundle-size.json`,
+    JSON.stringify(sizeRecord, null, 2) + '\n'
+  );
+
+  if (!withinBudget) {
+    console.error(`ERROR: Bundle size ${sizeKB}KB exceeds budget of ${BUNDLE_BUDGET_KB}KB`);
+    process.exit(1);
+  }
 }
 
 build().catch(err => {

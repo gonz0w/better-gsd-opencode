@@ -724,6 +724,23 @@ Examples:
   gsd-tools memory compact --raw
   gsd-tools memory compact --store bookmarks --dry-run --raw
   gsd-tools memory compact --threshold 30 --raw`,
+      "test-coverage": `Usage: gsd-tools test-coverage [--raw]
+
+Analyze test coverage by comparing test file invocations against router commands.
+
+Reads:
+  - Test file (default: bin/gsd-tools.test.cjs, override via config test_file)
+  - Router file (default: src/router.js, override via config router_file)
+
+Detects tested commands via:
+  - runGsdTools('command ...') invocations in test file
+  - describe('command ...') block names matching known commands
+  - Template literal invocations
+
+Output: { total_commands, commands_with_tests, coverage_percent, covered, uncovered, test_count }
+
+Examples:
+  gsd-tools test-coverage --raw`,
       "extract-sections": `Usage: gsd-tools extract-sections <file-path> [section1] [section2] ... [--raw]
 
 Extract specific named sections from a markdown file.
@@ -741,7 +758,21 @@ Output (extraction): { file, sections_found, sections_missing, content }
 Examples:
   gsd-tools extract-sections references/checkpoints.md --raw
   gsd-tools extract-sections references/checkpoints.md "types" --raw
-  gsd-tools extract-sections references/checkpoints.md "types" "guidelines" --raw`
+   gsd-tools extract-sections references/checkpoints.md "types" "guidelines" --raw`,
+      "token-budget": `Usage: gsd-tools token-budget [--raw]
+
+Show estimated token counts for all workflow files against their budgets.
+Searches for workflow .md files in:
+  1. <cwd>/workflows/
+  2. Plugin directory workflows/
+  3. ~/.config/opencode/workflows/ (home config)
+
+Each workflow is measured (chars/4 \u2248 tokens) and compared against known budget limits.
+
+Output: { workflows: [{ name, path, tokens, budget, within_budget }], total_tokens, over_budget_count }
+
+Examples:
+  gsd-tools token-budget --raw`
     };
     module2.exports = { MODEL_PROFILES, CONFIG_SCHEMA, COMMAND_HELP };
   }
@@ -6887,6 +6918,146 @@ Improved: ${improved} | Unchanged: ${unchanged} | Worsened: ${worsened}
 `);
       output(result, raw);
     }
+    var WORKFLOW_BUDGETS = {
+      "execute-phase": 15e3,
+      "plan-phase": 15e3,
+      "execute-plan": 12e3,
+      "new-project": 25e3,
+      "quick": 1e4,
+      "progress": 8e3,
+      "verify-work": 12e3,
+      "resume-project": 8e3,
+      "help": 1e4,
+      "pause-work": 5e3
+    };
+    function cmdTokenBudget(cwd, raw) {
+      let pluginDir = process.env.GSD_PLUGIN_DIR;
+      if (!pluginDir) {
+        pluginDir = path.resolve(__dirname, "..");
+      }
+      const searchDirs = [
+        path.join(cwd, "workflows"),
+        path.join(pluginDir, "workflows")
+      ];
+      const homeConfig = process.env.HOME ? path.join(process.env.HOME, ".config", "opencode", "get-shit-done", "workflows") : null;
+      if (homeConfig) searchDirs.push(homeConfig);
+      let workflowsDir = null;
+      for (const dir of searchDirs) {
+        if (fs.existsSync(dir)) {
+          workflowsDir = dir;
+          break;
+        }
+      }
+      const workflows = [];
+      let overBudgetCount = 0;
+      for (const [name, budgetTokens] of Object.entries(WORKFLOW_BUDGETS)) {
+        const fileName = `${name}.md`;
+        let content = null;
+        if (workflowsDir) {
+          const filePath = path.join(workflowsDir, fileName);
+          if (fs.existsSync(filePath)) {
+            try {
+              content = fs.readFileSync(filePath, "utf-8");
+            } catch (e) {
+              debugLog("feature.tokenBudget", `read workflow failed: ${fileName}`, e);
+            }
+          }
+        }
+        if (content === null) {
+          workflows.push({ name, actual_tokens: null, budget_tokens: budgetTokens, over_budget: false, percent_of_budget: null, status: "not_found" });
+          continue;
+        }
+        const actualTokens = Math.ceil(content.length / 4);
+        const overBudget = actualTokens > budgetTokens;
+        const percentOfBudget = Math.round(actualTokens / budgetTokens * 100);
+        if (overBudget) overBudgetCount++;
+        workflows.push({ name, actual_tokens: actualTokens, budget_tokens: budgetTokens, over_budget: overBudget, percent_of_budget: percentOfBudget });
+      }
+      output({ workflows, over_budget_count: overBudgetCount, total_workflows: workflows.length }, raw);
+    }
+    function cmdTestCoverage(cwd, raw) {
+      const config = loadConfig(cwd);
+      const testFile = config.test_file || "bin/gsd-tools.test.cjs";
+      const testPath = path.join(cwd, testFile);
+      if (!fs.existsSync(testPath)) {
+        error(`Test file not found: ${testFile}`);
+      }
+      const routerFile = config.router_file || "src/router.js";
+      const routerPath = path.join(cwd, routerFile);
+      if (!fs.existsSync(routerPath)) {
+        error(`Router file not found: ${routerFile}`);
+      }
+      const testContent = fs.readFileSync(testPath, "utf-8");
+      const routerContent = fs.readFileSync(routerPath, "utf-8");
+      const routerCommands = /* @__PURE__ */ new Set();
+      const casePattern = /^\s{4}case\s+'([^']+)'/gm;
+      let caseMatch;
+      while ((caseMatch = casePattern.exec(routerContent)) !== null) {
+        routerCommands.add(caseMatch[1]);
+      }
+      const initPattern = /^\s{8}case\s+'([^']+)'/gm;
+      let initMatch;
+      while ((initMatch = initPattern.exec(routerContent)) !== null) {
+        routerCommands.add("init " + initMatch[1]);
+      }
+      const testedCommands = /* @__PURE__ */ new Set();
+      const runPattern = /runGsdTools\(\s*['"`]([^'"`]+)['"`]/g;
+      let runMatch;
+      while ((runMatch = runPattern.exec(testContent)) !== null) {
+        const fullCmd = runMatch[1].trim();
+        const words = fullCmd.split(/\s+/);
+        const cmd = words[0];
+        testedCommands.add(cmd);
+        if (words.length > 1 && ["init", "state", "verify", "memory", "roadmap", "phase", "phases", "frontmatter", "template", "validate", "milestone", "requirements", "context-budget", "todo"].includes(cmd)) {
+          testedCommands.add(cmd + " " + words[1]);
+        }
+      }
+      const templatePattern = /runGsdTools\(\s*`([^`]+)`/g;
+      let templateMatch;
+      while ((templateMatch = templatePattern.exec(testContent)) !== null) {
+        const fullCmd = templateMatch[1].replace(/\$\{[^}]+\}/g, "X").trim();
+        const words = fullCmd.split(/\s+/);
+        const cmd = words[0];
+        testedCommands.add(cmd);
+        if (words.length > 1 && ["init", "state", "verify", "memory", "roadmap", "phase", "phases", "frontmatter", "template", "validate", "milestone", "requirements", "context-budget", "todo"].includes(cmd)) {
+          testedCommands.add(cmd + " " + words[1]);
+        }
+      }
+      const describePattern = /describe\(\s*['"`]([^'"`]+)['"`]/g;
+      let describeMatch;
+      while ((describeMatch = describePattern.exec(testContent)) !== null) {
+        const desc = describeMatch[1].trim();
+        const descWords = desc.split(/[\s:]+/);
+        for (const word of descWords) {
+          if (routerCommands.has(word)) {
+            testedCommands.add(word);
+          }
+        }
+      }
+      const testMatches = testContent.match(/\btest\s*\(/g) || [];
+      const testCount = testMatches.length;
+      const allCommands = [...routerCommands].sort();
+      const covered = allCommands.filter((cmd) => {
+        if (testedCommands.has(cmd)) return true;
+        const base = cmd.split(" ")[0];
+        if (testedCommands.has(base) && cmd.startsWith("init ")) {
+          return testedCommands.has(cmd);
+        }
+        return false;
+      });
+      const uncovered = allCommands.filter((cmd) => !covered.includes(cmd));
+      const totalCommands = allCommands.length;
+      const commandsWithTests = covered.length;
+      const coveragePercent = totalCommands > 0 ? Math.round(commandsWithTests / totalCommands * 100) : 0;
+      output({
+        total_commands: totalCommands,
+        commands_with_tests: commandsWithTests,
+        coverage_percent: coveragePercent,
+        covered,
+        uncovered,
+        test_count: testCount
+      }, raw);
+    }
     module2.exports = {
       cmdSessionDiff,
       cmdContextBudget,
@@ -6903,7 +7074,9 @@ Improved: ${improved} | Unchanged: ${unchanged} | Worsened: ${worsened}
       cmdValidateConfig,
       cmdQuickTaskSummary,
       cmdExtractSections,
-      extractSectionsFromFile
+      extractSectionsFromFile,
+      cmdTokenBudget,
+      cmdTestCoverage
     };
   }
 });
@@ -8516,7 +8689,9 @@ var require_router = __commonJS({
       cmdTraceRequirement,
       cmdValidateConfig,
       cmdQuickTaskSummary,
-      cmdExtractSections
+      cmdExtractSections,
+      cmdTestCoverage,
+      cmdTokenBudget
     } = require_features();
     var {
       cmdGenerateSlug,
@@ -8567,6 +8742,13 @@ var require_router = __commonJS({
           global._gsdRequestedFields = requestedFields;
         }
       }
+      const verboseIdx = args.indexOf("--verbose");
+      if (verboseIdx !== -1) {
+        global._gsdCompactMode = false;
+        args.splice(verboseIdx, 1);
+      } else if (global._gsdCompactMode === void 0) {
+        global._gsdCompactMode = true;
+      }
       const compactIdx = args.indexOf("--compact");
       if (compactIdx !== -1) {
         global._gsdCompactMode = true;
@@ -8580,7 +8762,7 @@ var require_router = __commonJS({
       const command = args[0];
       const cwd = process.cwd();
       if (!command) {
-        error("Usage: gsd-tools <command> [args] [--raw]\nCommands: codebase-impact, commit, config-ensure-section, config-get, config-migrate, config-set, context-budget, current-timestamp, extract-sections, find-phase, frontmatter, generate-slug, history-digest, init, list-todos, memory, milestone, phase, phase-plan-index, phases, progress, quick-summary, requirements, resolve-model, roadmap, rollback-info, scaffold, search-decisions, search-lessons, session-diff, state, state-snapshot, summary-extract, template, test-run, todo, trace-requirement, validate, validate-config, validate-dependencies, velocity, verify, verify-path-exists, verify-summary, websearch");
+        error("Usage: gsd-tools <command> [args] [--raw] [--verbose]\nCommands: codebase-impact, commit, config-ensure-section, config-get, config-migrate, config-set, context-budget, current-timestamp, extract-sections, find-phase, frontmatter, generate-slug, history-digest, init, list-todos, memory, milestone, phase, phase-plan-index, phases, progress, quick-summary, requirements, resolve-model, roadmap, rollback-info, scaffold, search-decisions, search-lessons, session-diff, state, state-snapshot, summary-extract, template, test-coverage, test-run, todo, token-budget, trace-requirement, validate, validate-config, validate-dependencies, velocity, verify, verify-path-exists, verify-summary, websearch");
       }
       if (args.includes("--help") || args.includes("-h")) {
         const helpKey = command || "";
@@ -9052,6 +9234,14 @@ Available: execute-phase, plan-phase, new-project, new-milestone, quick, resume,
         }
         case "extract-sections": {
           cmdExtractSections(cwd, args.slice(1), raw);
+          break;
+        }
+        case "test-coverage": {
+          cmdTestCoverage(cwd, raw);
+          break;
+        }
+        case "token-budget": {
+          cmdTokenBudget(cwd, raw);
           break;
         }
         case "memory": {

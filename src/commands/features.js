@@ -1441,6 +1441,178 @@ function cmdContextBudgetCompare(cwd, baselinePath, raw) {
   output(result, raw);
 }
 
+// ─── Token Budget Command ───────────────────────────────────────────────────
+
+const WORKFLOW_BUDGETS = {
+  'execute-phase': 15000,
+  'plan-phase': 15000,
+  'execute-plan': 12000,
+  'new-project': 25000,
+  'quick': 10000,
+  'progress': 8000,
+  'verify-work': 12000,
+  'resume-project': 8000,
+  'help': 10000,
+  'pause-work': 5000,
+};
+
+function cmdTokenBudget(cwd, raw) {
+  let pluginDir = process.env.GSD_PLUGIN_DIR;
+  if (!pluginDir) {
+    pluginDir = path.resolve(__dirname, '..');
+  }
+  const searchDirs = [
+    path.join(cwd, 'workflows'),
+    path.join(pluginDir, 'workflows'),
+  ];
+  const homeConfig = process.env.HOME
+    ? path.join(process.env.HOME, '.config', 'opencode', 'get-shit-done', 'workflows')
+    : null;
+  if (homeConfig) searchDirs.push(homeConfig);
+  let workflowsDir = null;
+  for (const dir of searchDirs) {
+    if (fs.existsSync(dir)) { workflowsDir = dir; break; }
+  }
+  const workflows = [];
+  let overBudgetCount = 0;
+  for (const [name, budgetTokens] of Object.entries(WORKFLOW_BUDGETS)) {
+    const fileName = `${name}.md`;
+    let content = null;
+    if (workflowsDir) {
+      const filePath = path.join(workflowsDir, fileName);
+      if (fs.existsSync(filePath)) {
+        try { content = fs.readFileSync(filePath, 'utf-8'); }
+        catch (e) { debugLog('feature.tokenBudget', `read workflow failed: ${fileName}`, e); }
+      }
+    }
+    if (content === null) {
+      workflows.push({ name, actual_tokens: null, budget_tokens: budgetTokens, over_budget: false, percent_of_budget: null, status: 'not_found' });
+      continue;
+    }
+    const actualTokens = Math.ceil(content.length / 4);
+    const overBudget = actualTokens > budgetTokens;
+    const percentOfBudget = Math.round((actualTokens / budgetTokens) * 100);
+    if (overBudget) overBudgetCount++;
+    workflows.push({ name, actual_tokens: actualTokens, budget_tokens: budgetTokens, over_budget: overBudget, percent_of_budget: percentOfBudget });
+  }
+  output({ workflows, over_budget_count: overBudgetCount, total_workflows: workflows.length }, raw);
+}
+
+// ─── Test Coverage Analysis ─────────────────────────────────────────────────
+
+function cmdTestCoverage(cwd, raw) {
+  const config = loadConfig(cwd);
+
+  // Determine test file path
+  const testFile = config.test_file || 'bin/gsd-tools.test.cjs';
+  const testPath = path.join(cwd, testFile);
+
+  if (!fs.existsSync(testPath)) {
+    error(`Test file not found: ${testFile}`);
+  }
+
+  // Determine router file path
+  const routerFile = config.router_file || 'src/router.js';
+  const routerPath = path.join(cwd, routerFile);
+
+  if (!fs.existsSync(routerPath)) {
+    error(`Router file not found: ${routerFile}`);
+  }
+
+  const testContent = fs.readFileSync(testPath, 'utf-8');
+  const routerContent = fs.readFileSync(routerPath, 'utf-8');
+
+  // Extract all command names from router switch cases
+  const routerCommands = new Set();
+  const casePattern = /^\s{4}case\s+'([^']+)'/gm;
+  let caseMatch;
+  while ((caseMatch = casePattern.exec(routerContent)) !== null) {
+    routerCommands.add(caseMatch[1]);
+  }
+
+  // Also extract init subcommands as 'init <sub>'
+  const initPattern = /^\s{8}case\s+'([^']+)'/gm;
+  let initMatch;
+  while ((initMatch = initPattern.exec(routerContent)) !== null) {
+    routerCommands.add('init ' + initMatch[1]);
+  }
+
+  // Extract tested commands from test file
+  const testedCommands = new Set();
+
+  // Pattern 1: runGsdTools('commandname ...')
+  const runPattern = /runGsdTools\(\s*['"`]([^'"`]+)['"`]/g;
+  let runMatch;
+  while ((runMatch = runPattern.exec(testContent)) !== null) {
+    const fullCmd = runMatch[1].trim();
+    const words = fullCmd.split(/\s+/);
+    const cmd = words[0];
+    testedCommands.add(cmd);
+
+    if (words.length > 1 && ['init', 'state', 'verify', 'memory', 'roadmap', 'phase', 'phases', 'frontmatter', 'template', 'validate', 'milestone', 'requirements', 'context-budget', 'todo'].includes(cmd)) {
+      testedCommands.add(cmd + ' ' + words[1]);
+    }
+  }
+
+  // Pattern 2: runGsdTools(`commandname ...`)
+  const templatePattern = /runGsdTools\(\s*`([^`]+)`/g;
+  let templateMatch;
+  while ((templateMatch = templatePattern.exec(testContent)) !== null) {
+    const fullCmd = templateMatch[1].replace(/\$\{[^}]+\}/g, 'X').trim();
+    const words = fullCmd.split(/\s+/);
+    const cmd = words[0];
+    testedCommands.add(cmd);
+
+    if (words.length > 1 && ['init', 'state', 'verify', 'memory', 'roadmap', 'phase', 'phases', 'frontmatter', 'template', 'validate', 'milestone', 'requirements', 'context-budget', 'todo'].includes(cmd)) {
+      testedCommands.add(cmd + ' ' + words[1]);
+    }
+  }
+
+  // Pattern 3: describe('command-name ...')
+  const describePattern = /describe\(\s*['"`]([^'"`]+)['"`]/g;
+  let describeMatch;
+  while ((describeMatch = describePattern.exec(testContent)) !== null) {
+    const desc = describeMatch[1].trim();
+    const descWords = desc.split(/[\s:]+/);
+    for (const word of descWords) {
+      if (routerCommands.has(word)) {
+        testedCommands.add(word);
+      }
+    }
+  }
+
+  // Count test functions
+  const testMatches = testContent.match(/\btest\s*\(/g) || [];
+  const testCount = testMatches.length;
+
+  // Compare
+  const allCommands = [...routerCommands].sort();
+  const covered = allCommands.filter(cmd => {
+    if (testedCommands.has(cmd)) return true;
+    const base = cmd.split(' ')[0];
+    if (testedCommands.has(base) && cmd.startsWith('init ')) {
+      return testedCommands.has(cmd);
+    }
+    return false;
+  });
+  const uncovered = allCommands.filter(cmd => !covered.includes(cmd));
+
+  const totalCommands = allCommands.length;
+  const commandsWithTests = covered.length;
+  const coveragePercent = totalCommands > 0
+    ? Math.round((commandsWithTests / totalCommands) * 100)
+    : 0;
+
+  output({
+    total_commands: totalCommands,
+    commands_with_tests: commandsWithTests,
+    coverage_percent: coveragePercent,
+    covered: covered,
+    uncovered: uncovered,
+    test_count: testCount,
+  }, raw);
+}
+
 module.exports = {
   cmdSessionDiff,
   cmdContextBudget,
@@ -1458,4 +1630,6 @@ module.exports = {
   cmdQuickTaskSummary,
   cmdExtractSections,
   extractSectionsFromFile,
+  cmdTokenBudget,
+  cmdTestCoverage,
 };

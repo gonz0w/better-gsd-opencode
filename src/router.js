@@ -41,7 +41,7 @@ const {
   cmdContextBudgetCompare, cmdTestRun, cmdSearchDecisions,
   cmdValidateDependencies, cmdSearchLessons, cmdCodebaseImpact,
   cmdRollbackInfo, cmdVelocity, cmdTraceRequirement, cmdValidateConfig,
-  cmdQuickTaskSummary, cmdExtractSections,
+  cmdQuickTaskSummary, cmdExtractSections, cmdTestCoverage, cmdTokenBudget,
 } = require('./commands/features');
 
 const {
@@ -76,7 +76,16 @@ async function main() {
     }
   }
 
-  // Parse --compact global flag for init command output reduction
+  // Parse --verbose global flag (default is compact mode)
+  const verboseIdx = args.indexOf('--verbose');
+  if (verboseIdx !== -1) {
+    global._gsdCompactMode = false;
+    args.splice(verboseIdx, 1);
+  } else if (global._gsdCompactMode === undefined) {
+    global._gsdCompactMode = true;
+  }
+
+  // Parse --compact global flag (backward-compat no-op, compact is already default)
   const compactIdx = args.indexOf('--compact');
   if (compactIdx !== -1) {
     global._gsdCompactMode = true;
@@ -94,7 +103,7 @@ async function main() {
   const cwd = process.cwd();
 
   if (!command) {
-    error('Usage: gsd-tools <command> [args] [--raw]\nCommands: codebase-impact, commit, config-ensure-section, config-get, config-migrate, config-set, context-budget, current-timestamp, extract-sections, find-phase, frontmatter, generate-slug, history-digest, init, list-todos, memory, milestone, phase, phase-plan-index, phases, progress, quick-summary, requirements, resolve-model, roadmap, rollback-info, scaffold, search-decisions, search-lessons, session-diff, state, state-snapshot, summary-extract, template, test-run, todo, trace-requirement, validate, validate-config, validate-dependencies, velocity, verify, verify-path-exists, verify-summary, websearch');
+    error('Usage: gsd-tools <command> [args] [--raw] [--verbose]\nCommands: codebase-impact, commit, config-ensure-section, config-get, config-migrate, config-set, context-budget, current-timestamp, extract-sections, find-phase, frontmatter, generate-slug, history-digest, init, list-todos, memory, milestone, phase, phase-plan-index, phases, progress, quick-summary, requirements, resolve-model, roadmap, rollback-info, scaffold, search-decisions, search-lessons, session-diff, state, state-snapshot, summary-extract, template, test-coverage, test-run, todo, token-budget, trace-requirement, validate, validate-config, validate-dependencies, velocity, verify, verify-path-exists, verify-summary, websearch');
   }
 
   // --help / -h: print command help to stderr (never contaminates JSON stdout)
@@ -613,6 +622,16 @@ async function main() {
 
     case 'extract-sections': {
       cmdExtractSections(cwd, args.slice(1), raw);
+      break;
+    }
+
+    case 'test-coverage': {
+      cmdTestCoverage(cwd, raw);
+      break;
+    }
+
+    case 'token-budget': {
+      cmdTokenBudget(cwd, raw);
       break;
     }
 

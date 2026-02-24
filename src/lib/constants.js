@@ -757,6 +757,24 @@ Examples:
   gsd-tools memory compact --store bookmarks --dry-run --raw
   gsd-tools memory compact --threshold 30 --raw`,
 
+  'test-coverage': `Usage: gsd-tools test-coverage [--raw]
+
+Analyze test coverage by comparing test file invocations against router commands.
+
+Reads:
+  - Test file (default: bin/gsd-tools.test.cjs, override via config test_file)
+  - Router file (default: src/router.js, override via config router_file)
+
+Detects tested commands via:
+  - runGsdTools('command ...') invocations in test file
+  - describe('command ...') block names matching known commands
+  - Template literal invocations
+
+Output: { total_commands, commands_with_tests, coverage_percent, covered, uncovered, test_count }
+
+Examples:
+  gsd-tools test-coverage --raw`,
+
   'extract-sections': `Usage: gsd-tools extract-sections <file-path> [section1] [section2] ... [--raw]
 
 Extract specific named sections from a markdown file.
@@ -774,7 +792,22 @@ Output (extraction): { file, sections_found, sections_missing, content }
 Examples:
   gsd-tools extract-sections references/checkpoints.md --raw
   gsd-tools extract-sections references/checkpoints.md "types" --raw
-  gsd-tools extract-sections references/checkpoints.md "types" "guidelines" --raw`,
+   gsd-tools extract-sections references/checkpoints.md "types" "guidelines" --raw`,
+
+  'token-budget': `Usage: gsd-tools token-budget [--raw]
+
+Show estimated token counts for all workflow files against their budgets.
+Searches for workflow .md files in:
+  1. <cwd>/workflows/
+  2. Plugin directory workflows/
+  3. ~/.config/opencode/workflows/ (home config)
+
+Each workflow is measured (chars/4 ≈ tokens) and compared against known budget limits.
+
+Output: { workflows: [{ name, path, tokens, budget, within_budget }], total_tokens, over_budget_count }
+
+Examples:
+  gsd-tools token-budget --raw`,
 };
 
 module.exports = { MODEL_PROFILES, CONFIG_SCHEMA, COMMAND_HELP };
