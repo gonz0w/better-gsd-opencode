@@ -1680,6 +1680,86 @@ function cmdTestCoverage(cwd, raw) {
   }, raw);
 }
 
+function cmdSessionSummary(cwd, raw) {
+  const pd = path.join(cwd, '.planning');
+  const sc = safeReadFile(path.join(pd, 'STATE.md'));
+  if (!sc) { output({ error: 'STATE.md not found' }, raw); return; }
+
+  const xf = (f) => { const m = sc.match(new RegExp(`\\*\\*${f}:\\*\\*\\s*(.+)`, 'i')); return m ? m[1].trim() : null; };
+  const pm = (xf('Phase') || '').match(/(\d+)\s*of\s*(\d+)\s*\(([^)]+)\)/);
+  const phaseNum = pm ? pm[1] : xf('Phase');
+  const phaseName = pm ? pm[3] : null;
+  const plan = xf('Current Plan') || 'Not started';
+  const status = xf('Status') || 'Unknown';
+  const lastAct = xf('Last Activity');
+
+  // Session activity from git log
+  const completed = [];
+  if (lastAct && isValidDateString(lastAct)) {
+    try {
+      const log = execSync(`git log --since=${sanitizeShellArg(lastAct)} --oneline --no-merges -- .planning/`, { cwd, encoding: 'utf-8', timeout: 1e4 }).trim();
+      if (log) for (const l of log.split('\n')) {
+        const m = l.match(/(?:feat|fix|docs|chore|refactor|test|perf)\((\d+-\d+)\)/);
+        if (m && !completed.includes(m[1])) completed.push(m[1]);
+      }
+    } catch (e) { debugLog('feature.sessionSummary', 'git failed', e); }
+  }
+
+  // Decisions from STATE.md
+  const ds = sc.match(/### Decisions\s*\n([\s\S]*?)(?=\n###|\n## |\n$)/);
+  const decisions = [];
+  if (ds) for (const l of ds[1].split('\n')) {
+    const m = l.match(/^-\s*(?:\[Phase \d+\]:\s*)?(.{10,})/);
+    if (m && !m[1].startsWith('All v')) decisions.push(m[1].trim());
+  }
+
+  // Next action from roadmap
+  let next = { command: '/gsd-resume', description: 'Resume project work' };
+  const rc = safeReadFile(path.join(pd, 'ROADMAP.md'));
+  if (rc && phaseNum) {
+    const unchecked = [];
+    let um; const up = /- \[ \] \*\*Phase (\d+):\s*([^*]+)\*\*/g;
+    while ((um = up.exec(rc)) !== null) unchecked.push({ n: um[1], name: um[2].trim() });
+
+    const pDir = path.join(pd, 'phases');
+    const countPlans = (num) => {
+      try {
+        const dirs = fs.readdirSync(pDir, { withFileTypes: true }).filter(e => e.isDirectory()).map(e => e.name);
+        const d = dirs.find(d => d.startsWith(normalizePhaseName(num) + '-'));
+        if (!d) return { plans: 0, summaries: 0 };
+        const files = fs.readdirSync(path.join(pDir, d));
+        return { plans: files.filter(f => f.endsWith('-PLAN.md')).length, summaries: files.filter(f => f.endsWith('-SUMMARY.md')).length };
+      } catch (e) { return { plans: 0, summaries: 0 }; }
+    };
+
+    const cur = countPlans(phaseNum);
+    if (cur.plans > 0 && cur.summaries < cur.plans) {
+      next = { command: `/gsd-execute-phase ${phaseNum}`, description: `Continue Phase ${phaseNum}: ${phaseName || 'current'}` };
+    } else if (unchecked.length > 0) {
+      const np = unchecked.find(p => parseInt(p.n) > parseInt(phaseNum));
+      if (np) {
+        const nc = countPlans(np.n);
+        next = nc.plans > 0
+          ? { command: `/gsd-execute-phase ${np.n}`, description: `Execute Phase ${np.n}: ${np.name}` }
+          : { command: `/gsd-plan-phase ${np.n}`, description: `Plan Phase ${np.n}: ${np.name}` };
+      } else {
+        next = { command: '/gsd-complete-milestone', description: 'All phases done — complete milestone' };
+      }
+    } else {
+      next = { command: '/gsd-complete-milestone', description: 'All phases done — complete milestone' };
+    }
+  }
+
+  const sa = sc.match(/Stopped at:\s*(.+)/);
+  const rf = sc.match(/Resume file:\s*(.+)/);
+  output({
+    current_position: { phase: pm ? `${pm[1]} of ${pm[2]}` : (phaseNum || 'Unknown'), phase_name: phaseName || 'Unknown', plan, status },
+    session_activity: { plans_completed: completed, decisions_made: decisions.slice(-5), blockers_resolved: [], last_activity: lastAct || 'Unknown' },
+    next_action: next,
+    session_continuity: { stopped_at: sa ? sa[1].trim() : `Phase ${phaseNum || '?'} — ${status}`, resume_file: rf ? rf[1].trim() : 'None' },
+  }, raw);
+}
+
 module.exports = {
   cmdSessionDiff,
   cmdContextBudget,
@@ -1699,4 +1779,5 @@ module.exports = {
   extractSectionsFromFile,
   cmdTokenBudget,
   cmdTestCoverage,
+  cmdSessionSummary,
 };

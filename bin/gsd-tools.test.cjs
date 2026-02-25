@@ -12168,3 +12168,172 @@ wave: 1
     assert.strictEqual(data.worktree_config.max_concurrent, 7, 'max_concurrent should be 7');
   });
 });
+
+// ─── Session Summary Tests ──────────────────────────────────────────────────
+
+describe('session-summary command', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('returns valid JSON with all required fields when STATE.md exists', () => {
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'STATE.md'), `# Project State
+
+## Current Position
+
+**Phase:** 21 of 22 (Worktree Parallelism)
+**Current Plan:** 03
+**Status:** Executing
+**Last Activity:** 2026-02-25
+
+Progress: [██████████] 100% (5/5 phases)
+
+## Accumulated Context
+
+### Decisions
+
+v4.0 decisions:
+- [Phase 21]: Worktree config read directly from config.json
+
+### Blockers/Concerns
+
+None.
+
+## Session Continuity
+
+Last session: 2026-02-25
+Stopped at: Completed 21-03-PLAN.md
+Resume file: None
+`);
+
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'ROADMAP.md'), `# Roadmap
+
+## Active Milestone: v4.0
+
+- [x] **Phase 21: Worktree Parallelism** — worktrees
+- [ ] **Phase 22: Workflow Polish** — session handoffs
+`);
+
+    const result = runGsdTools('session-summary --raw', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const data = JSON.parse(result.output);
+
+    // Check all 4 top-level fields exist
+    assert.ok(data.current_position, 'should have current_position');
+    assert.ok(data.session_activity, 'should have session_activity');
+    assert.ok(data.next_action, 'should have next_action');
+    assert.ok(data.session_continuity, 'should have session_continuity');
+
+    // Check position details
+    assert.strictEqual(data.current_position.phase, '21 of 22');
+    assert.strictEqual(data.current_position.phase_name, 'Worktree Parallelism');
+    assert.strictEqual(data.current_position.plan, '03');
+    assert.strictEqual(data.current_position.status, 'Executing');
+  });
+
+  test('returns error JSON when STATE.md is missing', () => {
+    // Don't create STATE.md — just use the empty temp project
+    const result = runGsdTools('session-summary --raw', tmpDir);
+    assert.ok(result.success, `Command should succeed even without STATE.md: ${result.error}`);
+
+    const data = JSON.parse(result.output);
+    assert.ok(data.error, 'should have error field');
+    assert.ok(data.error.includes('not found'), 'error should mention not found');
+  });
+
+  test('correctly identifies next action when current phase is complete', () => {
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'STATE.md'), `# Project State
+
+## Current Position
+
+**Phase:** 21 of 22 (Worktree Parallelism)
+**Current Plan:** Not started
+**Status:** Milestone complete
+**Last Activity:** 2026-02-25
+
+## Accumulated Context
+
+### Decisions
+
+None.
+
+## Session Continuity
+
+Last session: 2026-02-25
+Stopped at: Completed phase 21
+Resume file: None
+`);
+
+    // Create phase 22 directory with a plan
+    fs.mkdirSync(path.join(tmpDir, '.planning', 'phases', '22-workflow-polish'), { recursive: true });
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'phases', '22-workflow-polish', '22-01-PLAN.md'), '# Plan');
+
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'ROADMAP.md'), `# Roadmap
+
+## Active Milestone: v4.0
+
+- [x] **Phase 21: Worktree Parallelism** — worktrees
+- [ ] **Phase 22: Workflow Polish** — session handoffs
+`);
+
+    const result = runGsdTools('session-summary --raw', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const data = JSON.parse(result.output);
+
+    // Should suggest executing phase 22 (has plans, not yet complete)
+    assert.ok(data.next_action.command.includes('22'), `next action should reference phase 22, got: ${data.next_action.command}`);
+    assert.ok(data.next_action.command.includes('execute'), `should suggest execute since plans exist, got: ${data.next_action.command}`);
+  });
+
+  test('suggests plan-phase when next phase has no plans', () => {
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'STATE.md'), `# Project State
+
+## Current Position
+
+**Phase:** 21 of 22 (Worktree Parallelism)
+**Current Plan:** Not started
+**Status:** Milestone complete
+**Last Activity:** 2026-02-25
+
+## Accumulated Context
+
+### Decisions
+
+None.
+
+## Session Continuity
+
+Last session: 2026-02-25
+Stopped at: Completed phase 21
+Resume file: None
+`);
+
+    // Phase 22 dir exists but has no plans
+    fs.mkdirSync(path.join(tmpDir, '.planning', 'phases', '22-workflow-polish'), { recursive: true });
+
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'ROADMAP.md'), `# Roadmap
+
+## Active Milestone: v4.0
+
+- [x] **Phase 21: Worktree Parallelism** — worktrees
+- [ ] **Phase 22: Workflow Polish** — session handoffs
+`);
+
+    const result = runGsdTools('session-summary --raw', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const data = JSON.parse(result.output);
+
+    // Should suggest planning phase 22 (no plans yet)
+    assert.ok(data.next_action.command.includes('22'), `next action should reference phase 22, got: ${data.next_action.command}`);
+    assert.ok(data.next_action.command.includes('plan'), `should suggest plan since no plans exist, got: ${data.next_action.command}`);
+  });
+});

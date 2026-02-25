@@ -43,6 +43,7 @@ const {
   cmdValidateDependencies, cmdSearchLessons, cmdCodebaseImpact,
   cmdRollbackInfo, cmdVelocity, cmdTraceRequirement, cmdValidateConfig,
   cmdQuickTaskSummary, cmdExtractSections, cmdTestCoverage, cmdTokenBudget,
+  cmdSessionSummary,
 } = require('./commands/features');
 
 const {
@@ -581,6 +582,11 @@ async function main() {
 
     case 'session-diff': {
       cmdSessionDiff(cwd, raw);
+      break;
+    }
+
+    case 'session-summary': {
+      cmdSessionSummary(cwd, raw);
       break;
     }
 

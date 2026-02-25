@@ -415,6 +415,11 @@ Uses the last activity date from STATE.md to find recent commits.
 
 Output: { commits, since_date, count }`,
 
+  'session-summary': `Usage: gsd-tools session-summary [--raw]
+
+Session handoff summary: position, activity, next action, continuity.
+Output: { current_position, session_activity, next_action, session_continuity }`,
+
   'context-budget': `Usage: gsd-tools context-budget <subcommand|path> [options] [--raw]
 
 Measure and compare token consumption across GSD workflows.
