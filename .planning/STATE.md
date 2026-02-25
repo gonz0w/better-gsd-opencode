@@ -10,9 +10,9 @@ See: .planning/PROJECT.md (updated 2026-02-24)
 ## Current Position
 
 **Phase:** 16 of 17 (Workflow Integration & Self-Application)
-**Current Plan:** 2 of 3
+**Current Plan:** 3
 **Total Plans in Phase:** 3
-**Status:** In progress
+**Status:** Ready to execute
 **Last Activity:** 2026-02-25
 
 Progress: [████████░░] 75%
@@ -37,6 +37,7 @@ Phase 14-01: Graceful parser degradation — missing sections return null/empty 
 - [Phase 15]: getIntentDriftData() as shared function between drift command and init pre-flight (no shelling out)
 - [Phase 15]: Advisory-only drift pre-flight: never blocks, null when no INTENT.md, try/catch wrapped
 - [Phase 16]: Write INTENT.md directly rather than intent create CLI for richer dog-fooding content
+- [Phase 16]: getIntentSummary follows advisory try/catch pattern — null on missing INTENT.md, never crashes
 
 ### Pending Todos
 
@@ -49,5 +50,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-02-25
-Stopped at: Completed 16-02-PLAN.md
+Stopped at: Completed 16-01-PLAN.md
 Resume file: None
