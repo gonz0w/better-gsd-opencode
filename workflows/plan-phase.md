@@ -19,6 +19,8 @@ Parse: `researcher_model`, `planner_model`, `checker_model`, `research_enabled`,
 
 File paths: `state_path`, `roadmap_path`, `requirements_path`, `context_path`, `research_path`, `verification_path`, `uat_path` (null if absent).
 
+Intent fields (from 16-01): `intent_summary` (objective, outcome count, top P1 outcomes — null if no INTENT.md), `intent_path` (path to INTENT.md for @context references — null if absent). Use these to inject intent context into researcher and planner spawns when available.
+
 If no `.planning/`: error — run `/gsd-new-project`.
 
 ## 2. Parse Arguments
@@ -55,6 +57,7 @@ Task(
 Research Phase {phase_number}: {phase_name}.
 Question: What do I need to know to PLAN this phase well?
 Read: {context_path}, {requirements_path}, {state_path}
+Also read: .planning/INTENT.md (if it exists — project intent, objective, desired outcomes. Scope research to align with stated intent.)
 Phase description: {phase_desc}
 Requirement IDs: {phase_req_ids}
 Read ./CLAUDE.md and .agents/skills/ if they exist.
@@ -87,10 +90,11 @@ Task(
   prompt="Read /home/cam/.config/opencode/agents/gsd-planner.md for instructions.
 
 Phase: {phase_number}, Mode: {standard|gap_closure}
-Read: {state_path}, {roadmap_path}, {requirements_path}, {context_path}, {research_path}
+Read: {state_path}, {roadmap_path}, {requirements_path}, {context_path}, {research_path}, .planning/INTENT.md (if exists)
 If --gaps: also read {verification_path}, {uat_path}
 Requirement IDs (MUST all appear in plans): {phase_req_ids}
 Read ./CLAUDE.md and .agents/skills/ if they exist.
+If INTENT.md exists: derive plan objectives from desired outcomes (DO-XX). Each plan's objective should trace to at least one desired outcome. Include intent.outcome_ids in PLAN.md frontmatter.
 
 Output: PLAN.md files with frontmatter, XML tasks, verification, must_haves.",
   subagent_type="general", model="{planner_model}", description="Plan Phase {phase}"

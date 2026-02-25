@@ -50,10 +50,12 @@ Research implementation approach for Phase {phase}: {name}
 - {context_path} (USER DECISIONS from /gsd-discuss-phase)
 - {requirements_path} (Project requirements)
 - {state_path} (Project decisions and history)
+- .planning/INTENT.md (Project intent — objective, desired outcomes, target users. Skip if absent.)
 </files_to_read>
 
 <additional_context>
 Phase description: {description}
+If INTENT.md exists: scope research to align with stated project objective and desired outcomes. Prioritize findings relevant to P1 outcomes.
 </additional_context>
 
 <output>
