@@ -73,6 +73,22 @@
   type: behavior
   priority: nice-to-have
 
+## Assertion → Plan Flow
+
+During `/gsd-plan-phase`, the planner:
+1. Reads ASSERTIONS.md for the phase's requirements
+2. Uses must-have assertions as the source for `must_haves.truths` in PLAN.md frontmatter
+3. Each plan's truths map back to specific assertions
+4. During verification, each truth is checked against the original assertion
+
+This creates full traceability: Requirement → Assertion → Plan Truth → Verification Result
+
+## Migration
+
+Assertions are added gradually — when a phase touches a requirement, assertions for that requirement should be created. There is no need for a big-bang backfill.
+
+`assertions validate` will report coverage: how many requirements have assertions vs. how many don't.
+
 ---
 *Template: templates/assertions.md*
 *Schema version: 1.0*

@@ -54,13 +54,13 @@ Explicitly excluded. Documented to prevent scope creep.
 
 Which phases cover which requirements. Updated during roadmap creation.
 
-| Requirement | Phase | Status |
-|-------------|-------|--------|
-| AUTH-01 | Phase 1 | Pending |
-| AUTH-02 | Phase 1 | Pending |
-| AUTH-03 | Phase 1 | Pending |
-| AUTH-04 | Phase 1 | Pending |
-| [REQ-ID] | Phase [N] | Pending |
+| Requirement | Phase | Status | Test Command |
+|-------------|-------|--------|--------------|
+| AUTH-01 | Phase 1 | Pending | npm test -- --grep auth |
+| AUTH-02 | Phase 1 | Pending | npm test -- --grep verify |
+| AUTH-03 | Phase 1 | Pending | npm test -- --grep reset |
+| AUTH-04 | Phase 1 | Pending | npm test -- --grep session |
+| [REQ-ID] | Phase [N] | Pending | [test command] |
 
 **Coverage:**
 - v1 requirements: [X] total
@@ -101,6 +101,12 @@ Which phases cover which requirements. Updated during roadmap creation.
 - Each requirement maps to exactly one phase
 - Unmapped requirements = roadmap gap
 
+**Structured Assertions:**
+- Each requirement can have testable assertions in `.planning/ASSERTIONS.md`
+- Assertions are auto-generated during phase planning (see ASSERTIONS.md template)
+- Must-have assertions drive verification; nice-to-have are advisory
+- Coverage tracked: `assertions validate` reports requirements with/without assertions
+
 **Status Values:**
 - Pending: Not started
 - In Progress: Phase is active
@@ -115,6 +121,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 1. Mark covered requirements as Complete
 2. Update traceability status
 3. Note any requirements that changed scope
+4. Update ASSERTIONS.md: add assertions for newly-touched requirements if missing
 
 **After roadmap updates:**
 1. Verify all v1 requirements still mapped
@@ -197,26 +204,26 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 ## Traceability
 
-| Requirement | Phase | Status |
-|-------------|-------|--------|
-| AUTH-01 | Phase 1 | Pending |
-| AUTH-02 | Phase 1 | Pending |
-| AUTH-03 | Phase 1 | Pending |
-| AUTH-04 | Phase 1 | Pending |
-| PROF-01 | Phase 2 | Pending |
-| PROF-02 | Phase 2 | Pending |
-| PROF-03 | Phase 2 | Pending |
-| PROF-04 | Phase 2 | Pending |
-| CONT-01 | Phase 3 | Pending |
-| CONT-02 | Phase 3 | Pending |
-| CONT-03 | Phase 3 | Pending |
-| CONT-04 | Phase 3 | Pending |
-| CONT-05 | Phase 3 | Pending |
-| SOCL-01 | Phase 4 | Pending |
-| SOCL-02 | Phase 4 | Pending |
-| SOCL-03 | Phase 4 | Pending |
-| SOCL-04 | Phase 4 | Pending |
-| SOCL-05 | Phase 4 | Pending |
+| Requirement | Phase | Status | Test Command |
+|-------------|-------|--------|--------------|
+| AUTH-01 | Phase 1 | Pending | npm test -- --grep signup |
+| AUTH-02 | Phase 1 | Pending | npm test -- --grep verify |
+| AUTH-03 | Phase 1 | Pending | npm test -- --grep reset |
+| AUTH-04 | Phase 1 | Pending | npm test -- --grep session |
+| PROF-01 | Phase 2 | Pending | npm test -- --grep profile |
+| PROF-02 | Phase 2 | Pending | npm test -- --grep avatar |
+| PROF-03 | Phase 2 | Pending | npm test -- --grep bio |
+| PROF-04 | Phase 2 | Pending | npm test -- --grep profile |
+| CONT-01 | Phase 3 | Pending | npm test -- --grep post |
+| CONT-02 | Phase 3 | Pending | npm test -- --grep image |
+| CONT-03 | Phase 3 | Pending | npm test -- --grep edit |
+| CONT-04 | Phase 3 | Pending | npm test -- --grep delete |
+| CONT-05 | Phase 3 | Pending | npm test -- --grep feed |
+| SOCL-01 | Phase 4 | Pending | npm test -- --grep follow |
+| SOCL-02 | Phase 4 | Pending | npm test -- --grep unfollow |
+| SOCL-03 | Phase 4 | Pending | npm test -- --grep like |
+| SOCL-04 | Phase 4 | Pending | npm test -- --grep comment |
+| SOCL-05 | Phase 4 | Pending | npm test -- --grep activity |
 
 **Coverage:**
 - v1 requirements: 18 total
