@@ -8086,4 +8086,227 @@ A test project
         'help should describe exit codes or validation');
     });
   });
+
+  // ── Trace tests ──
+
+  describe('intent trace', () => {
+    // Helper to create a ROADMAP.md with milestone info for phase range scoping
+    function createRoadmap(dir, phaseStart, phaseEnd) {
+      const roadmapContent = `# Roadmap
+
+## Milestones
+
+- 🔵 **v1.0 Test Milestone** — Phases ${phaseStart}-${phaseEnd} (active)
+
+## Phases
+
+### Phase ${phaseStart}: First Phase
+**Goal**: Test goal
+**Plans:** 1 plan
+
+### Phase ${phaseEnd}: Second Phase
+**Goal**: Another goal
+**Plans:** 1 plan
+`;
+      fs.writeFileSync(path.join(dir, '.planning', 'ROADMAP.md'), roadmapContent, 'utf-8');
+    }
+
+    // Helper to create a PLAN.md with intent frontmatter
+    function createPlan(dir, phaseDir, planNum, outcomeIds, rationale) {
+      const phasePath = path.join(dir, '.planning', 'phases', phaseDir);
+      fs.mkdirSync(phasePath, { recursive: true });
+
+      const phaseNum = phaseDir.match(/^(\d+)/)[1];
+      const paddedPlan = String(planNum).padStart(2, '0');
+      const filename = `${phaseNum.padStart(2, '0')}-${paddedPlan}-PLAN.md`;
+
+      let frontmatter = `---
+phase: ${phaseDir}
+plan: ${paddedPlan}
+type: execute
+wave: 1
+depends_on: []`;
+
+      if (outcomeIds && outcomeIds.length > 0) {
+        frontmatter += `
+intent:
+  outcome_ids: [${outcomeIds.join(', ')}]
+  rationale: "${rationale || 'Test rationale'}"`;
+      }
+
+      frontmatter += `
+---
+
+<objective>
+Test plan objective.
+</objective>
+
+<tasks>
+<task type="auto">
+  <name>Task 1</name>
+  <action>Do something</action>
+  <verify>Check it</verify>
+  <done>Done</done>
+</task>
+</tasks>
+`;
+      fs.writeFileSync(path.join(phasePath, filename), frontmatter, 'utf-8');
+    }
+
+    test('trace with no INTENT.md errors', () => {
+      const result = runGsdTools('intent trace --raw', tmpDir);
+      assert.ok(!result.success, 'should fail without INTENT.md');
+      assert.ok(
+        (result.error || '').includes('No INTENT.md') || (result.output || '').includes('No INTENT.md'),
+        'should mention missing INTENT.md'
+      );
+    });
+
+    test('trace with INTENT.md but no plans returns 0 coverage and all outcomes as gaps', () => {
+      createPopulatedIntent(tmpDir);
+      createRoadmap(tmpDir, 14, 17);
+
+      const result = runGsdTools('intent trace --raw', tmpDir);
+      assert.ok(result.success, `trace failed: ${result.error}`);
+
+      const data = JSON.parse(result.output);
+      assert.strictEqual(data.total_outcomes, 3, 'should have 3 outcomes from populated intent');
+      assert.strictEqual(data.covered_outcomes, 0, 'none should be covered');
+      assert.strictEqual(data.coverage_percent, 0, 'coverage should be 0%');
+      assert.strictEqual(data.gaps.length, 3, 'all 3 outcomes should be gaps');
+      assert.strictEqual(data.plans.length, 0, 'no plans found');
+    });
+
+    test('trace with INTENT.md + plans tracing to outcomes shows correct matrix', () => {
+      createPopulatedIntent(tmpDir);
+      createRoadmap(tmpDir, 14, 17);
+
+      // Create plans that trace to outcomes
+      createPlan(tmpDir, '14-first-phase', 1, ['DO-01', 'DO-02'], 'Covers automation and tracking');
+      createPlan(tmpDir, '15-second-phase', 1, ['DO-03'], 'Covers git integration');
+
+      const result = runGsdTools('intent trace --raw', tmpDir);
+      assert.ok(result.success, `trace failed: ${result.error}`);
+
+      const data = JSON.parse(result.output);
+      assert.strictEqual(data.total_outcomes, 3);
+      assert.strictEqual(data.covered_outcomes, 3);
+      assert.strictEqual(data.coverage_percent, 100);
+      assert.strictEqual(data.gaps.length, 0, 'no gaps when all covered');
+
+      // Verify matrix entries
+      const do01 = data.matrix.find(m => m.outcome_id === 'DO-01');
+      assert.ok(do01, 'DO-01 should be in matrix');
+      assert.ok(do01.plans.length >= 1, 'DO-01 should have at least 1 plan');
+
+      const do03 = data.matrix.find(m => m.outcome_id === 'DO-03');
+      assert.ok(do03, 'DO-03 should be in matrix');
+      assert.ok(do03.plans.length >= 1, 'DO-03 should have at least 1 plan');
+
+      // Verify plans list
+      assert.strictEqual(data.plans.length, 2, 'should have 2 plans');
+    });
+
+    test('trace --gaps shows only uncovered outcomes', () => {
+      createPopulatedIntent(tmpDir);
+      createRoadmap(tmpDir, 14, 17);
+
+      // Only cover DO-01
+      createPlan(tmpDir, '14-first-phase', 1, ['DO-01'], 'Covers automation only');
+
+      const result = runGsdTools('intent trace --gaps --raw', tmpDir);
+      assert.ok(result.success, `trace --gaps failed: ${result.error}`);
+
+      const data = JSON.parse(result.output);
+      // --gaps mode: matrix should only contain gaps
+      assert.strictEqual(data.matrix.length, 2, 'should show 2 uncovered outcomes in matrix (DO-02, DO-03)');
+      for (const entry of data.matrix) {
+        assert.ok(entry.outcome_id !== 'DO-01', 'DO-01 should not appear in --gaps output');
+      }
+      assert.strictEqual(data.gaps.length, 2, 'should have 2 gaps');
+      assert.strictEqual(data.coverage_percent, 33, 'coverage should be 33% (1/3)');
+    });
+
+    test('trace with plan missing intent section includes plan with empty outcome_ids', () => {
+      createPopulatedIntent(tmpDir);
+      createRoadmap(tmpDir, 14, 17);
+
+      // Create plan WITHOUT intent section
+      createPlan(tmpDir, '14-first-phase', 1, null, null);
+
+      const result = runGsdTools('intent trace --raw', tmpDir);
+      assert.ok(result.success, `trace failed: ${result.error}`);
+
+      const data = JSON.parse(result.output);
+      assert.strictEqual(data.plans.length, 1, 'plan should appear in plans list');
+      assert.deepStrictEqual(data.plans[0].outcome_ids, [], 'plan without intent should have empty outcome_ids');
+      assert.strictEqual(data.covered_outcomes, 0, 'no outcomes covered');
+    });
+
+    test('trace --raw returns valid JSON with all expected fields', () => {
+      createPopulatedIntent(tmpDir);
+      createRoadmap(tmpDir, 14, 17);
+
+      const result = runGsdTools('intent trace --raw', tmpDir);
+      assert.ok(result.success, `trace --raw failed: ${result.error}`);
+
+      const data = JSON.parse(result.output);
+      assert.ok('total_outcomes' in data, 'should have total_outcomes');
+      assert.ok('covered_outcomes' in data, 'should have covered_outcomes');
+      assert.ok('coverage_percent' in data, 'should have coverage_percent');
+      assert.ok('matrix' in data, 'should have matrix');
+      assert.ok('gaps' in data, 'should have gaps');
+      assert.ok('plans' in data, 'should have plans');
+      assert.ok(Array.isArray(data.matrix), 'matrix should be an array');
+      assert.ok(Array.isArray(data.gaps), 'gaps should be an array');
+      assert.ok(Array.isArray(data.plans), 'plans should be an array');
+    });
+
+    test('parsePlanIntent handles comma-separated outcome IDs', () => {
+      createPopulatedIntent(tmpDir);
+      createRoadmap(tmpDir, 14, 17);
+
+      // Create a plan with comma-separated string format for outcome_ids
+      const phasePath = path.join(tmpDir, '.planning', 'phases', '14-test-phase');
+      fs.mkdirSync(phasePath, { recursive: true });
+      const planContent = `---
+phase: 14-test-phase
+plan: 01
+type: execute
+intent:
+  outcome_ids: "DO-01, DO-03"
+  rationale: "Comma separated test"
+---
+
+<objective>Test</objective>
+<tasks>
+<task type="auto"><name>T1</name><action>A</action><verify>V</verify><done>D</done></task>
+</tasks>
+`;
+      fs.writeFileSync(path.join(phasePath, '14-01-PLAN.md'), planContent, 'utf-8');
+
+      const result = runGsdTools('intent trace --raw', tmpDir);
+      assert.ok(result.success, `trace with comma-sep IDs failed: ${result.error}`);
+
+      const data = JSON.parse(result.output);
+      // The plan should have extracted DO-01 and DO-03
+      const plan = data.plans.find(p => p.phase === '14-test-phase');
+      assert.ok(plan, 'should find the test plan');
+      assert.ok(plan.outcome_ids.includes('DO-01'), 'should include DO-01');
+      assert.ok(plan.outcome_ids.includes('DO-03'), 'should include DO-03');
+      assert.strictEqual(plan.outcome_ids.length, 2, 'should have exactly 2 outcome IDs');
+    });
+
+    test('intent trace --help shows trace usage', () => {
+      const helpText = execSync(`node "${TOOLS_PATH}" intent trace --help 2>&1`, {
+        cwd: tmpDir,
+        encoding: 'utf-8',
+        stdio: ['pipe', 'pipe', 'pipe'],
+      }).trim();
+      assert.ok(helpText.includes('trace'), 'help should mention trace');
+      assert.ok(helpText.includes('--gaps'), 'help should mention --gaps flag');
+      assert.ok(helpText.includes('matrix') || helpText.includes('traceability'),
+        'help should describe traceability or matrix');
+    });
+  });
 });
