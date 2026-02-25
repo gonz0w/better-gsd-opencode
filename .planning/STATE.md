@@ -10,9 +10,9 @@ See: .planning/PROJECT.md (updated 2026-02-25)
 ## Current Position
 
 **Phase:** 18 of 22 (Environment Awareness)
-**Current Plan:** 2 of 3 in Phase 18
+**Current Plan:** 3 of 3 in Phase 18
 **Status:** Executing
-**Last Activity:** 2026-02-25 — Completed 18-01-PLAN.md
+**Last Activity:** 2026-02-25 — Completed 18-02-PLAN.md
 
 Progress: [░░░░░░░░░░] 0% (0/5 phases)
 
@@ -32,6 +32,7 @@ Progress: [░░░░░░░░░░] 0% (0/5 phases)
 | v2.0 | 4 | 13 | 3 days |
 | v3.0 | 4 | 10 | 1 day |
 | Phase 18 P01 | 14 min | 2 tasks | 14 files |
+| Phase 18 P02 | 11 min | 2 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -45,6 +46,8 @@ v4.0 decisions:
 - Worktrees as deployment mechanism on existing wave system — not architectural change
 - Bundle budget raised from 450KB to 500KB for new command modules
 - [Phase 18]: Raised bundle budget from 450KB to 500KB in build.js — env module adds ~19KB
+- [Phase 18]: Two-file split: gitignored env-manifest.json (machine-specific) + committed project-profile.json (team-visible)
+- [Phase 18]: Staleness detection based on watched file mtime comparison — root manifests, lockfiles, version manager files, docker-compose
 
 ### Pending Todos
 
@@ -57,5 +60,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-02-25
-Stopped at: Completed 18-01-PLAN.md
+Stopped at: Completed 18-02-PLAN.md
 Resume file: None

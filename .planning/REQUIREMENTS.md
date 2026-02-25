@@ -24,7 +24,7 @@ Requirements for milestone v4.0 Environment & Execution Intelligence. Each maps 
   - Run `<tool> --version` for version capture
   - Timeout per binary check (3s max), only check binaries relevant to detected languages
 
-- [ ] **ENV-04**: CLI writes environment manifest to `.planning/env-manifest.json`
+- [x] **ENV-04**: CLI writes environment manifest to `.planning/env-manifest.json`
   - JSON schema: languages, runtimes, package_manager, tools, scripts, monorepo, detection_ms
   - Includes detection source for each value (e.g., "source": "mise.toml")
   - Gitignored (machine-specific, not committed)
@@ -34,7 +34,7 @@ Requirements for milestone v4.0 Environment & Execution Intelligence. Each maps 
   - Compact format: "Tools: node@20 (npm), mix@1.16, go@1.21, docker@24"
   - Only inject if manifest exists and is fresh
 
-- [ ] **ENV-06**: CLI detects stale manifest and re-scans automatically
+- [x] **ENV-06**: CLI detects stale manifest and re-scans automatically
   - Compare manifest timestamp to git HEAD change
   - Re-scan if package.json, go.mod, mix.exs, etc. changed since last scan
   - `env scan --force` to manually re-scan
@@ -172,9 +172,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 | ENV-01 | Phase 18 | Complete |
 | ENV-02 | Phase 18 | Complete |
 | ENV-03 | Phase 18 | Complete |
-| ENV-04 | Phase 18 | Pending |
+| ENV-04 | Phase 18 | Complete |
 | ENV-05 | Phase 18 | Pending |
-| ENV-06 | Phase 18 | Pending |
+| ENV-06 | Phase 18 | Complete |
 | MCP-01 | Phase 19 | Pending |
 | MCP-02 | Phase 19 | Pending |
 | MCP-03 | Phase 19 | Pending |
