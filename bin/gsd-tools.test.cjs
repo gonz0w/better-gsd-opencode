@@ -8673,4 +8673,181 @@ Test plan objective.
       assert.ok(!data.intent_path, 'intent_path should be absent/falsy when no INTENT.md');
     });
   });
+
+  // ── History tests (Phase 17, Plan 01) ──
+
+  describe('intent history', () => {
+    // Helper to create an INTENT.md with a <history> section
+    function createIntentWithHistory(dir) {
+      const content = `**Revision:** 3
+**Created:** 2026-01-01
+**Updated:** 2026-02-25
+
+<objective>
+Build a CLI tool for project planning
+
+This tool helps teams manage complex multi-phase projects.
+</objective>
+
+<users>
+- Software engineers working on multi-service architectures
+- Team leads managing project milestones
+</users>
+
+<outcomes>
+- DO-01 [P1]: Automated phase planning and execution
+- DO-02 [P2]: Progress tracking with visual dashboards
+- DO-03 [P1]: Integration with git workflows
+</outcomes>
+
+<criteria>
+- SC-01: All CLI commands respond in under 500ms
+- SC-02: Zero data loss during state transitions
+</criteria>
+
+<constraints>
+### Technical
+- C-01: Single-file Node.js bundle, zero dependencies
+- C-02: Must work on Linux and macOS
+
+### Business
+- C-03: Open source under MIT license
+
+### Timeline
+- C-04: MVP ready within 2 weeks
+</constraints>
+
+<health>
+### Quantitative
+- HM-01: Bundle size under 500KB
+- HM-02: Test coverage above 80%
+
+### Qualitative
+Team velocity and developer satisfaction with the planning workflow.
+</health>
+
+<history>
+### v2.0 — 2026-02-20
+- **Modified** DO-01: Changed from "planning" to "automated phase planning and execution"
+  - Reason: Original wording was too vague for traceability
+- **Removed** DO-04: Removed real-time monitoring outcome
+  - Reason: CLI tool, not a daemon — monitoring doesn't fit the architecture
+
+### v1.0 — 2026-01-01
+- **Added** DO-01 [P1]: Phase planning and execution
+</history>
+`;
+      fs.writeFileSync(path.join(dir, '.planning', 'INTENT.md'), content, 'utf-8');
+    }
+
+    test('parse INTENT.md without history returns empty array', () => {
+      createPopulatedIntent(tmpDir);
+      const result = runGsdTools('intent show --raw', tmpDir);
+      assert.ok(result.success, `show --raw failed: ${result.error}`);
+
+      const data = JSON.parse(result.output);
+      assert.ok('history' in data, 'should have history key');
+      assert.ok(Array.isArray(data.history), 'history should be an array');
+      assert.strictEqual(data.history.length, 0, 'history should be empty when no <history> section');
+    });
+
+    test('parse INTENT.md with history returns entries and changes', () => {
+      createIntentWithHistory(tmpDir);
+      const result = runGsdTools('intent show --raw', tmpDir);
+      assert.ok(result.success, `show --raw failed: ${result.error}`);
+
+      const data = JSON.parse(result.output);
+      assert.strictEqual(data.history.length, 2, 'should have 2 milestone entries');
+
+      // First entry (newest)
+      assert.strictEqual(data.history[0].milestone, 'v2.0');
+      assert.strictEqual(data.history[0].date, '2026-02-20');
+      assert.strictEqual(data.history[0].changes.length, 2, 'v2.0 should have 2 changes');
+      assert.strictEqual(data.history[0].changes[0].type, 'Modified');
+      assert.strictEqual(data.history[0].changes[0].target, 'DO-01');
+      assert.ok(data.history[0].changes[0].reason, 'first change should have a reason');
+      assert.strictEqual(data.history[0].changes[1].type, 'Removed');
+
+      // Second entry (oldest)
+      assert.strictEqual(data.history[1].milestone, 'v1.0');
+      assert.strictEqual(data.history[1].date, '2026-01-01');
+      assert.strictEqual(data.history[1].changes.length, 1, 'v1.0 should have 1 change');
+      assert.strictEqual(data.history[1].changes[0].type, 'Added');
+    });
+
+    test('update auto-logs history entry', () => {
+      createPopulatedIntent(tmpDir);
+      // Create a ROADMAP.md for milestone info
+      fs.writeFileSync(path.join(tmpDir, '.planning', 'ROADMAP.md'),
+        '# Roadmap\n\n- 🔵 **v1.0 Test** — Phases 1-3 (active)\n', 'utf-8');
+
+      const result = runGsdTools('intent update outcomes --add "New test outcome" --priority P3 --raw', tmpDir);
+      assert.ok(result.success, `update failed: ${result.error}`);
+
+      // Read the file and check for history section
+      const content = fs.readFileSync(path.join(tmpDir, '.planning', 'INTENT.md'), 'utf-8');
+      assert.ok(content.includes('<history>'), 'INTENT.md should have <history> section after update');
+      assert.ok(content.includes('</history>'), 'INTENT.md should have closing </history> tag');
+      assert.ok(content.includes('**Added**'), 'history should contain Added entry');
+      assert.ok(content.includes('DO-04'), 'history should reference the new outcome ID');
+      assert.ok(content.includes('v1.0'), 'history should reference the active milestone');
+    });
+
+    test('update with --reason flag records custom reason', () => {
+      createPopulatedIntent(tmpDir);
+      fs.writeFileSync(path.join(tmpDir, '.planning', 'ROADMAP.md'),
+        '# Roadmap\n\n- 🔵 **v1.0 Test** — Phases 1-3 (active)\n', 'utf-8');
+
+      const result = runGsdTools('intent update outcomes --add "Another outcome" --priority P2 --reason "Testing reason tracking" --raw', tmpDir);
+      assert.ok(result.success, `update with --reason failed: ${result.error}`);
+
+      const content = fs.readFileSync(path.join(tmpDir, '.planning', 'INTENT.md'), 'utf-8');
+      assert.ok(content.includes('Testing reason tracking'), 'history should contain custom reason');
+    });
+
+    test('show compact includes evolution line when history exists', () => {
+      createIntentWithHistory(tmpDir);
+      const result = runGsdTools('intent show', tmpDir);
+      assert.ok(result.success, `show failed: ${result.error}`);
+      assert.ok(result.output.includes('Evolution:'), 'compact summary should include Evolution line');
+      assert.ok(result.output.includes('3 changes'), 'should count total changes');
+      assert.ok(result.output.includes('v2.0'), 'should mention milestone v2.0');
+    });
+
+    test('show history section renders evolution', () => {
+      createIntentWithHistory(tmpDir);
+      const result = runGsdTools('intent show history', tmpDir);
+      assert.ok(result.success, `show history failed: ${result.error}`);
+      assert.ok(result.output.includes('## Intent Evolution'), 'should have Intent Evolution heading');
+      assert.ok(result.output.includes('### v2.0'), 'should have v2.0 milestone header');
+      assert.ok(result.output.includes('### v1.0'), 'should have v1.0 milestone header');
+      assert.ok(result.output.includes('**Modified**'), 'should render Modified change');
+      assert.ok(result.output.includes('**Removed**'), 'should render Removed change');
+      assert.ok(result.output.includes('**Added**'), 'should render Added change');
+    });
+
+    test('validate accepts INTENT.md with valid history', () => {
+      createIntentWithHistory(tmpDir);
+      const result = runGsdTools('intent validate --raw', tmpDir);
+      assert.ok(result.success, `validate should pass for INTENT.md with history: ${result.error}`);
+
+      const data = JSON.parse(result.output);
+      assert.strictEqual(data.valid, true, 'should be valid');
+      assert.strictEqual(data.issues.length, 0, 'should have no issues');
+      // History section should be in sections
+      assert.ok(data.sections.history, 'sections should include history');
+      assert.strictEqual(data.sections.history.valid, true, 'history should be valid');
+      assert.strictEqual(data.sections.history.count, 2, 'should report 2 milestone entries');
+    });
+
+    test('validate works without history (backward compatible)', () => {
+      createPopulatedIntent(tmpDir);
+      const result = runGsdTools('intent validate --raw', tmpDir);
+      assert.ok(result.success, `validate should pass without history: ${result.error}`);
+
+      const data = JSON.parse(result.output);
+      assert.strictEqual(data.valid, true, 'should be valid without history');
+      assert.strictEqual(data.issues.length, 0, 'should have no issues');
+    });
+  });
 });

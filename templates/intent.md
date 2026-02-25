@@ -23,6 +23,7 @@ INTENT.md uses XML-tagged sections in narrative order. No preamble — file star
 | `<criteria>` | Launch gates / success criteria | `SC-XX:` |
 | `<constraints>` | Technical, business, timeline limits | `C-XX:` |
 | `<health>` | Quantitative metrics + qualitative principles | `HM-XX:` (quantitative only) |
+| `<history>` | Evolution log: what changed, why, which milestone | None (structured entries) |
 
 ## Section Details
 
@@ -58,12 +59,24 @@ Sub-headers `### Technical`, `### Business`, `### Timeline` inside the tag. Item
 ### `<health>`
 Sub-header `### Quantitative` with items `- HM-XX: metric`. Sub-header `### Qualitative` with prose (no IDs).
 
+### `<history>` (Optional)
+Milestone-grouped entries tracking intent evolution. Written automatically by `intent update`. Newest milestone first.
+
+Entry format:
+- `### vX.Y — YYYY-MM-DD` starts a milestone block
+- `- **Type** target: description` records a change (Type: Added, Modified, Removed)
+- `  - Reason: explanation` explains why the change was made
+
+This section is optional — older INTENT.md files without history are valid. History appears only after the first `intent update` call.
+
 ## Rules
 
 1. **Revision auto-increment:** Every update increments the revision number
 2. **ID gap preservation:** When items are removed, remaining IDs are NOT renumbered — gaps remain to preserve external references
 3. **No preamble:** Actual INTENT.md files start with metadata then `<objective>` — no "how to use" header
-4. **All sections required:** A valid INTENT.md has all 6 XML-tagged sections
+4. **All sections required:** A valid INTENT.md has all 6 core XML-tagged sections
+5. **History is optional:** INTENT.md files without `<history>` are valid. History is appended automatically by `intent update`.
+6. **History is newest-first:** Most recent milestone entries appear at the top.
 
 ## Example 1: CLI Tool
 
@@ -117,6 +130,17 @@ Reduces manual backup toil from hours/week to zero. Targets DevOps engineers who
 ### Qualitative
 Backups should be invisible when working — zero manual steps in the happy path. Failures should be loud, specific, and actionable.
 </health>
+
+<history>
+### v1.0 — 2026-01-20
+- **Added** DO-04 [P3]: Backup files are encrypted at rest with configurable key management
+  - Reason: Security audit flagged unencrypted backup files as a compliance risk
+
+### v1.0 — 2026-01-15
+- **Added** DO-01 [P1]: Full and incremental backups complete without manual intervention
+- **Added** DO-02 [P1]: Restore from any backup point within retention window succeeds
+- **Added** DO-03 [P2]: Backup status visible in monitoring dashboards via structured output
+</history>
 ```
 
 ## Example 2: Web Application
@@ -175,6 +199,22 @@ Most project knowledge lives in people's heads or scattered Slack threads. This 
 ### Qualitative
 Recording a decision should feel like writing a commit message — fast, natural, and part of the workflow. The app should never feel like extra paperwork.
 </health>
+
+<history>
+### v1.1 — 2026-02-20
+- **Modified** DO-01: Changed from "record decisions" to "record decisions with structured context"
+  - Reason: Unstructured text entries weren't useful for search or analysis
+- **Removed** DO-03: Removed real-time notification outcome
+  - Reason: Polling-based approach sufficient for team sizes under 50
+
+### v1.0 — 2026-01-10
+- **Added** DO-01 [P1]: Teams can record decisions
+- **Added** DO-02 [P1]: Any team member can search decisions
+- **Added** DO-03 [P2]: Real-time notifications for new decisions
+- **Added** DO-04 [P2]: Decisions link to code changes
+- **Added** DO-05 [P2]: Conflict detection between decisions
+- **Added** DO-06 [P3]: Decision templates for consistency
+</history>
 ```
 
 Note: Example 2 has an ID gap (DO-03 removed) — this is intentional and correct per the gap preservation rule.
