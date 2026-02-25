@@ -12,10 +12,10 @@ See: .planning/PROJECT.md (updated 2026-02-24)
 **Phase:** 14 of 17 (Intent Capture Foundation)
 **Current Plan:** 3
 **Total Plans in Phase:** 3
-**Status:** Ready to execute
+**Status:** Phase complete — ready for verification
 **Last Activity:** 2026-02-25
 
-Progress: [███░░░░░░░] 8%
+Progress: [████░░░░░░] 25%
 
 ## Accumulated Context
 
@@ -30,6 +30,8 @@ Phase 14-01: Graceful parser degradation — missing sections return null/empty 
 - [Phase 14]: Compact show targets 10-20 lines with priority-sorted outcomes (P1 first)
 - [Phase 14]: intent read is pure alias for intent show --raw (no separate implementation)
 - [Phase 14]: ID gaps preserved on removal — getNextId() looks at max, not count
+- [Phase 14]: Bundle budget 400→450KB for intent command family (parser+create+show+update+validate)
+- [Phase 14]: Validate uses direct process.exit() for exit codes, not error() (issues are expected output)
 
 ### Pending Todos
 
@@ -42,5 +44,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-02-25
-Stopped at: Completed 14-01-PLAN.md
+Stopped at: Completed 14-03-PLAN.md (Phase 14 all plans complete)
 Resume file: None
