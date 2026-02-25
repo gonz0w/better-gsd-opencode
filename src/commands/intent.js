@@ -1352,6 +1352,34 @@ function cmdIntentDrift(cwd, args, raw) {
   output(null, true, lines.join('\n') + '\n');
 }
 
+/**
+ * Get a lightweight intent summary for injection into init commands.
+ * Advisory: returns null if INTENT.md is missing or malformed, never throws.
+ *
+ * @param {string} cwd - project root
+ * @returns {{ objective: string, outcome_count: number, top_outcomes: Array<{id: string, text: string}>, users: string[], has_criteria: boolean } | null}
+ */
+function getIntentSummary(cwd) {
+  const intentPath = path.join(cwd, '.planning', 'INTENT.md');
+  if (!fs.existsSync(intentPath)) return null;
+
+  const content = fs.readFileSync(intentPath, 'utf-8');
+  const data = parseIntentMd(content);
+
+  if (!data.objective || !data.objective.statement) return null;
+
+  return {
+    objective: data.objective.statement,
+    outcome_count: (data.outcomes || []).length,
+    top_outcomes: (data.outcomes || [])
+      .filter(o => o.priority === 'P1')
+      .slice(0, 3)
+      .map(o => ({ id: o.id, text: o.text })),
+    users: (data.users || []).slice(0, 3).map(u => u.text),
+    has_criteria: (data.criteria || []).length > 0,
+  };
+}
+
 module.exports = {
   cmdIntentCreate,
   cmdIntentShow,
@@ -1360,4 +1388,5 @@ module.exports = {
   cmdIntentTrace,
   cmdIntentDrift,
   getIntentDriftData,
+  getIntentSummary,
 };

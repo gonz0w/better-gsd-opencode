@@ -5877,6 +5877,20 @@ var require_intent = __commonJS({
       lines.push(`Summary: ${data.covered_outcomes}/${data.total_outcomes} outcomes covered, ${data.traced_plans}/${data.total_plans} plans traced`);
       output(null, true, lines.join("\n") + "\n");
     }
+    function getIntentSummary(cwd) {
+      const intentPath = path.join(cwd, ".planning", "INTENT.md");
+      if (!fs.existsSync(intentPath)) return null;
+      const content = fs.readFileSync(intentPath, "utf-8");
+      const data = parseIntentMd(content);
+      if (!data.objective || !data.objective.statement) return null;
+      return {
+        objective: data.objective.statement,
+        outcome_count: (data.outcomes || []).length,
+        top_outcomes: (data.outcomes || []).filter((o) => o.priority === "P1").slice(0, 3).map((o) => ({ id: o.id, text: o.text })),
+        users: (data.users || []).slice(0, 3).map((u) => u.text),
+        has_criteria: (data.criteria || []).length > 0
+      };
+    }
     module2.exports = {
       cmdIntentCreate,
       cmdIntentShow,
@@ -5884,7 +5898,8 @@ var require_intent = __commonJS({
       cmdIntentValidate,
       cmdIntentTrace,
       cmdIntentDrift,
-      getIntentDriftData
+      getIntentDriftData,
+      getIntentSummary
     };
   }
 });
@@ -5901,7 +5916,7 @@ var require_init = __commonJS({
     var { safeReadFile, findPhaseInternal, resolveModelInternal, getRoadmapPhaseInternal, getMilestoneInfo, getArchivedPhaseDirs, normalizePhaseName, isValidDateString, sanitizeShellArg, pathExistsInternal, generateSlugInternal } = require_helpers();
     var { extractFrontmatter } = require_frontmatter();
     var { execGit } = require_git();
-    var { getIntentDriftData } = require_intent();
+    var { getIntentDriftData, getIntentSummary } = require_intent();
     function cmdInitExecutePhase(cwd, phase, raw) {
       if (!phase) {
         error("phase required for init execute-phase");
@@ -5955,8 +5970,15 @@ var require_init = __commonJS({
         roadmap_path: ".planning/ROADMAP.md",
         config_path: ".planning/config.json",
         // Intent drift advisory (null if no INTENT.md)
-        intent_drift: null
+        intent_drift: null,
+        // Intent summary (null if no INTENT.md)
+        intent_summary: null
       };
+      try {
+        result.intent_summary = getIntentSummary(cwd);
+      } catch (e) {
+        debugLog("init.executePhase", "intent summary failed (non-blocking)", e);
+      }
       try {
         const driftData = getIntentDriftData(cwd);
         if (driftData) {
@@ -6000,7 +6022,8 @@ var require_init = __commonJS({
             score: result.intent_drift.score,
             alignment: result.intent_drift.alignment,
             advisory: result.intent_drift.advisory
-          } : null
+          } : null,
+          intent_summary: result.intent_summary || null
         };
         if (global._gsdManifestMode) {
           compactResult._manifest = {
@@ -6048,8 +6071,20 @@ var require_init = __commonJS({
         // File paths
         state_path: ".planning/STATE.md",
         roadmap_path: ".planning/ROADMAP.md",
-        requirements_path: ".planning/REQUIREMENTS.md"
+        requirements_path: ".planning/REQUIREMENTS.md",
+        // Intent context (null if no INTENT.md)
+        intent_summary: null,
+        intent_path: null
       };
+      try {
+        result.intent_summary = getIntentSummary(cwd);
+        const intentFile = path.join(cwd, ".planning", "INTENT.md");
+        if (fs.existsSync(intentFile)) {
+          result.intent_path = ".planning/INTENT.md";
+        }
+      } catch (e) {
+        debugLog("init.planPhase", "intent summary failed (non-blocking)", e);
+      }
       if (phaseInfo?.directory) {
         const phaseDirFull = path.join(cwd, phaseInfo.directory);
         try {
@@ -6089,6 +6124,8 @@ var require_init = __commonJS({
           research_enabled: result.research_enabled,
           plan_checker_enabled: result.plan_checker_enabled
         };
+        if (result.intent_summary) compactResult.intent_summary = result.intent_summary;
+        if (result.intent_path) compactResult.intent_path = result.intent_path;
         if (result.context_path) compactResult.context_path = result.context_path;
         if (result.research_path) compactResult.research_path = result.research_path;
         if (result.verification_path) compactResult.verification_path = result.verification_path;
@@ -6722,8 +6759,15 @@ var require_init = __commonJS({
         project_path: ".planning/PROJECT.md",
         config_path: ".planning/config.json",
         // Session diff (what changed since last session)
-        session_diff: getSessionDiffSummary(cwd)
+        session_diff: getSessionDiffSummary(cwd),
+        // Intent summary (null if no INTENT.md)
+        intent_summary: null
       };
+      try {
+        result.intent_summary = getIntentSummary(cwd);
+      } catch (e) {
+        debugLog("init.progress", "intent summary failed (non-blocking)", e);
+      }
       if (global._gsdCompactMode) {
         const manifestFiles = [];
         if (result.state_exists) manifestFiles.push({ path: ".planning/STATE.md", sections: ["Current Position"], required: false });
@@ -6738,7 +6782,8 @@ var require_init = __commonJS({
           current_phase: result.current_phase,
           next_phase: result.next_phase,
           has_work_in_progress: result.has_work_in_progress,
-          session_diff: result.session_diff
+          session_diff: result.session_diff,
+          intent_summary: result.intent_summary || null
         };
         if (global._gsdManifestMode) {
           compactResult._manifest = { files: manifestFiles };

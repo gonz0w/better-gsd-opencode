@@ -8,7 +8,7 @@ const { loadConfig } = require('../lib/config');
 const { safeReadFile, findPhaseInternal, resolveModelInternal, getRoadmapPhaseInternal, getMilestoneInfo, getArchivedPhaseDirs, normalizePhaseName, isValidDateString, sanitizeShellArg, pathExistsInternal, generateSlugInternal } = require('../lib/helpers');
 const { extractFrontmatter } = require('../lib/frontmatter');
 const { execGit } = require('../lib/git');
-const { getIntentDriftData } = require('./intent');
+const { getIntentDriftData, getIntentSummary } = require('./intent');
 
 function cmdInitExecutePhase(cwd, phase, raw) {
   if (!phase) {
@@ -82,7 +82,17 @@ function cmdInitExecutePhase(cwd, phase, raw) {
 
     // Intent drift advisory (null if no INTENT.md)
     intent_drift: null,
+
+    // Intent summary (null if no INTENT.md)
+    intent_summary: null,
   };
+
+  // Advisory intent summary — never crash, never block
+  try {
+    result.intent_summary = getIntentSummary(cwd);
+  } catch (e) {
+    debugLog('init.executePhase', 'intent summary failed (non-blocking)', e);
+  }
 
   // Advisory intent drift scoring — never crash, never block
   try {
@@ -134,6 +144,7 @@ function cmdInitExecutePhase(cwd, phase, raw) {
         alignment: result.intent_drift.alignment,
         advisory: result.intent_drift.advisory,
       } : null,
+      intent_summary: result.intent_summary || null,
     };
     if (global._gsdManifestMode) {
       compactResult._manifest = {
@@ -191,7 +202,22 @@ function cmdInitPlanPhase(cwd, phase, raw) {
     state_path: '.planning/STATE.md',
     roadmap_path: '.planning/ROADMAP.md',
     requirements_path: '.planning/REQUIREMENTS.md',
+
+    // Intent context (null if no INTENT.md)
+    intent_summary: null,
+    intent_path: null,
   };
+
+  // Advisory intent summary — never crash, never block
+  try {
+    result.intent_summary = getIntentSummary(cwd);
+    const intentFile = path.join(cwd, '.planning', 'INTENT.md');
+    if (fs.existsSync(intentFile)) {
+      result.intent_path = '.planning/INTENT.md';
+    }
+  } catch (e) {
+    debugLog('init.planPhase', 'intent summary failed (non-blocking)', e);
+  }
 
   if (phaseInfo?.directory) {
     // Find *-CONTEXT.md in phase directory
@@ -232,6 +258,8 @@ function cmdInitPlanPhase(cwd, phase, raw) {
       research_enabled: result.research_enabled,
       plan_checker_enabled: result.plan_checker_enabled,
     };
+    if (result.intent_summary) compactResult.intent_summary = result.intent_summary;
+    if (result.intent_path) compactResult.intent_path = result.intent_path;
     if (result.context_path) compactResult.context_path = result.context_path;
     if (result.research_path) compactResult.research_path = result.research_path;
     if (result.verification_path) compactResult.verification_path = result.verification_path;
@@ -988,7 +1016,17 @@ function cmdInitProgress(cwd, raw) {
 
     // Session diff (what changed since last session)
     session_diff: getSessionDiffSummary(cwd),
+
+    // Intent summary (null if no INTENT.md)
+    intent_summary: null,
   };
+
+  // Advisory intent summary — never crash, never block
+  try {
+    result.intent_summary = getIntentSummary(cwd);
+  } catch (e) {
+    debugLog('init.progress', 'intent summary failed (non-blocking)', e);
+  }
 
   if (global._gsdCompactMode) {
     const manifestFiles = [];
@@ -1006,6 +1044,7 @@ function cmdInitProgress(cwd, raw) {
       next_phase: result.next_phase,
       has_work_in_progress: result.has_work_in_progress,
       session_diff: result.session_diff,
+      intent_summary: result.intent_summary || null,
     };
     if (global._gsdManifestMode) {
       compactResult._manifest = { files: manifestFiles };
