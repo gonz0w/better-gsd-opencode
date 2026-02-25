@@ -39,6 +39,13 @@ Read each to extract testable deliverables.
 
 <step name="extract_tests">
 From SUMMARYs, parse accomplishments and user-facing changes. Create tests with name + expected observable behavior. Skip internal/non-observable items.
+
+Also read .planning/INTENT.md if it exists. For each desired outcome (DO-XX) relevant to this phase's requirements:
+- Create a test verifying the outcome is observable (e.g., "DO-02: AI agents see intent" → test that init output includes intent data)
+- Mark these tests with "[Intent]" prefix in the test name to distinguish from accomplishment-based tests
+- Only include outcomes that map to this phase (cross-reference with ROADMAP requirements or intent trace)
+
+Intent-based tests check "did we achieve what we intended?" vs accomplishment-based tests which check "does what we built work?"
 </step>
 
 <step name="create_uat_file">
@@ -65,7 +72,8 @@ Read UAT file, find first pending test, announce progress, continue from there.
 <step name="complete_session">
 Update status: complete. Clear Current Test. Commit UAT file.
 
-Present summary table. If issues > 0 → diagnose_issues. If issues == 0 → suggest next phase.
+Present summary table. If intent-based tests were included: report intent outcome coverage alongside pass/fail counts.
+If issues > 0 → diagnose_issues. If issues == 0 → suggest next phase.
 </step>
 
 <step name="diagnose_issues">

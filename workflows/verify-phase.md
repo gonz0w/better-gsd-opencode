@@ -39,10 +39,18 @@ node /home/cam/.config/opencode/get-shit-done/bin/gsd-tools.cjs roadmap get-phas
 Use each criterion as a truth, derive artifacts and key links.
 
 **Option C — Derive from goal** (fallback): State goal → derive 3-7 truths → artifacts → key links.
+
+**Option D — INTENT.md desired outcomes** (if .planning/INTENT.md exists):
+Read .planning/INTENT.md. For outcomes relevant to this phase:
+- Each relevant outcome becomes a truth to verify
+- Success criteria (SC-XX) become additional verification gates
+- Merge with Option A/B/C truths (intent adds, doesn't replace)
 </step>
 
 <step name="verify_truths">
 For each truth: identify supporting artifacts → check status → check wiring → determine truth status.
+
+For intent-derived truths: verification should check that the desired outcome is observably achieved, not just that code exists. Example: "AI agents see intent" requires checking init output, not just that intent.js has a function.
 
 Status: ✓ VERIFIED | ✗ FAILED | ? UNCERTAIN (needs human)
 </step>
