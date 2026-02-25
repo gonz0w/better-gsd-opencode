@@ -19,4 +19,4 @@ requirements_completed:
 
 # Phase 13 Plan 04 Summary
 
-MCP discovery command reads .mcp.json from project-level, OpenCode user-level, and Claude Code user-level locations. Reports server names, transport types, and commands. Lightweight config-based discovery (full protocol introspection deferred to future milestone).
+MCP discovery command reads .mcp.json from project-level and OpenCode user-level locations. Reports server names, transport types, and commands. Lightweight config-based discovery (full protocol introspection deferred to future milestone).

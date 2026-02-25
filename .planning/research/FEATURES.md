@@ -5,7 +5,7 @@
 
 ## Summary
 
-Four feature categories. Environment awareness and MCP profiling are table stakes for 2026 AI coding tools. Structured requirements is a differentiator (no existing tool does this well). Worktree parallelism follows Claude Code/Cursor patterns but with GSD's wave-based orchestration layer.
+Four feature categories. Environment awareness and MCP profiling are table stakes for 2026 AI coding tools. Structured requirements is a differentiator (no existing tool does this well). Worktree parallelism follows OpenCode/Cursor patterns but with GSD's wave-based orchestration layer.
 
 ## Feature Categories
 
@@ -35,7 +35,7 @@ Four feature categories. Environment awareness and MCP profiling are table stake
 - Actionable recommendations with token savings
 - Auto-disable with backup/restore
 
-**Research notes:** Claude Code shipped Tool Search (Jan 2026) for 85% token reduction via on-demand loading. OpenCode has manual `enabled: false` but no profiling. A profiling CLI command is novel.
+**Research notes:** Tool Search patterns (Jan 2026) achieve 85% token reduction via on-demand loading. OpenCode has manual `enabled: false` but no profiling. A profiling CLI command is novel.
 
 ### 3. Structured Requirements
 
@@ -62,7 +62,7 @@ Four feature categories. Environment awareness and MCP profiling are table stake
 - Config-driven limits (max_concurrent, sync_files, setup_hooks)
 - Integration with existing `files_modified` static analysis
 
-**Research notes:** Claude Code, Cursor, agentree, git-worktree-runner all use worktrees for parallel agents. GSD's wave system provides the parallelism boundaries — worktrees are the execution mechanism. Key risk: disk space (2-4GB per worktree with node_modules) and lock file conflicts.
+**Research notes:** OpenCode, Cursor, agentree, git-worktree-runner all use worktrees for parallel agents. GSD's wave system provides the parallelism boundaries — worktrees are the execution mechanism. Key risk: disk space (2-4GB per worktree with node_modules) and lock file conflicts.
 
 ### 5. Complete-and-Clear Workflow
 

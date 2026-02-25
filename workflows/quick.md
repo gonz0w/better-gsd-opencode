@@ -62,7 +62,7 @@ Task(
 
 <files_to_read>
 - .planning/STATE.md
-- ./CLAUDE.md (if exists)
+- ./AGENTS.md (if exists)
 </files_to_read>
 
 **Project skills:** Check .agents/skills/ (if exists) — read SKILL.md files
@@ -166,7 +166,7 @@ Execute quick task ${next_num}.
 <files_to_read>
 - ${QUICK_DIR}/${next_num}-PLAN.md
 - .planning/STATE.md
-- ./CLAUDE.md (if exists)
+- ./AGENTS.md (if exists)
 - .agents/skills/ (if exists — list skills, read SKILL.md, follow relevant rules)
 </files_to_read>
 

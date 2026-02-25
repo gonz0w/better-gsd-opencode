@@ -825,12 +825,21 @@ function checkEnvManifestStaleness(cwd) {
     }
   }
 
-  // Also check for new watched files that weren't in the manifest
-  const currentWatched = getWatchedFiles(cwd, scanManifests(cwd, 0)); // Only depth 0 for speed
-  for (const file of currentWatched) {
-    if (!(file in manifest.watched_files_mtimes)) {
+  // Check for new watched files that weren't in the manifest.
+  // Instead of doing a full scanManifests(cwd, 0) recursive walk,
+  // just check if any known manifest/lockfile/version-manager files exist
+  // that weren't in the original watched list (cheap existsSync checks).
+  const knownFiles = [
+    ...LANG_MANIFESTS.map(m => m.file),
+    ...PM_LOCKFILES.map(l => l.file),
+    ...VERSION_MANAGERS.map(v => v.file),
+  ];
+  const trackedSet = new Set(manifest.watched_files || []);
+  for (const file of knownFiles) {
+    if (!trackedSet.has(file) && fs.existsSync(path.join(cwd, file))) {
       // New file appeared that wasn't tracked
       changedFiles.push(file);
+      break; // One new file is enough to trigger rescan
     }
   }
 
@@ -1142,9 +1151,9 @@ function autoTriggerEnvScan(cwd) {
     debugLog('env.autoTrigger', `rescan: ${staleness.reason}`);
   }
 
-  // No manifest or stale — run a fast scan (skip binary version checks)
+  // No manifest or stale — run a fast scan (skip binary version checks on rescan)
   try {
-    const result = performEnvScan(cwd, { skipBinaryVersions: !manifest });
+    const result = performEnvScan(cwd, { skipBinaryVersions: !!manifest });
     writeManifest(cwd, result);
     ensureManifestGitignored(cwd);
     writeProjectProfile(cwd, result);

@@ -74,4 +74,4 @@ Phase 9 goal fully achieved: pre-existing tech debt items from v1.0 are resolved
 ---
 
 _Verified: 2026-02-22T20:15:00Z_
-_Verifier: Claude (gsd-verifier)_
+_Verifier: gsd-verifier_

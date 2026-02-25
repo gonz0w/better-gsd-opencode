@@ -105,7 +105,7 @@ node --test bin/gsd-tools.test.cjs
 - Git (required for commit operations, history analysis, rollback features)
 
 **Production (plugin runtime):**
-- OpenCode AI assistant (replaces Claude Code) — the host environment that invokes workflows
+- OpenCode AI assistant — the host environment that invokes workflows
 - Node.js >=18 available on `PATH`
 - Git repository in the target project
 - Write access to `~/.config/opencode/get-shit-done/` for installation

@@ -29,7 +29,7 @@ Accurate token counting for all GSD layers, workflow baseline measurement with b
 - Dot-notation for nested access: `--fields name,phases.status,milestone.version`
 - Missing fields: include as null (caller knows it was requested but absent)
 - Arrays: apply field filtering to each element (e.g. `--fields name,status` on array of phases filters each phase object)
-- Scope for --fields + output mode: Claude's discretion on whether it affects both JSON and table output or JSON-only
+- Scope for --fields + output mode: Agent's discretion on whether it affects both JSON and table output or JSON-only
 
 ### Measurement command design
 - Extend the existing `context-budget` command (not new commands)
@@ -38,7 +38,7 @@ Accurate token counting for all GSD layers, workflow baseline measurement with b
 - Compare mode: no argument = compare vs most recent saved baseline; provide path = compare vs that specific file
 - Workflow discovery: dynamic — scan workflows directory, parse @-references and gsd-tools calls to build dependency graph automatically (no static manifest)
 
-### Claude's Discretion
+### Agent's Discretion
 - Whether --fields affects human-readable table output in addition to JSON
 - Exact tokenizer library choice (gpt-tokenizer, tiktoken, js-tiktoken, etc.)
 - Baseline file naming convention and JSON schema
@@ -49,7 +49,7 @@ Accurate token counting for all GSD layers, workflow baseline measurement with b
 <specifics>
 ## Specific Ideas
 
-- This is the OpenCode version of GSD (not Claude Code) — models used are Anthropic and GPT
+- This is the OpenCode version of GSD — models used are Anthropic and GPT
 - The existing `context-budget` command has a broken `lines * 4` heuristic that this phase replaces
 - The project currently has zero npm dependencies — adding one tokenizer library is the first dependency, so pick carefully
 - "Full agent context" measurement means the tool needs to understand what files a workflow actually pulls in, not just count the workflow file

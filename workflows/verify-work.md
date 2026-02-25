@@ -1,5 +1,5 @@
 <purpose>
-Validate features through conversational testing with persistent state. Creates UAT.md tracking test progress. User tests, Claude records. One test at a time.
+Validate features through conversational testing with persistent state. Creates UAT.md tracking test progress. User tests, the agent records. One test at a time.
 </purpose>
 
 <philosophy>
@@ -85,7 +85,7 @@ Spawn parallel debug agents for each issue. Collect root causes. Update UAT.md. 
 Task(
   prompt="Phase {phase_number}, Mode: gap_closure.
 Read: {phase_dir}/{phase_num}-UAT.md, .planning/STATE.md, .planning/ROADMAP.md
-Requirements: {phase_req_ids}. Read ./CLAUDE.md and .agents/skills/ if they exist.
+Requirements: {phase_req_ids}. Read ./AGENTS.md and .agents/skills/ if they exist.
 Output: Gap closure PLAN.md files.",
   subagent_type="gsd-planner", model="{planner_model}", description="Plan gap closure"
 )

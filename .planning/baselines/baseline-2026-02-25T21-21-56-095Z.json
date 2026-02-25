@@ -1,14 +1,14 @@
 {
-  "timestamp": "2026-02-25T12:44:07.465Z",
-  "workflow_count": 43,
-  "total_tokens": 74187,
+  "timestamp": "2026-02-25T21:21:56.095Z",
+  "workflow_count": 44,
+  "total_tokens": 76146,
   "workflows": [
     {
       "name": "execute-phase.md",
-      "workflow_tokens": 2661,
+      "workflow_tokens": 3645,
       "ref_count": 2,
       "ref_tokens": 4861,
-      "total_tokens": 7522
+      "total_tokens": 8506
     },
     {
       "name": "new-milestone.md",
@@ -19,17 +19,17 @@
     },
     {
       "name": "discuss-phase.md",
-      "workflow_tokens": 4122,
+      "workflow_tokens": 4125,
       "ref_count": 0,
       "ref_tokens": 0,
-      "total_tokens": 4122
+      "total_tokens": 4125
     },
     {
       "name": "help.md",
-      "workflow_tokens": 3769,
+      "workflow_tokens": 3772,
       "ref_count": 0,
       "ref_tokens": 0,
-      "total_tokens": 3769
+      "total_tokens": 3772
     },
     {
       "name": "transition.md",
@@ -47,10 +47,10 @@
     },
     {
       "name": "verify-work.md",
-      "workflow_tokens": 1585,
+      "workflow_tokens": 1586,
       "ref_count": 1,
       "ref_tokens": 1641,
-      "total_tokens": 3226
+      "total_tokens": 3227
     },
     {
       "name": "new-project.md",
@@ -68,10 +68,10 @@
     },
     {
       "name": "progress.md",
-      "workflow_tokens": 2652,
+      "workflow_tokens": 2653,
       "ref_count": 0,
       "ref_tokens": 0,
-      "total_tokens": 2652
+      "total_tokens": 2653
     },
     {
       "name": "audit-milestone.md",
@@ -82,10 +82,10 @@
     },
     {
       "name": "map-codebase.md",
-      "workflow_tokens": 2426,
+      "workflow_tokens": 2427,
       "ref_count": 0,
       "ref_tokens": 0,
-      "total_tokens": 2426
+      "total_tokens": 2427
     },
     {
       "name": "quick.md",
@@ -103,10 +103,10 @@
     },
     {
       "name": "plan-phase.md",
-      "workflow_tokens": 1838,
+      "workflow_tokens": 2094,
       "ref_count": 0,
       "ref_tokens": 0,
-      "total_tokens": 1838
+      "total_tokens": 2094
     },
     {
       "name": "plan-milestone-gaps.md",
@@ -166,10 +166,10 @@
     },
     {
       "name": "add-todo.md",
-      "workflow_tokens": 1198,
+      "workflow_tokens": 1200,
       "ref_count": 0,
       "ref_tokens": 0,
-      "total_tokens": 1198
+      "total_tokens": 1200
     },
     {
       "name": "remove-phase.md",
@@ -187,10 +187,10 @@
     },
     {
       "name": "list-phase-assumptions.md",
-      "workflow_tokens": 1097,
+      "workflow_tokens": 1104,
       "ref_count": 0,
       "ref_tokens": 0,
-      "total_tokens": 1097
+      "total_tokens": 1104
     },
     {
       "name": "pause-work.md",
@@ -219,6 +219,13 @@
       "ref_count": 0,
       "ref_tokens": 0,
       "total_tokens": 765
+    },
+    {
+      "name": "complete-and-clear.md",
+      "workflow_tokens": 701,
+      "ref_count": 0,
+      "ref_tokens": 0,
+      "total_tokens": 701
     },
     {
       "name": "set-profile.md",

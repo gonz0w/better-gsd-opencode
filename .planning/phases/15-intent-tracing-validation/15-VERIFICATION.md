@@ -92,4 +92,4 @@ No gaps found. All 5 observable truths verified with evidence. All 8 requirement
 ---
 
 _Verified: 2026-02-25T10:19:26Z_
-_Verifier: Claude (gsd-verifier)_
+_Verifier: gsd-verifier_

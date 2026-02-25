@@ -610,7 +610,7 @@ For automation-first checkpoint patterns, server lifecycle management, CLI insta
 **@/home/cam/.config/opencode/get-shit-done/references/checkpoints.md** → `<automation_reference>` section
 
 Key principles:
-- Claude sets up verification environment BEFORE presenting checkpoints
+- The agent sets up verification environment BEFORE presenting checkpoints
 - Users never run CLI commands (visit URLs only)
 - Server lifecycle: start before checkpoint, handle port conflicts, keep running for duration
 - CLI installation: auto-install where safe, checkpoint for user choice otherwise

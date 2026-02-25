@@ -9,7 +9,7 @@ The plugin turns unstructured project ideas into executable plans with traceabil
 </objective>
 
 <users>
-- Software developers using AI coding assistants (OpenCode, Claude Code) for project planning and execution
+- Software developers using AI coding assistants (OpenCode) for project planning and execution
 - Solo developers managing complex multi-phase projects with AI assistance
 - The GSD plugin's own development workflow (self-referential: planning GSD improvements using GSD)
 </users>

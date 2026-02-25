@@ -1125,7 +1125,12 @@ var require_config = __commonJS({
     var { execSync } = require("child_process");
     var { CONFIG_SCHEMA } = require_constants();
     var { debugLog } = require_output();
+    var _configCache = /* @__PURE__ */ new Map();
     function loadConfig(cwd) {
+      if (_configCache.has(cwd)) {
+        debugLog("config.load", `cache hit: ${cwd}`);
+        return _configCache.get(cwd);
+      }
       const configPath = path.join(cwd, ".planning", "config.json");
       const defaults = {};
       for (const [key, def] of Object.entries(CONFIG_SCHEMA)) {
@@ -1159,9 +1164,11 @@ var require_config = __commonJS({
             result[key] = get(key, def) ?? def.default;
           }
         }
+        _configCache.set(cwd, result);
         return result;
       } catch (e) {
         debugLog("config.load", "parse config.json failed, using defaults", e);
+        _configCache.set(cwd, defaults);
         return defaults;
       }
     }
@@ -1324,6 +1331,7 @@ var require_helpers = __commonJS({
     var { loadConfig } = require_config();
     var { MODEL_PROFILES } = require_constants();
     var fileCache = /* @__PURE__ */ new Map();
+    var dirCache = /* @__PURE__ */ new Map();
     function safeReadFile(filePath) {
       try {
         return fs.readFileSync(filePath, "utf-8");
@@ -1349,6 +1357,75 @@ var require_helpers = __commonJS({
       } else {
         fileCache.clear();
       }
+    }
+    function cachedReaddirSync(dirPath, options) {
+      const optKey = options?.withFileTypes ? ":wt" : "";
+      const key = dirPath + optKey;
+      if (dirCache.has(key)) {
+        return dirCache.get(key);
+      }
+      try {
+        const entries = fs.readdirSync(dirPath, options);
+        dirCache.set(key, entries);
+        return entries;
+      } catch (e) {
+        debugLog("dir.cache", `readdir failed: ${dirPath}`, e);
+        dirCache.set(key, null);
+        return null;
+      }
+    }
+    var _phaseTreeCache = null;
+    var _phaseTreeCwd = null;
+    function getPhaseTree(cwd) {
+      if (_phaseTreeCache && _phaseTreeCwd === cwd) {
+        return _phaseTreeCache;
+      }
+      const phasesDir = path.join(cwd, ".planning", "phases");
+      const tree = /* @__PURE__ */ new Map();
+      try {
+        const entries = fs.readdirSync(phasesDir, { withFileTypes: true });
+        const dirs = entries.filter((e) => e.isDirectory()).map((e) => e.name).sort();
+        for (const dir of dirs) {
+          const dirMatch = dir.match(/^(\d+(?:\.\d+)?)-?(.*)/);
+          const phaseNumber = dirMatch ? dirMatch[1] : dir;
+          const normalized = normalizePhaseName(phaseNumber);
+          const phaseName = dirMatch && dirMatch[2] ? dirMatch[2] : null;
+          const phaseDir = path.join(phasesDir, dir);
+          const phaseFiles = fs.readdirSync(phaseDir);
+          const plans = phaseFiles.filter((f) => f.endsWith("-PLAN.md") || f === "PLAN.md").sort();
+          const summaries = phaseFiles.filter((f) => f.endsWith("-SUMMARY.md") || f === "SUMMARY.md").sort();
+          const hasResearch = phaseFiles.some((f) => f.endsWith("-RESEARCH.md") || f === "RESEARCH.md");
+          const hasContext = phaseFiles.some((f) => f.endsWith("-CONTEXT.md") || f === "CONTEXT.md");
+          const hasVerification = phaseFiles.some((f) => f.endsWith("-VERIFICATION.md") || f === "VERIFICATION.md");
+          const completedPlanIds = new Set(
+            summaries.map((s) => s.replace("-SUMMARY.md", "").replace("SUMMARY.md", ""))
+          );
+          const incompletePlans = plans.filter((p) => {
+            const planId = p.replace("-PLAN.md", "").replace("PLAN.md", "");
+            return !completedPlanIds.has(planId);
+          });
+          tree.set(normalized, {
+            dirName: dir,
+            fullPath: phaseDir,
+            relPath: path.join(".planning", "phases", dir),
+            phaseNumber,
+            phaseName,
+            phaseSlug: phaseName ? phaseName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") : null,
+            files: phaseFiles,
+            plans,
+            summaries,
+            incompletePlans,
+            hasResearch,
+            hasContext,
+            hasVerification
+          });
+        }
+      } catch (e) {
+        debugLog("phase.tree", "scan failed", e);
+      }
+      _phaseTreeCache = tree;
+      _phaseTreeCwd = cwd;
+      return tree;
     }
     function normalizePhaseName(phase) {
       const match = phase.match(/^(\d+(?:\.\d+)?)/);
@@ -1493,10 +1570,24 @@ var require_helpers = __commonJS({
     }
     function findPhaseInternal(cwd, phase) {
       if (!phase) return null;
-      const phasesDir = path.join(cwd, ".planning", "phases");
       const normalized = normalizePhaseName(phase);
-      const current = searchPhaseInDir(phasesDir, path.join(".planning", "phases"), normalized);
-      if (current) return current;
+      const tree = getPhaseTree(cwd);
+      const cached = tree.get(normalized);
+      if (cached) {
+        return {
+          found: true,
+          directory: cached.relPath,
+          phase_number: cached.phaseNumber,
+          phase_name: cached.phaseName,
+          phase_slug: cached.phaseSlug,
+          plans: cached.plans,
+          summaries: cached.summaries,
+          incomplete_plans: cached.incompletePlans,
+          has_research: cached.hasResearch,
+          has_context: cached.hasContext,
+          has_verification: cached.hasVerification
+        };
+      }
       const milestonesDir = path.join(cwd, ".planning", "milestones");
       if (!fs.existsSync(milestonesDir)) return null;
       try {
@@ -1520,9 +1611,9 @@ var require_helpers = __commonJS({
     function getRoadmapPhaseInternal(cwd, phaseNum) {
       if (!phaseNum) return null;
       const roadmapPath = path.join(cwd, ".planning", "ROADMAP.md");
-      if (!fs.existsSync(roadmapPath)) return null;
       try {
-        const content = fs.readFileSync(roadmapPath, "utf-8");
+        const content = cachedReadFile(roadmapPath);
+        if (!content) return null;
         const escapedPhase = phaseNum.toString().replace(/\./g, "\\.");
         const phasePattern = new RegExp(`#{2,4}\\s*Phase\\s+${escapedPhase}:\\s*([^\\n]+)`, "i");
         const headerMatch = content.match(phasePattern);
@@ -1569,7 +1660,8 @@ var require_helpers = __commonJS({
           return null;
         };
         var extractPhaseRange = extractPhaseRange2;
-        const roadmap = fs.readFileSync(path.join(cwd, ".planning", "ROADMAP.md"), "utf-8");
+        const roadmap = cachedReadFile(path.join(cwd, ".planning", "ROADMAP.md"));
+        if (!roadmap) return { version: "v1.0", name: "milestone", phaseRange: null };
         let version = null;
         let name = null;
         let phaseRange = null;
@@ -1934,6 +2026,8 @@ var require_helpers = __commonJS({
       safeReadFile,
       cachedReadFile,
       invalidateFileCache,
+      cachedReaddirSync,
+      getPhaseTree,
       normalizePhaseName,
       parseMustHavesBlock,
       sanitizeShellArg,
@@ -1957,15 +2051,11 @@ var require_helpers = __commonJS({
 // src/lib/git.js
 var require_git = __commonJS({
   "src/lib/git.js"(exports2, module2) {
-    var { execSync } = require("child_process");
+    var { execFileSync } = require("child_process");
     var { debugLog } = require_output();
     function execGit(cwd, args) {
       try {
-        const escaped = args.map((a) => {
-          if (/^[a-zA-Z0-9._\-/=:@]+$/.test(a)) return a;
-          return "'" + a.replace(/'/g, "'\\''") + "'";
-        });
-        const stdout = execSync("git " + escaped.join(" "), {
+        const stdout = execFileSync("git", args, {
           cwd,
           stdio: "pipe",
           encoding: "utf-8"
@@ -1991,17 +2081,14 @@ var require_state = __commonJS({
     var path = require("path");
     var { output, error, debugLog } = require_output();
     var { loadConfig } = require_config();
-    var { safeReadFile, normalizePhaseName, findPhaseInternal } = require_helpers();
+    var { safeReadFile, cachedReadFile, normalizePhaseName, findPhaseInternal, getPhaseTree } = require_helpers();
     var { execGit } = require_git();
     function cmdStateLoad(cwd, raw) {
       const config = loadConfig(cwd);
       const planningDir = path.join(cwd, ".planning");
       let stateRaw = "";
-      try {
-        stateRaw = fs.readFileSync(path.join(planningDir, "STATE.md"), "utf-8");
-      } catch (e) {
-        debugLog("state.load", "read failed", e);
-      }
+      const stateContent = cachedReadFile(path.join(planningDir, "STATE.md"));
+      if (stateContent) stateRaw = stateContent;
       const configExists = fs.existsSync(path.join(planningDir, "config.json"));
       const roadmapExists = fs.existsSync(path.join(planningDir, "ROADMAP.md"));
       const stateExists = stateRaw.length > 0;
@@ -2185,16 +2272,12 @@ var require_state = __commonJS({
         return;
       }
       let content = fs.readFileSync(statePath, "utf-8");
-      const phasesDir = path.join(cwd, ".planning", "phases");
       let totalPlans = 0;
       let totalSummaries = 0;
-      if (fs.existsSync(phasesDir)) {
-        const phaseDirs = fs.readdirSync(phasesDir, { withFileTypes: true }).filter((e) => e.isDirectory()).map((e) => e.name);
-        for (const dir of phaseDirs) {
-          const files = fs.readdirSync(path.join(phasesDir, dir));
-          totalPlans += files.filter((f) => f.match(/-PLAN\.md$/i)).length;
-          totalSummaries += files.filter((f) => f.match(/-SUMMARY\.md$/i)).length;
-        }
+      const phaseTree = getPhaseTree(cwd);
+      for (const [, entry] of phaseTree) {
+        totalPlans += entry.plans.length;
+        totalSummaries += entry.summaries.length;
       }
       const percent = totalPlans > 0 ? Math.round(totalSummaries / totalPlans * 100) : 0;
       const barWidth = 10;
@@ -2368,18 +2451,12 @@ var require_state = __commonJS({
           let diskPlanCount = 0;
           let diskSummaryCount = 0;
           let phaseDirName = null;
-          try {
-            if (fs.existsSync(phasesDir)) {
-              const dirs = fs.readdirSync(phasesDir, { withFileTypes: true }).filter((e) => e.isDirectory()).map((e) => e.name);
-              phaseDirName = dirs.find((d) => d.startsWith(normalized + "-") || d === normalized);
-              if (phaseDirName) {
-                const phaseFiles = fs.readdirSync(path.join(phasesDir, phaseDirName));
-                diskPlanCount = phaseFiles.filter((f) => f.endsWith("-PLAN.md") || f === "PLAN.md").length;
-                diskSummaryCount = phaseFiles.filter((f) => f.endsWith("-SUMMARY.md") || f === "SUMMARY.md").length;
-              }
-            }
-          } catch (e) {
-            debugLog("state.validate", "readdir failed for phase " + phaseNum, e);
+          const phaseTree = getPhaseTree(cwd);
+          const cachedPhase = phaseTree.get(normalized);
+          if (cachedPhase) {
+            phaseDirName = cachedPhase.dirName;
+            diskPlanCount = cachedPhase.plans.length;
+            diskSummaryCount = cachedPhase.summaries.length;
           }
           if (claimedPlanCount !== null && claimedPlanCount !== diskPlanCount && phaseDirName) {
             issues.push({
@@ -2481,16 +2558,9 @@ var require_state = __commonJS({
         const config = loadConfig(cwd);
         const stalenessThreshold = config.staleness_threshold || 2;
         let totalCompletedPlans = 0;
-        try {
-          if (fs.existsSync(phasesDir)) {
-            const dirs = fs.readdirSync(phasesDir, { withFileTypes: true }).filter((e) => e.isDirectory()).map((e) => e.name);
-            for (const dir of dirs) {
-              const files = fs.readdirSync(path.join(phasesDir, dir));
-              totalCompletedPlans += files.filter((f) => f.endsWith("-SUMMARY.md") || f === "SUMMARY.md").length;
-            }
-          }
-        } catch (e) {
-          debugLog("state.validate", "count completed plans failed", e);
+        const phaseTreeForBlockers = getPhaseTree(cwd);
+        for (const [, entry] of phaseTreeForBlockers) {
+          totalCompletedPlans += entry.summaries.length;
         }
         const blockerSection = stateContent.match(/###?\s*(?:Blockers|Blockers\/Concerns|Concerns)\s*\n([\s\S]*?)(?=\n###?|\n##[^#]|$)/i);
         if (blockerSection) {
@@ -2567,16 +2637,16 @@ var require_roadmap = __commonJS({
     var fs = require("fs");
     var path = require("path");
     var { output, error, debugLog } = require_output();
-    var { normalizePhaseName, findPhaseInternal } = require_helpers();
+    var { normalizePhaseName, cachedReadFile, findPhaseInternal, getPhaseTree } = require_helpers();
     var { extractFrontmatter } = require_frontmatter();
     function cmdRoadmapGetPhase(cwd, phaseNum, raw) {
       const roadmapPath = path.join(cwd, ".planning", "ROADMAP.md");
-      if (!fs.existsSync(roadmapPath)) {
-        output({ found: false, error: "ROADMAP.md not found" }, raw, "");
-        return;
-      }
       try {
-        const content = fs.readFileSync(roadmapPath, "utf-8");
+        const content = cachedReadFile(roadmapPath);
+        if (!content) {
+          output({ found: false, error: "ROADMAP.md not found" }, raw, "");
+          return;
+        }
         const escapedPhase = phaseNum.replace(/\./g, "\\.");
         const phasePattern = new RegExp(
           `#{2,4}\\s*Phase\\s+${escapedPhase}:\\s*([^\\n]+)`,
@@ -2631,11 +2701,11 @@ var require_roadmap = __commonJS({
     }
     function cmdRoadmapAnalyze(cwd, raw) {
       const roadmapPath = path.join(cwd, ".planning", "ROADMAP.md");
-      if (!fs.existsSync(roadmapPath)) {
+      const content = cachedReadFile(roadmapPath);
+      if (!content) {
         output({ error: "ROADMAP.md not found", milestones: [], phases: [], current_phase: null }, raw);
         return;
       }
-      const content = fs.readFileSync(roadmapPath, "utf-8");
       const phasesDir = path.join(cwd, ".planning", "phases");
       const phasePattern = /#{2,4}\s*Phase\s+(\d+(?:\.\d+)?)\s*:\s*([^\n]+)/gi;
       const phases = [];
@@ -2658,25 +2728,19 @@ var require_roadmap = __commonJS({
         let summaryCount = 0;
         let hasContext = false;
         let hasResearch = false;
-        try {
-          const entries = fs.readdirSync(phasesDir, { withFileTypes: true });
-          const dirs = entries.filter((e) => e.isDirectory()).map((e) => e.name);
-          const dirMatch = dirs.find((d) => d.startsWith(normalized + "-") || d === normalized);
-          if (dirMatch) {
-            const phaseFiles = fs.readdirSync(path.join(phasesDir, dirMatch));
-            planCount = phaseFiles.filter((f) => f.endsWith("-PLAN.md") || f === "PLAN.md").length;
-            summaryCount = phaseFiles.filter((f) => f.endsWith("-SUMMARY.md") || f === "SUMMARY.md").length;
-            hasContext = phaseFiles.some((f) => f.endsWith("-CONTEXT.md") || f === "CONTEXT.md");
-            hasResearch = phaseFiles.some((f) => f.endsWith("-RESEARCH.md") || f === "RESEARCH.md");
-            if (summaryCount >= planCount && planCount > 0) diskStatus = "complete";
-            else if (summaryCount > 0) diskStatus = "partial";
-            else if (planCount > 0) diskStatus = "planned";
-            else if (hasResearch) diskStatus = "researched";
-            else if (hasContext) diskStatus = "discussed";
-            else diskStatus = "empty";
-          }
-        } catch (e) {
-          debugLog("roadmap.analyze", "readdir failed", e);
+        const phaseTree = getPhaseTree(cwd);
+        const cachedPhase = phaseTree.get(normalized);
+        if (cachedPhase) {
+          planCount = cachedPhase.plans.length;
+          summaryCount = cachedPhase.summaries.length;
+          hasContext = cachedPhase.hasContext;
+          hasResearch = cachedPhase.hasResearch;
+          if (summaryCount >= planCount && planCount > 0) diskStatus = "complete";
+          else if (summaryCount > 0) diskStatus = "partial";
+          else if (planCount > 0) diskStatus = "planned";
+          else if (hasResearch) diskStatus = "researched";
+          else if (hasContext) diskStatus = "discussed";
+          else diskStatus = "empty";
         }
         const checkboxPattern = new RegExp(`-\\s*\\[(x| )\\]\\s*.*Phase\\s+${phaseNum.replace(".", "\\.")}`, "i");
         const checkboxMatch = content.match(checkboxPattern);
@@ -7164,10 +7228,16 @@ var require_env = __commonJS({
           }
         }
       }
-      const currentWatched = getWatchedFiles(cwd, scanManifests(cwd, 0));
-      for (const file of currentWatched) {
-        if (!(file in manifest.watched_files_mtimes)) {
+      const knownFiles = [
+        ...LANG_MANIFESTS.map((m) => m.file),
+        ...PM_LOCKFILES.map((l) => l.file),
+        ...VERSION_MANAGERS.map((v) => v.file)
+      ];
+      const trackedSet = new Set(manifest.watched_files || []);
+      for (const file of knownFiles) {
+        if (!trackedSet.has(file) && fs.existsSync(path.join(cwd, file))) {
           changedFiles.push(file);
+          break;
         }
       }
       if (changedFiles.length > 0) {
@@ -7356,7 +7426,7 @@ var require_env = __commonJS({
         debugLog("env.autoTrigger", `rescan: ${staleness.reason}`);
       }
       try {
-        const result = performEnvScan(cwd, { skipBinaryVersions: !manifest });
+        const result = performEnvScan(cwd, { skipBinaryVersions: !!manifest });
         writeManifest(cwd, result);
         ensureManifestGitignored(cwd);
         writeProjectProfile(cwd, result);
@@ -7938,7 +8008,7 @@ var require_init = __commonJS({
     var { execSync } = require("child_process");
     var { output, error, debugLog } = require_output();
     var { loadConfig } = require_config();
-    var { safeReadFile, findPhaseInternal, resolveModelInternal, getRoadmapPhaseInternal, getMilestoneInfo, getArchivedPhaseDirs, normalizePhaseName, isValidDateString, sanitizeShellArg, pathExistsInternal, generateSlugInternal } = require_helpers();
+    var { safeReadFile, cachedReadFile, findPhaseInternal, resolveModelInternal, getRoadmapPhaseInternal, getMilestoneInfo, getArchivedPhaseDirs, normalizePhaseName, isValidDateString, sanitizeShellArg, pathExistsInternal, generateSlugInternal, getPhaseTree } = require_helpers();
     var { extractFrontmatter } = require_frontmatter();
     var { execGit } = require_git();
     var { getIntentDriftData, getIntentSummary } = require_intent();
@@ -8693,22 +8763,10 @@ var require_init = __commonJS({
       const milestone = getMilestoneInfo(cwd);
       let phaseCount = 0;
       let completedPhases = 0;
-      const phasesDir = path.join(cwd, ".planning", "phases");
-      try {
-        const entries = fs.readdirSync(phasesDir, { withFileTypes: true });
-        const dirs = entries.filter((e) => e.isDirectory()).map((e) => e.name);
-        phaseCount = dirs.length;
-        for (const dir of dirs) {
-          try {
-            const phaseFiles = fs.readdirSync(path.join(phasesDir, dir));
-            const hasSummary = phaseFiles.some((f) => f.endsWith("-SUMMARY.md") || f === "SUMMARY.md");
-            if (hasSummary) completedPhases++;
-          } catch (e) {
-            debugLog("init.milestoneOp", "readdir failed", e);
-          }
-        }
-      } catch (e) {
-        debugLog("init.milestoneOp", "readdir failed", e);
+      const phaseTree = getPhaseTree(cwd);
+      phaseCount = phaseTree.size;
+      for (const [, entry] of phaseTree) {
+        if (entry.summaries.length > 0) completedPhases++;
       }
       const archiveDir = path.join(cwd, ".planning", "archive");
       let archivedMilestones = [];
@@ -8803,50 +8861,37 @@ var require_init = __commonJS({
     function cmdInitProgress(cwd, raw) {
       const config = loadConfig(cwd);
       const milestone = getMilestoneInfo(cwd);
-      const phasesDir = path.join(cwd, ".planning", "phases");
       const phases = [];
       let currentPhase = null;
       let nextPhase = null;
-      try {
-        const entries = fs.readdirSync(phasesDir, { withFileTypes: true });
-        const dirs = entries.filter((e) => e.isDirectory()).map((e) => e.name).sort();
-        for (const dir of dirs) {
-          const match = dir.match(/^(\d+(?:\.\d+)?)-?(.*)/);
-          const phaseNumber = match ? match[1] : dir;
-          if (milestone.phaseRange) {
-            const num = parseInt(phaseNumber);
-            if (num < milestone.phaseRange.start || num > milestone.phaseRange.end) continue;
-          }
-          const phaseName = match && match[2] ? match[2] : null;
-          const phasePath = path.join(phasesDir, dir);
-          const phaseFiles = fs.readdirSync(phasePath);
-          const plans = phaseFiles.filter((f) => f.endsWith("-PLAN.md") || f === "PLAN.md");
-          const summaries = phaseFiles.filter((f) => f.endsWith("-SUMMARY.md") || f === "SUMMARY.md");
-          const hasResearch = phaseFiles.some((f) => f.endsWith("-RESEARCH.md") || f === "RESEARCH.md");
-          const status = summaries.length >= plans.length && plans.length > 0 ? "complete" : plans.length > 0 ? "in_progress" : hasResearch ? "researched" : "pending";
-          const phaseInfo = {
-            number: phaseNumber,
-            name: phaseName,
-            directory: path.join(".planning", "phases", dir),
-            status,
-            plan_count: plans.length,
-            summary_count: summaries.length,
-            has_research: hasResearch
-          };
-          phases.push(phaseInfo);
-          if (!currentPhase && (status === "in_progress" || status === "researched")) {
-            currentPhase = phaseInfo;
-          }
-          if (!nextPhase && status === "pending") {
-            nextPhase = phaseInfo;
-          }
+      const phaseTree = getPhaseTree(cwd);
+      for (const [, entry] of phaseTree) {
+        const phaseNumber = entry.phaseNumber;
+        if (milestone.phaseRange) {
+          const num = parseInt(phaseNumber);
+          if (num < milestone.phaseRange.start || num > milestone.phaseRange.end) continue;
         }
-      } catch (e) {
-        debugLog("init.progress", "read phases failed", e);
+        const status = entry.summaries.length >= entry.plans.length && entry.plans.length > 0 ? "complete" : entry.plans.length > 0 ? "in_progress" : entry.hasResearch ? "researched" : "pending";
+        const phaseInfo = {
+          number: phaseNumber,
+          name: entry.phaseName,
+          directory: entry.relPath,
+          status,
+          plan_count: entry.plans.length,
+          summary_count: entry.summaries.length,
+          has_research: entry.hasResearch
+        };
+        phases.push(phaseInfo);
+        if (!currentPhase && (status === "in_progress" || status === "researched")) {
+          currentPhase = phaseInfo;
+        }
+        if (!nextPhase && status === "pending") {
+          nextPhase = phaseInfo;
+        }
       }
       let pausedAt = null;
       try {
-        const state = fs.readFileSync(path.join(cwd, ".planning", "STATE.md"), "utf-8");
+        const state = cachedReadFile(path.join(cwd, ".planning", "STATE.md"));
         const pauseMatch = state.match(/\*\*Paused At:\*\*\s*(.+)/);
         if (pauseMatch) pausedAt = pauseMatch[1].trim();
       } catch (e) {
@@ -9120,7 +9165,7 @@ var require_init = __commonJS({
     }
     function getSessionDiffSummary(cwd) {
       try {
-        const state = fs.readFileSync(path.join(cwd, ".planning", "STATE.md"), "utf-8");
+        const state = cachedReadFile(path.join(cwd, ".planning", "STATE.md"));
         let since = null;
         const lastMatch = state.match(/\*\*Last Activity:\*\*\s*(\d{4}-\d{2}-\d{2})/);
         if (lastMatch) since = lastMatch[1];
@@ -9367,14 +9412,14 @@ var require_features = __commonJS({
     var { loadConfig } = require_config();
     var { CONFIG_SCHEMA } = require_constants();
     var { parseAssertionsMd } = require_verify();
-    var { safeReadFile, findPhaseInternal, getArchivedPhaseDirs, normalizePhaseName, isValidDateString, sanitizeShellArg, getMilestoneInfo } = require_helpers();
+    var { safeReadFile, cachedReadFile, findPhaseInternal, getArchivedPhaseDirs, normalizePhaseName, isValidDateString, sanitizeShellArg, getMilestoneInfo, getPhaseTree } = require_helpers();
     var { extractFrontmatter } = require_frontmatter();
     var { execGit } = require_git();
     var { estimateTokens, estimateJsonTokens, checkBudget } = require_context();
     function cmdSessionDiff(cwd, raw) {
       let since = null;
       try {
-        const state2 = fs.readFileSync(path.join(cwd, ".planning", "STATE.md"), "utf-8");
+        const state2 = cachedReadFile(path.join(cwd, ".planning", "STATE.md"));
         const lastMatch = state2.match(/\*\*Last Activity:\*\*\s*(\d{4}-\d{2}-\d{2})/);
         if (lastMatch) since = lastMatch[1];
         const sessionMatch = state2.match(/\*\*Last session:\*\*\s*(\S+)/);
@@ -9625,7 +9670,7 @@ var require_features = __commonJS({
       const queryWords = queryLower.split(/\s+/);
       const results = [];
       try {
-        const state = fs.readFileSync(path.join(cwd, ".planning", "STATE.md"), "utf-8");
+        const state = cachedReadFile(path.join(cwd, ".planning", "STATE.md"));
         const decisions = extractDecisions(state, "current");
         for (const d of decisions) {
           const score = scoreDecision(d.text, queryWords);
@@ -9702,8 +9747,8 @@ var require_features = __commonJS({
       }
       if (planFiles.length === 0) {
         try {
-          const roadmap = fs.readFileSync(path.join(cwd, ".planning", "ROADMAP.md"), "utf-8");
-          const phaseSection = roadmap.match(new RegExp(`###?\\s*Phase\\s+${phase}[\\s\\S]*?(?=###?\\s*Phase\\s+\\d|$)`, "i"));
+          const roadmap = cachedReadFile(path.join(cwd, ".planning", "ROADMAP.md"));
+          const phaseSection = roadmap ? roadmap.match(new RegExp(`###?\\s*Phase\\s+${phase}[\\s\\S]*?(?=###?\\s*Phase\\s+\\d|$)`, "i")) : null;
           if (phaseSection) {
             const depMatch = phaseSection[0].match(/\*\*Depends on:?\*\*:?\s*([^\n]+)/i);
             if (depMatch && !depMatch[1].toLowerCase().includes("nothing")) {
@@ -9711,34 +9756,25 @@ var require_features = __commonJS({
               for (const dp of depPhases) {
                 const num = dp.match(/\d+/)[0];
                 const depCheck = { plan: "ROADMAP", dependency: dp, status: "unknown" };
-                try {
-                  const entries = fs.readdirSync(phasesDir, { withFileTypes: true });
-                  const dirs = entries.filter((e) => e.isDirectory()).map((e) => e.name);
-                  const depDir = dirs.find((d) => d.startsWith(num + "-") || d === num);
-                  if (!depDir) {
-                    depCheck.status = "missing";
-                    depCheck.message = `Dependency phase ${num} has no directory`;
+                const phaseTree = getPhaseTree(cwd);
+                const depNorm = normalizePhaseName(num);
+                const depEntry = phaseTree.get(depNorm);
+                if (!depEntry) {
+                  depCheck.status = "missing";
+                  depCheck.message = `Dependency phase ${num} has no directory`;
+                  issues.push(depCheck);
+                } else {
+                  if (depEntry.plans.length === 0) {
+                    depCheck.status = "not_planned";
+                    depCheck.message = `Phase ${num} has no plans`;
+                    issues.push(depCheck);
+                  } else if (depEntry.summaries.length < depEntry.plans.length) {
+                    depCheck.status = "incomplete";
+                    depCheck.message = `Phase ${num}: ${depEntry.summaries.length}/${depEntry.plans.length} complete`;
                     issues.push(depCheck);
                   } else {
-                    const depFiles = fs.readdirSync(path.join(phasesDir, depDir));
-                    const depPlans = depFiles.filter((f) => f.endsWith("-PLAN.md"));
-                    const depSummaries = depFiles.filter((f) => f.endsWith("-SUMMARY.md"));
-                    if (depPlans.length === 0) {
-                      depCheck.status = "not_planned";
-                      depCheck.message = `Phase ${num} has no plans`;
-                      issues.push(depCheck);
-                    } else if (depSummaries.length < depPlans.length) {
-                      depCheck.status = "incomplete";
-                      depCheck.message = `Phase ${num}: ${depSummaries.length}/${depPlans.length} complete`;
-                      issues.push(depCheck);
-                    } else {
-                      depCheck.status = "satisfied";
-                    }
+                    depCheck.status = "satisfied";
                   }
-                } catch (e) {
-                  debugLog("validate.dependencies", "readdir failed", e);
-                  depCheck.status = "error";
-                  issues.push(depCheck);
                 }
                 checked.push(depCheck);
               }
@@ -9766,42 +9802,32 @@ var require_features = __commonJS({
             continue;
           }
           const depPhaseNum = depPhaseMatch[1];
-          try {
-            const entries = fs.readdirSync(phasesDir, { withFileTypes: true });
-            const dirs = entries.filter((e) => e.isDirectory()).map((e) => e.name);
-            const depDir = dirs.find((d) => d.startsWith(depPhaseNum + "-") || d === depPhaseNum);
-            if (!depDir) {
-              depCheck.status = "missing";
-              depCheck.message = `Dependency phase ${depPhaseNum} has no directory`;
+          const depPhaseTree = getPhaseTree(cwd);
+          const depNorm = normalizePhaseName(depPhaseNum);
+          const depEntry = depPhaseTree.get(depNorm);
+          if (!depEntry) {
+            depCheck.status = "missing";
+            depCheck.message = `Dependency phase ${depPhaseNum} has no directory`;
+            issues.push(depCheck);
+          } else {
+            if (depEntry.plans.length === 0) {
+              depCheck.status = "not_planned";
+              depCheck.message = `Dependency phase ${depPhaseNum} has no plans`;
+              issues.push(depCheck);
+            } else if (depEntry.summaries.length < depEntry.plans.length) {
+              depCheck.status = "incomplete";
+              depCheck.message = `Dependency phase ${depPhaseNum}: ${depEntry.summaries.length}/${depEntry.plans.length} plans complete`;
               issues.push(depCheck);
             } else {
-              const depFiles = fs.readdirSync(path.join(phasesDir, depDir));
-              const depPlans = depFiles.filter((f) => f.endsWith("-PLAN.md") || f === "PLAN.md");
-              const depSummaries = depFiles.filter((f) => f.endsWith("-SUMMARY.md") || f === "SUMMARY.md");
-              if (depPlans.length === 0) {
-                depCheck.status = "not_planned";
-                depCheck.message = `Dependency phase ${depPhaseNum} has no plans`;
-                issues.push(depCheck);
-              } else if (depSummaries.length < depPlans.length) {
-                depCheck.status = "incomplete";
-                depCheck.message = `Dependency phase ${depPhaseNum}: ${depSummaries.length}/${depPlans.length} plans complete`;
-                issues.push(depCheck);
-              } else {
-                depCheck.status = "satisfied";
-              }
+              depCheck.status = "satisfied";
             }
-          } catch (e) {
-            debugLog("validate.dependencies", `check dependency phase ${depPhaseNum} failed`, e);
-            depCheck.status = "error";
-            depCheck.message = `Error checking dependency phase ${depPhaseNum}`;
-            issues.push(depCheck);
           }
           checked.push(depCheck);
         }
       }
       try {
-        const roadmap = fs.readFileSync(path.join(cwd, ".planning", "ROADMAP.md"), "utf-8");
-        const phaseSection = roadmap.match(new RegExp(`###?\\s*Phase\\s+${phase}[\\s\\S]*?(?=###?\\s*Phase\\s+\\d|$)`, "i"));
+        const roadmap = cachedReadFile(path.join(cwd, ".planning", "ROADMAP.md"));
+        const phaseSection = roadmap ? roadmap.match(new RegExp(`###?\\s*Phase\\s+${phase}[\\s\\S]*?(?=###?\\s*Phase\\s+\\d|$)`, "i")) : null;
         if (phaseSection) {
           const depMatch = phaseSection[0].match(/\*\*Depends on:?\*\*:?\s*([^\n]+)/i);
           if (depMatch && !depMatch[1].toLowerCase().includes("nothing")) {
@@ -10009,37 +10035,42 @@ var require_features = __commonJS({
       const commitPattern = /\b([a-f0-9]{7,40})\b/g;
       const fm = extractFrontmatter(summaryContent);
       const commits = fm.commits || [];
-      const bodyCommits = [];
+      const candidateShas = [];
       let cm;
       while ((cm = commitPattern.exec(summaryContent)) !== null) {
         const sha = cm[1];
-        try {
-          execSync(`git rev-parse --verify ${sha}^{commit}`, { cwd, encoding: "utf-8", timeout: 5e3, stdio: ["pipe", "pipe", "pipe"] });
-          if (!bodyCommits.includes(sha) && !commits.includes(sha)) {
-            bodyCommits.push(sha);
-          }
-        } catch (e) {
-          debugLog("feature.rollbackInfo", "exec failed", e);
+        if (!commits.includes(sha)) {
+          candidateShas.push(sha);
         }
       }
-      const allCommits = [...commits, ...bodyCommits];
+      if (candidateShas.length > 0) {
+        const verifyResult = execGit(cwd, ["rev-parse", "--verify", ...candidateShas.map((s) => s + "^{commit}")]);
+        if (verifyResult.exitCode === 0) {
+          for (const sha of candidateShas) {
+            if (!commits.includes(sha)) commits.push(sha);
+          }
+        } else {
+          for (const sha of candidateShas) {
+            const result = execGit(cwd, ["rev-parse", "--verify", sha + "^{commit}"]);
+            if (result.exitCode === 0 && !commits.includes(sha)) {
+              commits.push(sha);
+            }
+          }
+        }
+      }
+      const allCommits = commits;
       const commitDetails = [];
-      for (const sha of allCommits) {
-        try {
-          const info = execSync(`git log -1 --format="%H|%s|%an|%ai" ${sha}`, {
-            cwd,
-            encoding: "utf-8",
-            timeout: 5e3
-          }).trim();
-          const [hash, subject, author, date] = info.split("|");
-          const files = execSync(`git diff-tree --no-commit-id --name-only -r ${sha}`, {
-            cwd,
-            encoding: "utf-8",
-            timeout: 5e3
-          }).trim().split("\n").filter(Boolean);
-          commitDetails.push({ sha: hash.slice(0, 7), subject, author, date, files });
-        } catch (e) {
-          debugLog("feature.rollbackInfo", "exec failed", e);
+      if (allCommits.length > 0) {
+        const logResult = execGit(cwd, ["log", "--no-walk", "--format=%H|%s|%an|%ai", ...allCommits]);
+        if (logResult.exitCode === 0 && logResult.stdout) {
+          const logLines = logResult.stdout.split("\n").filter(Boolean);
+          for (const line of logLines) {
+            const [hash, subject, author, date] = line.split("|");
+            if (!hash) continue;
+            const filesResult = execGit(cwd, ["diff-tree", "--no-commit-id", "--name-only", "-r", hash]);
+            const files = filesResult.exitCode === 0 ? filesResult.stdout.split("\n").filter(Boolean) : [];
+            commitDetails.push({ sha: hash.slice(0, 7), subject, author, date, files });
+          }
         }
       }
       output({
@@ -10056,7 +10087,7 @@ var require_features = __commonJS({
       const milestone = getMilestoneInfo(cwd);
       const metrics = [];
       try {
-        const state = fs.readFileSync(path.join(cwd, ".planning", "STATE.md"), "utf-8");
+        const state = cachedReadFile(path.join(cwd, ".planning", "STATE.md"));
         const metricsSection = state.match(/### Performance Metrics[\s\S]*?\|[\s\S]*?(?=\n###|\n---|\n$)/);
         if (metricsSection) {
           const rows = metricsSection[0].match(/\|\s*[\d.]+-[\d.]+\s*\|[^\n]+/g) || [];
@@ -10101,7 +10132,7 @@ var require_features = __commonJS({
       const avgPerDay = (totalCompletedPlans / totalDays).toFixed(1);
       let remainingPhases = 0;
       try {
-        const roadmap = fs.readFileSync(path.join(cwd, ".planning", "ROADMAP.md"), "utf-8");
+        const roadmap = cachedReadFile(path.join(cwd, ".planning", "ROADMAP.md"));
         const unchecked = (roadmap.match(/- \[ \] \*\*Phase/g) || []).length;
         remainingPhases = unchecked;
       } catch (e) {
@@ -10134,7 +10165,7 @@ var require_features = __commonJS({
       const reqUpper = reqId.toUpperCase();
       const trace = { requirement: reqUpper, phase: null, plans: [], files: [], status: "unknown" };
       try {
-        const roadmap = fs.readFileSync(path.join(cwd, ".planning", "ROADMAP.md"), "utf-8");
+        const roadmap = cachedReadFile(path.join(cwd, ".planning", "ROADMAP.md"));
         const coverageMatch = roadmap.match(new RegExp(`${reqUpper}\\s*\\|\\s*(\\d+)`, "i"));
         if (coverageMatch) {
           trace.phase = coverageMatch[1];
@@ -10316,7 +10347,7 @@ var require_features = __commonJS({
       const milestone = getMilestoneInfo(cwd);
       const quickTasks = [];
       try {
-        const state = fs.readFileSync(path.join(cwd, ".planning", "STATE.md"), "utf-8");
+        const state = cachedReadFile(path.join(cwd, ".planning", "STATE.md"));
         const quickSection = state.match(/### Quick Tasks Completed[\s\S]*?\|[\s\S]*?(?=\n###|\n---|\n$)/);
         if (quickSection) {
           const rows = quickSection[0].match(/\|\s*\d+\s*\|[^\n]+/g) || [];
@@ -11051,7 +11082,7 @@ var require_misc = __commonJS({
     var { output, error, debugLog } = require_output();
     var { loadConfig, isGitIgnored } = require_config();
     var { MODEL_PROFILES, CONFIG_SCHEMA } = require_constants();
-    var { safeReadFile, normalizePhaseName, findPhaseInternal, generateSlugInternal, getArchivedPhaseDirs, getMilestoneInfo } = require_helpers();
+    var { safeReadFile, normalizePhaseName, findPhaseInternal, generateSlugInternal, getArchivedPhaseDirs, getMilestoneInfo, getPhaseTree, cachedReaddirSync } = require_helpers();
     var { extractFrontmatter, reconstructFrontmatter, spliceFrontmatter } = require_frontmatter();
     var { execGit } = require_git();
     function cmdGenerateSlug(text, raw) {
@@ -12129,37 +12160,23 @@ ${r.description}`).join("\n\n"));
       output({ valid: missing.length === 0, missing, present, schema: schemaName }, raw, missing.length === 0 ? "valid" : "invalid");
     }
     function cmdProgressRender(cwd, format, raw) {
-      const phasesDir = path.join(cwd, ".planning", "phases");
-      const roadmapPath = path.join(cwd, ".planning", "ROADMAP.md");
       const milestone = getMilestoneInfo(cwd);
       const phases = [];
       let totalPlans = 0;
       let totalSummaries = 0;
-      try {
-        const entries = fs.readdirSync(phasesDir, { withFileTypes: true });
-        const dirs = entries.filter((e) => e.isDirectory()).map((e) => e.name).sort((a, b) => {
-          const aNum = parseFloat(a.match(/^(\d+(?:\.\d+)?)/)?.[1] || "0");
-          const bNum = parseFloat(b.match(/^(\d+(?:\.\d+)?)/)?.[1] || "0");
-          return aNum - bNum;
-        });
-        for (const dir of dirs) {
-          const dm = dir.match(/^(\d+(?:\.\d+)?)-?(.*)/);
-          const phaseNum = dm ? dm[1] : dir;
-          const phaseName = dm && dm[2] ? dm[2].replace(/-/g, " ") : "";
-          const phaseFiles = fs.readdirSync(path.join(phasesDir, dir));
-          const plans = phaseFiles.filter((f) => f.endsWith("-PLAN.md") || f === "PLAN.md").length;
-          const summaries = phaseFiles.filter((f) => f.endsWith("-SUMMARY.md") || f === "SUMMARY.md").length;
-          totalPlans += plans;
-          totalSummaries += summaries;
-          let status;
-          if (plans === 0) status = "Pending";
-          else if (summaries >= plans) status = "Complete";
-          else if (summaries > 0) status = "In Progress";
-          else status = "Planned";
-          phases.push({ number: phaseNum, name: phaseName, plans, summaries, status });
-        }
-      } catch (e) {
-        debugLog("progress.render", "readdir failed", e);
+      const phaseTree = getPhaseTree(cwd);
+      for (const [, entry] of phaseTree) {
+        const plans = entry.plans.length;
+        const summaries = entry.summaries.length;
+        const phaseName = entry.phaseName ? entry.phaseName.replace(/-/g, " ") : "";
+        totalPlans += plans;
+        totalSummaries += summaries;
+        let status;
+        if (plans === 0) status = "Pending";
+        else if (summaries >= plans) status = "Complete";
+        else if (summaries > 0) status = "In Progress";
+        else status = "Planned";
+        phases.push({ number: entry.phaseNumber, name: phaseName, plans, summaries, status });
       }
       const percent = totalPlans > 0 ? Math.round(totalSummaries / totalPlans * 100) : 0;
       if (format === "table") {

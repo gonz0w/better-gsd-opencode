@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const { output, error, debugLog } = require('../lib/output');
-const { normalizePhaseName, findPhaseInternal } = require('../lib/helpers');
+const { normalizePhaseName, cachedReadFile, findPhaseInternal, getPhaseTree } = require('../lib/helpers');
 const { extractFrontmatter } = require('../lib/frontmatter');
 
 // ─── Roadmap Commands ────────────────────────────────────────────────────────
@@ -9,13 +9,12 @@ const { extractFrontmatter } = require('../lib/frontmatter');
 function cmdRoadmapGetPhase(cwd, phaseNum, raw) {
   const roadmapPath = path.join(cwd, '.planning', 'ROADMAP.md');
 
-  if (!fs.existsSync(roadmapPath)) {
-    output({ found: false, error: 'ROADMAP.md not found' }, raw, '');
-    return;
-  }
-
   try {
-    const content = fs.readFileSync(roadmapPath, 'utf-8');
+    const content = cachedReadFile(roadmapPath);
+    if (!content) {
+      output({ found: false, error: 'ROADMAP.md not found' }, raw, '');
+      return;
+    }
 
     // Escape special regex chars in phase number, handle decimal
     const escapedPhase = phaseNum.replace(/\./g, '\\.');
@@ -93,13 +92,12 @@ function cmdRoadmapGetPhase(cwd, phaseNum, raw) {
 
 function cmdRoadmapAnalyze(cwd, raw) {
   const roadmapPath = path.join(cwd, '.planning', 'ROADMAP.md');
+  const content = cachedReadFile(roadmapPath);
 
-  if (!fs.existsSync(roadmapPath)) {
+  if (!content) {
     output({ error: 'ROADMAP.md not found', milestones: [], phases: [], current_phase: null }, raw);
     return;
   }
-
-  const content = fs.readFileSync(roadmapPath, 'utf-8');
   const phasesDir = path.join(cwd, '.planning', 'phases');
 
   // Extract all phase headings: ## Phase N: Name or ### Phase N: Name
@@ -124,7 +122,7 @@ function cmdRoadmapAnalyze(cwd, raw) {
     const dependsMatch = section.match(/\*\*Depends on:?\*\*:?\s*([^\n]+)/i);
     const depends_on = dependsMatch ? dependsMatch[1].trim() : null;
 
-    // Check completion on disk
+    // Check completion on disk — use cached phase tree (single scan)
     const normalized = normalizePhaseName(phaseNum);
     let diskStatus = 'no_directory';
     let planCount = 0;
@@ -132,26 +130,21 @@ function cmdRoadmapAnalyze(cwd, raw) {
     let hasContext = false;
     let hasResearch = false;
 
-    try {
-      const entries = fs.readdirSync(phasesDir, { withFileTypes: true });
-      const dirs = entries.filter(e => e.isDirectory()).map(e => e.name);
-      const dirMatch = dirs.find(d => d.startsWith(normalized + '-') || d === normalized);
+    const phaseTree = getPhaseTree(cwd);
+    const cachedPhase = phaseTree.get(normalized);
+    if (cachedPhase) {
+      planCount = cachedPhase.plans.length;
+      summaryCount = cachedPhase.summaries.length;
+      hasContext = cachedPhase.hasContext;
+      hasResearch = cachedPhase.hasResearch;
 
-      if (dirMatch) {
-        const phaseFiles = fs.readdirSync(path.join(phasesDir, dirMatch));
-        planCount = phaseFiles.filter(f => f.endsWith('-PLAN.md') || f === 'PLAN.md').length;
-        summaryCount = phaseFiles.filter(f => f.endsWith('-SUMMARY.md') || f === 'SUMMARY.md').length;
-        hasContext = phaseFiles.some(f => f.endsWith('-CONTEXT.md') || f === 'CONTEXT.md');
-        hasResearch = phaseFiles.some(f => f.endsWith('-RESEARCH.md') || f === 'RESEARCH.md');
-
-        if (summaryCount >= planCount && planCount > 0) diskStatus = 'complete';
-        else if (summaryCount > 0) diskStatus = 'partial';
-        else if (planCount > 0) diskStatus = 'planned';
-        else if (hasResearch) diskStatus = 'researched';
-        else if (hasContext) diskStatus = 'discussed';
-        else diskStatus = 'empty';
-      }
-    } catch (e) { debugLog('roadmap.analyze', 'readdir failed', e); }
+      if (summaryCount >= planCount && planCount > 0) diskStatus = 'complete';
+      else if (summaryCount > 0) diskStatus = 'partial';
+      else if (planCount > 0) diskStatus = 'planned';
+      else if (hasResearch) diskStatus = 'researched';
+      else if (hasContext) diskStatus = 'discussed';
+      else diskStatus = 'empty';
+    }
 
     // Check ROADMAP checkbox status
     const checkboxPattern = new RegExp(`-\\s*\\[(x| )\\]\\s*.*Phase\\s+${phaseNum.replace('.', '\\.')}`, 'i');

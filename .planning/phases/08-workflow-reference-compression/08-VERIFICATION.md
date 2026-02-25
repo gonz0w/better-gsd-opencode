@@ -113,4 +113,4 @@ Build succeeds. 201/202 tests pass (1 pre-existing DEBT-01 failure unrelated to 
 ---
 
 _Verified: 2026-02-22T19:44:27Z_
-_Verifier: Claude (gsd-verifier)_
+_Verifier: gsd-verifier_

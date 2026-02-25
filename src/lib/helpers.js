@@ -9,6 +9,9 @@ const { MODEL_PROFILES } = require('./constants');
 /** Module-level file cache — lives for single CLI invocation, no TTL needed */
 const fileCache = new Map();
 
+/** Module-level directory listing cache — avoids redundant readdirSync calls */
+const dirCache = new Map();
+
 function safeReadFile(filePath) {
   try {
     return fs.readFileSync(filePath, 'utf-8');
@@ -45,6 +48,104 @@ function invalidateFileCache(filePath) {
   } else {
     fileCache.clear();
   }
+}
+
+/**
+ * Cached wrapper around fs.readdirSync. Returns cached listing on repeated reads
+ * of the same directory within a single CLI invocation.
+ * @param {string} dirPath - Absolute directory path
+ * @param {object} [options] - Options passed to readdirSync (e.g., { withFileTypes: true })
+ * @returns {Array|null} Directory entries or null on error
+ */
+function cachedReaddirSync(dirPath, options) {
+  // Build cache key from path + option signature
+  const optKey = options?.withFileTypes ? ':wt' : '';
+  const key = dirPath + optKey;
+  if (dirCache.has(key)) {
+    return dirCache.get(key);
+  }
+  try {
+    const entries = fs.readdirSync(dirPath, options);
+    dirCache.set(key, entries);
+    return entries;
+  } catch (e) {
+    debugLog('dir.cache', `readdir failed: ${dirPath}`, e);
+    dirCache.set(key, null);
+    return null;
+  }
+}
+
+/** Module-level phase tree cache — built once per invocation */
+let _phaseTreeCache = null;
+let _phaseTreeCwd = null;
+
+/**
+ * Get a cached scan of the entire .planning/phases/ directory tree.
+ * Returns a Map<normalizedPhaseNum, phaseEntry> where phaseEntry contains
+ * all file metadata needed by most commands.
+ *
+ * This replaces 100+ individual readdirSync calls with a single tree scan.
+ *
+ * @param {string} cwd - Project root
+ * @returns {Map<string, object>} Phase tree map
+ */
+function getPhaseTree(cwd) {
+  if (_phaseTreeCache && _phaseTreeCwd === cwd) {
+    return _phaseTreeCache;
+  }
+
+  const phasesDir = path.join(cwd, '.planning', 'phases');
+  const tree = new Map();
+
+  try {
+    const entries = fs.readdirSync(phasesDir, { withFileTypes: true });
+    const dirs = entries.filter(e => e.isDirectory()).map(e => e.name).sort();
+
+    for (const dir of dirs) {
+      const dirMatch = dir.match(/^(\d+(?:\.\d+)?)-?(.*)/);
+      const phaseNumber = dirMatch ? dirMatch[1] : dir;
+      const normalized = normalizePhaseName(phaseNumber);
+      const phaseName = dirMatch && dirMatch[2] ? dirMatch[2] : null;
+      const phaseDir = path.join(phasesDir, dir);
+      const phaseFiles = fs.readdirSync(phaseDir);
+
+      const plans = phaseFiles.filter(f => f.endsWith('-PLAN.md') || f === 'PLAN.md').sort();
+      const summaries = phaseFiles.filter(f => f.endsWith('-SUMMARY.md') || f === 'SUMMARY.md').sort();
+      const hasResearch = phaseFiles.some(f => f.endsWith('-RESEARCH.md') || f === 'RESEARCH.md');
+      const hasContext = phaseFiles.some(f => f.endsWith('-CONTEXT.md') || f === 'CONTEXT.md');
+      const hasVerification = phaseFiles.some(f => f.endsWith('-VERIFICATION.md') || f === 'VERIFICATION.md');
+
+      const completedPlanIds = new Set(
+        summaries.map(s => s.replace('-SUMMARY.md', '').replace('SUMMARY.md', ''))
+      );
+      const incompletePlans = plans.filter(p => {
+        const planId = p.replace('-PLAN.md', '').replace('PLAN.md', '');
+        return !completedPlanIds.has(planId);
+      });
+
+      tree.set(normalized, {
+        dirName: dir,
+        fullPath: phaseDir,
+        relPath: path.join('.planning', 'phases', dir),
+        phaseNumber,
+        phaseName,
+        phaseSlug: phaseName ? phaseName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') : null,
+        files: phaseFiles,
+        plans,
+        summaries,
+        incompletePlans,
+        hasResearch,
+        hasContext,
+        hasVerification,
+      });
+    }
+  } catch (e) {
+    debugLog('phase.tree', 'scan failed', e);
+  }
+
+  _phaseTreeCache = tree;
+  _phaseTreeCwd = cwd;
+  return tree;
 }
 
 // ─── Phase Helpers ───────────────────────────────────────────────────────────
@@ -246,12 +347,26 @@ function searchPhaseInDir(baseDir, relBase, normalized) {
 function findPhaseInternal(cwd, phase) {
   if (!phase) return null;
 
-  const phasesDir = path.join(cwd, '.planning', 'phases');
   const normalized = normalizePhaseName(phase);
 
-  // Search current phases first
-  const current = searchPhaseInDir(phasesDir, path.join('.planning', 'phases'), normalized);
-  if (current) return current;
+  // Search current phases first — use cached tree for fast lookup
+  const tree = getPhaseTree(cwd);
+  const cached = tree.get(normalized);
+  if (cached) {
+    return {
+      found: true,
+      directory: cached.relPath,
+      phase_number: cached.phaseNumber,
+      phase_name: cached.phaseName,
+      phase_slug: cached.phaseSlug,
+      plans: cached.plans,
+      summaries: cached.summaries,
+      incomplete_plans: cached.incompletePlans,
+      has_research: cached.hasResearch,
+      has_context: cached.hasContext,
+      has_verification: cached.hasVerification,
+    };
+  }
 
   // Search archived milestone phases (newest first)
   const milestonesDir = path.join(cwd, '.planning', 'milestones');
@@ -283,10 +398,10 @@ function findPhaseInternal(cwd, phase) {
 function getRoadmapPhaseInternal(cwd, phaseNum) {
   if (!phaseNum) return null;
   const roadmapPath = path.join(cwd, '.planning', 'ROADMAP.md');
-  if (!fs.existsSync(roadmapPath)) return null;
 
   try {
-    const content = fs.readFileSync(roadmapPath, 'utf-8');
+    const content = cachedReadFile(roadmapPath);
+    if (!content) return null;
     const escapedPhase = phaseNum.toString().replace(/\./g, '\\.');
     const phasePattern = new RegExp(`#{2,4}\\s*Phase\\s+${escapedPhase}:\\s*([^\\n]+)`, 'i');
     const headerMatch = content.match(phasePattern);
@@ -333,7 +448,8 @@ function generateSlugInternal(text) {
 
 function getMilestoneInfo(cwd) {
   try {
-    const roadmap = fs.readFileSync(path.join(cwd, '.planning', 'ROADMAP.md'), 'utf-8');
+    const roadmap = cachedReadFile(path.join(cwd, '.planning', 'ROADMAP.md'));
+    if (!roadmap) return { version: 'v1.0', name: 'milestone', phaseRange: null };
     let version = null;
     let name = null;
     let phaseRange = null;
@@ -785,6 +901,8 @@ module.exports = {
   safeReadFile,
   cachedReadFile,
   invalidateFileCache,
+  cachedReaddirSync,
+  getPhaseTree,
   normalizePhaseName,
   parseMustHavesBlock,
   sanitizeShellArg,

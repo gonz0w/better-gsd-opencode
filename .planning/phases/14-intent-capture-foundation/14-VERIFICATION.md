@@ -94,4 +94,4 @@ Truths derived from ROADMAP.md Success Criteria plus PLAN must_haves across all 
 ---
 
 _Verified: 2026-02-25T10:15:00Z_
-_Verifier: Claude (gsd-verifier)_
+_Verifier: gsd-verifier_

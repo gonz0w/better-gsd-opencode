@@ -62,7 +62,7 @@ Users can create, read, and update a structured INTENT.md that captures why a pr
 - **No file import:** CLI flags or guided workflow only — no `--from file.json`
 - **Sub-sections use markdown headers:** `### Technical`, `### Quantitative` etc. inside XML tags — no nested XML tags
 
-### Claude's Discretion
+### Agent's Discretion
 - Compact `intent show` density (somewhere between 5-25 lines — calibrate for agent usefulness)
 - JSON wrapper shape when filtering by section (metadata inclusion vs items-only)
 

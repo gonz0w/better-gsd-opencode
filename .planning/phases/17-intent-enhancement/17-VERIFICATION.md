@@ -96,4 +96,4 @@ The only minor note is the bundle size (457KB vs 450KB budget) which is informat
 ---
 
 _Verified: 2026-02-25T12:00:00Z_
-_Verifier: Claude (gsd-verifier)_
+_Verifier: gsd-verifier_

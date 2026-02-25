@@ -29,7 +29,7 @@ The GSD plugin uses a single-file Node.js CLI (`bin/gsd-tools.cjs`) as a data/op
 - Location: `workflows/*.md` (32 files)
 - Contains: XML-structured prompts with `<process>`, `<step>`, `<purpose>` tags
 - Depends on: CLI tool for data, references for behavioral rules, templates for document structure
-- Used by: Claude Code slash commands (in `~/.config/opencode/command/`)
+- Used by: OpenCode slash commands (in `~/.config/opencode/command/`)
 
 **Layer 3 — Templates (`templates/*.md`, `templates/config.json`)**
 - Purpose: Document structure definitions for all `.planning/` artifacts
@@ -112,7 +112,7 @@ The GSD plugin uses a single-file Node.js CLI (`bin/gsd-tools.cjs`) as a data/op
 - Pattern: Returns JSON with resolved models, config flags, phase info, file paths, file existence checks. Minimizes round-trips between workflow and CLI.
 
 **Model Profile:**
-- Purpose: Maps agent types to Claude model tiers based on budget preference
+- Purpose: Maps agent types to model tiers based on budget preference
 - Implementation: `MODEL_PROFILES` lookup table in `bin/gsd-tools.cjs` (line 132)
 - Pattern: Three profiles (`quality`, `balanced`, `budget`) map 11 agent types to `opus`/`sonnet`/`haiku`. Per-agent overrides via `config.json`.
 
@@ -130,7 +130,7 @@ The GSD plugin uses a single-file Node.js CLI (`bin/gsd-tools.cjs`) as a data/op
 
 **Workflow Entry (workflow markdown files):**
 - Location: `workflows/*.md` (32 files)
-- Triggers: Claude Code slash commands (e.g., `/gsd-execute-phase`, `/gsd-plan-phase`)
+- Triggers: OpenCode slash commands (e.g., `/gsd-execute-phase`, `/gsd-plan-phase`)
 - Responsibilities: Define the orchestration logic, agent spawning, user interaction, and state transitions
 
 **Deploy Entry (`deploy.sh`):**

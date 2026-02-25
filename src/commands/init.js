@@ -5,7 +5,7 @@ const path = require('path');
 const { execSync } = require('child_process');
 const { output, error, debugLog } = require('../lib/output');
 const { loadConfig } = require('../lib/config');
-const { safeReadFile, findPhaseInternal, resolveModelInternal, getRoadmapPhaseInternal, getMilestoneInfo, getArchivedPhaseDirs, normalizePhaseName, isValidDateString, sanitizeShellArg, pathExistsInternal, generateSlugInternal } = require('../lib/helpers');
+const { safeReadFile, cachedReadFile, findPhaseInternal, resolveModelInternal, getRoadmapPhaseInternal, getMilestoneInfo, getArchivedPhaseDirs, normalizePhaseName, isValidDateString, sanitizeShellArg, pathExistsInternal, generateSlugInternal, getPhaseTree } = require('../lib/helpers');
 const { extractFrontmatter } = require('../lib/frontmatter');
 const { execGit } = require('../lib/git');
 const { getIntentDriftData, getIntentSummary } = require('./intent');
@@ -893,24 +893,14 @@ function cmdInitMilestoneOp(cwd, raw) {
   const config = loadConfig(cwd);
   const milestone = getMilestoneInfo(cwd);
 
-  // Count phases
+  // Count phases — use cached phase tree
   let phaseCount = 0;
   let completedPhases = 0;
-  const phasesDir = path.join(cwd, '.planning', 'phases');
-  try {
-    const entries = fs.readdirSync(phasesDir, { withFileTypes: true });
-    const dirs = entries.filter(e => e.isDirectory()).map(e => e.name);
-    phaseCount = dirs.length;
-
-    // Count phases with summaries (completed)
-    for (const dir of dirs) {
-      try {
-        const phaseFiles = fs.readdirSync(path.join(phasesDir, dir));
-        const hasSummary = phaseFiles.some(f => f.endsWith('-SUMMARY.md') || f === 'SUMMARY.md');
-        if (hasSummary) completedPhases++;
-      } catch (e) { debugLog('init.milestoneOp', 'readdir failed', e); }
-    }
-  } catch (e) { debugLog('init.milestoneOp', 'readdir failed', e); }
+  const phaseTree = getPhaseTree(cwd);
+  phaseCount = phaseTree.size;
+  for (const [, entry] of phaseTree) {
+    if (entry.summaries.length > 0) completedPhases++;
+  }
 
   // Check archive
   const archiveDir = path.join(cwd, '.planning', 'archive');
@@ -1025,64 +1015,50 @@ function cmdInitProgress(cwd, raw) {
   const config = loadConfig(cwd);
   const milestone = getMilestoneInfo(cwd);
 
-  // Analyze phases — only include phases in current milestone range
-  const phasesDir = path.join(cwd, '.planning', 'phases');
+  // Analyze phases — only include phases in current milestone range (cached tree)
   const phases = [];
   let currentPhase = null;
   let nextPhase = null;
 
-  try {
-    const entries = fs.readdirSync(phasesDir, { withFileTypes: true });
-    const dirs = entries.filter(e => e.isDirectory()).map(e => e.name).sort();
+  const phaseTree = getPhaseTree(cwd);
+  for (const [, entry] of phaseTree) {
+    const phaseNumber = entry.phaseNumber;
 
-    for (const dir of dirs) {
-      const match = dir.match(/^(\d+(?:\.\d+)?)-?(.*)/);
-      const phaseNumber = match ? match[1] : dir;
-
-      // Filter to current milestone phase range if available
-      if (milestone.phaseRange) {
-        const num = parseInt(phaseNumber);
-        if (num < milestone.phaseRange.start || num > milestone.phaseRange.end) continue;
-      }
-      const phaseName = match && match[2] ? match[2] : null;
-
-      const phasePath = path.join(phasesDir, dir);
-      const phaseFiles = fs.readdirSync(phasePath);
-
-      const plans = phaseFiles.filter(f => f.endsWith('-PLAN.md') || f === 'PLAN.md');
-      const summaries = phaseFiles.filter(f => f.endsWith('-SUMMARY.md') || f === 'SUMMARY.md');
-      const hasResearch = phaseFiles.some(f => f.endsWith('-RESEARCH.md') || f === 'RESEARCH.md');
-
-      const status = summaries.length >= plans.length && plans.length > 0 ? 'complete' :
-                     plans.length > 0 ? 'in_progress' :
-                     hasResearch ? 'researched' : 'pending';
-
-      const phaseInfo = {
-        number: phaseNumber,
-        name: phaseName,
-        directory: path.join('.planning', 'phases', dir),
-        status,
-        plan_count: plans.length,
-        summary_count: summaries.length,
-        has_research: hasResearch,
-      };
-
-      phases.push(phaseInfo);
-
-      // Find current (first incomplete with plans) and next (first pending)
-      if (!currentPhase && (status === 'in_progress' || status === 'researched')) {
-        currentPhase = phaseInfo;
-      }
-      if (!nextPhase && status === 'pending') {
-        nextPhase = phaseInfo;
-      }
+    // Filter to current milestone phase range if available
+    if (milestone.phaseRange) {
+      const num = parseInt(phaseNumber);
+      if (num < milestone.phaseRange.start || num > milestone.phaseRange.end) continue;
     }
-  } catch (e) { debugLog('init.progress', 'read phases failed', e); }
+
+    const status = entry.summaries.length >= entry.plans.length && entry.plans.length > 0 ? 'complete' :
+                   entry.plans.length > 0 ? 'in_progress' :
+                   entry.hasResearch ? 'researched' : 'pending';
+
+    const phaseInfo = {
+      number: phaseNumber,
+      name: entry.phaseName,
+      directory: entry.relPath,
+      status,
+      plan_count: entry.plans.length,
+      summary_count: entry.summaries.length,
+      has_research: entry.hasResearch,
+    };
+
+    phases.push(phaseInfo);
+
+    // Find current (first incomplete with plans) and next (first pending)
+    if (!currentPhase && (status === 'in_progress' || status === 'researched')) {
+      currentPhase = phaseInfo;
+    }
+    if (!nextPhase && status === 'pending') {
+      nextPhase = phaseInfo;
+    }
+  }
 
   // Check for paused work
   let pausedAt = null;
   try {
-    const state = fs.readFileSync(path.join(cwd, '.planning', 'STATE.md'), 'utf-8');
+    const state = cachedReadFile(path.join(cwd, '.planning', 'STATE.md'));
     const pauseMatch = state.match(/\*\*Paused At:\*\*\s*(.+)/);
     if (pauseMatch) pausedAt = pauseMatch[1].trim();
   } catch (e) { debugLog('init.progress', 'read failed', e); }
@@ -1402,7 +1378,7 @@ function cmdInitMemory(cwd, args, raw) {
 
 function getSessionDiffSummary(cwd) {
   try {
-    const state = fs.readFileSync(path.join(cwd, '.planning', 'STATE.md'), 'utf-8');
+    const state = cachedReadFile(path.join(cwd, '.planning', 'STATE.md'));
     let since = null;
     const lastMatch = state.match(/\*\*Last Activity:\*\*\s*(\d{4}-\d{2}-\d{2})/);
     if (lastMatch) since = lastMatch[1];

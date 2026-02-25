@@ -100,4 +100,4 @@ No gaps found. All 10 observable truths verified, all 8 artifacts pass 3-level v
 ---
 
 _Verified: 2026-02-25T11:15:00Z_
-_Verifier: Claude (gsd-verifier)_
+_Verifier: gsd-verifier_

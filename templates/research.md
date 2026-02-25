@@ -2,7 +2,7 @@
 
 Template for `.planning/phases/XX-name/{phase_num}-RESEARCH.md` - comprehensive ecosystem research before planning.
 
-**Purpose:** Document what Claude needs to know to implement a phase well - not just "which library" but "how do experts build this."
+**Purpose:** Document what the agent needs to know to implement a phase well - not just "which library" but "how do experts build this."
 
 ---
 
@@ -44,7 +44,7 @@ Template for `.planning/phases/XX-name/{phase_num}-RESEARCH.md` - comprehensive 
 ### User Constraints
 
 [If CONTEXT.md exists: list locked decisions only, one-liner each]
-[If no CONTEXT.md: "No user constraints — all decisions at Claude's discretion"]
+[If no CONTEXT.md: "No user constraints — all decisions at the agent's discretion"]
 
 </research_compact>
 <!-- /section -->
@@ -60,7 +60,7 @@ Template for `.planning/phases/XX-name/{phase_num}-RESEARCH.md` - comprehensive 
 - [Decision 1]
 - [Decision 2]
 
-### Claude's Discretion
+### Agent's Discretion
 [Copy from CONTEXT.md - areas where researcher/planner can choose]
 - [Area 1]
 - [Area 2]
@@ -70,7 +70,7 @@ Template for `.planning/phases/XX-name/{phase_num}-RESEARCH.md` - comprehensive 
 - [Deferred 1]
 - [Deferred 2]
 
-**If no CONTEXT.md exists:** Write "No user constraints - all decisions at Claude's discretion"
+**If no CONTEXT.md exists:** Write "No user constraints - all decisions at the agent's discretion"
 </user_constraints>
 <!-- /section -->
 
@@ -574,7 +574,7 @@ function useVehicleControls(rigidBodyRef) {
 
 **When to create:**
 - Before planning phases in niche/complex domains
-- When Claude's training data is likely stale or sparse
+- When the AI's training data is likely stale or sparse
 - When "how do experts do this" matters more than "which library"
 
 **Structure:**

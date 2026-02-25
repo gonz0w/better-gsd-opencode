@@ -2,7 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const { output, error, debugLog } = require('../lib/output');
 const { loadConfig } = require('../lib/config');
-const { safeReadFile, normalizePhaseName, findPhaseInternal } = require('../lib/helpers');
+const { safeReadFile, cachedReadFile, normalizePhaseName, findPhaseInternal, getPhaseTree } = require('../lib/helpers');
 const { execGit } = require('../lib/git');
 
 // ─── State Commands ──────────────────────────────────────────────────────────
@@ -12,9 +12,8 @@ function cmdStateLoad(cwd, raw) {
   const planningDir = path.join(cwd, '.planning');
 
   let stateRaw = '';
-  try {
-    stateRaw = fs.readFileSync(path.join(planningDir, 'STATE.md'), 'utf-8');
-  } catch (e) { debugLog('state.load', 'read failed', e); }
+  const stateContent = cachedReadFile(path.join(planningDir, 'STATE.md'));
+  if (stateContent) stateRaw = stateContent;
 
   const configExists = fs.existsSync(path.join(planningDir, 'config.json'));
   const roadmapExists = fs.existsSync(path.join(planningDir, 'ROADMAP.md'));
@@ -227,19 +226,14 @@ function cmdStateUpdateProgress(cwd, raw) {
 
   let content = fs.readFileSync(statePath, 'utf-8');
 
-  // Count summaries across all phases
-  const phasesDir = path.join(cwd, '.planning', 'phases');
+  // Count summaries across all phases — use cached phase tree
   let totalPlans = 0;
   let totalSummaries = 0;
 
-  if (fs.existsSync(phasesDir)) {
-    const phaseDirs = fs.readdirSync(phasesDir, { withFileTypes: true })
-      .filter(e => e.isDirectory()).map(e => e.name);
-    for (const dir of phaseDirs) {
-      const files = fs.readdirSync(path.join(phasesDir, dir));
-      totalPlans += files.filter(f => f.match(/-PLAN\.md$/i)).length;
-      totalSummaries += files.filter(f => f.match(/-SUMMARY\.md$/i)).length;
-    }
+  const phaseTree = getPhaseTree(cwd);
+  for (const [, entry] of phaseTree) {
+    totalPlans += entry.plans.length;
+    totalSummaries += entry.summaries.length;
   }
 
   const percent = totalPlans > 0 ? Math.round(totalSummaries / totalPlans * 100) : 0;
@@ -420,24 +414,18 @@ function cmdStateValidate(cwd, options, raw) {
       const claimedPlanCount = plansMatch ? parseInt(plansMatch[2], 10) : null;
       const claimedSummaryCount = plansMatch && plansMatch[1] ? parseInt(plansMatch[1], 10) : null;
 
-      // Count actual files on disk
+      // Count actual files on disk — use cached phase tree
       let diskPlanCount = 0;
       let diskSummaryCount = 0;
       let phaseDirName = null;
 
-      try {
-        if (fs.existsSync(phasesDir)) {
-          const dirs = fs.readdirSync(phasesDir, { withFileTypes: true })
-            .filter(e => e.isDirectory()).map(e => e.name);
-          phaseDirName = dirs.find(d => d.startsWith(normalized + '-') || d === normalized);
-
-          if (phaseDirName) {
-            const phaseFiles = fs.readdirSync(path.join(phasesDir, phaseDirName));
-            diskPlanCount = phaseFiles.filter(f => f.endsWith('-PLAN.md') || f === 'PLAN.md').length;
-            diskSummaryCount = phaseFiles.filter(f => f.endsWith('-SUMMARY.md') || f === 'SUMMARY.md').length;
-          }
-        }
-      } catch (e) { debugLog('state.validate', 'readdir failed for phase ' + phaseNum, e); }
+      const phaseTree = getPhaseTree(cwd);
+      const cachedPhase = phaseTree.get(normalized);
+      if (cachedPhase) {
+        phaseDirName = cachedPhase.dirName;
+        diskPlanCount = cachedPhase.plans.length;
+        diskSummaryCount = cachedPhase.summaries.length;
+      }
 
       // Compare plan count
       if (claimedPlanCount !== null && claimedPlanCount !== diskPlanCount && phaseDirName) {
@@ -561,18 +549,12 @@ function cmdStateValidate(cwd, options, raw) {
     const config = loadConfig(cwd);
     const stalenessThreshold = config.staleness_threshold || 2;
 
-    // Count completed plans across all phases
+    // Count completed plans across all phases — use cached phase tree
     let totalCompletedPlans = 0;
-    try {
-      if (fs.existsSync(phasesDir)) {
-        const dirs = fs.readdirSync(phasesDir, { withFileTypes: true })
-          .filter(e => e.isDirectory()).map(e => e.name);
-        for (const dir of dirs) {
-          const files = fs.readdirSync(path.join(phasesDir, dir));
-          totalCompletedPlans += files.filter(f => f.endsWith('-SUMMARY.md') || f === 'SUMMARY.md').length;
-        }
-      }
-    } catch (e) { debugLog('state.validate', 'count completed plans failed', e); }
+    const phaseTreeForBlockers = getPhaseTree(cwd);
+    for (const [, entry] of phaseTreeForBlockers) {
+      totalCompletedPlans += entry.summaries.length;
+    }
 
     // Check blockers section
     const blockerSection = stateContent.match(/###?\s*(?:Blockers|Blockers\/Concerns|Concerns)\s*\n([\s\S]*?)(?=\n###?|\n##[^#]|$)/i);

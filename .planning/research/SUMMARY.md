@@ -15,7 +15,7 @@
 ### MCP Context Overhead
 - 5-10 MCP servers consume 40-82K tokens before the user types anything. GitHub alone = 46K tokens.
 - Static analysis sufficient. Known-server database + config parsing provides 80% of value without connecting to servers.
-- Claude Code shipped Tool Search (Jan 2026) — 85% token reduction via on-demand loading. OpenCode has no equivalent.
+- Tool Search patterns (Jan 2026) — 85% token reduction via on-demand loading. OpenCode has no equivalent.
 - Project-file matching determines relevance. Postgres MCP relevant if migrations/ exists.
 
 ### Structured Requirements
@@ -25,7 +25,7 @@
 - GSD's must_haves system is already more precise than Gherkin for artifact/wiring verification. Gap is at requirements level.
 
 ### Worktree Parallelism
-- Industry standard for 2026. Claude Code, Cursor, agentree, git-worktree-runner all use worktrees.
+- Industry standard for 2026. OpenCode, Cursor, agentree, git-worktree-runner all use worktrees.
 - GSD's wave system is the right foundation. Worktrees are the deployment mechanism.
 - Key constraints: no shared branches, 2-4GB disk per worktree, lock file conflicts nearly guaranteed.
 - `git merge-tree` (Git 2.38+) enables dry-run conflict detection.

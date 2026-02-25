@@ -96,4 +96,4 @@ None. All truths are programmatically verifiable and have been verified:
 ---
 
 _Verified: 2026-02-22T08:15:00Z_
-_Verifier: Claude (gsd-verifier)_
+_Verifier: gsd-verifier_

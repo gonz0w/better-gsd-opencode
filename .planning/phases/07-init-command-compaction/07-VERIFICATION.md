@@ -125,4 +125,4 @@ Measured against actual project data in this workspace, **after Plan 07-03 split
 ---
 
 _Verified: 2026-02-22T19:10:00Z_
-_Verifier: Claude (gsd-verifier)_
+_Verifier: gsd-verifier_

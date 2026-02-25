@@ -6,7 +6,15 @@ const { debugLog } = require('./output');
 
 // ─── Configuration ───────────────────────────────────────────────────────────
 
+/** Module-level config cache — keyed by cwd, lives for single CLI invocation */
+const _configCache = new Map();
+
 function loadConfig(cwd) {
+  if (_configCache.has(cwd)) {
+    debugLog('config.load', `cache hit: ${cwd}`);
+    return _configCache.get(cwd);
+  }
+
   const configPath = path.join(cwd, '.planning', 'config.json');
 
   // Build defaults from CONFIG_SCHEMA
@@ -43,9 +51,11 @@ function loadConfig(cwd) {
         result[key] = get(key, def) ?? def.default;
       }
     }
+    _configCache.set(cwd, result);
     return result;
   } catch (e) {
     debugLog('config.load', 'parse config.json failed, using defaults', e);
+    _configCache.set(cwd, defaults);
     return defaults;
   }
 }

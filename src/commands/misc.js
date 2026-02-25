@@ -6,7 +6,7 @@ const { execSync } = require('child_process');
 const { output, error, debugLog } = require('../lib/output');
 const { loadConfig, isGitIgnored } = require('../lib/config');
 const { MODEL_PROFILES, CONFIG_SCHEMA } = require('../lib/constants');
-const { safeReadFile, normalizePhaseName, findPhaseInternal, generateSlugInternal, getArchivedPhaseDirs, getMilestoneInfo } = require('../lib/helpers');
+const { safeReadFile, normalizePhaseName, findPhaseInternal, generateSlugInternal, getArchivedPhaseDirs, getMilestoneInfo, getPhaseTree, cachedReaddirSync } = require('../lib/helpers');
 const { extractFrontmatter, reconstructFrontmatter, spliceFrontmatter } = require('../lib/frontmatter');
 const { execGit } = require('../lib/git');
 
@@ -1258,42 +1258,29 @@ function cmdFrontmatterValidate(cwd, filePath, schemaName, raw) {
 }
 
 function cmdProgressRender(cwd, format, raw) {
-  const phasesDir = path.join(cwd, '.planning', 'phases');
-  const roadmapPath = path.join(cwd, '.planning', 'ROADMAP.md');
   const milestone = getMilestoneInfo(cwd);
 
   const phases = [];
   let totalPlans = 0;
   let totalSummaries = 0;
 
-  try {
-    const entries = fs.readdirSync(phasesDir, { withFileTypes: true });
-    const dirs = entries.filter(e => e.isDirectory()).map(e => e.name).sort((a, b) => {
-      const aNum = parseFloat(a.match(/^(\d+(?:\.\d+)?)/)?.[1] || '0');
-      const bNum = parseFloat(b.match(/^(\d+(?:\.\d+)?)/)?.[1] || '0');
-      return aNum - bNum;
-    });
+  const phaseTree = getPhaseTree(cwd);
+  for (const [, entry] of phaseTree) {
+    const plans = entry.plans.length;
+    const summaries = entry.summaries.length;
+    const phaseName = entry.phaseName ? entry.phaseName.replace(/-/g, ' ') : '';
 
-    for (const dir of dirs) {
-      const dm = dir.match(/^(\d+(?:\.\d+)?)-?(.*)/);
-      const phaseNum = dm ? dm[1] : dir;
-      const phaseName = dm && dm[2] ? dm[2].replace(/-/g, ' ') : '';
-      const phaseFiles = fs.readdirSync(path.join(phasesDir, dir));
-      const plans = phaseFiles.filter(f => f.endsWith('-PLAN.md') || f === 'PLAN.md').length;
-      const summaries = phaseFiles.filter(f => f.endsWith('-SUMMARY.md') || f === 'SUMMARY.md').length;
+    totalPlans += plans;
+    totalSummaries += summaries;
 
-      totalPlans += plans;
-      totalSummaries += summaries;
+    let status;
+    if (plans === 0) status = 'Pending';
+    else if (summaries >= plans) status = 'Complete';
+    else if (summaries > 0) status = 'In Progress';
+    else status = 'Planned';
 
-      let status;
-      if (plans === 0) status = 'Pending';
-      else if (summaries >= plans) status = 'Complete';
-      else if (summaries > 0) status = 'In Progress';
-      else status = 'Planned';
-
-      phases.push({ number: phaseNum, name: phaseName, plans, summaries, status });
-    }
-  } catch (e) { debugLog('progress.render', 'readdir failed', e); }
+    phases.push({ number: entry.phaseNumber, name: phaseName, plans, summaries, status });
+  }
 
   const percent = totalPlans > 0 ? Math.round((totalSummaries / totalPlans) * 100) : 0;
 
