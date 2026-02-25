@@ -11379,6 +11379,25 @@ var require_mcp = __commonJS({
     var DEFAULT_TOKENS_PER_TOOL = 150;
     var DEFAULT_BASE_TOKENS = 400;
     var DEFAULT_CONTEXT_WINDOW = 2e5;
+    var LOW_COST_THRESHOLD = 1e3;
+    var RELEVANCE_INDICATORS = {
+      postgres: { files: ["prisma/schema.prisma", "migrations/", "db/", "ecto/", "schema.sql", "knexfile.js", "drizzle.config.ts"], patterns: ["*.sql"], description: "Database schema or migrations detected" },
+      github: { files: [".github/", ".git/"], description: "Git repository detected" },
+      terraform: { files: ["terraform/", ".terraform/"], patterns: ["*.tf"], description: "Terraform configuration files detected" },
+      docker: { files: ["Dockerfile", "docker-compose.yml", "docker-compose.yaml", ".dockerignore"], description: "Docker configuration detected" },
+      "brave-search": { description: "General-purpose web search (always useful)", always_relevant: true },
+      context7: { description: "Documentation lookup (always useful)", always_relevant: true },
+      redis: { files: ["redis.conf"], env_hints: ["REDIS_URL", "REDIS_HOST"], description: "Redis configuration or environment hints detected" },
+      rabbitmq: { files: ["schemas/", "rabbitmq.conf"], env_hints: ["RABBITMQ_URL", "AMQP_URL"], description: "Message queue schemas or config detected" },
+      pulsar: { env_hints: ["PULSAR_SERVICE_URL"], description: "Pulsar connection configured" },
+      consul: { files: ["consul.hcl", "consul/"], env_hints: ["CONSUL_HTTP_ADDR"], description: "Consul configuration detected" },
+      vault: { files: ["vault.hcl", "vault/"], env_hints: ["VAULT_ADDR"], description: "Vault configuration detected" },
+      sqlite: { patterns: ["*.sqlite", "*.db"], description: "SQLite database files detected" },
+      puppeteer: { files: ["puppeteer.config.js", ".puppeteerrc"], description: "Puppeteer/browser automation config detected" },
+      slack: { files: ["slack.json", ".slack/"], env_hints: ["SLACK_BOT_TOKEN", "SLACK_WEBHOOK_URL"], description: "Slack integration detected" },
+      filesystem: { description: "Filesystem access (always useful for coding)", always_relevant: true },
+      podman: { files: ["Containerfile", "Dockerfile", "podman-compose.yml"], description: "Container configuration detected" }
+    };
     function safeReadJson(filePath) {
       try {
         if (!fs.existsSync(filePath)) return null;
@@ -11501,6 +11520,112 @@ var require_mcp = __commonJS({
         source: "default-estimate"
       };
     }
+    function matchIndicatorKey(serverName) {
+      const lower = serverName.toLowerCase();
+      if (RELEVANCE_INDICATORS[lower]) return lower;
+      for (const key of Object.keys(RELEVANCE_INDICATORS)) {
+        if (lower.includes(key) || key.includes(lower)) return key;
+      }
+      return null;
+    }
+    function checkEnvHints(envHints, cwd) {
+      if (!envHints || envHints.length === 0) return false;
+      const envFiles = [".env", ".env.local", ".env.development", "docker-compose.yml", "docker-compose.yaml"];
+      for (const envFile of envFiles) {
+        const filePath = path.join(cwd, envFile);
+        try {
+          if (!fs.existsSync(filePath)) continue;
+          const content = fs.readFileSync(filePath, "utf-8");
+          for (const hint of envHints) {
+            if (content.includes(hint)) return true;
+          }
+        } catch {
+        }
+      }
+      return false;
+    }
+    function scoreServerRelevance(server, cwd) {
+      const indicatorKey = matchIndicatorKey(server.name);
+      if (indicatorKey) {
+        const indicator = RELEVANCE_INDICATORS[indicatorKey];
+        if (indicator.always_relevant) {
+          return { score: "relevant", reason: indicator.description };
+        }
+        if (server.token_estimate && server.token_estimate < LOW_COST_THRESHOLD) {
+          return { score: "relevant", reason: "Low cost (<1K tokens) \u2014 not worth disabling" };
+        }
+        const files = indicator.files || [];
+        for (const file of files) {
+          try {
+            if (fs.existsSync(path.join(cwd, file))) {
+              return { score: "relevant", reason: indicator.description };
+            }
+          } catch {
+          }
+        }
+        const patterns = indicator.patterns || [];
+        for (const pattern of patterns) {
+          if (pattern.startsWith("*.")) {
+            const ext = pattern.slice(1);
+            try {
+              const entries = fs.readdirSync(cwd);
+              if (entries.some((e) => e.endsWith(ext))) {
+                return { score: "relevant", reason: indicator.description };
+              }
+            } catch {
+            }
+          }
+        }
+        if (checkEnvHints(indicator.env_hints, cwd)) {
+          return { score: "possibly-relevant", reason: "Environment hints found but no project files" };
+        }
+        return { score: "not-relevant", reason: "No project files matching this server type" };
+      }
+      if (server.token_estimate && server.token_estimate < LOW_COST_THRESHOLD) {
+        return { score: "relevant", reason: "Low cost (<1K tokens) \u2014 not worth disabling" };
+      }
+      return { score: "possibly-relevant", reason: "Unknown server \u2014 manual review recommended" };
+    }
+    function generateRecommendations(servers, cwd, contextWindow) {
+      contextWindow = contextWindow || DEFAULT_CONTEXT_WINDOW;
+      let totalPotentialSavings = 0;
+      const summary = { keep: 0, disable: 0, review: 0 };
+      const enriched = servers.map((server) => {
+        const { score, reason } = scoreServerRelevance(server, cwd);
+        let recommendation;
+        let recommendationReason;
+        if (score === "relevant") {
+          recommendation = "keep";
+          recommendationReason = reason;
+          summary.keep++;
+        } else if (score === "possibly-relevant") {
+          recommendation = "review";
+          recommendationReason = "Check if this server is needed for your workflow";
+          summary.review++;
+        } else {
+          recommendation = "disable";
+          const tokenSave = server.token_estimate || 0;
+          const pct = (tokenSave / contextWindow * 100).toFixed(1);
+          recommendationReason = `No matching project files found \u2014 saves ${tokenSave} tokens (${pct}%)`;
+          totalPotentialSavings += tokenSave;
+          summary.disable++;
+        }
+        return {
+          ...server,
+          relevance: score,
+          recommendation,
+          recommendation_reason: recommendationReason
+        };
+      });
+      const totalTokens = servers.reduce((sum, s) => sum + (s.token_estimate || 0), 0);
+      const potentialSavingsPercent = totalTokens > 0 ? (totalPotentialSavings / contextWindow * 100).toFixed(1) + "%" : "0.0%";
+      return {
+        servers: enriched,
+        total_potential_savings: totalPotentialSavings,
+        potential_savings_percent: potentialSavingsPercent,
+        recommendations_summary: summary
+      };
+    }
     function cmdMcpProfile(cwd, args, raw) {
       let contextWindow = DEFAULT_CONTEXT_WINDOW;
       const windowIdx = args.indexOf("--window");
@@ -11534,15 +11659,19 @@ var require_mcp = __commonJS({
           context_percent: contextPercent
         };
       });
+      const recommendations = generateRecommendations(serverResults, cwd, contextWindow);
       const totalContextPercent = (totalTokens / contextWindow * 100).toFixed(1) + "%";
       const result = {
-        servers: serverResults,
+        servers: recommendations.servers,
         total_tokens: totalTokens,
         total_context_percent: totalContextPercent,
         context_window: contextWindow,
         server_count: servers.length,
         known_count: knownCount,
-        unknown_count: unknownCount
+        unknown_count: unknownCount,
+        total_potential_savings: recommendations.total_potential_savings,
+        potential_savings_percent: recommendations.potential_savings_percent,
+        recommendations_summary: recommendations.recommendations_summary
       };
       output(result, raw);
     }
@@ -11550,14 +11679,20 @@ var require_mcp = __commonJS({
       cmdMcpProfile,
       discoverMcpServers,
       estimateTokenCost,
+      scoreServerRelevance,
+      generateRecommendations,
       MCP_KNOWN_SERVERS,
+      RELEVANCE_INDICATORS,
       DEFAULT_CONTEXT_WINDOW,
       DEFAULT_TOKENS_PER_TOOL,
       DEFAULT_BASE_TOKENS,
+      LOW_COST_THRESHOLD,
       // Internal helpers exported for testing
       extractFromMcpJson,
       extractFromOpencodeJson,
-      safeReadJson
+      safeReadJson,
+      matchIndicatorKey,
+      checkEnvHints
     };
   }
 });
