@@ -33,9 +33,9 @@ Requirements for v3.0 Intent Engineering milestone. Each maps to roadmap phases.
 ### Workflow Integration
 
 - [x] **WINT-01**: Init commands (progress, execute, plan) include intent summary in their output so agents always see project intent
-- [ ] **WINT-02**: Research agents receive intent context (objective, target users, desired outcomes) to scope their exploration
-- [ ] **WINT-03**: Planner agents reference intent when creating phase plans, ensuring plan objectives derive from desired outcomes
-- [ ] **WINT-04**: Verify-work workflow checks deliverables against desired outcomes and success criteria, not just requirements
+- [x] **WINT-02**: Research agents receive intent context (objective, target users, desired outcomes) to scope their exploration
+- [x] **WINT-03**: Planner agents reference intent when creating phase plans, ensuring plan objectives derive from desired outcomes
+- [x] **WINT-04**: Verify-work workflow checks deliverables against desired outcomes and success criteria, not just requirements
 
 ### Self-Application
 
@@ -86,9 +86,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 | IVAL-04 | Phase 15 | Complete |
 | IVAL-05 | Phase 15 | Complete |
 | WINT-01 | Phase 16 | Complete |
-| WINT-02 | Phase 16 | Pending |
-| WINT-03 | Phase 16 | Pending |
-| WINT-04 | Phase 16 | Pending |
+| WINT-02 | Phase 16 | Complete |
+| WINT-03 | Phase 16 | Complete |
+| WINT-04 | Phase 16 | Complete |
 | SELF-01 | Phase 16 | Complete |
 
 **Coverage:**

@@ -12,7 +12,7 @@ See: .planning/PROJECT.md (updated 2026-02-24)
 **Phase:** 16 of 17 (Workflow Integration & Self-Application)
 **Current Plan:** 3
 **Total Plans in Phase:** 3
-**Status:** Ready to execute
+**Status:** Phase complete — ready for verification
 **Last Activity:** 2026-02-25
 
 Progress: [████████░░] 75%
@@ -38,6 +38,8 @@ Phase 14-01: Graceful parser degradation — missing sections return null/empty 
 - [Phase 15]: Advisory-only drift pre-flight: never blocks, null when no INTENT.md, try/catch wrapped
 - [Phase 16]: Write INTENT.md directly rather than intent create CLI for richer dog-fooding content
 - [Phase 16]: getIntentSummary follows advisory try/catch pattern — null on missing INTENT.md, never crashes
+- [Phase 16]: All intent workflow injections are conditional — 'if INTENT.md exists' — projects without INTENT.md see zero changes
+- [Phase 16]: Intent-based verification is additive (Option D) — merges with existing truth sources, never replaces
 
 ### Pending Todos
 
@@ -50,5 +52,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-02-25
-Stopped at: Completed 16-01-PLAN.md
+Stopped at: Completed 16-03-PLAN.md (Phase 16 complete)
 Resume file: None

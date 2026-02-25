@@ -52,7 +52,7 @@ Full details: `.planning/milestones/v2.0-ROADMAP.md`
 
 - [x] **Phase 14: Intent Capture Foundation** - INTENT.md template and CRUD commands for creating, reading, and updating project intent (completed 2026-02-25)
 - [x] **Phase 15: Intent Tracing & Validation** - Per-plan intent tracing, traceability matrix, coverage gap detection, and drift scoring (completed 2026-02-25)
-- [ ] **Phase 16: Workflow Integration & Self-Application** - Inject intent context into all workflows and dog-food the system on GSD itself
+- [x] **Phase 16: Workflow Integration & Self-Application** - Inject intent context into all workflows and dog-food the system on GSD itself (completed 2026-02-25)
 - [ ] **Phase 17: Intent Enhancement** - Guided intent questionnaire for new projects and intent evolution tracking across milestones
 
 ## Phase Details
@@ -99,7 +99,7 @@ Plans:
   3. Planner workflows reference intent when creating phase plans, deriving plan objectives from desired outcomes
   4. Verify-work workflow checks deliverables against desired outcomes and success criteria, not just requirements
   5. GSD's own `.planning/INTENT.md` exists and is actively used for its own milestone planning
-**Plans:** 2/3 plans executed
+**Plans:** 3/3 plans complete
 
 Plans:
 - [ ] 16-01-PLAN.md — Intent summary in init commands (getIntentSummary + 3 init commands)
@@ -135,5 +135,5 @@ Plans:
 | 13. Test Infrastructure & Polish | v2.0 | 4/4 | Complete | 2026-02-24 |
 | 14. Intent Capture Foundation | 3/3 | Complete    | 2026-02-25 | - |
 | 15. Intent Tracing & Validation | 2/2 | Complete    | 2026-02-25 | - |
-| 16. Workflow Integration & Self-Application | 2/3 | In Progress|  | - |
+| 16. Workflow Integration & Self-Application | 3/3 | Complete   | 2026-02-25 | - |
 | 17. Intent Enhancement | v3.0 | 0/? | Not started | - |
