@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-02-25)
 
 **Core value:** Manage and deliver high-quality software with high-quality documentation, while continuously reducing token usage and improving performance
-**Current focus:** v4.0 Phase 20 — Structured Requirements
+**Current focus:** v4.0 Phase 21 — Worktree Parallelism
 
 ## Current Position
 
-**Phase:** 20 of 22 (Structured Requirements)
-**Current Plan:** 3 of 3
-**Status:** In progress
+**Phase:** 21 of 22 (Worktree Parallelism)
+**Current Plan:** 1 of ?
+**Status:** Not started
 **Last Activity:** 2026-02-25
 
-Progress: [██████░░░░] 60% (3/5 phases)
+Progress: [████████░░] 80% (4/5 phases)
 
 ## Performance Metrics
 
@@ -38,6 +38,7 @@ Progress: [██████░░░░] 60% (3/5 phases)
 | Phase 19 P02 | 4 min | 2 tasks | 3 files |
 | Phase 19 P03 | 9 min | 2 tasks | 4 files |
 | Phase 20 P01 | 8 min | 2 tasks | 6 files |
+| Phase 20 P02 | 11 min | 2 tasks | 4 files |
 | Phase 20 P03 | 2 min | 2 tasks | 3 files |
 
 ## Accumulated Context
@@ -70,6 +71,10 @@ v4.0 decisions:
 - [Phase 20]: Assertion reading integrated into existing plan-phase steps — 12 net new lines, under 20-line target
 - [Phase 20]: Planner derives must_haves.truths from assertions with fallback to requirement text
 - [Phase 20]: Test-command column added to requirements traceability table template
+- [Phase 20]: File-type assertions check disk existence via path extraction; CLI-type match against known command list
+- [Phase 20]: Behavior/api assertions always need_human — no static verification possible
+- [Phase 20]: Traceability regex uses [^|\n]* to prevent cross-row matching in markdown tables
+- [Phase 20]: Cross-reference assertion text against plan must_haves.truths for planned/gap detection
 
 ### Pending Todos
 
@@ -82,5 +87,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-02-25
-Stopped at: Completed 20-03-PLAN.md
+Stopped at: Completed Phase 20 (all 3 plans) — metadata finalized for 20-02
 Resume file: None

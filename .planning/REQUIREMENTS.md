@@ -80,12 +80,12 @@ Requirements for milestone v4.0 Environment & Execution Intelligence. Each maps 
   - Auto-suggest assertions based on requirement text
   - Validate: every v1 requirement has at least 2 assertions
 
-- [ ] **SREQ-03**: Traceability table maps requirements to test commands
+- [x] **SREQ-03**: Traceability table maps requirements to test commands
   - New column: test command(s) that verify the requirement
   - `verify requirements` checks test commands exist and can run
   - Coverage: track tested vs untested requirements
 
-- [ ] **SREQ-04**: Phase verifier checks structured assertions, not just requirement text
+- [x] **SREQ-04**: Phase verifier checks structured assertions, not just requirement text
   - Verifier reads acceptance criteria from REQUIREMENTS.md
   - Each assertion checked against codebase evidence
   - Report includes per-assertion pass/fail status
@@ -182,8 +182,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | MCP-05 | Phase 19 | Complete |
 | SREQ-01 | Phase 20 | Complete |
 | SREQ-02 | Phase 20 | Complete |
-| SREQ-03 | Phase 20 | Pending |
-| SREQ-04 | Phase 20 | Pending |
+| SREQ-03 | Phase 20 | Complete |
+| SREQ-04 | Phase 20 | Complete |
 | SREQ-05 | Phase 20 | Complete |
 | WKTR-01 | Phase 21 | Pending |
 | WKTR-02 | Phase 21 | Pending |
@@ -200,4 +200,4 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 ---
 *Requirements defined: 2026-02-25*
-*Last updated: 2026-02-25 after roadmap creation*
+*Last updated: 2026-02-25 after Phase 20 Plan 02 completion*
