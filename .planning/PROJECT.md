@@ -2,22 +2,25 @@
 
 ## What This Is
 
-A zero-dependency, single-file Node.js CLI built from 16 organized `src/` modules via esbuild, producing `bin/gsd-tools.cjs`. It provides structured data operations for AI-driven project planning workflows running in OpenCode. v1.0 established the test suite, module split, and observability layer. v1.1 added context reduction across all workflow layers (46.7% CLI output reduction, 54.6% workflow compression, 67% reference file reduction). v2.0 added state validation, atomic plan decomposition, cross-session memory, comprehensive verification (quality scoring, regression detection), integration testing (297 tests), and dependency/token optimization.
+A zero-dependency, single-file Node.js CLI built from 16 organized `src/` modules via esbuild, producing `bin/gsd-tools.cjs`. It provides structured data operations for AI-driven project planning workflows running in OpenCode. v1.0 established the test suite, module split, and observability layer. v1.1 added context reduction across all workflow layers (46.7% CLI output reduction, 54.6% workflow compression, 67% reference file reduction). v2.0 added state validation, atomic plan decomposition, cross-session memory, comprehensive verification (quality scoring, regression detection), integration testing (297 tests), and dependency/token optimization. v3.0 added intent engineering — INTENT.md capture, per-plan intent tracing, drift validation (4 signals, 0-100 score), workflow-wide intent injection, and guided intent questionnaires for new projects/milestones.
 
 ## Core Value
 
 Manage and deliver high-quality software with high-quality documentation, while continuously reducing token usage and improving performance.
 
-## Current Milestone: v3.0 Intent Engineering
+## Current State
 
-**Goal:** Make intent the architectural backbone of GSD — every project captures *why* it exists and *what success looks like*, and every downstream workflow (research, planning, execution, verification) validates alignment against that intent.
+**Last shipped:** v3.0 Intent Engineering (2026-02-25)
+**Next milestone:** Not yet planned — run `/gsd-new-milestone` to start
 
-**Target features:**
-- INTENT.md — project-level intent capture (objective, desired outcomes, health metrics, target users, constraints, success criteria)
-- Per-phase intent — each PLAN.md traces its objective back to INTENT.md desired outcomes
-- Intent validation — command that scores plans/phases against stated intent, detects drift (objective mismatch, feature creep, priority inversion)
-- Workflow injection — all workflows get intent context injected so agents always see it
-- GSD dog-fooding — GSD itself uses the intent system for its own development
+**Shipped in v3.0:**
+- INTENT.md template and CRUD commands (create, read/show, update, validate)
+- Per-plan intent tracing with traceability matrix and gap detection
+- Intent drift validation (4 signals, 0-100 score, advisory pre-flight)
+- Workflow-wide intent injection (research, planning, execution, verification)
+- Guided intent questionnaire in new-project/new-milestone workflows
+- Intent evolution tracking with history section and --reason flag
+- GSD dog-fooding — plugin uses its own intent system
 
 ## Requirements
 
@@ -73,16 +76,19 @@ Manage and deliver high-quality software with high-quality documentation, while 
 - ✓ Bundle size tracking (400KB budget) and token budgets for workflows — v2.0
 - ✓ --compact as default for all init commands — v2.0
 - ✓ MCP server discovery from .mcp.json configs — v2.0
+- ✓ INTENT.md template and CRUD commands (create, read/show, update, validate) — v3.0
+- ✓ Per-plan intent tracing with traceability matrix and gap detection — v3.0
+- ✓ Intent drift validation (4 signals, 0-100 score, advisory pre-flight) — v3.0
+- ✓ Workflow-wide intent injection (research, planning, execution, verification) — v3.0
+- ✓ Guided intent questionnaire in new-project/new-milestone workflows — v3.0
+- ✓ Intent evolution tracking with history section and --reason flag — v3.0
+- ✓ GSD self-application (dog-fooding its own intent system) — v3.0
 
 ### Active
 
-<!-- v3.0 Intent Engineering scope. Requirements defined in REQUIREMENTS.md. -->
+<!-- Next milestone scope. Requirements defined in REQUIREMENTS.md after /gsd-new-milestone. -->
 
-- [ ] INTENT.md capture — project-level intent with structured sections
-- [ ] Per-phase intent tracing — plans link objectives back to desired outcomes
-- [ ] Intent validation — drift detection (mismatch, creep, priority inversion)
-- [ ] Workflow injection — intent context available in all workflows
-- [ ] Intent-aware questioning — new-project/new-milestone gathers intent first
+No active milestone. Run `/gsd-new-milestone` to define next scope.
 
 ### Out of Scope
 
@@ -95,10 +101,10 @@ Manage and deliver high-quality software with high-quality documentation, while 
 
 ## Context
 
-Shipped v1.0, v1.1, and v2.0. 297 tests passing, 16 src/ modules, 373KB bundle, esbuild bundler.
+Shipped v1.0, v1.1, v2.0, and v3.0. 348 tests passing, 16 src/ modules, 447KB bundle, esbuild bundler.
 Platform: OpenCode (no longer targeting Claude Code).
 Tech stack: Node.js 18+, node:test, esbuild, tokenx (bundled), zero runtime dependencies.
-Source: 10,519 lines across 16 modules — `src/lib/` (7 modules) and `src/commands/` (8 modules) + router + index.
+Source: 12,729 lines across 16 modules — `src/lib/` (7 modules) and `src/commands/` (8 modules) + router + index.
 Deploy pipeline: `npm run build` → esbuild bundle → `deploy.sh` with smoke test and rollback.
 
 No known tech debt.
@@ -134,6 +140,13 @@ No known tech debt.
 | Union-find for concern grouping | Efficient clustering for single-responsibility analysis | Good — O(n) plan analysis |
 | 400KB bundle budget | Ceiling prevents accidental bloat from new dependencies | Good — 373KB actual, 7% headroom |
 | Compact-as-default | Most consumers are AI agents that need compact output | Good — saves ~47% tokens per invocation |
+| Intent as architectural layer | INTENT.md + per-phase tracing + validation as dedicated system | Good — every workflow sees project purpose, drift detected early |
+| Advisory intent validation | Flag drift, don't hard-block workflows | Good — consistent with v2.0 advisory pattern, zero workflow disruption |
+| Cascading intent | Project-level INTENT.md + per-phase intent sections in PLAN frontmatter | Good — traceability at both macro and micro level |
+| Conditional intent injection | All workflow injections check if INTENT.md exists first | Good — zero impact on projects without intent, graceful degradation |
+| Additive verification (Option D) | Intent-based checks merge with existing truth sources | Good — never replaces existing verification, only adds intent dimension |
+| Step 4.5 intent placement | Intent questionnaire after PROJECT.md, before requirements | Good — intent guides requirement definition |
+| Bundle budget 400→450KB | Accommodate intent command family (parser+CRUD+trace+drift) | Good — 447KB actual, 0.7% headroom |
 
 ---
-*Last updated: 2026-02-24 after v3.0 milestone started*
+*Last updated: 2026-02-25 after v3.0 milestone completed*

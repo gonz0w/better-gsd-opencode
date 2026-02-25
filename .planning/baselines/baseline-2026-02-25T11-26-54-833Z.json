@@ -1,14 +1,21 @@
 {
-  "timestamp": "2026-02-24T23:14:00.226Z",
+  "timestamp": "2026-02-25T11:26:54.832Z",
   "workflow_count": 43,
-  "total_tokens": 72163,
+  "total_tokens": 74187,
   "workflows": [
     {
       "name": "execute-phase.md",
       "workflow_tokens": 2661,
       "ref_count": 2,
-      "ref_tokens": 4765,
-      "total_tokens": 7426
+      "ref_tokens": 4861,
+      "total_tokens": 7522
+    },
+    {
+      "name": "new-milestone.md",
+      "workflow_tokens": 4156,
+      "ref_count": 0,
+      "ref_tokens": 0,
+      "total_tokens": 4156
     },
     {
       "name": "discuss-phase.md",
@@ -23,13 +30,6 @@
       "ref_count": 0,
       "ref_tokens": 0,
       "total_tokens": 3769
-    },
-    {
-      "name": "new-milestone.md",
-      "workflow_tokens": 3510,
-      "ref_count": 0,
-      "ref_tokens": 0,
-      "total_tokens": 3510
     },
     {
       "name": "transition.md",
@@ -47,10 +47,17 @@
     },
     {
       "name": "verify-work.md",
-      "workflow_tokens": 1413,
+      "workflow_tokens": 1585,
       "ref_count": 1,
       "ref_tokens": 1641,
-      "total_tokens": 3054
+      "total_tokens": 3226
+    },
+    {
+      "name": "new-project.md",
+      "workflow_tokens": 3090,
+      "ref_count": 0,
+      "ref_tokens": 0,
+      "total_tokens": 3090
     },
     {
       "name": "execute-plan.md",
@@ -88,18 +95,18 @@
       "total_tokens": 2382
     },
     {
-      "name": "new-project.md",
-      "workflow_tokens": 2356,
-      "ref_count": 0,
-      "ref_tokens": 0,
-      "total_tokens": 2356
-    },
-    {
       "name": "discovery-phase.md",
       "workflow_tokens": 2226,
       "ref_count": 0,
       "ref_tokens": 0,
       "total_tokens": 2226
+    },
+    {
+      "name": "plan-phase.md",
+      "workflow_tokens": 1838,
+      "ref_count": 0,
+      "ref_tokens": 0,
+      "total_tokens": 1838
     },
     {
       "name": "plan-milestone-gaps.md",
@@ -116,18 +123,25 @@
       "total_tokens": 1683
     },
     {
-      "name": "plan-phase.md",
-      "workflow_tokens": 1667,
-      "ref_count": 0,
-      "ref_tokens": 0,
-      "total_tokens": 1667
-    },
-    {
       "name": "settings.md",
       "workflow_tokens": 1597,
       "ref_count": 0,
       "ref_tokens": 0,
       "total_tokens": 1597
+    },
+    {
+      "name": "verify-phase.md",
+      "workflow_tokens": 1495,
+      "ref_count": 0,
+      "ref_tokens": 0,
+      "total_tokens": 1495
+    },
+    {
+      "name": "research-phase.md",
+      "workflow_tokens": 630,
+      "ref_count": 2,
+      "ref_tokens": 807,
+      "total_tokens": 1437
     },
     {
       "name": "update.md",
@@ -142,20 +156,6 @@
       "ref_count": 0,
       "ref_tokens": 0,
       "total_tokens": 1387
-    },
-    {
-      "name": "research-phase.md",
-      "workflow_tokens": 568,
-      "ref_count": 2,
-      "ref_tokens": 807,
-      "total_tokens": 1375
-    },
-    {
-      "name": "verify-phase.md",
-      "workflow_tokens": 1352,
-      "ref_count": 0,
-      "ref_tokens": 0,
-      "total_tokens": 1352
     },
     {
       "name": "check-todos.md",

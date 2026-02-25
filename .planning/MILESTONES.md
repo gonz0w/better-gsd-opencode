@@ -1,5 +1,27 @@
 # Milestones
 
+## ✅ v3.0 Intent Engineering (Shipped: 2026-02-25)
+
+**Phases completed:** 4 phases, 10 plans
+**Commits:** 43 | **Files changed:** 47 | **Lines:** +10,142 / -400
+**Timeline:** 1 day (2026-02-24 → 2026-02-25)
+**Tests:** 348 passing (0 failures)
+**Bundle:** 447KB / 450KB budget
+
+**Key accomplishments:**
+- Built INTENT.md template and CRUD commands (create, read/show, update, validate) with structured sections for capturing project purpose, desired outcomes, health metrics, target users, constraints, and success criteria
+- Implemented intent tracing with per-plan intent sections in YAML frontmatter, traceability matrix showing outcome-to-phase mapping, and coverage gap detection for unaddressed outcomes
+- Added intent drift validation with 4 signals (coverage gap, objective mismatch, feature creep, priority inversion) producing a weighted 0-100 drift score as advisory pre-flight
+- Injected intent context into all workflows (research, planning, execution, verification) via getIntentSummary() — all injections conditional, zero impact on projects without INTENT.md
+- Created guided intent questionnaire in new-project and new-milestone workflows (Step 4.5) so projects start with clear intent before requirements
+- Added intent evolution tracking with history section, auto-logging changes with milestone context and --reason flag
+
+**Archives:**
+- `.planning/milestones/v3.0-ROADMAP.md`
+- `.planning/milestones/v3.0-REQUIREMENTS.md`
+
+---
+
 ## ✅ v2.0 Quality & Intelligence (Shipped: 2026-02-24)
 
 **Phases completed:** 4 phases, 13 plans
