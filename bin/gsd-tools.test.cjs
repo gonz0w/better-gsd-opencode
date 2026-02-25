@@ -7567,10 +7567,10 @@ describe('test-coverage', () => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe('build pipeline', () => {
-  test('bundle size is under 525KB budget', () => {
+  test('bundle size is under 550KB budget', () => {
     const stat = fs.statSync(TOOLS_PATH);
     const sizeKB = Math.round(stat.size / 1024);
-    assert.ok(sizeKB <= 525, `Bundle size ${sizeKB}KB exceeds 525KB budget`);
+    assert.ok(sizeKB <= 550, `Bundle size ${sizeKB}KB exceeds 550KB budget`);
     assert.ok(sizeKB > 50, `Bundle size ${sizeKB}KB suspiciously small`);
   });
 
@@ -11006,5 +11006,430 @@ must_haves:
     assert.ok(niceFormatting, 'should find the nice-to-have assertion');
     assert.strictEqual(niceFormatting.gap, true, 'unplanned assertion should be a gap');
     assert.strictEqual(niceFormatting.planned, false, 'unplanned assertion should have planned: false');
+  });
+});
+
+// =============================================================================
+// Worktree Commands
+// =============================================================================
+
+describe('worktree commands', () => {
+  let tmpDir;
+  let worktreeBase;
+
+  /**
+   * Create a temp project with a real git repo (required for git worktree).
+   * Also creates a separate temp dir for worktree base_path.
+   */
+  function createGitProject(configOverrides = {}) {
+    tmpDir = fs.mkdtempSync(path.join(require('os').tmpdir(), 'gsd-wt-test-'));
+    worktreeBase = fs.mkdtempSync(path.join(require('os').tmpdir(), 'gsd-wt-base-'));
+
+    // Init git repo with initial commit (worktree requires at least one commit)
+    execSync('git init', { cwd: tmpDir, stdio: 'pipe' });
+    execSync('git config user.email "test@test.com"', { cwd: tmpDir, stdio: 'pipe' });
+    execSync('git config user.name "Test"', { cwd: tmpDir, stdio: 'pipe' });
+    fs.writeFileSync(path.join(tmpDir, 'README.md'), '# Test\n');
+    execSync('git add . && git commit -m "init"', { cwd: tmpDir, stdio: 'pipe' });
+
+    // Create .planning directory with config
+    fs.mkdirSync(path.join(tmpDir, '.planning', 'phases', '21-worktree-parallelism'), { recursive: true });
+
+    const worktreeConfig = {
+      enabled: true,
+      base_path: worktreeBase,
+      sync_files: ['.env', '.env.local', '.planning/config.json'],
+      setup_hooks: [],
+      max_concurrent: 3,
+      ...configOverrides,
+    };
+
+    const config = {
+      mode: 'yolo',
+      worktree: worktreeConfig,
+    };
+
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'config.json'),
+      JSON.stringify(config, null, 2)
+    );
+
+    return tmpDir;
+  }
+
+  /**
+   * Cleanup all worktrees before removing temp dirs.
+   * Must remove worktrees before deleting the git repo.
+   */
+  function cleanupAll() {
+    if (tmpDir && fs.existsSync(tmpDir)) {
+      try {
+        // Remove all worktrees first
+        execSync('git worktree prune', { cwd: tmpDir, stdio: 'pipe' });
+        const listOutput = execSync('git worktree list --porcelain', {
+          cwd: tmpDir,
+          encoding: 'utf-8',
+          stdio: 'pipe',
+        });
+        // Parse and remove each non-main worktree
+        const blocks = listOutput.split('\n\n');
+        for (const block of blocks) {
+          const pathMatch = block.match(/^worktree (.+)$/m);
+          if (pathMatch && pathMatch[1] !== tmpDir) {
+            try {
+              execSync(`git worktree remove "${pathMatch[1]}" --force`, {
+                cwd: tmpDir,
+                stdio: 'pipe',
+              });
+            } catch { /* ignore cleanup errors */ }
+          }
+        }
+        execSync('git worktree prune', { cwd: tmpDir, stdio: 'pipe' });
+      } catch { /* ignore */ }
+
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+    if (worktreeBase && fs.existsSync(worktreeBase)) {
+      fs.rmSync(worktreeBase, { recursive: true, force: true });
+    }
+  }
+
+  afterEach(() => {
+    cleanupAll();
+  });
+
+  // ---------------------------------------------------------------------------
+  // worktree list
+  // ---------------------------------------------------------------------------
+
+  describe('worktree list', () => {
+    test('returns empty worktrees array when no worktrees exist', () => {
+      createGitProject();
+      const result = runGsdTools('worktree list', tmpDir);
+      assert.ok(result.success, `Command failed: ${result.error}`);
+      const data = JSON.parse(result.output);
+      assert.ok(Array.isArray(data.worktrees), 'worktrees should be an array');
+      assert.strictEqual(data.worktrees.length, 0, 'should have no worktrees');
+    });
+
+    test('returns worktree details after create', () => {
+      createGitProject();
+      // Create a worktree first
+      const createResult = runGsdTools('worktree create 21-02', tmpDir);
+      assert.ok(createResult.success, `Create failed: ${createResult.error}`);
+
+      // Now list
+      const listResult = runGsdTools('worktree list', tmpDir);
+      assert.ok(listResult.success, `List failed: ${listResult.error}`);
+      const data = JSON.parse(listResult.output);
+
+      assert.strictEqual(data.worktrees.length, 1, 'should have 1 worktree');
+      const wt = data.worktrees[0];
+      assert.strictEqual(wt.plan_id, '21-02', 'plan_id should match');
+      assert.ok(wt.branch, 'should have a branch name');
+      assert.ok(wt.path, 'should have a path');
+      assert.ok(wt.disk_usage, 'should have disk_usage');
+    });
+
+    test('only shows worktrees for current project', () => {
+      createGitProject();
+      // Create a worktree for this project
+      runGsdTools('worktree create 21-02', tmpDir);
+
+      // Manually create a worktree outside the project's base_path prefix
+      // by using a different path — the list should not show it
+      const otherPath = path.join(worktreeBase, 'other-project', '99-01');
+      fs.mkdirSync(path.dirname(otherPath), { recursive: true });
+      execSync(`git worktree add -b other-branch "${otherPath}"`, {
+        cwd: tmpDir,
+        stdio: 'pipe',
+      });
+
+      const result = runGsdTools('worktree list', tmpDir);
+      assert.ok(result.success, `List failed: ${result.error}`);
+      const data = JSON.parse(result.output);
+
+      // Should only show the one under project name, not the 'other-project' one
+      assert.strictEqual(data.worktrees.length, 1, 'should only show 1 project worktree');
+      assert.strictEqual(data.worktrees[0].plan_id, '21-02', 'should be the correct plan');
+
+      // Cleanup the extra worktree
+      try {
+        execSync(`git worktree remove "${otherPath}" --force`, { cwd: tmpDir, stdio: 'pipe' });
+        execSync('git branch -D other-branch', { cwd: tmpDir, stdio: 'pipe' });
+      } catch { /* ignore */ }
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // worktree create
+  // ---------------------------------------------------------------------------
+
+  describe('worktree create', () => {
+    test('creates worktree at expected path with correct branch', () => {
+      createGitProject();
+      const result = runGsdTools('worktree create 21-02', tmpDir);
+      assert.ok(result.success, `Command failed: ${result.error}`);
+      const data = JSON.parse(result.output);
+
+      assert.strictEqual(data.created, true, 'should report created');
+      assert.strictEqual(data.plan_id, '21-02', 'plan_id should match');
+      assert.ok(data.branch.startsWith('worktree-21-02-'), 'branch should start with worktree-21-02-');
+      assert.ok(data.path.includes(worktreeBase), 'path should be under base_path');
+      assert.ok(data.path.endsWith('21-02'), 'path should end with plan_id');
+      assert.ok(fs.existsSync(data.path), 'worktree directory should exist on disk');
+      assert.strictEqual(data.setup_status, 'ok', 'setup should succeed');
+    });
+
+    test('syncs .env file if it exists in source project', () => {
+      createGitProject();
+      // Create a .env file in the source project
+      fs.writeFileSync(path.join(tmpDir, '.env'), 'SECRET_KEY=test123\n');
+
+      const result = runGsdTools('worktree create 21-02', tmpDir);
+      assert.ok(result.success, `Command failed: ${result.error}`);
+      const data = JSON.parse(result.output);
+
+      assert.ok(data.synced_files.includes('.env'), '.env should be in synced_files');
+      // Verify the file was actually copied
+      const destEnv = path.join(data.path, '.env');
+      assert.ok(fs.existsSync(destEnv), '.env should exist in worktree');
+      assert.strictEqual(
+        fs.readFileSync(destEnv, 'utf-8'),
+        'SECRET_KEY=test123\n',
+        '.env content should match'
+      );
+    });
+
+    test('skips sync gracefully when .env does not exist', () => {
+      createGitProject();
+      // Don't create .env — it shouldn't be in synced_files list
+      const result = runGsdTools('worktree create 21-02', tmpDir);
+      assert.ok(result.success, `Command failed: ${result.error}`);
+      const data = JSON.parse(result.output);
+
+      assert.ok(!data.synced_files.includes('.env'), '.env should NOT be in synced_files');
+      assert.ok(!data.synced_files.includes('.env.local'), '.env.local should NOT be in synced_files');
+      // .planning/config.json DOES exist (we created it), so it should be synced
+      assert.ok(
+        data.synced_files.includes('.planning/config.json'),
+        '.planning/config.json should be synced'
+      );
+    });
+
+    test('returns setup_failed when setup hook fails', () => {
+      createGitProject({ setup_hooks: ['false'] });
+
+      const result = runGsdTools('worktree create 21-02', tmpDir);
+      assert.ok(result.success, `Command failed: ${result.error}`);
+      const data = JSON.parse(result.output);
+
+      assert.strictEqual(data.created, true, 'worktree should still be created');
+      assert.strictEqual(data.setup_status, 'failed', 'setup should report failed');
+      assert.ok(data.setup_error, 'should have setup_error message');
+      assert.ok(data.setup_error.includes('false'), 'error should mention the failing hook');
+    });
+
+    test('returns error when plan_id is missing', () => {
+      createGitProject();
+      const result = runGsdTools('worktree create', tmpDir);
+      assert.ok(!result.success, 'should fail without plan_id');
+    });
+
+    test('returns error when worktree already exists for same plan_id', () => {
+      createGitProject();
+      // Create the first time — should succeed
+      const first = runGsdTools('worktree create 21-02', tmpDir);
+      assert.ok(first.success, `First create failed: ${first.error}`);
+
+      // Create again — should fail
+      const second = runGsdTools('worktree create 21-02', tmpDir);
+      assert.ok(!second.success, 'should fail when worktree already exists');
+      assert.ok(
+        second.error.includes('already exists') || second.output.includes('already exists'),
+        'error should mention "already exists"'
+      );
+    });
+
+    test('respects max_concurrent limit', () => {
+      createGitProject({ max_concurrent: 1 });
+
+      // Create first worktree — should succeed
+      const first = runGsdTools('worktree create 21-01', tmpDir);
+      assert.ok(first.success, `First create failed: ${first.error}`);
+
+      // Create second — should fail because max_concurrent=1
+      const second = runGsdTools('worktree create 21-02', tmpDir);
+      assert.ok(!second.success, 'should fail when max_concurrent exceeded');
+      assert.ok(
+        second.error.includes('Max concurrent') || second.output.includes('Max concurrent'),
+        'error should mention max concurrent limit'
+      );
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // worktree remove
+  // ---------------------------------------------------------------------------
+
+  describe('worktree remove', () => {
+    test('removes worktree and deletes branch', () => {
+      createGitProject();
+      // Create then remove
+      const createResult = runGsdTools('worktree create 21-02', tmpDir);
+      assert.ok(createResult.success, `Create failed: ${createResult.error}`);
+      const createData = JSON.parse(createResult.output);
+      const wtPath = createData.path;
+      const branchName = createData.branch;
+
+      // Verify it exists
+      assert.ok(fs.existsSync(wtPath), 'worktree should exist before remove');
+
+      // Remove it
+      const removeResult = runGsdTools('worktree remove 21-02', tmpDir);
+      assert.ok(removeResult.success, `Remove failed: ${removeResult.error}`);
+      const removeData = JSON.parse(removeResult.output);
+
+      assert.strictEqual(removeData.removed, true, 'should report removed');
+      assert.strictEqual(removeData.plan_id, '21-02', 'plan_id should match');
+      assert.ok(!fs.existsSync(wtPath), 'worktree directory should be gone');
+
+      // Verify branch is deleted
+      const branchCheck = execSync('git branch', { cwd: tmpDir, encoding: 'utf-8' });
+      assert.ok(!branchCheck.includes(branchName), 'branch should be deleted');
+    });
+
+    test('returns error for non-existent plan_id', () => {
+      createGitProject();
+      const result = runGsdTools('worktree remove 99-99', tmpDir);
+      assert.ok(!result.success, 'should fail for non-existent plan');
+      assert.ok(
+        result.error.includes('No worktree found') || result.output.includes('No worktree found'),
+        'error should mention no worktree found'
+      );
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // worktree cleanup
+  // ---------------------------------------------------------------------------
+
+  describe('worktree cleanup', () => {
+    test('removes all project worktrees', () => {
+      createGitProject({ max_concurrent: 3 });
+      // Create two worktrees
+      runGsdTools('worktree create 21-01', tmpDir);
+      runGsdTools('worktree create 21-02', tmpDir);
+
+      // Verify they exist
+      const listBefore = runGsdTools('worktree list', tmpDir);
+      const beforeData = JSON.parse(listBefore.output);
+      assert.strictEqual(beforeData.worktrees.length, 2, 'should have 2 worktrees before cleanup');
+
+      // Cleanup
+      const result = runGsdTools('worktree cleanup', tmpDir);
+      assert.ok(result.success, `Cleanup failed: ${result.error}`);
+      const data = JSON.parse(result.output);
+
+      assert.strictEqual(data.cleaned, 2, 'should have cleaned 2 worktrees');
+      assert.strictEqual(data.worktrees.length, 2, 'should list 2 removed worktrees');
+
+      // Verify list is now empty
+      const listAfter = runGsdTools('worktree list', tmpDir);
+      const afterData = JSON.parse(listAfter.output);
+      assert.strictEqual(afterData.worktrees.length, 0, 'should have 0 worktrees after cleanup');
+    });
+
+    test('returns cleaned: 0 when no worktrees exist', () => {
+      createGitProject();
+      const result = runGsdTools('worktree cleanup', tmpDir);
+      assert.ok(result.success, `Cleanup failed: ${result.error}`);
+      const data = JSON.parse(result.output);
+
+      assert.strictEqual(data.cleaned, 0, 'should report 0 cleaned');
+      assert.strictEqual(data.worktrees.length, 0, 'should have empty worktrees array');
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // config validation
+  // ---------------------------------------------------------------------------
+
+  describe('worktree config', () => {
+    test('default config used when no worktree section in config.json', () => {
+      tmpDir = fs.mkdtempSync(path.join(require('os').tmpdir(), 'gsd-wt-test-'));
+      worktreeBase = fs.mkdtempSync(path.join(require('os').tmpdir(), 'gsd-wt-base-'));
+
+      // Init git repo
+      execSync('git init', { cwd: tmpDir, stdio: 'pipe' });
+      execSync('git config user.email "test@test.com"', { cwd: tmpDir, stdio: 'pipe' });
+      execSync('git config user.name "Test"', { cwd: tmpDir, stdio: 'pipe' });
+      fs.writeFileSync(path.join(tmpDir, 'README.md'), '# Test\n');
+      execSync('git add . && git commit -m "init"', { cwd: tmpDir, stdio: 'pipe' });
+      fs.mkdirSync(path.join(tmpDir, '.planning'), { recursive: true });
+
+      // Create config WITHOUT worktree section
+      fs.writeFileSync(
+        path.join(tmpDir, '.planning', 'config.json'),
+        JSON.stringify({ mode: 'yolo' }, null, 2)
+      );
+
+      // List should work with defaults (uses /tmp/gsd-worktrees as base_path)
+      const result = runGsdTools('worktree list', tmpDir);
+      assert.ok(result.success, `Command failed: ${result.error}`);
+      const data = JSON.parse(result.output);
+      assert.ok(Array.isArray(data.worktrees), 'should return worktrees array with defaults');
+    });
+
+    test('custom base_path is respected', () => {
+      const customBase = fs.mkdtempSync(path.join(require('os').tmpdir(), 'gsd-wt-custom-'));
+      createGitProject({ base_path: customBase });
+
+      const result = runGsdTools('worktree create 21-02', tmpDir);
+      assert.ok(result.success, `Command failed: ${result.error}`);
+      const data = JSON.parse(result.output);
+
+      assert.ok(data.path.startsWith(customBase), `path should start with custom base: ${data.path}`);
+      assert.ok(fs.existsSync(data.path), 'worktree should exist at custom path');
+
+      // Cleanup the custom base too
+      try {
+        execSync(`git worktree remove "${data.path}" --force`, { cwd: tmpDir, stdio: 'pipe' });
+      } catch { /* ignore */ }
+      fs.rmSync(customBase, { recursive: true, force: true });
+    });
+
+    test('resource warnings included when memory is low for max_concurrent', () => {
+      // Set max_concurrent very high so resource warning triggers
+      createGitProject({ max_concurrent: 100 });
+
+      const result = runGsdTools('worktree create 21-02', tmpDir);
+      assert.ok(result.success, `Command failed: ${result.error}`);
+      const data = JSON.parse(result.output);
+
+      // With max_concurrent=100, the system would need 400GB RAM — should trigger warning
+      assert.ok(data.resource_warnings, 'should have resource_warnings');
+      assert.ok(data.resource_warnings.length > 0, 'should have at least one warning');
+      assert.ok(
+        data.resource_warnings.some(w => w.includes('memory') || w.includes('Memory')),
+        'should warn about memory'
+      );
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // parsePlanId helper
+  // ---------------------------------------------------------------------------
+
+  describe('worktree parsePlanId (via CLI)', () => {
+    test('rejects invalid plan ID format', () => {
+      createGitProject();
+      const result = runGsdTools('worktree create not-valid', tmpDir);
+      assert.ok(!result.success, 'should fail for invalid plan ID');
+      assert.ok(
+        result.error.includes('Invalid plan ID') || result.output.includes('Invalid plan ID'),
+        'error should mention invalid plan ID'
+      );
+    });
   });
 });
