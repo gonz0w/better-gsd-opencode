@@ -1637,6 +1637,135 @@ function cmdVerifyQuality(cwd, options, raw) {
   }, raw);
 }
 
+// ─── Assertions Commands ────────────────────────────────────────────────────
+
+function cmdAssertionsList(cwd, options, raw) {
+  const assertionsPath = path.join(cwd, '.planning', 'ASSERTIONS.md');
+  const content = safeReadFile(assertionsPath);
+  if (!content) {
+    output({ error: 'ASSERTIONS.md not found', path: '.planning/ASSERTIONS.md' }, raw, 'ASSERTIONS.md not found');
+    return;
+  }
+
+  const parsed = parseAssertionsMd(content);
+
+  // Filter by reqId if specified
+  const reqId = options && options.reqId;
+  const requirements = {};
+  let totalAssertions = 0;
+  let mustHaveCount = 0;
+  let niceToHaveCount = 0;
+
+  for (const [id, data] of Object.entries(parsed)) {
+    if (reqId && id !== reqId) continue;
+    const assertions = data.assertions || [];
+    const must = assertions.filter(a => a.priority === 'must-have').length;
+    const nice = assertions.filter(a => a.priority === 'nice-to-have').length;
+    totalAssertions += assertions.length;
+    mustHaveCount += must;
+    niceToHaveCount += nice;
+    requirements[id] = {
+      description: data.description,
+      assertion_count: assertions.length,
+      assertions,
+    };
+  }
+
+  const totalRequirements = Object.keys(requirements).length;
+  const rawValue = `${totalRequirements} requirements, ${totalAssertions} assertions (${mustHaveCount} must-have, ${niceToHaveCount} nice-to-have)`;
+
+  output({
+    total_requirements: totalRequirements,
+    total_assertions: totalAssertions,
+    must_have_count: mustHaveCount,
+    nice_to_have_count: niceToHaveCount,
+    requirements,
+  }, raw, rawValue);
+}
+
+function cmdAssertionsValidate(cwd, raw) {
+  const assertionsPath = path.join(cwd, '.planning', 'ASSERTIONS.md');
+  const content = safeReadFile(assertionsPath);
+  if (!content) {
+    output({ error: 'ASSERTIONS.md not found', path: '.planning/ASSERTIONS.md' }, raw, 'ASSERTIONS.md not found');
+    return;
+  }
+
+  const parsed = parseAssertionsMd(content);
+  const issues = [];
+
+  // Read REQUIREMENTS.md for cross-referencing
+  const reqPath = path.join(cwd, '.planning', 'REQUIREMENTS.md');
+  const reqContent = safeReadFile(reqPath);
+  const reqIds = new Set();
+  if (reqContent) {
+    const reqPattern = /- \[(x| )\] \*\*(\w+-\d+)\*\*/g;
+    let m;
+    while ((m = reqPattern.exec(reqContent)) !== null) {
+      reqIds.add(m[2]);
+    }
+  }
+
+  const validTypes = new Set(['api', 'cli', 'file', 'behavior']);
+  const validPriorities = new Set(['must-have', 'nice-to-have']);
+  let totalAssertions = 0;
+
+  for (const [reqId, data] of Object.entries(parsed)) {
+    // Check: requirement ID exists in REQUIREMENTS.md
+    if (reqIds.size > 0 && !reqIds.has(reqId)) {
+      issues.push({ reqId, issue: `Requirement ${reqId} not found in REQUIREMENTS.md`, severity: 'warning' });
+    }
+
+    const assertions = data.assertions || [];
+    totalAssertions += assertions.length;
+
+    // Check: 2-5 assertions per requirement
+    if (assertions.length < 2) {
+      issues.push({ reqId, issue: `Only ${assertions.length} assertion(s), recommended 2-5`, severity: 'info' });
+    } else if (assertions.length > 5) {
+      issues.push({ reqId, issue: `${assertions.length} assertions, recommended max 5`, severity: 'info' });
+    }
+
+    for (let i = 0; i < assertions.length; i++) {
+      const a = assertions[i];
+
+      // Check: non-empty assert field
+      if (!a.assert || !a.assert.trim()) {
+        issues.push({ reqId, issue: `Assertion ${i + 1} has empty assert field`, severity: 'error' });
+      }
+
+      // Check: valid type if present
+      if (a.type && !validTypes.has(a.type)) {
+        issues.push({ reqId, issue: `Assertion ${i + 1} has invalid type "${a.type}"`, severity: 'error' });
+      }
+
+      // Check: valid priority
+      if (a.priority && !validPriorities.has(a.priority)) {
+        issues.push({ reqId, issue: `Assertion ${i + 1} has invalid priority "${a.priority}"`, severity: 'error' });
+      }
+    }
+  }
+
+  // Coverage: requirements with assertions / total requirements
+  const assertionReqCount = Object.keys(parsed).length;
+  const totalReqs = reqIds.size || assertionReqCount;
+  const coveragePercent = totalReqs > 0 ? Math.round((assertionReqCount / totalReqs) * 100) : 0;
+
+  const valid = issues.filter(i => i.severity === 'error').length === 0;
+  const rawValue = valid ? 'valid' : `${issues.length} issues found`;
+
+  output({
+    valid,
+    issues,
+    stats: {
+      total_reqs: totalReqs,
+      total_assertions: totalAssertions,
+      reqs_with_assertions: assertionReqCount,
+      coverage_percent: coveragePercent,
+    },
+  }, raw, rawValue);
+}
+
 // ─── Assertions Parser ──────────────────────────────────────────────────────
 
 /**
@@ -1722,4 +1851,6 @@ module.exports = {
   cmdVerifyPlanDeps,
   cmdVerifyQuality,
   parseAssertionsMd,
+  cmdAssertionsList,
+  cmdAssertionsValidate,
 };

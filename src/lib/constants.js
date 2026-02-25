@@ -937,6 +937,51 @@ Examples:
   gsd-tools mcp profile --raw
   gsd-tools mcp profile --apply --raw`,
 
+  'assertions': `Usage: gsd-tools assertions <subcommand> [options] [--raw]
+
+Manage structured acceptance criteria in ASSERTIONS.md.
+
+Subcommands:
+  list [--req SREQ-01]    List all assertions, optionally filter by requirement ID
+  validate                Check assertion format, coverage, and consistency
+
+Output (list): { total_requirements, total_assertions, must_have_count, nice_to_have_count, requirements }
+Output (validate): { valid, issues, stats: { total_reqs, total_assertions, coverage_percent } }
+
+Examples:
+  gsd-tools assertions list --raw
+  gsd-tools assertions list --req SREQ-01 --raw
+  gsd-tools assertions validate --raw`,
+
+  'assertions list': `Usage: gsd-tools assertions list [--req <id>] [--raw]
+
+List all assertions from .planning/ASSERTIONS.md grouped by requirement ID.
+
+Options:
+  --req <id>    Filter to specific requirement (e.g., SREQ-01)
+
+Output: { total_requirements, total_assertions, must_have_count, nice_to_have_count, requirements }
+
+Examples:
+  gsd-tools assertions list --raw
+  gsd-tools assertions list --req SREQ-01 --raw`,
+
+  'assertions validate': `Usage: gsd-tools assertions validate [--raw]
+
+Validate ASSERTIONS.md format, coverage, and consistency with REQUIREMENTS.md.
+
+Checks:
+  - Every requirement ID exists in REQUIREMENTS.md
+  - Each requirement has 2-5 assertions (advisory)
+  - Every assertion has non-empty assert field
+  - type values are valid: api, cli, file, behavior
+  - priority values are valid: must-have, nice-to-have
+
+Output: { valid, issues: [{reqId, issue, severity}], stats: {total_reqs, total_assertions, coverage_percent} }
+
+Examples:
+  gsd-tools assertions validate --raw`,
+
   'env': `Usage: gsd-tools env <subcommand> [options] [--raw]
 
 Detect project languages, tools, and runtimes.
