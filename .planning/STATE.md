@@ -9,9 +9,9 @@ See: .planning/PROJECT.md (updated 2026-02-25)
 
 ## Current Position
 
-**Phase:** 21 of 22 (Worktree Parallelism)
-**Current Plan:** Not started
-**Status:** Milestone complete
+**Phase:** 22 of 22 (Workflow Polish)
+**Current Plan:** 01 of 01 (complete)
+**Status:** Phase complete
 **Last Activity:** 2026-02-25
 
 Progress: [██████████] 100% (5/5 phases)
@@ -43,6 +43,7 @@ Progress: [██████████] 100% (5/5 phases)
 | Phase 21 P01 | 14 min | 2 tasks | 7 files |
 | Phase 21 P02 | 8 min | 2 tasks | 4 files |
 | Phase 21 P03 | 9 min | 2 tasks | 4 files |
+| Phase 22 P01 | 7 min | 2 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -86,6 +87,7 @@ v4.0 decisions:
 - [Phase 21]: Worktree execution gated on three conditions: worktree_enabled AND parallelization AND multi-plan wave
 - [Phase 21]: Merge ordering: plan number order (smallest first) for predictable sequential merge-back
 - [Phase 21]: Yolo/auto mode skips conflicting plans on merge failure — consistent with "let all agents finish" decision
+- [Phase 22]: Compact session-summary implementation to stay within 550KB bundle budget
 
 ### Pending Todos
 
@@ -98,5 +100,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-02-25
-Stopped at: Completed 21-03-PLAN.md (worktree workflow integration + init extensions + tests)
+Stopped at: Completed 22-01-PLAN.md (session summary CLI + complete-and-clear workflow)
 Resume file: None

@@ -65,7 +65,7 @@ Full details: `.planning/milestones/v3.0-ROADMAP.md`
 - [x] **Phase 19: MCP Server Profiling** — Estimate MCP token costs, score relevance, recommend disabling wasteful servers (completed 2026-02-25)
 - [x] **Phase 20: Structured Requirements** — Upgrade requirements with testable assertions, test mapping, and verifier integration (completed 2026-02-25)
 - [x] **Phase 21: Worktree Parallelism** — Create, manage, and merge git worktrees for parallel plan execution (completed 2026-02-25)
-- [ ] **Phase 22: Workflow Polish** — Complete-and-clear workflow for session handoffs
+- [x] **Phase 22: Workflow Polish** — Complete-and-clear workflow for session handoffs (completed 2026-02-25)
 
 ## Phase Details
 
@@ -137,7 +137,7 @@ Plans:
 **Success Criteria** (what must be TRUE):
   1. `/gsd-complete-and-clear` generates a session summary from STATE.md showing what was completed, suggests the next command to run, and updates session continuity
   2. Running the workflow leaves STATE.md in a clean state ready for the next session to pick up without stale context
-**Plans**: 1/1 plans
+**Plans**: 1/1 plans complete
 Plans:
 - [ ] 22-01-PLAN.md — Session summary CLI command + complete-and-clear workflow
 
@@ -166,4 +166,4 @@ Plans:
 | 19. MCP Server Profiling | v4.0 | Complete    | 2026-02-25 | 2026-02-25 |
 | 20. Structured Requirements | v4.0 | Complete    | 2026-02-25 | 2026-02-25 |
 | 21. Worktree Parallelism | 3/3 | Complete    | 2026-02-25 | - |
-| 22. Workflow Polish | v4.0 | 0/1 | Planned | - |
+| 22. Workflow Polish | 1/1 | Complete   | 2026-02-25 | - |

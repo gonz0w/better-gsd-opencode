@@ -132,7 +132,7 @@ Requirements for milestone v4.0 Environment & Execution Intelligence. Each maps 
 
 ### Workflow Additions
 
-- [ ] **WFLW-01**: `/gsd-complete-and-clear` workflow auto-summarizes and prompts context reset
+- [x] **WFLW-01**: `/gsd-complete-and-clear` workflow auto-summarizes and prompts context reset
   - Generate session summary from STATE.md current position
   - List what was completed in this session
   - Suggest `/clear` with next command to run
@@ -191,7 +191,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | WKTR-04 | Phase 21 | Complete |
 | WKTR-05 | Phase 21 | Complete |
 | WKTR-06 | Phase 21 | Complete |
-| WFLW-01 | Phase 22 | Pending |
+| WFLW-01 | Phase 22 | Complete |
 
 **Coverage:**
 - v4.0 requirements: 23 total
