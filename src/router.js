@@ -68,6 +68,10 @@ const {
   getIntentDriftData,
 } = require('./commands/intent');
 
+const {
+  cmdEnvScan,
+} = require('./commands/env');
+
 
 async function main() {
   const args = process.argv.slice(2);
@@ -113,7 +117,7 @@ async function main() {
   const cwd = process.cwd();
 
   if (!command) {
-    error('Usage: gsd-tools <command> [args] [--raw] [--verbose]\nCommands: codebase-impact, commit, config-ensure-section, config-get, config-migrate, config-set, context-budget, current-timestamp, extract-sections, find-phase, frontmatter, generate-slug, history-digest, init, intent, list-todos, memory, milestone, phase, phase-plan-index, phases, progress, quick-summary, requirements, resolve-model, roadmap, rollback-info, scaffold, search-decisions, search-lessons, session-diff, state, state-snapshot, summary-extract, template, test-coverage, test-run, todo, token-budget, trace-requirement, validate, validate-config, validate-dependencies, velocity, verify, verify-path-exists, verify-summary, websearch');
+    error('Usage: gsd-tools <command> [args] [--raw] [--verbose]\nCommands: codebase-impact, commit, config-ensure-section, config-get, config-migrate, config-set, context-budget, current-timestamp, env, extract-sections, find-phase, frontmatter, generate-slug, history-digest, init, intent, list-todos, memory, milestone, phase, phase-plan-index, phases, progress, quick-summary, requirements, resolve-model, roadmap, rollback-info, scaffold, search-decisions, search-lessons, session-diff, state, state-snapshot, summary-extract, template, test-coverage, test-run, todo, token-budget, trace-requirement, validate, validate-config, validate-dependencies, velocity, verify, verify-path-exists, verify-summary, websearch');
   }
 
   // --help / -h: print command help to stderr (never contaminates JSON stdout)
@@ -706,6 +710,16 @@ async function main() {
         cmdIntentDrift(cwd, args.slice(2), raw);
       } else {
         error('Unknown intent subcommand. Available: create, show, read, update, validate, trace, drift');
+      }
+      break;
+    }
+
+    case 'env': {
+      const subcommand = args[1];
+      if (subcommand === 'scan') {
+        cmdEnvScan(cwd, args.slice(2), raw);
+      } else {
+        error('Unknown env subcommand. Available: scan');
       }
       break;
     }
