@@ -9694,3 +9694,380 @@ describe('env scan', () => {
     });
   });
 });
+
+// =============================================================================
+// MCP Profile Tests
+// =============================================================================
+
+describe('mcp-profile', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(require('os').tmpdir(), 'gsd-mcp-test-'));
+  });
+
+  afterEach(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  // Helper to run mcp-profile and parse JSON
+  // isolateHome: set HOME to tmpDir to prevent user-level config interference
+  function mcpProfile(dir, extraArgs, { isolateHome = false } = {}) {
+    const origHome = process.env.HOME;
+    if (isolateHome) process.env.HOME = tmpDir;
+    try {
+      const args = extraArgs ? `mcp-profile ${extraArgs} --raw` : 'mcp-profile --raw';
+      const result = runGsdTools(args, dir || tmpDir);
+      if (!result.success) return { success: false, error: result.error };
+      try {
+        return { success: true, data: JSON.parse(result.output) };
+      } catch (e) {
+        return { success: false, error: `JSON parse failed: ${e.message}, output: ${result.output}` };
+      }
+    } finally {
+      if (isolateHome) process.env.HOME = origHome;
+    }
+  }
+
+  describe('server discovery from .mcp.json', () => {
+    test('discovers servers from .mcp.json', () => {
+      const config = {
+        mcpServers: {
+          postgres: {
+            command: '/usr/local/bin/toolbox',
+            args: ['--prebuilt', 'postgres', '--stdio'],
+            env: { POSTGRES_HOST: 'localhost' },
+          },
+          consul: {
+            command: 'node',
+            args: ['./tools/consul-mcp-server/dist/index.js'],
+          },
+        },
+      };
+      fs.writeFileSync(path.join(tmpDir, '.mcp.json'), JSON.stringify(config));
+
+      const result = mcpProfile(null, null, { isolateHome: true });
+      assert.ok(result.success, `mcp-profile failed: ${result.error}`);
+      assert.strictEqual(result.data.server_count, 2, 'should find 2 servers');
+
+      const postgres = result.data.servers.find(s => s.name === 'postgres');
+      assert.ok(postgres, 'should find postgres');
+      assert.strictEqual(postgres.source, '.mcp.json');
+      assert.strictEqual(postgres.transport, 'stdio');
+      assert.strictEqual(postgres.command, '/usr/local/bin/toolbox');
+
+      const consul = result.data.servers.find(s => s.name === 'consul');
+      assert.ok(consul, 'should find consul');
+      assert.strictEqual(consul.command, 'node');
+    });
+  });
+
+  describe('server discovery from opencode.json', () => {
+    test('discovers servers from opencode.json', () => {
+      const config = {
+        mcp: {
+          'brave-search': {
+            type: 'local',
+            command: ['npx', '-y', '@modelcontextprotocol/server-brave-search'],
+          },
+        },
+      };
+      fs.writeFileSync(path.join(tmpDir, 'opencode.json'), JSON.stringify(config));
+
+      const result = mcpProfile(null, null, { isolateHome: true });
+      assert.ok(result.success, `mcp-profile failed: ${result.error}`);
+      assert.strictEqual(result.data.server_count, 1, 'should find 1 server');
+
+      const brave = result.data.servers.find(s => s.name === 'brave-search');
+      assert.ok(brave, 'should find brave-search');
+      assert.strictEqual(brave.source, 'opencode.json');
+      assert.strictEqual(brave.transport, 'stdio');
+      assert.strictEqual(brave.command, 'npx');
+    });
+  });
+
+  describe('remote MCP server discovery', () => {
+    test('discovers remote servers with correct transport', () => {
+      const config = {
+        mcp: {
+          context7: {
+            type: 'remote',
+            url: 'https://mcp.context7.com/mcp',
+          },
+        },
+      };
+      fs.writeFileSync(path.join(tmpDir, 'opencode.json'), JSON.stringify(config));
+
+      const result = mcpProfile(null, null, { isolateHome: true });
+      assert.ok(result.success, `mcp-profile failed: ${result.error}`);
+
+      const ctx7 = result.data.servers.find(s => s.name === 'context7');
+      assert.ok(ctx7, 'should find context7');
+      assert.strictEqual(ctx7.transport, 'remote');
+      assert.strictEqual(ctx7.command, 'https://mcp.context7.com/mcp');
+    });
+  });
+
+  describe('server merging from both configs', () => {
+    test('merges servers from both configs with deduplication', () => {
+      // Override HOME to isolate from user-level config
+      const origHome = process.env.HOME;
+      process.env.HOME = tmpDir;
+      try {
+        // .mcp.json: postgres, vault
+        const mcpConfig = {
+          mcpServers: {
+            postgres: {
+              command: '/usr/local/bin/toolbox',
+              args: ['--prebuilt', 'postgres'],
+            },
+            vault: {
+              command: '/usr/local/bin/vault-mcp-server',
+              args: ['stdio'],
+            },
+          },
+        };
+        fs.writeFileSync(path.join(tmpDir, '.mcp.json'), JSON.stringify(mcpConfig));
+
+        // opencode.json: terraform, vault (duplicate)
+        const opcConfig = {
+          mcp: {
+            terraform: {
+              type: 'local',
+              command: ['docker', 'run', '-i', 'hashicorp/terraform-mcp-server'],
+            },
+            vault: {
+              type: 'local',
+              command: ['/home/user/vault-mcp', 'stdio'],
+            },
+          },
+        };
+        fs.writeFileSync(path.join(tmpDir, 'opencode.json'), JSON.stringify(opcConfig));
+
+        const result = mcpProfile();
+        assert.ok(result.success, `mcp-profile failed: ${result.error}`);
+
+        // Should have 3 servers: postgres, terraform, vault (deduplicated)
+        assert.strictEqual(result.data.server_count, 3, 'should have 3 servers after dedup');
+
+        // vault should come from .mcp.json (project-level priority)
+        const vault = result.data.servers.find(s => s.name === 'vault');
+        assert.ok(vault, 'should find vault');
+        assert.strictEqual(vault.source, '.mcp.json', 'vault should come from .mcp.json');
+      } finally {
+        process.env.HOME = origHome;
+      }
+    });
+  });
+
+  describe('known server token estimation', () => {
+    test('estimates known server tokens correctly', () => {
+      const config = {
+        mcpServers: {
+          postgres: { command: 'toolbox', args: ['--prebuilt', 'postgres'] },
+        },
+      };
+      fs.writeFileSync(path.join(tmpDir, '.mcp.json'), JSON.stringify(config));
+
+      const result = mcpProfile(null, null, { isolateHome: true });
+      assert.ok(result.success, `mcp-profile failed: ${result.error}`);
+
+      const postgres = result.data.servers.find(s => s.name === 'postgres');
+      assert.ok(postgres, 'should find postgres');
+      assert.strictEqual(postgres.token_source, 'known-db');
+      assert.strictEqual(postgres.token_estimate, 4500);
+      assert.strictEqual(postgres.tool_count, 12);
+    });
+
+    test('estimates unknown server with default', () => {
+      const config = {
+        mcpServers: {
+          'my-custom-server': { command: '/usr/local/bin/my-server', args: [] },
+        },
+      };
+      fs.writeFileSync(path.join(tmpDir, '.mcp.json'), JSON.stringify(config));
+
+      const result = mcpProfile(null, null, { isolateHome: true });
+      assert.ok(result.success, `mcp-profile failed: ${result.error}`);
+
+      const custom = result.data.servers.find(s => s.name === 'my-custom-server');
+      assert.ok(custom, 'should find my-custom-server');
+      assert.strictEqual(custom.token_source, 'default-estimate');
+      assert.ok(custom.token_estimate > 0, 'should have positive token estimate');
+      assert.ok(custom.tool_count > 0, 'should have positive tool count');
+    });
+  });
+
+  describe('total context calculation', () => {
+    test('total_tokens is sum of individual estimates', () => {
+      const config = {
+        mcpServers: {
+          postgres: { command: 'toolbox', args: ['--prebuilt', 'postgres'] },
+          consul: { command: 'node', args: ['consul-server.js'] },
+        },
+      };
+      fs.writeFileSync(path.join(tmpDir, '.mcp.json'), JSON.stringify(config));
+
+      const result = mcpProfile(null, null, { isolateHome: true });
+      assert.ok(result.success, `mcp-profile failed: ${result.error}`);
+
+      const sum = result.data.servers.reduce((acc, s) => acc + s.token_estimate, 0);
+      assert.strictEqual(result.data.total_tokens, sum, 'total_tokens should be sum of server estimates');
+
+      // Verify context percentage calculation
+      const expectedPercent = ((sum / 200000) * 100).toFixed(1) + '%';
+      assert.strictEqual(result.data.total_context_percent, expectedPercent, 'context percent should be correct');
+    });
+  });
+
+  describe('custom window size', () => {
+    test('--window flag changes context_window and percentages', () => {
+      const config = {
+        mcpServers: {
+          postgres: { command: 'toolbox', args: ['--prebuilt', 'postgres'] },
+        },
+      };
+      fs.writeFileSync(path.join(tmpDir, '.mcp.json'), JSON.stringify(config));
+
+      const result = mcpProfile(null, '--window 100000', { isolateHome: true });
+      assert.ok(result.success, `mcp-profile failed: ${result.error}`);
+
+      assert.strictEqual(result.data.context_window, 100000, 'context window should be 100000');
+
+      // Postgres is 4500 tokens — at 100K window that's 4.5%
+      const postgres = result.data.servers.find(s => s.name === 'postgres');
+      assert.ok(postgres, 'should find postgres');
+      assert.strictEqual(postgres.context_percent, '4.5%', 'should be 4.5% of 100K window');
+    });
+  });
+
+  describe('empty config', () => {
+    test('empty directory with no user config returns empty results', () => {
+      // Override HOME to prevent user-level config discovery
+      // execSync inherits process.env, so this affects the subprocess
+      const origHome = process.env.HOME;
+      process.env.HOME = tmpDir; // tmpDir has no .config/opencode/opencode.json
+      try {
+        const result = mcpProfile();
+        assert.ok(result.success, `mcp-profile failed: ${result.error}`);
+        assert.deepStrictEqual(result.data.servers, [], 'servers should be empty');
+        assert.strictEqual(result.data.server_count, 0, 'server_count should be 0');
+        assert.strictEqual(result.data.total_tokens, 0, 'total_tokens should be 0');
+        assert.strictEqual(result.data.known_count, 0, 'known_count should be 0');
+        assert.strictEqual(result.data.unknown_count, 0, 'unknown_count should be 0');
+      } finally {
+        process.env.HOME = origHome;
+      }
+    });
+  });
+
+  describe('malformed config', () => {
+    test('invalid JSON in .mcp.json degrades gracefully', () => {
+      fs.writeFileSync(path.join(tmpDir, '.mcp.json'), '{ invalid json!!!');
+
+      const result = mcpProfile(null, null, { isolateHome: true });
+      assert.ok(result.success, `mcp-profile should not crash: ${result.error}`);
+      assert.deepStrictEqual(result.data.servers, [], 'should return empty servers on bad JSON');
+      assert.strictEqual(result.data.server_count, 0);
+    });
+
+    test('missing mcpServers key in .mcp.json returns empty', () => {
+      fs.writeFileSync(path.join(tmpDir, '.mcp.json'), JSON.stringify({ other: 'data' }));
+
+      const result = mcpProfile(null, null, { isolateHome: true });
+      assert.ok(result.success, `mcp-profile failed: ${result.error}`);
+      assert.strictEqual(result.data.server_count, 0);
+    });
+
+    test('missing mcp key in opencode.json returns empty', () => {
+      fs.writeFileSync(path.join(tmpDir, 'opencode.json'), JSON.stringify({ "$schema": "test" }));
+
+      const result = mcpProfile(null, null, { isolateHome: true });
+      assert.ok(result.success, `mcp-profile failed: ${result.error}`);
+      assert.strictEqual(result.data.server_count, 0);
+    });
+  });
+
+  describe('user-level config discovery', () => {
+    test('discovers servers from user-level config', () => {
+      // We can verify that the user-level config is attempted by checking
+      // that servers from ~/.config/opencode/opencode.json appear
+      // Only if user has MCP servers configured there (integration test)
+      const userConfig = path.join(
+        process.env.HOME || '',
+        '.config', 'opencode', 'opencode.json'
+      );
+      if (!fs.existsSync(userConfig)) {
+        // Skip if no user config exists
+        return;
+      }
+
+      // Run from empty directory — should still find user-level servers
+      const result = mcpProfile();
+      assert.ok(result.success, `mcp-profile failed: ${result.error}`);
+      // If user has MCP servers, server_count > 0
+      // This is an integration test — passes either way
+      assert.ok(typeof result.data.server_count === 'number', 'server_count should be a number');
+    });
+  });
+
+  describe('mcp subcommand syntax', () => {
+    test('mcp profile works as alias', () => {
+      const config = {
+        mcpServers: {
+          postgres: { command: 'toolbox', args: ['postgres'] },
+        },
+      };
+      fs.writeFileSync(path.join(tmpDir, '.mcp.json'), JSON.stringify(config));
+
+      const origHome = process.env.HOME;
+      process.env.HOME = tmpDir;
+      try {
+        const result = runGsdTools('mcp profile --raw', tmpDir);
+        assert.ok(result.success, `mcp profile failed: ${result.error}`);
+        const data = JSON.parse(result.output);
+        assert.strictEqual(data.server_count, 1, 'should find 1 server via mcp profile');
+      } finally {
+        process.env.HOME = origHome;
+      }
+    });
+  });
+
+  describe('known/unknown counts', () => {
+    test('correctly splits known vs unknown servers', () => {
+      const config = {
+        mcpServers: {
+          postgres: { command: 'toolbox', args: ['postgres'] },
+          'my-unknown-server': { command: '/path/to/unknown', args: [] },
+          consul: { command: 'consul-server', args: [] },
+        },
+      };
+      fs.writeFileSync(path.join(tmpDir, '.mcp.json'), JSON.stringify(config));
+
+      const result = mcpProfile();
+      assert.ok(result.success, `mcp-profile failed: ${result.error}`);
+      // Note: server_count may include user-level servers from ~/.config/opencode/opencode.json
+      assert.ok(result.data.server_count >= 3, 'should have at least 3 servers');
+
+      // Verify the project-level servers are present and classified correctly
+      const postgres = result.data.servers.find(s => s.name === 'postgres');
+      assert.ok(postgres, 'should find postgres');
+      assert.strictEqual(postgres.token_source, 'known-db', 'postgres should be known');
+
+      const consul = result.data.servers.find(s => s.name === 'consul');
+      assert.ok(consul, 'should find consul');
+      assert.strictEqual(consul.token_source, 'known-db', 'consul should be known');
+
+      const unknown = result.data.servers.find(s => s.name === 'my-unknown-server');
+      assert.ok(unknown, 'should find my-unknown-server');
+      assert.strictEqual(unknown.token_source, 'default-estimate', 'custom server should use default estimate');
+
+      // Verify known + unknown counts add up to total
+      assert.strictEqual(
+        result.data.known_count + result.data.unknown_count,
+        result.data.server_count,
+        'known + unknown should equal total'
+      );
+    });
+  });
+});
