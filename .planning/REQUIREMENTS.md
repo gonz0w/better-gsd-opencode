@@ -169,35 +169,35 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| ENV-01 | — | Pending |
-| ENV-02 | — | Pending |
-| ENV-03 | — | Pending |
-| ENV-04 | — | Pending |
-| ENV-05 | — | Pending |
-| ENV-06 | — | Pending |
-| MCP-01 | — | Pending |
-| MCP-02 | — | Pending |
-| MCP-03 | — | Pending |
-| MCP-04 | — | Pending |
-| MCP-05 | — | Pending |
-| SREQ-01 | — | Pending |
-| SREQ-02 | — | Pending |
-| SREQ-03 | — | Pending |
-| SREQ-04 | — | Pending |
-| SREQ-05 | — | Pending |
-| WKTR-01 | — | Pending |
-| WKTR-02 | — | Pending |
-| WKTR-03 | — | Pending |
-| WKTR-04 | — | Pending |
-| WKTR-05 | — | Pending |
-| WKTR-06 | — | Pending |
-| WFLW-01 | — | Pending |
+| ENV-01 | Phase 18 | Pending |
+| ENV-02 | Phase 18 | Pending |
+| ENV-03 | Phase 18 | Pending |
+| ENV-04 | Phase 18 | Pending |
+| ENV-05 | Phase 18 | Pending |
+| ENV-06 | Phase 18 | Pending |
+| MCP-01 | Phase 19 | Pending |
+| MCP-02 | Phase 19 | Pending |
+| MCP-03 | Phase 19 | Pending |
+| MCP-04 | Phase 19 | Pending |
+| MCP-05 | Phase 19 | Pending |
+| SREQ-01 | Phase 20 | Pending |
+| SREQ-02 | Phase 20 | Pending |
+| SREQ-03 | Phase 20 | Pending |
+| SREQ-04 | Phase 20 | Pending |
+| SREQ-05 | Phase 20 | Pending |
+| WKTR-01 | Phase 21 | Pending |
+| WKTR-02 | Phase 21 | Pending |
+| WKTR-03 | Phase 21 | Pending |
+| WKTR-04 | Phase 21 | Pending |
+| WKTR-05 | Phase 21 | Pending |
+| WKTR-06 | Phase 21 | Pending |
+| WFLW-01 | Phase 22 | Pending |
 
 **Coverage:**
 - v4.0 requirements: 23 total
-- Mapped to phases: 0
-- Unmapped: 23 ⚠️
+- Mapped to phases: 23 ✓
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-02-25*
-*Last updated: 2026-02-25 after initial definition*
+*Last updated: 2026-02-25 after roadmap creation*
