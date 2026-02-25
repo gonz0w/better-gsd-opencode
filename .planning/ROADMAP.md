@@ -66,7 +66,12 @@ Full details: `.planning/milestones/v2.0-ROADMAP.md`
   2. Running `intent read` returns intent data as JSON; `intent show` renders a human-readable summary
   3. Running `intent update <section>` modifies only the targeted section, leaving all other sections untouched
   4. INTENT.md template exists in `templates/` and follows the same pattern as other GSD templates
-**Plans**: TBD
+**Plans:** 3 plans
+
+Plans:
+- [ ] 14-01-PLAN.md — Template reference doc + intent parser + create command
+- [ ] 14-02-PLAN.md — Show/read + update commands with ID management
+- [ ] 14-03-PLAN.md — Validate command + help entries + integration tests
 
 ### Phase 15: Intent Tracing & Validation
 **Goal**: Plugin traces every plan's objective back to INTENT.md desired outcomes and detects when work drifts from stated intent
@@ -119,7 +124,7 @@ Full details: `.planning/milestones/v2.0-ROADMAP.md`
 | 11. Session Continuity | v2.0 | 3/3 | Complete | 2026-02-24 |
 | 12. Quality Gates | v2.0 | 4/4 | Complete | 2026-02-24 |
 | 13. Test Infrastructure & Polish | v2.0 | 4/4 | Complete | 2026-02-24 |
-| 14. Intent Capture Foundation | v3.0 | 0/? | Not started | - |
+| 14. Intent Capture Foundation | v3.0 | 0/3 | Not started | - |
 | 15. Intent Tracing & Validation | v3.0 | 0/? | Not started | - |
 | 16. Workflow Integration & Self-Application | v3.0 | 0/? | Not started | - |
 | 17. Intent Enhancement | v3.0 | 0/? | Not started | - |
