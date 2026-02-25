@@ -959,6 +959,60 @@ Output: { workflows: [{ name, path, tokens, budget, within_budget }], total_toke
 
 Examples:
   gsd-tools token-budget --raw`,
+
+  'env': `Usage: gsd-tools env <subcommand> [options] [--raw]
+
+Detect project languages, tools, and runtimes.
+
+Subcommands:
+  scan [--force] [--verbose]  Detect project environment and write manifest
+  status                      Check environment manifest freshness
+
+The scan command detects languages from manifest files (package.json, go.mod,
+mix.exs, etc.), checks binary availability, detects package managers, version
+managers, CI platforms, test frameworks, linters/formatters, scripts, Docker
+services, MCP servers, and monorepo configurations.
+
+Results are written to:
+  .planning/env-manifest.json   Machine-specific (gitignored)
+  .planning/project-profile.json  Team-visible (committed)
+
+Flags:
+  --force     Force full rescan even if manifest is fresh
+  --verbose   Print human-readable summary to stderr
+  --raw       Output JSON to stdout
+
+Examples:
+  gsd-tools env scan --raw
+  gsd-tools env scan --force --verbose
+  gsd-tools env status --raw`,
+
+  'env scan': `Usage: gsd-tools env scan [--force] [--verbose] [--raw]
+
+Scan project for languages, tools, runtimes, and write env-manifest.json.
+
+Without --force, skips scan if manifest is fresh (no watched files changed).
+With --force, always performs a full scan.
+
+Detects: 26 language manifest patterns, package managers (with lockfile
+precedence), version managers, CI platforms, test frameworks, linters/formatters,
+well-known scripts, Docker services, MCP servers, monorepo configurations.
+
+Output includes: languages (with binary version/path), package_manager,
+version_managers, tools, scripts, infrastructure, monorepo, watched_files.
+
+Examples:
+  gsd-tools env scan --raw
+  gsd-tools env scan --force --verbose`,
+
+  'env status': `Usage: gsd-tools env status [--raw]
+
+Report manifest freshness without triggering a scan.
+
+Output: { exists, stale, reason, scanned_at, age_minutes, languages_count, changed_files }
+
+Examples:
+  gsd-tools env status --raw`,
 };
 
 module.exports = { MODEL_PROFILES, CONFIG_SCHEMA, COMMAND_HELP };

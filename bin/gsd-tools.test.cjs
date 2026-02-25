@@ -9446,4 +9446,251 @@ describe('env scan', () => {
         'idempotent scan should return existing manifest without re-scanning');
     });
   });
+
+  describe('env integration - formatEnvSummary', () => {
+    test('formatEnvSummary with node+go+elixir manifest produces compact format', () => {
+      const dir = fs.mkdtempSync(path.join(require('os').tmpdir(), 'gsd-envfmt-'));
+      fs.mkdirSync(path.join(dir, '.planning'));
+      // Create manifest files so staleness check passes
+      fs.writeFileSync(path.join(dir, 'package.json'), '{"name":"test"}');
+      fs.writeFileSync(path.join(dir, 'go.mod'), 'module example.com/test');
+      fs.writeFileSync(path.join(dir, 'mix.exs'), 'defmodule Test do end');
+      const manifest = {
+        '$schema_version': '1.0',
+        scanned_at: new Date().toISOString(),
+        languages: [
+          { name: 'node', primary: true, binary: { available: true, version: '20.11.0' }, manifests: [{ file: 'package.json', path: 'package.json', depth: 0 }] },
+          { name: 'go', primary: false, binary: { available: true, version: '1.21.5' }, manifests: [{ file: 'go.mod', path: 'go.mod', depth: 0 }] },
+          { name: 'elixir', primary: false, binary: { available: true, version: '1.16.0' }, manifests: [{ file: 'mix.exs', path: 'mix.exs', depth: 0 }] },
+        ],
+        package_manager: { name: 'pnpm', version: '8.15.1' },
+        infrastructure: { docker_services: [] },
+        watched_files: ['package.json', 'go.mod', 'mix.exs'],
+        watched_files_mtimes: {
+          'package.json': fs.statSync(path.join(dir, 'package.json')).mtimeMs,
+          'go.mod': fs.statSync(path.join(dir, 'go.mod')).mtimeMs,
+          'mix.exs': fs.statSync(path.join(dir, 'mix.exs')).mtimeMs,
+        },
+      };
+      fs.writeFileSync(path.join(dir, '.planning', 'env-manifest.json'), JSON.stringify(manifest));
+      // Use init progress to check env_summary is produced
+      // Need ROADMAP.md and STATE.md for init progress to work
+      fs.writeFileSync(path.join(dir, '.planning', 'ROADMAP.md'), '# Roadmap\n## Milestones\n- 🔵 v1.0\n## Phases\n');
+      fs.writeFileSync(path.join(dir, '.planning', 'STATE.md'), '# Project State\n## Current Position\n**Phase:** 1\n**Status:** Executing');
+      fs.writeFileSync(path.join(dir, '.planning', 'MILESTONES.md'), '# Milestones\n- 🔵 v1.0 — Test');
+      const result = runGsdTools('init progress --raw --verbose', dir);
+      assert.ok(result.success, `init progress failed: ${result.error}`);
+      const data = JSON.parse(result.output);
+      assert.ok(data.env_summary, 'should have env_summary');
+      assert.ok(data.env_summary.startsWith('Tools:'), 'should start with "Tools:"');
+      assert.ok(data.env_summary.includes('node@20.11.0'), 'should include node@20.11.0');
+      assert.ok(data.env_summary.includes('(pnpm)'), 'should include (pnpm)');
+      assert.ok(data.env_summary.includes('go@1.21.5'), 'should include go@1.21.5');
+      assert.ok(data.env_summary.includes('elixir@1.16.0'), 'should include elixir@1.16.0');
+      fs.rmSync(dir, { recursive: true, force: true });
+    });
+
+    test('formatEnvSummary with null manifest returns null', () => {
+      const dir = fs.mkdtempSync(path.join(require('os').tmpdir(), 'gsd-envfmt-'));
+      fs.mkdirSync(path.join(dir, '.planning'));
+      // No env-manifest.json, no language files → env_summary should be null
+      fs.writeFileSync(path.join(dir, '.planning', 'ROADMAP.md'), '# Roadmap\n## Milestones\n- 🔵 v1.0\n## Phases\n');
+      fs.writeFileSync(path.join(dir, '.planning', 'STATE.md'), '# Project State\n## Current Position\n**Phase:** 1\n**Status:** Executing');
+      fs.writeFileSync(path.join(dir, '.planning', 'MILESTONES.md'), '# Milestones\n- 🔵 v1.0 — Test');
+      const result = runGsdTools('init progress --raw --verbose', dir);
+      assert.ok(result.success, `init progress failed: ${result.error}`);
+      const data = JSON.parse(result.output);
+      assert.strictEqual(data.env_summary, null, 'should be null when no languages detected');
+      fs.rmSync(dir, { recursive: true, force: true });
+    });
+
+    test('formatEnvSummary with empty languages returns null', () => {
+      const manifest = {
+        '$schema_version': '1.0',
+        scanned_at: new Date().toISOString(),
+        languages: [],
+        package_manager: { name: null },
+        infrastructure: { docker_services: [] },
+        watched_files: [],
+        watched_files_mtimes: {},
+      };
+      const dir = fs.mkdtempSync(path.join(require('os').tmpdir(), 'gsd-envfmt-'));
+      fs.mkdirSync(path.join(dir, '.planning'));
+      fs.writeFileSync(path.join(dir, '.planning', 'env-manifest.json'), JSON.stringify(manifest));
+      fs.writeFileSync(path.join(dir, '.planning', 'ROADMAP.md'), '# Roadmap\n## Milestones\n- 🔵 v1.0\n## Phases\n');
+      fs.writeFileSync(path.join(dir, '.planning', 'STATE.md'), '# Project State\n## Current Position\n**Phase:** 1\n**Status:** Executing');
+      fs.writeFileSync(path.join(dir, '.planning', 'MILESTONES.md'), '# Milestones\n- 🔵 v1.0 — Test');
+      const result = runGsdTools('init progress --raw --verbose', dir);
+      assert.ok(result.success, `init progress failed: ${result.error}`);
+      const data = JSON.parse(result.output);
+      assert.strictEqual(data.env_summary, null, 'should be null when languages empty');
+      fs.rmSync(dir, { recursive: true, force: true });
+    });
+
+    test('formatEnvSummary with missing binary includes "(no binary)" suffix', () => {
+      const manifest = {
+        '$schema_version': '1.0',
+        scanned_at: new Date().toISOString(),
+        languages: [
+          { name: 'rust', primary: true, binary: { available: false, version: null }, manifests: [{ file: 'Cargo.toml', path: 'Cargo.toml', depth: 0 }] },
+        ],
+        package_manager: { name: 'cargo' },
+        infrastructure: { docker_services: [] },
+        watched_files: ['Cargo.toml'],
+        watched_files_mtimes: {},
+      };
+      const dir = fs.mkdtempSync(path.join(require('os').tmpdir(), 'gsd-envfmt-'));
+      fs.mkdirSync(path.join(dir, '.planning'));
+      // Create Cargo.toml so watched file exists with matching mtime
+      fs.writeFileSync(path.join(dir, 'Cargo.toml'), '[package]\nname = "test"');
+      manifest.watched_files_mtimes['Cargo.toml'] = fs.statSync(path.join(dir, 'Cargo.toml')).mtimeMs;
+      fs.writeFileSync(path.join(dir, '.planning', 'env-manifest.json'), JSON.stringify(manifest));
+      fs.writeFileSync(path.join(dir, '.planning', 'ROADMAP.md'), '# Roadmap\n## Milestones\n- 🔵 v1.0\n## Phases\n');
+      fs.writeFileSync(path.join(dir, '.planning', 'STATE.md'), '# Project State\n## Current Position\n**Phase:** 1\n**Status:** Executing');
+      fs.writeFileSync(path.join(dir, '.planning', 'MILESTONES.md'), '# Milestones\n- 🔵 v1.0 — Test');
+      const result = runGsdTools('init progress --raw --verbose', dir);
+      assert.ok(result.success, `init progress failed: ${result.error}`);
+      const data = JSON.parse(result.output);
+      assert.ok(data.env_summary, 'should have env_summary');
+      assert.ok(data.env_summary.includes('(no binary)'), 'should include "(no binary)"');
+      fs.rmSync(dir, { recursive: true, force: true });
+    });
+
+    test('formatEnvSummary includes docker when docker_services detected', () => {
+      const manifest = {
+        '$schema_version': '1.0',
+        scanned_at: new Date().toISOString(),
+        languages: [
+          { name: 'node', primary: true, binary: { available: true, version: '20.11.0' }, manifests: [{ file: 'package.json', path: 'package.json', depth: 0 }] },
+        ],
+        package_manager: { name: 'npm' },
+        infrastructure: { docker_services: ['postgres', 'redis'] },
+        watched_files: ['package.json'],
+        watched_files_mtimes: {},
+      };
+      const dir = fs.mkdtempSync(path.join(require('os').tmpdir(), 'gsd-envfmt-'));
+      fs.mkdirSync(path.join(dir, '.planning'));
+      // Create package.json so watched file exists with matching mtime
+      fs.writeFileSync(path.join(dir, 'package.json'), '{"name":"test-docker"}');
+      manifest.watched_files_mtimes['package.json'] = fs.statSync(path.join(dir, 'package.json')).mtimeMs;
+      fs.writeFileSync(path.join(dir, '.planning', 'env-manifest.json'), JSON.stringify(manifest));
+      fs.writeFileSync(path.join(dir, '.planning', 'ROADMAP.md'), '# Roadmap\n## Milestones\n- 🔵 v1.0\n## Phases\n');
+      fs.writeFileSync(path.join(dir, '.planning', 'STATE.md'), '# Project State\n## Current Position\n**Phase:** 1\n**Status:** Executing');
+      fs.writeFileSync(path.join(dir, '.planning', 'MILESTONES.md'), '# Milestones\n- 🔵 v1.0 — Test');
+      const result = runGsdTools('init progress --raw --verbose', dir);
+      assert.ok(result.success, `init progress failed: ${result.error}`);
+      const data = JSON.parse(result.output);
+      assert.ok(data.env_summary, 'should have env_summary');
+      assert.ok(data.env_summary.includes('docker'), 'should include docker when services detected');
+      fs.rmSync(dir, { recursive: true, force: true });
+    });
+  });
+
+  describe('env integration - autoTriggerEnvScan', () => {
+    test('auto-trigger creates manifest on first init progress', () => {
+      const dir = fs.mkdtempSync(path.join(require('os').tmpdir(), 'gsd-envtrigger-'));
+      fs.mkdirSync(path.join(dir, '.planning'));
+      fs.writeFileSync(path.join(dir, 'package.json'), '{"name":"test-auto-trigger"}');
+      fs.writeFileSync(path.join(dir, '.planning', 'ROADMAP.md'), '# Roadmap\n## Milestones\n- 🔵 v1.0\n## Phases\n');
+      fs.writeFileSync(path.join(dir, '.planning', 'STATE.md'), '# Project State\n## Current Position\n**Phase:** 1\n**Status:** Executing');
+      fs.writeFileSync(path.join(dir, '.planning', 'MILESTONES.md'), '# Milestones\n- 🔵 v1.0 — Test');
+      // No env-manifest.json exists yet
+      assert.ok(!fs.existsSync(path.join(dir, '.planning', 'env-manifest.json')), 'manifest should not exist before');
+      const result = runGsdTools('init progress --raw --verbose', dir);
+      assert.ok(result.success, `init progress failed: ${result.error}`);
+      // After init, manifest should have been created
+      assert.ok(fs.existsSync(path.join(dir, '.planning', 'env-manifest.json')), 'manifest should be auto-created after init');
+      const data = JSON.parse(result.output);
+      assert.ok(data.env_summary, 'should have env_summary after auto-trigger');
+      assert.ok(data.env_summary.includes('node'), 'should detect node');
+      fs.rmSync(dir, { recursive: true, force: true });
+    });
+
+    test('auto-trigger returns existing manifest when fresh', () => {
+      const dir = fs.mkdtempSync(path.join(require('os').tmpdir(), 'gsd-envtrigger-'));
+      fs.mkdirSync(path.join(dir, '.planning'));
+      fs.writeFileSync(path.join(dir, 'package.json'), '{"name":"test-fresh"}');
+      fs.writeFileSync(path.join(dir, '.planning', 'ROADMAP.md'), '# Roadmap\n## Milestones\n- 🔵 v1.0\n## Phases\n');
+      fs.writeFileSync(path.join(dir, '.planning', 'STATE.md'), '# Project State\n## Current Position\n**Phase:** 1\n**Status:** Executing');
+      fs.writeFileSync(path.join(dir, '.planning', 'MILESTONES.md'), '# Milestones\n- 🔵 v1.0 — Test');
+      // First: create manifest via env scan
+      runGsdTools('env scan --force --raw', dir);
+      const firstManifest = JSON.parse(fs.readFileSync(path.join(dir, '.planning', 'env-manifest.json'), 'utf-8'));
+      // Second: init progress should use existing (fresh) manifest
+      const result = runGsdTools('init progress --raw --verbose', dir);
+      assert.ok(result.success, `init progress failed: ${result.error}`);
+      const secondManifest = JSON.parse(fs.readFileSync(path.join(dir, '.planning', 'env-manifest.json'), 'utf-8'));
+      assert.strictEqual(secondManifest.scanned_at, firstManifest.scanned_at,
+        'manifest should not be re-scanned when fresh');
+      fs.rmSync(dir, { recursive: true, force: true });
+    });
+
+    test('init execute-phase includes env_summary', () => {
+      const dir = fs.mkdtempSync(path.join(require('os').tmpdir(), 'gsd-envexec-'));
+      fs.mkdirSync(path.join(dir, '.planning', 'phases', '01-test'), { recursive: true });
+      fs.writeFileSync(path.join(dir, '.planning', 'phases', '01-test', '01-01-PLAN.md'), '---\nphase: 01-test\nplan: 01\n---\n');
+      fs.writeFileSync(path.join(dir, 'package.json'), '{"name":"test-exec"}');
+      fs.writeFileSync(path.join(dir, '.planning', 'ROADMAP.md'), '# Roadmap\n## Milestones\n- 🔵 v1.0\n## Phases\n| Phase | Name |\n|---|---|\n| 1 | Test |\n');
+      fs.writeFileSync(path.join(dir, '.planning', 'STATE.md'), '# Project State\n## Current Position\n**Phase:** 1\n**Status:** Executing');
+      fs.writeFileSync(path.join(dir, '.planning', 'MILESTONES.md'), '# Milestones\n- 🔵 v1.0 — Test');
+      fs.writeFileSync(path.join(dir, '.planning', 'config.json'), '{}');
+      const result = runGsdTools('init execute-phase 1 --raw --verbose', dir);
+      assert.ok(result.success, `init execute-phase failed: ${result.error}`);
+      const data = JSON.parse(result.output);
+      assert.ok(data.env_summary !== undefined, 'should have env_summary field');
+      fs.rmSync(dir, { recursive: true, force: true });
+    });
+
+    test('env status returns correct JSON structure', () => {
+      const dir = fs.mkdtempSync(path.join(require('os').tmpdir(), 'gsd-envstatus-'));
+      fs.mkdirSync(path.join(dir, '.planning'));
+      fs.writeFileSync(path.join(dir, 'package.json'), '{"name":"test-status"}');
+      runGsdTools('env scan --force --raw', dir);
+      const result = runGsdTools('env status --raw', dir);
+      assert.ok(result.success, `env status failed: ${result.error}`);
+      const status = JSON.parse(result.output);
+      assert.strictEqual(typeof status.exists, 'boolean');
+      assert.strictEqual(typeof status.stale, 'boolean');
+      assert.ok(status.scanned_at, 'should have scanned_at');
+      assert.strictEqual(typeof status.age_minutes, 'number');
+      assert.strictEqual(typeof status.languages_count, 'number');
+      assert.ok(Array.isArray(status.changed_files));
+      fs.rmSync(dir, { recursive: true, force: true });
+    });
+  });
+
+  describe('env integration - full flow', () => {
+    test('create project, scan, verify status, then init progress with tools line', () => {
+      const dir = fs.mkdtempSync(path.join(require('os').tmpdir(), 'gsd-envflow-'));
+      fs.mkdirSync(path.join(dir, '.planning'));
+      fs.writeFileSync(path.join(dir, 'package.json'), '{"name":"integration-test"}');
+      fs.writeFileSync(path.join(dir, 'go.mod'), 'module example.com/test\ngo 1.21');
+      fs.writeFileSync(path.join(dir, '.planning', 'ROADMAP.md'), '# Roadmap\n## Milestones\n- 🔵 v1.0\n## Phases\n');
+      fs.writeFileSync(path.join(dir, '.planning', 'STATE.md'), '# Project State\n## Current Position\n**Phase:** 1\n**Status:** Executing');
+      fs.writeFileSync(path.join(dir, '.planning', 'MILESTONES.md'), '# Milestones\n- 🔵 v1.0 — Test');
+
+      // Step 1: Run env scan
+      const scanResult = runGsdTools('env scan --force --raw', dir);
+      assert.ok(scanResult.success, `scan failed: ${scanResult.error}`);
+      assert.ok(fs.existsSync(path.join(dir, '.planning', 'env-manifest.json')), 'manifest should exist');
+
+      // Step 2: Verify env status reports fresh
+      const statusResult = runGsdTools('env status --raw', dir);
+      assert.ok(statusResult.success);
+      const status = JSON.parse(statusResult.output);
+      assert.strictEqual(status.stale, false, 'manifest should be fresh');
+      assert.ok(status.languages_count >= 2, 'should detect at least 2 languages');
+
+      // Step 3: init progress should include Tools line
+      const progressResult = runGsdTools('init progress --raw --verbose', dir);
+      assert.ok(progressResult.success, `progress failed: ${progressResult.error}`);
+      const progressData = JSON.parse(progressResult.output);
+      assert.ok(progressData.env_summary, 'should have env_summary');
+      assert.ok(progressData.env_summary.startsWith('Tools:'), 'should start with Tools:');
+      assert.ok(progressData.env_summary.includes('node'), 'should mention node');
+      assert.ok(progressData.env_summary.includes('go'), 'should mention go');
+
+      fs.rmSync(dir, { recursive: true, force: true });
+    });
+  });
 });
