@@ -849,81 +849,30 @@ Examples:
 
   'intent validate': `Usage: gsd-tools intent validate [--raw]
 
-Validate INTENT.md structural integrity.
-
-Checks:
-  Section presence    All 6 sections must exist with content
-  ID format           DO-XX [PX], SC-XX, C-XX, HM-XX patterns
-  ID uniqueness       No duplicate IDs within sections
-  Sub-sections        Constraints needs Technical/Business/Timeline, Health needs Quantitative/Qualitative
-  Content minimums    At least 1 outcome and 1 success criterion
-  Revision            Must be a positive integer
-
-Exit codes: 0 = valid, 1 = issues found
-
-Output (default): Lint-style with checkmarks/crosses
-Output (--raw):   { valid, issues, sections, revision }
+Validate INTENT.md structure: sections, ID format, uniqueness, minimums.
+Exit 0=valid, 1=issues. Output (--raw): { valid, issues, sections, revision }
 
 Examples:
-  gsd-tools intent validate
   gsd-tools intent validate --raw`,
 
   'intent trace': `Usage: gsd-tools intent trace [--gaps] [--raw]
 
-Build traceability matrix: desired outcomes from INTENT.md → plans tracing to them.
+Traceability matrix: desired outcomes → plans addressing them.
+Scans PLAN.md frontmatter for intent.outcome_ids.
 
-Scans all PLAN.md files in current milestone's phase range for intent.outcome_ids
-in their frontmatter, then maps each desired outcome to the plans addressing it.
-
-Flags:
-  --gaps    Show only uncovered outcomes (no plans tracing to them)
-  --raw     JSON output with matrix, gaps, coverage, and plans
-
-Output (default):
-  Human-readable matrix with ✓/✗ markers, coverage percentage, gap summary.
-  Sorted: gaps first (by priority P1→P3), then covered outcomes.
-
-Output (--raw):
-  { total_outcomes, covered_outcomes, coverage_percent, matrix, gaps, plans }
-
-Plan frontmatter format:
-  intent:
-    outcome_ids: [DO-01, DO-03]
-    rationale: "Brief explanation"
+Flags: --gaps (uncovered only), --raw (JSON output)
 
 Examples:
-  gsd-tools intent trace
-  gsd-tools intent trace --gaps
-  gsd-tools intent trace --raw`,
+  gsd-tools intent trace --gaps --raw`,
 
   'intent drift': `Usage: gsd-tools intent drift [--raw]
 
-Analyze intent drift: detect misalignment between work and stated intent.
+Detect misalignment between work and stated intent. Drift score 0-100.
 
-Computes a numeric drift score (0-100, 0=perfect alignment, 100=total drift)
-from 4 weighted signals:
-
-Signals:
-  Coverage Gaps (40 pts)     Outcomes with no plans addressing them
-                             P1 gaps weighted 3x, P2 weighted 2x, P3 weighted 1x
-  Objective Mismatch (25 pts) Plans with no intent section in frontmatter
-  Feature Creep (15 pts)      Plans referencing non-existent outcome IDs
-  Priority Inversion (20 pts) Uncovered P1 outcomes while P2/P3 are covered
-
-Score interpretation:
-  0-15:  excellent (all work aligned)
-  16-35: good (minor gaps)
-  36-60: moderate (review recommended)
-  61-100: poor (significant drift)
-
-Output (default):
-  Human-readable analysis with per-signal breakdown and summary.
-
-Output (--raw):
-  JSON with drift_score, alignment, signals (4 objects), outcome/plan counts.
+Signals: Coverage Gaps (40pts), Objective Mismatch (25pts), Feature Creep (15pts), Priority Inversion (20pts).
+Score: 0-15 excellent, 16-35 good, 36-60 moderate, 61-100 poor.
 
 Examples:
-  gsd-tools intent drift
   gsd-tools intent drift --raw`,
 
   'extract-sections': `Usage: gsd-tools extract-sections <file-path> [section1] [section2] ... [--raw]
@@ -962,39 +911,31 @@ Examples:
 
   'mcp-profile': `Usage: gsd-tools mcp-profile [options] [--raw]
 
-Discover configured MCP servers and estimate their token cost.
+Discover MCP servers, estimate token cost, score relevance, apply/restore.
 
-Reads server configurations from:
-  .mcp.json              Claude Code format (mcpServers key)
-  opencode.json          OpenCode format (mcp key)
-  ~/.config/opencode/opencode.json  User-level OpenCode config
-
-For each server, estimates token cost from a known-server database
-(15+ common servers) or falls back to a default estimate.
+Sources: .mcp.json, opencode.json, ~/.config/opencode/opencode.json
+Known-server DB covers 15+ servers. Scores keep/disable/review per server.
 
 Options:
-  --window <size>   Context window size in tokens (default: 200000)
-  --raw             Output raw JSON
+  --window <size>   Context window size (default: 200000)
+  --apply           Disable recommended servers in opencode.json (backup first)
+  --dry-run         With --apply: preview without modifying
+  --restore         Restore opencode.json from opencode.json.bak
+  --raw             JSON output
 
-Output includes per-server token estimates, total context cost,
-and context window percentage breakdown.
-
-Also available as: gsd-tools mcp profile
+Only opencode.json is modified (not .mcp.json). Also: gsd-tools mcp profile
 
 Examples:
-  gsd-tools mcp-profile --raw
-  gsd-tools mcp-profile --window 100000 --raw`,
+  gsd-tools mcp-profile --apply --raw
+  gsd-tools mcp-profile --restore --raw`,
 
   'mcp': `Usage: gsd-tools mcp <subcommand> [options] [--raw]
 
-MCP server management commands.
-
-Subcommands:
-  profile [--window N]   Discover servers and estimate token costs
+MCP server management. Subcommands: profile [--window N] [--apply] [--restore]
 
 Examples:
   gsd-tools mcp profile --raw
-  gsd-tools mcp profile --window 100000 --raw`,
+  gsd-tools mcp profile --apply --raw`,
 
   'env': `Usage: gsd-tools env <subcommand> [options] [--raw]
 

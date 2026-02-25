@@ -4,18 +4,7 @@ const fs = require('fs');
 const path = require('path');
 const { output, error, debugLog } = require('../lib/output');
 
-// --- Known MCP Server Database ------------------------------------------------
-
-/**
- * Static lookup table mapping server identifiers to approximate token cost data.
- * Token estimates based on typical tool definition sizes (~150 tokens/tool).
- *
- * Each entry:
- * - patterns: array of regex/string patterns to match server name or command
- * - tool_count: approximate number of tools the server exposes
- * - base_tokens: fixed overhead (server description, protocol, etc.)
- * - total_estimate: pre-calculated total token estimate
- */
+// Known server DB: name → patterns, tool_count, base_tokens, total_estimate
 const MCP_KNOWN_SERVERS = [
   { name: 'postgres', patterns: [/postgres/i, /toolbox.*postgres/i], tool_count: 12, base_tokens: 700, total_estimate: 4500 },
   { name: 'github', patterns: [/github/i], tool_count: 30, base_tokens: 1500, total_estimate: 46000 },
@@ -42,12 +31,9 @@ const MCP_KNOWN_SERVERS = [
 const DEFAULT_TOKENS_PER_TOOL = 150;
 const DEFAULT_BASE_TOKENS = 400;
 const DEFAULT_CONTEXT_WINDOW = 200000;
-const LOW_COST_THRESHOLD = 1000; // Servers under this are always "relevant"
+const LOW_COST_THRESHOLD = 1000;
 
-
-// --- Relevance Indicators -----------------------------------------------------
-
-/** Static mapping: server type → project file indicators for relevance scoring. */
+// Relevance: server type → file indicators
 const RELEVANCE_INDICATORS = {
   postgres: { files: ['prisma/schema.prisma', 'migrations/', 'db/', 'ecto/', 'schema.sql', 'knexfile.js', 'drizzle.config.ts'], patterns: ['*.sql'], description: 'Database schema or migrations detected' },
   github: { files: ['.github/', '.git/'], description: 'Git repository detected' },
@@ -68,11 +54,7 @@ const RELEVANCE_INDICATORS = {
 };
 
 
-// --- Server Discovery ---------------------------------------------------------
-
-/**
- * Read and parse a JSON file, returning null on any error.
- */
+// Server Discovery
 function safeReadJson(filePath) {
   try {
     if (!fs.existsSync(filePath)) return null;
@@ -83,145 +65,50 @@ function safeReadJson(filePath) {
   }
 }
 
-/**
- * Extract servers from .mcp.json (Claude Code format).
- * Format: { mcpServers: { name: { command, args?, env? } } }
- */
 function extractFromMcpJson(filePath) {
   const data = safeReadJson(filePath);
   if (!data || !data.mcpServers || typeof data.mcpServers !== 'object') return [];
-
   const servers = [];
   for (const [name, config] of Object.entries(data.mcpServers)) {
     if (!config || typeof config !== 'object') continue;
-
-    const command = typeof config.command === 'string' ? config.command : null;
-    const args = Array.isArray(config.args) ? config.args : [];
-
-    servers.push({
-      name,
-      source: '.mcp.json',
-      transport: 'stdio',
-      command: command || 'unknown',
-      args,
-    });
+    servers.push({ name, source: '.mcp.json', transport: 'stdio', command: (typeof config.command === 'string' ? config.command : null) || 'unknown', args: Array.isArray(config.args) ? config.args : [] });
   }
   return servers;
 }
 
-/**
- * Extract servers from opencode.json (OpenCode format).
- * Format: { mcp: { name: { type, command, environment? } } }
- */
 function extractFromOpencodeJson(filePath, sourceName) {
   const data = safeReadJson(filePath);
   if (!data || !data.mcp || typeof data.mcp !== 'object') return [];
-
   const servers = [];
   for (const [name, config] of Object.entries(data.mcp)) {
     if (!config || typeof config !== 'object') continue;
-
-    // Determine transport
     const transport = config.type === 'remote' ? 'remote' : 'stdio';
-
-    // Extract command — can be string or array
-    let command = 'unknown';
-    let args = [];
-
-    if (transport === 'remote') {
-      command = config.url || 'unknown';
-    } else if (Array.isArray(config.command)) {
-      command = config.command[0] || 'unknown';
-      args = config.command.slice(1);
-    } else if (typeof config.command === 'string') {
-      command = config.command;
-    }
-
-    servers.push({
-      name,
-      source: sourceName || path.basename(filePath),
-      transport,
-      command,
-      args,
-    });
+    let command = 'unknown', args = [];
+    if (transport === 'remote') { command = config.url || 'unknown'; }
+    else if (Array.isArray(config.command)) { command = config.command[0] || 'unknown'; args = config.command.slice(1); }
+    else if (typeof config.command === 'string') { command = config.command; }
+    servers.push({ name, source: sourceName || path.basename(filePath), transport, command, args });
   }
   return servers;
 }
 
-/**
- * Discover MCP servers from 3 locations:
- * 1. Project .mcp.json (Claude Code format)
- * 2. Project opencode.json (OpenCode format)
- * 3. User-level ~/.config/opencode/opencode.json (lower priority)
- *
- * Deduplication: project-level wins over user-level. Same name in both
- * project configs → merge (keep both but deduplicate by name, preferring
- * project .mcp.json entry but keeping opencode.json metadata when richer).
- *
- * @param {string} cwd - Project root directory
- * @returns {object[]} Array of server objects sorted by name
- */
 function discoverMcpServers(cwd) {
-  // 1. Project .mcp.json
   const mcpJsonServers = extractFromMcpJson(path.join(cwd, '.mcp.json'));
-
-  // 2. Project opencode.json
-  const opencodeServers = extractFromOpencodeJson(
-    path.join(cwd, 'opencode.json'),
-    'opencode.json'
-  );
-
-  // 3. User-level opencode.json
-  const homeConfig = path.join(
-    process.env.HOME || process.env.USERPROFILE || '~',
-    '.config', 'opencode', 'opencode.json'
-  );
+  const opencodeServers = extractFromOpencodeJson(path.join(cwd, 'opencode.json'), 'opencode.json');
+  const homeConfig = path.join(process.env.HOME || process.env.USERPROFILE || '~', '.config', 'opencode', 'opencode.json');
   const userServers = extractFromOpencodeJson(homeConfig, '~/.config/opencode/opencode.json');
-
-  // Merge with deduplication:
-  // Project .mcp.json + project opencode.json are both project-level
-  // User-level servers only included if name not already present
   const serverMap = new Map();
-
-  // Project .mcp.json first
-  for (const s of mcpJsonServers) {
-    serverMap.set(s.name, s);
-  }
-
-  // Project opencode.json — only add if not already present from .mcp.json
-  for (const s of opencodeServers) {
-    if (!serverMap.has(s.name)) {
-      serverMap.set(s.name, s);
-    }
-    // If already present, keep .mcp.json version (project-level dedup)
-  }
-
-  // User-level — only add if not already present from project configs
-  for (const s of userServers) {
-    if (!serverMap.has(s.name)) {
-      serverMap.set(s.name, s);
-    }
-  }
-
-  // Sort by name
+  for (const s of mcpJsonServers) serverMap.set(s.name, s);
+  for (const s of opencodeServers) { if (!serverMap.has(s.name)) serverMap.set(s.name, s); }
+  for (const s of userServers) { if (!serverMap.has(s.name)) serverMap.set(s.name, s); }
   return Array.from(serverMap.values()).sort((a, b) => a.name.localeCompare(b.name));
 }
 
 
-// --- Token Cost Estimation ----------------------------------------------------
-
-/**
- * Estimate token cost for a discovered server.
- * Matches server name and command against known-server patterns.
- *
- * @param {object} server - Discovered server object
- * @param {object[]} [knownServers] - Known server database (default: MCP_KNOWN_SERVERS)
- * @returns {object} Token cost estimate
- */
+/** Estimate token cost for a server. Matches against known-server patterns. */
 function estimateTokenCost(server, knownServers) {
   const db = knownServers || MCP_KNOWN_SERVERS;
 
-  // Match against known servers by name, then command
   for (const known of db) {
     for (const pattern of known.patterns) {
       const testStr = `${server.name} ${server.command} ${(server.args || []).join(' ')}`;
@@ -250,7 +137,6 @@ function estimateTokenCost(server, knownServers) {
     }
   }
 
-  // Unknown server — default estimate
   const defaultToolCount = 5;
   const estimate = (defaultToolCount * DEFAULT_TOKENS_PER_TOOL) + DEFAULT_BASE_TOKENS;
   return {
@@ -262,8 +148,6 @@ function estimateTokenCost(server, knownServers) {
   };
 }
 
-
-// --- Relevance Scoring --------------------------------------------------------
 
 /** Match server name against RELEVANCE_INDICATORS keys (fuzzy). */
 function matchIndicatorKey(serverName) {
@@ -308,60 +192,29 @@ function scoreServerRelevance(server, cwd) {
   if (indicatorKey) {
     const indicator = RELEVANCE_INDICATORS[indicatorKey];
 
-    // Always-relevant servers (brave-search, context7, filesystem)
     if (indicator.always_relevant) {
       return { score: 'relevant', reason: indicator.description };
     }
 
-    // Low-cost servers — not worth disabling
     if (server.token_estimate && server.token_estimate < LOW_COST_THRESHOLD) {
       return { score: 'relevant', reason: 'Low cost (<1K tokens) — not worth disabling' };
     }
 
-    // Check indicator files
     const files = indicator.files || [];
-    for (const file of files) {
-      try {
-        if (fs.existsSync(path.join(cwd, file))) {
-          return { score: 'relevant', reason: indicator.description };
-        }
-      } catch {
-        // Ignore access errors
-      }
-    }
-
-    // Check glob-like patterns (simple check: look for files matching *.ext)
+    for (const file of files) { try { if (fs.existsSync(path.join(cwd, file))) return { score: 'relevant', reason: indicator.description }; } catch {} }
     const patterns = indicator.patterns || [];
-    for (const pattern of patterns) {
-      if (pattern.startsWith('*.')) {
-        const ext = pattern.slice(1); // e.g., '.sql', '.tf'
-        try {
-          // Check top-level directory for matching files
-          const entries = fs.readdirSync(cwd);
-          if (entries.some(e => e.endsWith(ext))) {
-            return { score: 'relevant', reason: indicator.description };
-          }
-        } catch {
-          // Ignore read errors
-        }
-      }
-    }
-
-    // Check env hints
+    for (const pattern of patterns) { if (pattern.startsWith('*.')) { const ext = pattern.slice(1); try { if (fs.readdirSync(cwd).some(e => e.endsWith(ext))) return { score: 'relevant', reason: indicator.description }; } catch {} } }
     if (checkEnvHints(indicator.env_hints, cwd)) {
       return { score: 'possibly-relevant', reason: 'Environment hints found but no project files' };
     }
 
-    // Known server type but no matching indicators
     return { score: 'not-relevant', reason: 'No project files matching this server type' };
   }
 
-  // Low-cost unknown server
   if (server.token_estimate && server.token_estimate < LOW_COST_THRESHOLD) {
     return { score: 'relevant', reason: 'Low cost (<1K tokens) — not worth disabling' };
   }
 
-  // Unknown server — not in RELEVANCE_INDICATORS
   return { score: 'possibly-relevant', reason: 'Unknown server — manual review recommended' };
 }
 
@@ -418,17 +271,48 @@ function generateRecommendations(servers, cwd, contextWindow) {
 }
 
 
-// --- Main Command Function ----------------------------------------------------
+/** Apply disable recommendations to opencode.json. Creates backup first. */
+function applyRecommendations(cwd, servers) {
+  const cfgPath = path.join(cwd, 'opencode.json');
+  const bakPath = path.join(cwd, 'opencode.json.bak');
+  if (!fs.existsSync(cfgPath)) return { applied: false, reason: 'No opencode.json found — only OpenCode configs support disable' };
+  let config;
+  try { config = JSON.parse(fs.readFileSync(cfgPath, 'utf-8')); } catch (e) { return { applied: false, reason: `Failed to parse opencode.json: ${e.message}` }; }
+  if (!config.mcp || typeof config.mcp !== 'object') return { applied: false, reason: 'No mcp section in opencode.json' };
+  fs.copyFileSync(cfgPath, bakPath);
+  const toDisable = servers.filter(s => s.recommendation === 'disable' && s.source === 'opencode.json');
+  const disabled = []; let saved = 0;
+  for (const s of toDisable) { if (config.mcp[s.name]) { config.mcp[s.name].enabled = false; disabled.push(s.name); saved += s.token_estimate || 0; } }
+  fs.writeFileSync(cfgPath, JSON.stringify(config, null, 2) + '\n');
+  const skipped = servers.filter(s => s.recommendation === 'disable' && s.source === '.mcp.json').map(s => s.name);
+  return { applied: true, backup_path: 'opencode.json.bak', disabled_count: disabled.length, disabled_servers: disabled, tokens_saved: saved, skipped_mcp_json: skipped.length > 0 ? skipped : undefined };
+}
 
-/**
- * cmdMcpProfile - MCP server profiling command.
- * Discovers servers, estimates token cost, reports context window usage.
- *
- * @param {string} cwd - Project root directory
- * @param {string[]} args - CLI arguments
- * @param {boolean} raw - Raw JSON output mode
- */
+/** Restore opencode.json from backup. */
+function restoreBackup(cwd) {
+  const cfgPath = path.join(cwd, 'opencode.json');
+  const bakPath = path.join(cwd, 'opencode.json.bak');
+  if (!fs.existsSync(bakPath)) return { restored: false, reason: 'No backup found (opencode.json.bak)' };
+  fs.copyFileSync(bakPath, cfgPath);
+  fs.unlinkSync(bakPath);
+  return { restored: true, message: 'Restored opencode.json from backup' };
+}
+
+
+/** MCP server profiling: discovery, estimation, relevance, apply/restore. */
 function cmdMcpProfile(cwd, args, raw) {
+  // Parse flags
+  const hasApply = args.includes('--apply');
+  const hasRestore = args.includes('--restore');
+  const hasDryRun = args.includes('--dry-run');
+
+  // Handle --restore (standalone, no discovery needed)
+  if (hasRestore) {
+    const result = restoreBackup(cwd);
+    output(result, raw);
+    return;
+  }
+
   // Parse --window flag
   let contextWindow = DEFAULT_CONTEXT_WINDOW;
   const windowIdx = args.indexOf('--window');
@@ -488,6 +372,13 @@ function cmdMcpProfile(cwd, args, raw) {
     recommendations_summary: recommendations.recommendations_summary,
   };
 
+  if (hasApply && !hasDryRun) {
+    result.apply_result = applyRecommendations(cwd, recommendations.servers);
+  } else if (hasApply && hasDryRun) {
+    const wd = recommendations.servers.filter(s => s.recommendation === 'disable' && s.source === 'opencode.json');
+    result.dry_run = { would_disable: wd.map(s => s.name), would_disable_count: wd.length, tokens_would_save: wd.reduce((sum, s) => sum + (s.token_estimate || 0), 0), skipped_mcp_json: recommendations.servers.filter(s => s.recommendation === 'disable' && s.source === '.mcp.json').map(s => s.name) };
+  }
+
   output(result, raw);
 }
 
@@ -497,6 +388,8 @@ module.exports = {
   estimateTokenCost,
   scoreServerRelevance,
   generateRecommendations,
+  applyRecommendations,
+  restoreBackup,
   MCP_KNOWN_SERVERS,
   RELEVANCE_INDICATORS,
   DEFAULT_CONTEXT_WINDOW,

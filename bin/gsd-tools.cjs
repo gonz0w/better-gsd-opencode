@@ -811,79 +811,28 @@ Examples:
   gsd-tools intent read outcomes --raw`,
       "intent validate": `Usage: gsd-tools intent validate [--raw]
 
-Validate INTENT.md structural integrity.
-
-Checks:
-  Section presence    All 6 sections must exist with content
-  ID format           DO-XX [PX], SC-XX, C-XX, HM-XX patterns
-  ID uniqueness       No duplicate IDs within sections
-  Sub-sections        Constraints needs Technical/Business/Timeline, Health needs Quantitative/Qualitative
-  Content minimums    At least 1 outcome and 1 success criterion
-  Revision            Must be a positive integer
-
-Exit codes: 0 = valid, 1 = issues found
-
-Output (default): Lint-style with checkmarks/crosses
-Output (--raw):   { valid, issues, sections, revision }
+Validate INTENT.md structure: sections, ID format, uniqueness, minimums.
+Exit 0=valid, 1=issues. Output (--raw): { valid, issues, sections, revision }
 
 Examples:
-  gsd-tools intent validate
   gsd-tools intent validate --raw`,
       "intent trace": `Usage: gsd-tools intent trace [--gaps] [--raw]
 
-Build traceability matrix: desired outcomes from INTENT.md \u2192 plans tracing to them.
+Traceability matrix: desired outcomes \u2192 plans addressing them.
+Scans PLAN.md frontmatter for intent.outcome_ids.
 
-Scans all PLAN.md files in current milestone's phase range for intent.outcome_ids
-in their frontmatter, then maps each desired outcome to the plans addressing it.
-
-Flags:
-  --gaps    Show only uncovered outcomes (no plans tracing to them)
-  --raw     JSON output with matrix, gaps, coverage, and plans
-
-Output (default):
-  Human-readable matrix with \u2713/\u2717 markers, coverage percentage, gap summary.
-  Sorted: gaps first (by priority P1\u2192P3), then covered outcomes.
-
-Output (--raw):
-  { total_outcomes, covered_outcomes, coverage_percent, matrix, gaps, plans }
-
-Plan frontmatter format:
-  intent:
-    outcome_ids: [DO-01, DO-03]
-    rationale: "Brief explanation"
+Flags: --gaps (uncovered only), --raw (JSON output)
 
 Examples:
-  gsd-tools intent trace
-  gsd-tools intent trace --gaps
-  gsd-tools intent trace --raw`,
+  gsd-tools intent trace --gaps --raw`,
       "intent drift": `Usage: gsd-tools intent drift [--raw]
 
-Analyze intent drift: detect misalignment between work and stated intent.
+Detect misalignment between work and stated intent. Drift score 0-100.
 
-Computes a numeric drift score (0-100, 0=perfect alignment, 100=total drift)
-from 4 weighted signals:
-
-Signals:
-  Coverage Gaps (40 pts)     Outcomes with no plans addressing them
-                             P1 gaps weighted 3x, P2 weighted 2x, P3 weighted 1x
-  Objective Mismatch (25 pts) Plans with no intent section in frontmatter
-  Feature Creep (15 pts)      Plans referencing non-existent outcome IDs
-  Priority Inversion (20 pts) Uncovered P1 outcomes while P2/P3 are covered
-
-Score interpretation:
-  0-15:  excellent (all work aligned)
-  16-35: good (minor gaps)
-  36-60: moderate (review recommended)
-  61-100: poor (significant drift)
-
-Output (default):
-  Human-readable analysis with per-signal breakdown and summary.
-
-Output (--raw):
-  JSON with drift_score, alignment, signals (4 objects), outcome/plan counts.
+Signals: Coverage Gaps (40pts), Objective Mismatch (25pts), Feature Creep (15pts), Priority Inversion (20pts).
+Score: 0-15 excellent, 16-35 good, 36-60 moderate, 61-100 poor.
 
 Examples:
-  gsd-tools intent drift
   gsd-tools intent drift --raw`,
       "extract-sections": `Usage: gsd-tools extract-sections <file-path> [section1] [section2] ... [--raw]
 
@@ -919,38 +868,30 @@ Examples:
   gsd-tools token-budget --raw`,
       "mcp-profile": `Usage: gsd-tools mcp-profile [options] [--raw]
 
-Discover configured MCP servers and estimate their token cost.
+Discover MCP servers, estimate token cost, score relevance, apply/restore.
 
-Reads server configurations from:
-  .mcp.json              Claude Code format (mcpServers key)
-  opencode.json          OpenCode format (mcp key)
-  ~/.config/opencode/opencode.json  User-level OpenCode config
-
-For each server, estimates token cost from a known-server database
-(15+ common servers) or falls back to a default estimate.
+Sources: .mcp.json, opencode.json, ~/.config/opencode/opencode.json
+Known-server DB covers 15+ servers. Scores keep/disable/review per server.
 
 Options:
-  --window <size>   Context window size in tokens (default: 200000)
-  --raw             Output raw JSON
+  --window <size>   Context window size (default: 200000)
+  --apply           Disable recommended servers in opencode.json (backup first)
+  --dry-run         With --apply: preview without modifying
+  --restore         Restore opencode.json from opencode.json.bak
+  --raw             JSON output
 
-Output includes per-server token estimates, total context cost,
-and context window percentage breakdown.
-
-Also available as: gsd-tools mcp profile
+Only opencode.json is modified (not .mcp.json). Also: gsd-tools mcp profile
 
 Examples:
-  gsd-tools mcp-profile --raw
-  gsd-tools mcp-profile --window 100000 --raw`,
+  gsd-tools mcp-profile --apply --raw
+  gsd-tools mcp-profile --restore --raw`,
       "mcp": `Usage: gsd-tools mcp <subcommand> [options] [--raw]
 
-MCP server management commands.
-
-Subcommands:
-  profile [--window N]   Discover servers and estimate token costs
+MCP server management. Subcommands: profile [--window N] [--apply] [--restore]
 
 Examples:
   gsd-tools mcp profile --raw
-  gsd-tools mcp profile --window 100000 --raw`,
+  gsd-tools mcp profile --apply --raw`,
       "env": `Usage: gsd-tools env <subcommand> [options] [--raw]
 
 Detect project languages, tools, and runtimes.
@@ -11413,15 +11354,7 @@ var require_mcp = __commonJS({
       const servers = [];
       for (const [name, config] of Object.entries(data.mcpServers)) {
         if (!config || typeof config !== "object") continue;
-        const command = typeof config.command === "string" ? config.command : null;
-        const args = Array.isArray(config.args) ? config.args : [];
-        servers.push({
-          name,
-          source: ".mcp.json",
-          transport: "stdio",
-          command: command || "unknown",
-          args
-        });
+        servers.push({ name, source: ".mcp.json", transport: "stdio", command: (typeof config.command === "string" ? config.command : null) || "unknown", args: Array.isArray(config.args) ? config.args : [] });
       }
       return servers;
     }
@@ -11432,8 +11365,7 @@ var require_mcp = __commonJS({
       for (const [name, config] of Object.entries(data.mcp)) {
         if (!config || typeof config !== "object") continue;
         const transport = config.type === "remote" ? "remote" : "stdio";
-        let command = "unknown";
-        let args = [];
+        let command = "unknown", args = [];
         if (transport === "remote") {
           command = config.url || "unknown";
         } else if (Array.isArray(config.command)) {
@@ -11442,42 +11374,22 @@ var require_mcp = __commonJS({
         } else if (typeof config.command === "string") {
           command = config.command;
         }
-        servers.push({
-          name,
-          source: sourceName || path.basename(filePath),
-          transport,
-          command,
-          args
-        });
+        servers.push({ name, source: sourceName || path.basename(filePath), transport, command, args });
       }
       return servers;
     }
     function discoverMcpServers(cwd) {
       const mcpJsonServers = extractFromMcpJson(path.join(cwd, ".mcp.json"));
-      const opencodeServers = extractFromOpencodeJson(
-        path.join(cwd, "opencode.json"),
-        "opencode.json"
-      );
-      const homeConfig = path.join(
-        process.env.HOME || process.env.USERPROFILE || "~",
-        ".config",
-        "opencode",
-        "opencode.json"
-      );
+      const opencodeServers = extractFromOpencodeJson(path.join(cwd, "opencode.json"), "opencode.json");
+      const homeConfig = path.join(process.env.HOME || process.env.USERPROFILE || "~", ".config", "opencode", "opencode.json");
       const userServers = extractFromOpencodeJson(homeConfig, "~/.config/opencode/opencode.json");
       const serverMap = /* @__PURE__ */ new Map();
-      for (const s of mcpJsonServers) {
-        serverMap.set(s.name, s);
-      }
+      for (const s of mcpJsonServers) serverMap.set(s.name, s);
       for (const s of opencodeServers) {
-        if (!serverMap.has(s.name)) {
-          serverMap.set(s.name, s);
-        }
+        if (!serverMap.has(s.name)) serverMap.set(s.name, s);
       }
       for (const s of userServers) {
-        if (!serverMap.has(s.name)) {
-          serverMap.set(s.name, s);
-        }
+        if (!serverMap.has(s.name)) serverMap.set(s.name, s);
       }
       return Array.from(serverMap.values()).sort((a, b) => a.name.localeCompare(b.name));
     }
@@ -11557,9 +11469,7 @@ var require_mcp = __commonJS({
         const files = indicator.files || [];
         for (const file of files) {
           try {
-            if (fs.existsSync(path.join(cwd, file))) {
-              return { score: "relevant", reason: indicator.description };
-            }
+            if (fs.existsSync(path.join(cwd, file))) return { score: "relevant", reason: indicator.description };
           } catch {
           }
         }
@@ -11568,10 +11478,7 @@ var require_mcp = __commonJS({
           if (pattern.startsWith("*.")) {
             const ext = pattern.slice(1);
             try {
-              const entries = fs.readdirSync(cwd);
-              if (entries.some((e) => e.endsWith(ext))) {
-                return { score: "relevant", reason: indicator.description };
-              }
+              if (fs.readdirSync(cwd).some((e) => e.endsWith(ext))) return { score: "relevant", reason: indicator.description };
             } catch {
             }
           }
@@ -11626,7 +11533,49 @@ var require_mcp = __commonJS({
         recommendations_summary: summary
       };
     }
+    function applyRecommendations(cwd, servers) {
+      const cfgPath = path.join(cwd, "opencode.json");
+      const bakPath = path.join(cwd, "opencode.json.bak");
+      if (!fs.existsSync(cfgPath)) return { applied: false, reason: "No opencode.json found \u2014 only OpenCode configs support disable" };
+      let config;
+      try {
+        config = JSON.parse(fs.readFileSync(cfgPath, "utf-8"));
+      } catch (e) {
+        return { applied: false, reason: `Failed to parse opencode.json: ${e.message}` };
+      }
+      if (!config.mcp || typeof config.mcp !== "object") return { applied: false, reason: "No mcp section in opencode.json" };
+      fs.copyFileSync(cfgPath, bakPath);
+      const toDisable = servers.filter((s) => s.recommendation === "disable" && s.source === "opencode.json");
+      const disabled = [];
+      let saved = 0;
+      for (const s of toDisable) {
+        if (config.mcp[s.name]) {
+          config.mcp[s.name].enabled = false;
+          disabled.push(s.name);
+          saved += s.token_estimate || 0;
+        }
+      }
+      fs.writeFileSync(cfgPath, JSON.stringify(config, null, 2) + "\n");
+      const skipped = servers.filter((s) => s.recommendation === "disable" && s.source === ".mcp.json").map((s) => s.name);
+      return { applied: true, backup_path: "opencode.json.bak", disabled_count: disabled.length, disabled_servers: disabled, tokens_saved: saved, skipped_mcp_json: skipped.length > 0 ? skipped : void 0 };
+    }
+    function restoreBackup(cwd) {
+      const cfgPath = path.join(cwd, "opencode.json");
+      const bakPath = path.join(cwd, "opencode.json.bak");
+      if (!fs.existsSync(bakPath)) return { restored: false, reason: "No backup found (opencode.json.bak)" };
+      fs.copyFileSync(bakPath, cfgPath);
+      fs.unlinkSync(bakPath);
+      return { restored: true, message: "Restored opencode.json from backup" };
+    }
     function cmdMcpProfile(cwd, args, raw) {
+      const hasApply = args.includes("--apply");
+      const hasRestore = args.includes("--restore");
+      const hasDryRun = args.includes("--dry-run");
+      if (hasRestore) {
+        const result2 = restoreBackup(cwd);
+        output(result2, raw);
+        return;
+      }
       let contextWindow = DEFAULT_CONTEXT_WINDOW;
       const windowIdx = args.indexOf("--window");
       if (windowIdx !== -1 && args[windowIdx + 1]) {
@@ -11673,6 +11622,12 @@ var require_mcp = __commonJS({
         potential_savings_percent: recommendations.potential_savings_percent,
         recommendations_summary: recommendations.recommendations_summary
       };
+      if (hasApply && !hasDryRun) {
+        result.apply_result = applyRecommendations(cwd, recommendations.servers);
+      } else if (hasApply && hasDryRun) {
+        const wd = recommendations.servers.filter((s) => s.recommendation === "disable" && s.source === "opencode.json");
+        result.dry_run = { would_disable: wd.map((s) => s.name), would_disable_count: wd.length, tokens_would_save: wd.reduce((sum, s) => sum + (s.token_estimate || 0), 0), skipped_mcp_json: recommendations.servers.filter((s) => s.recommendation === "disable" && s.source === ".mcp.json").map((s) => s.name) };
+      }
       output(result, raw);
     }
     module2.exports = {
@@ -11681,6 +11636,8 @@ var require_mcp = __commonJS({
       estimateTokenCost,
       scoreServerRelevance,
       generateRecommendations,
+      applyRecommendations,
+      restoreBackup,
       MCP_KNOWN_SERVERS,
       RELEVANCE_INDICATORS,
       DEFAULT_CONTEXT_WINDOW,
