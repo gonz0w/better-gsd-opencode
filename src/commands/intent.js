@@ -3,7 +3,8 @@ const path = require('path');
 const { output, error, debugLog } = require('../lib/output');
 const { loadConfig } = require('../lib/config');
 const { execGit } = require('../lib/git');
-const { parseIntentMd, generateIntentMd } = require('../lib/helpers');
+const { parseIntentMd, generateIntentMd, parsePlanIntent, getMilestoneInfo, normalizePhaseName } = require('../lib/helpers');
+const { extractFrontmatter } = require('../lib/frontmatter');
 
 // ─── Intent Commands ─────────────────────────────────────────────────────────
 
@@ -846,9 +847,187 @@ function cmdIntentValidate(cwd, args, raw) {
   }
 }
 
+// ─── Intent Trace ────────────────────────────────────────────────────────────
+
+function cmdIntentTrace(cwd, args, raw) {
+  const planningDir = path.join(cwd, '.planning');
+  const intentPath = path.join(planningDir, 'INTENT.md');
+
+  if (!fs.existsSync(intentPath)) {
+    error('No INTENT.md found. Run `intent create` first.');
+  }
+
+  const intentContent = fs.readFileSync(intentPath, 'utf-8');
+  const intentData = parseIntentMd(intentContent);
+
+  if (!intentData.outcomes || intentData.outcomes.length === 0) {
+    error('INTENT.md has no desired outcomes defined.');
+  }
+
+  const gapsOnly = args.includes('--gaps');
+
+  // Get milestone info for phase range scoping
+  const milestone = getMilestoneInfo(cwd);
+  const phaseRange = milestone.phaseRange;
+
+  // Scan phase directories for PLAN.md files
+  const phasesDir = path.join(planningDir, 'phases');
+  const plans = [];
+
+  if (fs.existsSync(phasesDir)) {
+    try {
+      const entries = fs.readdirSync(phasesDir, { withFileTypes: true });
+      const phaseDirs = entries
+        .filter(e => e.isDirectory())
+        .map(e => e.name)
+        .sort();
+
+      for (const dir of phaseDirs) {
+        // Filter to current milestone's phase range if available
+        const phaseNumMatch = dir.match(/^(\d+)/);
+        if (phaseNumMatch && phaseRange) {
+          const phaseNum = parseInt(phaseNumMatch[1], 10);
+          if (phaseNum < phaseRange.start || phaseNum > phaseRange.end) continue;
+        }
+
+        const phaseDir = path.join(phasesDir, dir);
+        const files = fs.readdirSync(phaseDir);
+        const planFiles = files.filter(f => f.endsWith('-PLAN.md') || f === 'PLAN.md').sort();
+
+        for (const planFile of planFiles) {
+          const planPath = path.join(phaseDir, planFile);
+          const planContent = fs.readFileSync(planPath, 'utf-8');
+          const fm = extractFrontmatter(planContent);
+          const intentInfo = parsePlanIntent(planContent);
+
+          // Build plan_id from frontmatter or filename
+          const planPhase = fm.phase || dir;
+          const planNum = fm.plan || planFile.replace(/-PLAN\.md$/, '').split('-').pop() || '01';
+          const paddedPhase = normalizePhaseName(planPhase);
+          const paddedPlan = String(planNum).padStart(2, '0');
+          const planId = `${paddedPhase}-${paddedPlan}`;
+
+          plans.push({
+            plan_id: planId,
+            phase: planPhase,
+            outcome_ids: intentInfo ? intentInfo.outcome_ids : [],
+            rationale: intentInfo ? intentInfo.rationale : '',
+          });
+        }
+      }
+    } catch (e) {
+      debugLog('intent.trace', 'scan phase dirs failed', e);
+    }
+  }
+
+  // Build traceability matrix
+  const matrix = [];
+  const gaps = [];
+  let coveredCount = 0;
+
+  for (const outcome of intentData.outcomes) {
+    const tracingPlans = plans
+      .filter(p => p.outcome_ids.includes(outcome.id))
+      .map(p => p.plan_id);
+
+    const entry = {
+      outcome_id: outcome.id,
+      priority: outcome.priority,
+      text: outcome.text,
+      plans: tracingPlans,
+    };
+    matrix.push(entry);
+
+    if (tracingPlans.length === 0) {
+      gaps.push({
+        outcome_id: outcome.id,
+        priority: outcome.priority,
+        text: outcome.text,
+      });
+    } else {
+      coveredCount++;
+    }
+  }
+
+  const totalOutcomes = intentData.outcomes.length;
+  const coveragePercent = totalOutcomes > 0 ? Math.round((coveredCount / totalOutcomes) * 100) : 0;
+
+  // Sort: gaps first (by priority P1→P3), then covered (by priority)
+  const priorityOrder = (a, b) => {
+    const pa = parseInt((a.priority || 'P9').replace('P', ''), 10);
+    const pb = parseInt((b.priority || 'P9').replace('P', ''), 10);
+    return pa - pb;
+  };
+
+  const sortedMatrix = [
+    ...matrix.filter(m => m.plans.length === 0).sort(priorityOrder),
+    ...matrix.filter(m => m.plans.length > 0).sort(priorityOrder),
+  ];
+
+  const result = {
+    total_outcomes: totalOutcomes,
+    covered_outcomes: coveredCount,
+    coverage_percent: coveragePercent,
+    matrix: gapsOnly ? gaps.sort(priorityOrder) : sortedMatrix,
+    gaps: gaps.sort(priorityOrder),
+    plans: plans.map(p => ({
+      plan_id: p.plan_id,
+      phase: p.phase,
+      outcome_ids: p.outcome_ids,
+    })),
+  };
+
+  if (raw) {
+    output(result, false);
+    return;
+  }
+
+  // Human-readable output
+  const lines = [];
+  lines.push('Intent Traceability — .planning/INTENT.md');
+  lines.push(`Coverage: ${coveredCount}/${totalOutcomes} outcomes (${coveragePercent}%)`);
+  lines.push('');
+
+  if (gapsOnly) {
+    // Show only gaps
+    if (gaps.length === 0) {
+      lines.push('  No gaps — all outcomes have at least one plan tracing to them.');
+    } else {
+      for (const gap of gaps.sort(priorityOrder)) {
+        lines.push(`  ✗ ${gap.outcome_id} [${gap.priority}]: ${gap.text} → (no plans)`);
+      }
+    }
+  } else {
+    // Show full matrix sorted: gaps first, then covered
+    for (const entry of sortedMatrix) {
+      if (entry.plans.length === 0) {
+        lines.push(`  ✗ ${entry.outcome_id} [${entry.priority}]: ${entry.text} → (no plans)`);
+      } else {
+        lines.push(`  ✓ ${entry.outcome_id} [${entry.priority}]: ${entry.text} → ${entry.plans.join(', ')}`);
+      }
+    }
+  }
+
+  if (gaps.length > 0) {
+    lines.push('');
+    // Count gaps by priority
+    const gapCounts = {};
+    for (const g of gaps) {
+      gapCounts[g.priority] = (gapCounts[g.priority] || 0) + 1;
+    }
+    const gapParts = Object.entries(gapCounts)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([p, c]) => `${c}×${p}`);
+    lines.push(`Gaps: ${gaps.length} outcomes uncovered (${gapParts.join(', ')})`);
+  }
+
+  output(null, true, lines.join('\n') + '\n');
+}
+
 module.exports = {
   cmdIntentCreate,
   cmdIntentShow,
   cmdIntentUpdate,
   cmdIntentValidate,
+  cmdIntentTrace,
 };

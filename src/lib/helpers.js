@@ -681,6 +681,54 @@ function generateIntentMd(data) {
   return lines.join('\n');
 }
 
+// ─── Plan Intent Parsing ─────────────────────────────────────────────────────
+
+/**
+ * Extract intent tracing data from a PLAN.md's YAML frontmatter.
+ * Looks for an `intent` field with `outcome_ids` and `rationale`.
+ *
+ * Handles:
+ *   - Array format: outcome_ids: [DO-01, DO-03]
+ *   - Comma-separated string: outcome_ids: "DO-01, DO-03"
+ *   - Validates IDs match DO-\d+ pattern, filters out invalid ones
+ *
+ * @param {string} content - Raw PLAN.md file content
+ * @returns {{ outcome_ids: string[], rationale: string } | null}
+ */
+function parsePlanIntent(content) {
+  if (!content || typeof content !== 'string') return null;
+
+  const { extractFrontmatter } = require('./frontmatter');
+  const fm = extractFrontmatter(content);
+  if (!fm || !fm.intent) return null;
+
+  const intent = fm.intent;
+  let outcomeIds = [];
+  let rationale = '';
+
+  // Extract outcome_ids
+  const rawIds = intent.outcome_ids || intent['outcome_ids'];
+  if (rawIds) {
+    if (Array.isArray(rawIds)) {
+      outcomeIds = rawIds;
+    } else if (typeof rawIds === 'string') {
+      // Comma-separated string: "DO-01, DO-03"
+      outcomeIds = rawIds.split(',').map(s => s.trim()).filter(Boolean);
+    }
+  }
+
+  // Validate IDs match DO-\d+ pattern
+  const doPattern = /^DO-\d+$/;
+  outcomeIds = outcomeIds.filter(id => doPattern.test(id));
+
+  // Extract rationale
+  rationale = intent.rationale || '';
+
+  if (outcomeIds.length === 0 && !rationale) return null;
+
+  return { outcome_ids: outcomeIds, rationale };
+}
+
 module.exports = {
   safeReadFile,
   cachedReadFile,
@@ -700,4 +748,5 @@ module.exports = {
   extractAtReferences,
   parseIntentMd,
   generateIntentMd,
+  parsePlanIntent,
 };

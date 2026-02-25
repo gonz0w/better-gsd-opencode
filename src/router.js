@@ -63,6 +63,7 @@ const {
   cmdIntentShow,
   cmdIntentUpdate,
   cmdIntentValidate,
+  cmdIntentTrace,
 } = require('./commands/intent');
 
 
@@ -697,8 +698,10 @@ async function main() {
         cmdIntentUpdate(cwd, args.slice(2), raw);
       } else if (subcommand === 'validate') {
         cmdIntentValidate(cwd, args.slice(2), raw);
+      } else if (subcommand === 'trace') {
+        cmdIntentTrace(cwd, args.slice(2), raw);
       } else {
-        error('Unknown intent subcommand. Available: create, show, read, update, validate');
+        error('Unknown intent subcommand. Available: create, show, read, update, validate, trace');
       }
       break;
     }

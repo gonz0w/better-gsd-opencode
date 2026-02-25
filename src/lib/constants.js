@@ -783,13 +783,17 @@ Subcommands:
   create      Create a new INTENT.md (errors if exists, use --force to overwrite)
   show        Display intent summary (compact by default, --full for complete, section filter supported)
   read        Read intent as JSON (alias for intent show --raw, section filter supported)
+  update      Update INTENT.md sections (--add, --remove, --set-priority, --value)
   validate    Validate INTENT.md structure (exit 0=valid, 1=issues)
+  trace       Traceability matrix: desired outcomes → plans (--gaps for uncovered only)
 
 Examples:
   gsd-tools intent create
   gsd-tools intent show
   gsd-tools intent read outcomes --raw
-  gsd-tools intent validate --raw`,
+  gsd-tools intent validate --raw
+  gsd-tools intent trace --raw
+  gsd-tools intent trace --gaps`,
 
   'intent create': `Usage: gsd-tools intent create [options] [--raw]
 
@@ -861,6 +865,34 @@ Output (--raw):   { valid, issues, sections, revision }
 Examples:
   gsd-tools intent validate
   gsd-tools intent validate --raw`,
+
+  'intent trace': `Usage: gsd-tools intent trace [--gaps] [--raw]
+
+Build traceability matrix: desired outcomes from INTENT.md → plans tracing to them.
+
+Scans all PLAN.md files in current milestone's phase range for intent.outcome_ids
+in their frontmatter, then maps each desired outcome to the plans addressing it.
+
+Flags:
+  --gaps    Show only uncovered outcomes (no plans tracing to them)
+  --raw     JSON output with matrix, gaps, coverage, and plans
+
+Output (default):
+  Human-readable matrix with ✓/✗ markers, coverage percentage, gap summary.
+  Sorted: gaps first (by priority P1→P3), then covered outcomes.
+
+Output (--raw):
+  { total_outcomes, covered_outcomes, coverage_percent, matrix, gaps, plans }
+
+Plan frontmatter format:
+  intent:
+    outcome_ids: [DO-01, DO-03]
+    rationale: "Brief explanation"
+
+Examples:
+  gsd-tools intent trace
+  gsd-tools intent trace --gaps
+  gsd-tools intent trace --raw`,
 
   'extract-sections': `Usage: gsd-tools extract-sections <file-path> [section1] [section2] ... [--raw]
 

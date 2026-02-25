@@ -749,13 +749,17 @@ Subcommands:
   create      Create a new INTENT.md (errors if exists, use --force to overwrite)
   show        Display intent summary (compact by default, --full for complete, section filter supported)
   read        Read intent as JSON (alias for intent show --raw, section filter supported)
+  update      Update INTENT.md sections (--add, --remove, --set-priority, --value)
   validate    Validate INTENT.md structure (exit 0=valid, 1=issues)
+  trace       Traceability matrix: desired outcomes \u2192 plans (--gaps for uncovered only)
 
 Examples:
   gsd-tools intent create
   gsd-tools intent show
   gsd-tools intent read outcomes --raw
-  gsd-tools intent validate --raw`,
+  gsd-tools intent validate --raw
+  gsd-tools intent trace --raw
+  gsd-tools intent trace --gaps`,
       "intent create": `Usage: gsd-tools intent create [options] [--raw]
 
 Create a new INTENT.md in .planning/ with 6 structured sections.
@@ -823,6 +827,33 @@ Output (--raw):   { valid, issues, sections, revision }
 Examples:
   gsd-tools intent validate
   gsd-tools intent validate --raw`,
+      "intent trace": `Usage: gsd-tools intent trace [--gaps] [--raw]
+
+Build traceability matrix: desired outcomes from INTENT.md \u2192 plans tracing to them.
+
+Scans all PLAN.md files in current milestone's phase range for intent.outcome_ids
+in their frontmatter, then maps each desired outcome to the plans addressing it.
+
+Flags:
+  --gaps    Show only uncovered outcomes (no plans tracing to them)
+  --raw     JSON output with matrix, gaps, coverage, and plans
+
+Output (default):
+  Human-readable matrix with \u2713/\u2717 markers, coverage percentage, gap summary.
+  Sorted: gaps first (by priority P1\u2192P3), then covered outcomes.
+
+Output (--raw):
+  { total_outcomes, covered_outcomes, coverage_percent, matrix, gaps, plans }
+
+Plan frontmatter format:
+  intent:
+    outcome_ids: [DO-01, DO-03]
+    rationale: "Brief explanation"
+
+Examples:
+  gsd-tools intent trace
+  gsd-tools intent trace --gaps
+  gsd-tools intent trace --raw`,
       "extract-sections": `Usage: gsd-tools extract-sections <file-path> [section1] [section2] ... [--raw]
 
 Extract specific named sections from a markdown file.
@@ -1006,6 +1037,140 @@ var require_config = __commonJS({
       }
     }
     module2.exports = { loadConfig, isGitIgnored };
+  }
+});
+
+// src/lib/frontmatter.js
+var require_frontmatter = __commonJS({
+  "src/lib/frontmatter.js"(exports2, module2) {
+    function extractFrontmatter(content) {
+      const frontmatter = {};
+      const match = content.match(/^---\n([\s\S]+?)\n---/);
+      if (!match) return frontmatter;
+      const yaml = match[1];
+      const lines = yaml.split("\n");
+      let stack = [{ obj: frontmatter, key: null, indent: -1 }];
+      for (const line of lines) {
+        if (line.trim() === "") continue;
+        const indentMatch = line.match(/^(\s*)/);
+        const indent = indentMatch ? indentMatch[1].length : 0;
+        while (stack.length > 1 && indent <= stack[stack.length - 1].indent) {
+          stack.pop();
+        }
+        const current = stack[stack.length - 1];
+        const keyMatch = line.match(/^(\s*)([a-zA-Z0-9_-]+):\s*(.*)/);
+        if (keyMatch) {
+          const key = keyMatch[2];
+          const value = keyMatch[3].trim();
+          if (value === "" || value === "[") {
+            current.obj[key] = value === "[" ? [] : {};
+            current.key = null;
+            stack.push({ obj: current.obj[key], key: null, indent });
+          } else if (value.startsWith("[") && value.endsWith("]")) {
+            current.obj[key] = value.slice(1, -1).split(",").map((s) => s.trim().replace(/^["']|["']$/g, "")).filter(Boolean);
+            current.key = null;
+          } else {
+            current.obj[key] = value.replace(/^["']|["']$/g, "");
+            current.key = null;
+          }
+        } else if (line.trim().startsWith("- ")) {
+          const itemValue = line.trim().slice(2).replace(/^["']|["']$/g, "");
+          if (typeof current.obj === "object" && !Array.isArray(current.obj) && Object.keys(current.obj).length === 0) {
+            const parent = stack.length > 1 ? stack[stack.length - 2] : null;
+            if (parent) {
+              for (const k of Object.keys(parent.obj)) {
+                if (parent.obj[k] === current.obj) {
+                  parent.obj[k] = [itemValue];
+                  current.obj = parent.obj[k];
+                  break;
+                }
+              }
+            }
+          } else if (Array.isArray(current.obj)) {
+            current.obj.push(itemValue);
+          }
+        }
+      }
+      return frontmatter;
+    }
+    function reconstructFrontmatter(obj) {
+      const lines = [];
+      for (const [key, value] of Object.entries(obj)) {
+        if (value === null || value === void 0) continue;
+        if (Array.isArray(value)) {
+          if (value.length === 0) {
+            lines.push(`${key}: []`);
+          } else if (value.every((v) => typeof v === "string") && value.length <= 3 && value.join(", ").length < 60) {
+            lines.push(`${key}: [${value.join(", ")}]`);
+          } else {
+            lines.push(`${key}:`);
+            for (const item of value) {
+              lines.push(`  - ${typeof item === "string" && (item.includes(":") || item.includes("#")) ? `"${item}"` : item}`);
+            }
+          }
+        } else if (typeof value === "object") {
+          lines.push(`${key}:`);
+          for (const [subkey, subval] of Object.entries(value)) {
+            if (subval === null || subval === void 0) continue;
+            if (Array.isArray(subval)) {
+              if (subval.length === 0) {
+                lines.push(`  ${subkey}: []`);
+              } else if (subval.every((v) => typeof v === "string") && subval.length <= 3 && subval.join(", ").length < 60) {
+                lines.push(`  ${subkey}: [${subval.join(", ")}]`);
+              } else {
+                lines.push(`  ${subkey}:`);
+                for (const item of subval) {
+                  lines.push(`    - ${typeof item === "string" && (item.includes(":") || item.includes("#")) ? `"${item}"` : item}`);
+                }
+              }
+            } else if (typeof subval === "object") {
+              lines.push(`  ${subkey}:`);
+              for (const [subsubkey, subsubval] of Object.entries(subval)) {
+                if (subsubval === null || subsubval === void 0) continue;
+                if (Array.isArray(subsubval)) {
+                  if (subsubval.length === 0) {
+                    lines.push(`    ${subsubkey}: []`);
+                  } else {
+                    lines.push(`    ${subsubkey}:`);
+                    for (const item of subsubval) {
+                      lines.push(`      - ${item}`);
+                    }
+                  }
+                } else {
+                  lines.push(`    ${subsubkey}: ${subsubval}`);
+                }
+              }
+            } else {
+              const sv = String(subval);
+              lines.push(`  ${subkey}: ${sv.includes(":") || sv.includes("#") ? `"${sv}"` : sv}`);
+            }
+          }
+        } else {
+          const sv = String(value);
+          if (sv.includes(":") || sv.includes("#") || sv.startsWith("[") || sv.startsWith("{")) {
+            lines.push(`${key}: "${sv}"`);
+          } else {
+            lines.push(`${key}: ${sv}`);
+          }
+        }
+      }
+      return lines.join("\n");
+    }
+    function spliceFrontmatter(content, newObj) {
+      const yamlStr = reconstructFrontmatter(newObj);
+      const match = content.match(/^---\n[\s\S]+?\n---/);
+      if (match) {
+        return `---
+${yamlStr}
+---` + content.slice(match[0].length);
+      }
+      return `---
+${yamlStr}
+---
+
+` + content;
+    }
+    module2.exports = { extractFrontmatter, reconstructFrontmatter, spliceFrontmatter };
   }
 });
 
@@ -1556,6 +1721,28 @@ var require_helpers = __commonJS({
       lines.push("");
       return lines.join("\n");
     }
+    function parsePlanIntent(content) {
+      if (!content || typeof content !== "string") return null;
+      const { extractFrontmatter } = require_frontmatter();
+      const fm = extractFrontmatter(content);
+      if (!fm || !fm.intent) return null;
+      const intent = fm.intent;
+      let outcomeIds = [];
+      let rationale = "";
+      const rawIds = intent.outcome_ids || intent["outcome_ids"];
+      if (rawIds) {
+        if (Array.isArray(rawIds)) {
+          outcomeIds = rawIds;
+        } else if (typeof rawIds === "string") {
+          outcomeIds = rawIds.split(",").map((s) => s.trim()).filter(Boolean);
+        }
+      }
+      const doPattern = /^DO-\d+$/;
+      outcomeIds = outcomeIds.filter((id) => doPattern.test(id));
+      rationale = intent.rationale || "";
+      if (outcomeIds.length === 0 && !rationale) return null;
+      return { outcome_ids: outcomeIds, rationale };
+    }
     module2.exports = {
       safeReadFile,
       cachedReadFile,
@@ -1574,7 +1761,8 @@ var require_helpers = __commonJS({
       getMilestoneInfo,
       extractAtReferences,
       parseIntentMd,
-      generateIntentMd
+      generateIntentMd,
+      parsePlanIntent
     };
   }
 });
@@ -2183,140 +2371,6 @@ var require_state = __commonJS({
       cmdStateRecordSession,
       cmdStateValidate
     };
-  }
-});
-
-// src/lib/frontmatter.js
-var require_frontmatter = __commonJS({
-  "src/lib/frontmatter.js"(exports2, module2) {
-    function extractFrontmatter(content) {
-      const frontmatter = {};
-      const match = content.match(/^---\n([\s\S]+?)\n---/);
-      if (!match) return frontmatter;
-      const yaml = match[1];
-      const lines = yaml.split("\n");
-      let stack = [{ obj: frontmatter, key: null, indent: -1 }];
-      for (const line of lines) {
-        if (line.trim() === "") continue;
-        const indentMatch = line.match(/^(\s*)/);
-        const indent = indentMatch ? indentMatch[1].length : 0;
-        while (stack.length > 1 && indent <= stack[stack.length - 1].indent) {
-          stack.pop();
-        }
-        const current = stack[stack.length - 1];
-        const keyMatch = line.match(/^(\s*)([a-zA-Z0-9_-]+):\s*(.*)/);
-        if (keyMatch) {
-          const key = keyMatch[2];
-          const value = keyMatch[3].trim();
-          if (value === "" || value === "[") {
-            current.obj[key] = value === "[" ? [] : {};
-            current.key = null;
-            stack.push({ obj: current.obj[key], key: null, indent });
-          } else if (value.startsWith("[") && value.endsWith("]")) {
-            current.obj[key] = value.slice(1, -1).split(",").map((s) => s.trim().replace(/^["']|["']$/g, "")).filter(Boolean);
-            current.key = null;
-          } else {
-            current.obj[key] = value.replace(/^["']|["']$/g, "");
-            current.key = null;
-          }
-        } else if (line.trim().startsWith("- ")) {
-          const itemValue = line.trim().slice(2).replace(/^["']|["']$/g, "");
-          if (typeof current.obj === "object" && !Array.isArray(current.obj) && Object.keys(current.obj).length === 0) {
-            const parent = stack.length > 1 ? stack[stack.length - 2] : null;
-            if (parent) {
-              for (const k of Object.keys(parent.obj)) {
-                if (parent.obj[k] === current.obj) {
-                  parent.obj[k] = [itemValue];
-                  current.obj = parent.obj[k];
-                  break;
-                }
-              }
-            }
-          } else if (Array.isArray(current.obj)) {
-            current.obj.push(itemValue);
-          }
-        }
-      }
-      return frontmatter;
-    }
-    function reconstructFrontmatter(obj) {
-      const lines = [];
-      for (const [key, value] of Object.entries(obj)) {
-        if (value === null || value === void 0) continue;
-        if (Array.isArray(value)) {
-          if (value.length === 0) {
-            lines.push(`${key}: []`);
-          } else if (value.every((v) => typeof v === "string") && value.length <= 3 && value.join(", ").length < 60) {
-            lines.push(`${key}: [${value.join(", ")}]`);
-          } else {
-            lines.push(`${key}:`);
-            for (const item of value) {
-              lines.push(`  - ${typeof item === "string" && (item.includes(":") || item.includes("#")) ? `"${item}"` : item}`);
-            }
-          }
-        } else if (typeof value === "object") {
-          lines.push(`${key}:`);
-          for (const [subkey, subval] of Object.entries(value)) {
-            if (subval === null || subval === void 0) continue;
-            if (Array.isArray(subval)) {
-              if (subval.length === 0) {
-                lines.push(`  ${subkey}: []`);
-              } else if (subval.every((v) => typeof v === "string") && subval.length <= 3 && subval.join(", ").length < 60) {
-                lines.push(`  ${subkey}: [${subval.join(", ")}]`);
-              } else {
-                lines.push(`  ${subkey}:`);
-                for (const item of subval) {
-                  lines.push(`    - ${typeof item === "string" && (item.includes(":") || item.includes("#")) ? `"${item}"` : item}`);
-                }
-              }
-            } else if (typeof subval === "object") {
-              lines.push(`  ${subkey}:`);
-              for (const [subsubkey, subsubval] of Object.entries(subval)) {
-                if (subsubval === null || subsubval === void 0) continue;
-                if (Array.isArray(subsubval)) {
-                  if (subsubval.length === 0) {
-                    lines.push(`    ${subsubkey}: []`);
-                  } else {
-                    lines.push(`    ${subsubkey}:`);
-                    for (const item of subsubval) {
-                      lines.push(`      - ${item}`);
-                    }
-                  }
-                } else {
-                  lines.push(`    ${subsubkey}: ${subsubval}`);
-                }
-              }
-            } else {
-              const sv = String(subval);
-              lines.push(`  ${subkey}: ${sv.includes(":") || sv.includes("#") ? `"${sv}"` : sv}`);
-            }
-          }
-        } else {
-          const sv = String(value);
-          if (sv.includes(":") || sv.includes("#") || sv.startsWith("[") || sv.startsWith("{")) {
-            lines.push(`${key}: "${sv}"`);
-          } else {
-            lines.push(`${key}: ${sv}`);
-          }
-        }
-      }
-      return lines.join("\n");
-    }
-    function spliceFrontmatter(content, newObj) {
-      const yamlStr = reconstructFrontmatter(newObj);
-      const match = content.match(/^---\n[\s\S]+?\n---/);
-      if (match) {
-        return `---
-${yamlStr}
----` + content.slice(match[0].length);
-      }
-      return `---
-${yamlStr}
----
-
-` + content;
-    }
-    module2.exports = { extractFrontmatter, reconstructFrontmatter, spliceFrontmatter };
   }
 });
 
@@ -8931,7 +8985,8 @@ var require_intent = __commonJS({
     var { output, error, debugLog } = require_output();
     var { loadConfig } = require_config();
     var { execGit } = require_git();
-    var { parseIntentMd, generateIntentMd } = require_helpers();
+    var { parseIntentMd, generateIntentMd, parsePlanIntent, getMilestoneInfo, normalizePhaseName } = require_helpers();
+    var { extractFrontmatter } = require_frontmatter();
     function cmdIntentCreate(cwd, args, raw) {
       const planningDir = path.join(cwd, ".planning");
       if (!fs.existsSync(planningDir)) {
@@ -9594,11 +9649,144 @@ var require_intent = __commonJS({
         process.exit(valid ? 0 : 1);
       }
     }
+    function cmdIntentTrace(cwd, args, raw) {
+      const planningDir = path.join(cwd, ".planning");
+      const intentPath = path.join(planningDir, "INTENT.md");
+      if (!fs.existsSync(intentPath)) {
+        error("No INTENT.md found. Run `intent create` first.");
+      }
+      const intentContent = fs.readFileSync(intentPath, "utf-8");
+      const intentData = parseIntentMd(intentContent);
+      if (!intentData.outcomes || intentData.outcomes.length === 0) {
+        error("INTENT.md has no desired outcomes defined.");
+      }
+      const gapsOnly = args.includes("--gaps");
+      const milestone = getMilestoneInfo(cwd);
+      const phaseRange = milestone.phaseRange;
+      const phasesDir = path.join(planningDir, "phases");
+      const plans = [];
+      if (fs.existsSync(phasesDir)) {
+        try {
+          const entries = fs.readdirSync(phasesDir, { withFileTypes: true });
+          const phaseDirs = entries.filter((e) => e.isDirectory()).map((e) => e.name).sort();
+          for (const dir of phaseDirs) {
+            const phaseNumMatch = dir.match(/^(\d+)/);
+            if (phaseNumMatch && phaseRange) {
+              const phaseNum = parseInt(phaseNumMatch[1], 10);
+              if (phaseNum < phaseRange.start || phaseNum > phaseRange.end) continue;
+            }
+            const phaseDir = path.join(phasesDir, dir);
+            const files = fs.readdirSync(phaseDir);
+            const planFiles = files.filter((f) => f.endsWith("-PLAN.md") || f === "PLAN.md").sort();
+            for (const planFile of planFiles) {
+              const planPath = path.join(phaseDir, planFile);
+              const planContent = fs.readFileSync(planPath, "utf-8");
+              const fm = extractFrontmatter(planContent);
+              const intentInfo = parsePlanIntent(planContent);
+              const planPhase = fm.phase || dir;
+              const planNum = fm.plan || planFile.replace(/-PLAN\.md$/, "").split("-").pop() || "01";
+              const paddedPhase = normalizePhaseName(planPhase);
+              const paddedPlan = String(planNum).padStart(2, "0");
+              const planId = `${paddedPhase}-${paddedPlan}`;
+              plans.push({
+                plan_id: planId,
+                phase: planPhase,
+                outcome_ids: intentInfo ? intentInfo.outcome_ids : [],
+                rationale: intentInfo ? intentInfo.rationale : ""
+              });
+            }
+          }
+        } catch (e) {
+          debugLog("intent.trace", "scan phase dirs failed", e);
+        }
+      }
+      const matrix = [];
+      const gaps = [];
+      let coveredCount = 0;
+      for (const outcome of intentData.outcomes) {
+        const tracingPlans = plans.filter((p) => p.outcome_ids.includes(outcome.id)).map((p) => p.plan_id);
+        const entry = {
+          outcome_id: outcome.id,
+          priority: outcome.priority,
+          text: outcome.text,
+          plans: tracingPlans
+        };
+        matrix.push(entry);
+        if (tracingPlans.length === 0) {
+          gaps.push({
+            outcome_id: outcome.id,
+            priority: outcome.priority,
+            text: outcome.text
+          });
+        } else {
+          coveredCount++;
+        }
+      }
+      const totalOutcomes = intentData.outcomes.length;
+      const coveragePercent = totalOutcomes > 0 ? Math.round(coveredCount / totalOutcomes * 100) : 0;
+      const priorityOrder = (a, b) => {
+        const pa = parseInt((a.priority || "P9").replace("P", ""), 10);
+        const pb = parseInt((b.priority || "P9").replace("P", ""), 10);
+        return pa - pb;
+      };
+      const sortedMatrix = [
+        ...matrix.filter((m) => m.plans.length === 0).sort(priorityOrder),
+        ...matrix.filter((m) => m.plans.length > 0).sort(priorityOrder)
+      ];
+      const result = {
+        total_outcomes: totalOutcomes,
+        covered_outcomes: coveredCount,
+        coverage_percent: coveragePercent,
+        matrix: gapsOnly ? gaps.sort(priorityOrder) : sortedMatrix,
+        gaps: gaps.sort(priorityOrder),
+        plans: plans.map((p) => ({
+          plan_id: p.plan_id,
+          phase: p.phase,
+          outcome_ids: p.outcome_ids
+        }))
+      };
+      if (raw) {
+        output(result, false);
+        return;
+      }
+      const lines = [];
+      lines.push("Intent Traceability \u2014 .planning/INTENT.md");
+      lines.push(`Coverage: ${coveredCount}/${totalOutcomes} outcomes (${coveragePercent}%)`);
+      lines.push("");
+      if (gapsOnly) {
+        if (gaps.length === 0) {
+          lines.push("  No gaps \u2014 all outcomes have at least one plan tracing to them.");
+        } else {
+          for (const gap of gaps.sort(priorityOrder)) {
+            lines.push(`  \u2717 ${gap.outcome_id} [${gap.priority}]: ${gap.text} \u2192 (no plans)`);
+          }
+        }
+      } else {
+        for (const entry of sortedMatrix) {
+          if (entry.plans.length === 0) {
+            lines.push(`  \u2717 ${entry.outcome_id} [${entry.priority}]: ${entry.text} \u2192 (no plans)`);
+          } else {
+            lines.push(`  \u2713 ${entry.outcome_id} [${entry.priority}]: ${entry.text} \u2192 ${entry.plans.join(", ")}`);
+          }
+        }
+      }
+      if (gaps.length > 0) {
+        lines.push("");
+        const gapCounts = {};
+        for (const g of gaps) {
+          gapCounts[g.priority] = (gapCounts[g.priority] || 0) + 1;
+        }
+        const gapParts = Object.entries(gapCounts).sort(([a], [b]) => a.localeCompare(b)).map(([p, c]) => `${c}\xD7${p}`);
+        lines.push(`Gaps: ${gaps.length} outcomes uncovered (${gapParts.join(", ")})`);
+      }
+      output(null, true, lines.join("\n") + "\n");
+    }
     module2.exports = {
       cmdIntentCreate,
       cmdIntentShow,
       cmdIntentUpdate,
-      cmdIntentValidate
+      cmdIntentValidate,
+      cmdIntentTrace
     };
   }
 });
@@ -9728,7 +9916,8 @@ var require_router = __commonJS({
       cmdIntentCreate,
       cmdIntentShow,
       cmdIntentUpdate,
-      cmdIntentValidate
+      cmdIntentValidate,
+      cmdIntentTrace
     } = require_intent();
     async function main2() {
       const args = process.argv.slice(2);
@@ -10298,8 +10487,10 @@ Available: execute-phase, plan-phase, new-project, new-milestone, quick, resume,
             cmdIntentUpdate(cwd, args.slice(2), raw);
           } else if (subcommand === "validate") {
             cmdIntentValidate(cwd, args.slice(2), raw);
+          } else if (subcommand === "trace") {
+            cmdIntentTrace(cwd, args.slice(2), raw);
           } else {
-            error("Unknown intent subcommand. Available: create, show, read, update, validate");
+            error("Unknown intent subcommand. Available: create, show, read, update, validate, trace");
           }
           break;
         }
