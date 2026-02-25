@@ -9,8 +9,8 @@ Requirements for v3.0 Intent Engineering milestone. Each maps to roadmap phases.
 
 ### Intent Capture
 
-- [ ] **ICAP-01**: Plugin provides an INTENT.md template with structured sections: objective, desired outcomes, health metrics, target users, constraints, success criteria
-- [ ] **ICAP-02**: Plugin can create a new INTENT.md via `intent create` command, populating from provided arguments or interactive input
+- [x] **ICAP-01**: Plugin provides an INTENT.md template with structured sections: objective, desired outcomes, health metrics, target users, constraints, success criteria
+- [x] **ICAP-02**: Plugin can create a new INTENT.md via `intent create` command, populating from provided arguments or interactive input
 - [ ] **ICAP-03**: Plugin can read and display intent via `intent read` / `intent show` commands with JSON output and human-readable formats
 - [ ] **ICAP-04**: Plugin can update specific intent sections via `intent update` command without overwriting unmodified sections
 - [ ] **ICAP-05**: New-project and new-milestone workflows include guided intent questionnaire that extracts objective, outcomes, and success criteria before proceeding
@@ -71,8 +71,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| ICAP-01 | Phase 14 | Pending |
-| ICAP-02 | Phase 14 | Pending |
+| ICAP-01 | Phase 14 | Complete |
+| ICAP-02 | Phase 14 | Complete |
 | ICAP-03 | Phase 14 | Pending |
 | ICAP-04 | Phase 14 | Pending |
 | ICAP-05 | Phase 17 | Pending |
