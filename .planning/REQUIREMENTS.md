@@ -70,7 +70,7 @@ Requirements for milestone v4.0 Environment & Execution Intelligence. Each maps 
 
 ### Structured Requirements
 
-- [ ] **SREQ-01**: Requirements template includes structured acceptance criteria
+- [x] **SREQ-01**: Requirements template includes structured acceptance criteria
   - 2-5 testable assertions per requirement
   - Format: indented bullet list under each requirement
   - Each assertion is specific, testable, unambiguous
@@ -180,7 +180,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | MCP-03 | Phase 19 | Complete |
 | MCP-04 | Phase 19 | Complete |
 | MCP-05 | Phase 19 | Complete |
-| SREQ-01 | Phase 20 | Pending |
+| SREQ-01 | Phase 20 | Complete |
 | SREQ-02 | Phase 20 | Pending |
 | SREQ-03 | Phase 20 | Pending |
 | SREQ-04 | Phase 20 | Pending |

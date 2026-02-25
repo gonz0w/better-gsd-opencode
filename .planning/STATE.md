@@ -5,13 +5,13 @@
 See: .planning/PROJECT.md (updated 2026-02-25)
 
 **Core value:** Manage and deliver high-quality software with high-quality documentation, while continuously reducing token usage and improving performance
-**Current focus:** v4.0 Phase 19 — MCP Server Profiling
+**Current focus:** v4.0 Phase 20 — Structured Requirements
 
 ## Current Position
 
-**Phase:** 19 of 22 (MCP Server Profiling)
-**Current Plan:** Not started
-**Status:** Milestone complete
+**Phase:** 20 of 22 (Structured Requirements)
+**Current Plan:** 2 of 3
+**Status:** In progress
 **Last Activity:** 2026-02-25
 
 Progress: [██████░░░░] 60% (3/5 phases)
@@ -37,6 +37,7 @@ Progress: [██████░░░░] 60% (3/5 phases)
 | Phase 19 P01 | 9 min | 2 tasks | 5 files |
 | Phase 19 P02 | 4 min | 2 tasks | 3 files |
 | Phase 19 P03 | 9 min | 2 tasks | 4 files |
+| Phase 20 P01 | 8 min | 2 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -62,6 +63,9 @@ v4.0 decisions:
 - [Phase 19]: Compact RELEVANCE_INDICATORS format to stay within 500KB bundle budget
 - [Phase 19]: Only opencode.json mutated by --apply (not .mcp.json — no standard disable field)
 - [Phase 19]: Trimmed intent help text to fit apply/restore code within 500KB bundle budget
+- [Phase 20]: Bundle budget raised from 500KB to 525KB for assertion commands
+- [Phase 20]: Parser in verify.js (not helpers.js) since consumed by verifier
+- [Phase 20]: Heading-based section splitting for parseAssertionsMd (## REQ-ID: format)
 
 ### Pending Todos
 
@@ -74,5 +78,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-02-25
-Stopped at: Completed 19-03-PLAN.md
+Stopped at: Completed 20-01-PLAN.md
 Resume file: None
