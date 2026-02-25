@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-02-25)
 
 **Core value:** Manage and deliver high-quality software with high-quality documentation, while continuously reducing token usage and improving performance
-**Current focus:** v4.0 Phase 18 — Environment Awareness
+**Current focus:** v4.0 Phase 19 — MCP Server Profiling
 
 ## Current Position
 
-**Phase:** 18 of 22 (Environment Awareness)
-**Current Plan:** Not started
-**Status:** Milestone complete
+**Phase:** 19 of 22 (MCP Server Profiling)
+**Current Plan:** 1 of 3
+**Status:** In progress
 **Last Activity:** 2026-02-25
 
-Progress: [██░░░░░░░░] 20% (1/5 phases)
+Progress: [████░░░░░░] 40% (2/5 phases)
 
 ## Performance Metrics
 
@@ -34,6 +34,7 @@ Progress: [██░░░░░░░░] 20% (1/5 phases)
 | Phase 18 P01 | 14 min | 2 tasks | 14 files |
 | Phase 18 P02 | 11 min | 2 tasks | 6 files |
 | Phase 18 P03 | 8 min | 2 tasks | 5 files |
+| Phase 19 P01 | 9 min | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -50,6 +51,9 @@ v4.0 decisions:
 - [Phase 18]: Two-file split: gitignored env-manifest.json (machine-specific) + committed project-profile.json (team-visible)
 - [Phase 18]: Staleness detection based on watched file mtime comparison — root manifests, lockfiles, version manager files, docker-compose
 - [Phase 18]: Env summary wired into progress/execute-phase/resume/quick init commands; NOT phase-op/new-project/new-milestone per CONTEXT.md
+- [Phase 19]: 20-server known-DB with regex pattern matching for token estimation
+- [Phase 19]: Deduplication by name: .mcp.json > opencode.json > user-level config
+- [Phase 19]: HOME env var isolation in tests to prevent user-config interference
 
 ### Pending Todos
 
@@ -62,5 +66,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-02-25
-Stopped at: Completed 18-03-PLAN.md (Phase 18 complete)
+Stopped at: Completed 19-01-PLAN.md
 Resume file: None

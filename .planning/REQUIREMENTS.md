@@ -41,12 +41,12 @@ Requirements for milestone v4.0 Environment & Execution Intelligence. Each maps 
 
 ### MCP Profiling
 
-- [ ] **MCP-01**: CLI discovers configured MCP servers from config files
+- [x] **MCP-01**: CLI discovers configured MCP servers from config files
   - Parse .mcp.json (Claude Code), opencode.json (OpenCode)
   - Merge project-scoped and user-scoped configs
   - List server name, transport type, command
 
-- [ ] **MCP-02**: CLI estimates token cost per server from known-server database
+- [x] **MCP-02**: CLI estimates token cost per server from known-server database
   - Static lookup table: server-name → approximate tool count → token estimate
   - Cover 15+ common servers (GitHub, Postgres, Terraform, Brave, Docker, etc.)
   - Unknown servers estimated at 150 tokens/tool average
@@ -175,8 +175,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | ENV-04 | Phase 18 | Complete |
 | ENV-05 | Phase 18 | Complete |
 | ENV-06 | Phase 18 | Complete |
-| MCP-01 | Phase 19 | Pending |
-| MCP-02 | Phase 19 | Pending |
+| MCP-01 | Phase 19 | Complete |
+| MCP-02 | Phase 19 | Complete |
 | MCP-03 | Phase 19 | Pending |
 | MCP-04 | Phase 19 | Pending |
 | MCP-05 | Phase 19 | Pending |
