@@ -847,8 +847,12 @@ function checkEnvManifestStaleness(cwd) {
 /**
  * Perform the full environment scan and return the result object.
  * Extracted so both cmdEnvScan and cmdEnvStatus can reuse detection logic.
+ * @param {string} cwd - Project root directory
+ * @param {object} [options] - Scan options
+ * @param {boolean} [options.skipBinaryVersions=false] - Skip binary version checks for speed
  */
-function performEnvScan(cwd) {
+function performEnvScan(cwd, options = {}) {
+  const { skipBinaryVersions = false } = options;
   const startMs = Date.now();
 
   // 1. Scan for manifest files (fast path — file existence only)
@@ -861,18 +865,20 @@ function performEnvScan(cwd) {
   const languages = buildLanguageEntries(manifests, primaryLang);
 
   // 4. Check binary availability for each detected language
-  for (const lang of languages) {
-    const binaryResult = checkBinary(lang.binary.name, lang.binary.versionFlag);
-    lang.binary.available = binaryResult.available;
-    lang.binary.version = binaryResult.version;
-    lang.binary.path = binaryResult.path;
-  }
+  if (!skipBinaryVersions) {
+    for (const lang of languages) {
+      const binaryResult = checkBinary(lang.binary.name, lang.binary.versionFlag);
+      lang.binary.available = binaryResult.available;
+      lang.binary.version = binaryResult.version;
+      lang.binary.path = binaryResult.path;
+    }
 
-  // Elixir special case: also check 'mix' binary
-  const elixirLang = languages.find(l => l.name === 'elixir');
-  if (elixirLang) {
-    const mixResult = checkBinary('mix', '--version');
-    elixirLang.binary.extra = { name: 'mix', ...mixResult };
+    // Elixir special case: also check 'mix' binary
+    const elixirLang = languages.find(l => l.name === 'elixir');
+    if (elixirLang) {
+      const mixResult = checkBinary('mix', '--version');
+      elixirLang.binary.extra = { name: 'mix', ...mixResult };
+    }
   }
 
   // 5. Detect package manager
@@ -1037,9 +1043,122 @@ function cmdEnvStatus(cwd, args, raw) {
   output(result, raw);
 }
 
+// --- Environment Summary Helpers -----------------------------------------------
+
+/**
+ * Read and parse the env-manifest.json file.
+ * @param {string} cwd - Project root directory
+ * @returns {object|null} Parsed manifest or null if missing/invalid
+ */
+function readEnvManifest(cwd) {
+  const manifestPath = path.join(cwd, '.planning', 'env-manifest.json');
+  try {
+    if (!fs.existsSync(manifestPath)) return null;
+    return JSON.parse(fs.readFileSync(manifestPath, 'utf-8'));
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Format a compact "Tools: ..." summary line from a manifest.
+ * Groups each language with its PM if applicable.
+ * Output: "Tools: node@20.11 (pnpm), elixir@1.16 (mix), go@1.21, docker"
+ *
+ * @param {object|null} manifest - Parsed env-manifest.json
+ * @returns {string|null} Compact summary line or null
+ */
+function formatEnvSummary(manifest) {
+  if (!manifest || !manifest.languages || manifest.languages.length === 0) return null;
+
+  // Map PM names to the language they belong to
+  const langPmMap = {
+    npm: 'node', pnpm: 'node', yarn: 'node', bun: 'node',
+    mix: 'elixir',
+    cargo: 'rust',
+    bundler: 'ruby',
+    poetry: 'python', pipenv: 'python',
+    'go-modules': 'go',
+  };
+
+  const pm = manifest.package_manager;
+  const pmName = pm && pm.name ? pm.name : null;
+  const pmLang = pmName ? (langPmMap[pmName] || null) : null;
+
+  const parts = [];
+  for (const lang of manifest.languages) {
+    let entry;
+    if (lang.binary && lang.binary.available && lang.binary.version) {
+      entry = `${lang.name}@${lang.binary.version}`;
+    } else if (lang.binary && lang.binary.available) {
+      entry = lang.name;
+    } else {
+      entry = `${lang.name} (no binary)`;
+    }
+
+    // Append PM in parentheses if this is the PM's language
+    if (pmLang === lang.name && pmName) {
+      // For go-modules, show as "go modules" in parens
+      const pmDisplay = pmName === 'go-modules' ? 'go modules' : pmName;
+      // Don't duplicate: if entry is "elixir@1.16" and PM is "mix", add "(mix)"
+      // But if PM name === language name (like "mix" for elixir), still useful
+      entry += ` (${pmDisplay})`;
+    }
+
+    parts.push(entry);
+  }
+
+  // Add docker if detected
+  if (manifest.infrastructure && manifest.infrastructure.docker_services && manifest.infrastructure.docker_services.length > 0) {
+    // Only add docker entry if no docker language entry already exists
+    if (!manifest.languages.some(l => l.name === 'docker')) {
+      parts.push('docker');
+    }
+  }
+
+  return `Tools: ${parts.join(', ')}`;
+}
+
+/**
+ * Auto-trigger environment scan on init commands if no manifest exists or manifest is stale.
+ * Uses fast path: skips binary version checks for speed.
+ *
+ * @param {string} cwd - Project root directory
+ * @returns {object|null} Manifest object or null if not a GSD project
+ */
+function autoTriggerEnvScan(cwd) {
+  const planningDir = path.join(cwd, '.planning');
+  if (!fs.existsSync(planningDir)) return null;  // Not a GSD project
+
+  const manifest = readEnvManifest(cwd);
+
+  // If manifest exists, check staleness
+  if (manifest) {
+    const staleness = checkEnvManifestStaleness(cwd);
+    if (!staleness.stale) {
+      return manifest; // Fresh manifest — return as-is
+    }
+    // Stale — rescan
+    debugLog('env.autoTrigger', `rescan: ${staleness.reason}`);
+  }
+
+  // No manifest or stale — run a fast scan (skip binary version checks)
+  try {
+    const result = performEnvScan(cwd, { skipBinaryVersions: !manifest });
+    writeManifest(cwd, result);
+    ensureManifestGitignored(cwd);
+    writeProjectProfile(cwd, result);
+    return result;
+  } catch (e) {
+    debugLog('env.autoTrigger', `scan failed: ${e.message}`);
+    return manifest; // Return stale manifest rather than nothing
+  }
+}
+
 module.exports = {
   cmdEnvScan, cmdEnvStatus, checkEnvManifestStaleness,
   LANG_MANIFESTS, scanManifests, checkBinary, detectPackageManager, matchSimpleGlob,
   performEnvScan, writeManifest, ensureManifestGitignored, writeProjectProfile,
   getWatchedFiles, getWatchedFilesMtimes,
+  readEnvManifest, formatEnvSummary, autoTriggerEnvScan,
 };

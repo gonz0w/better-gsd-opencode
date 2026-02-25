@@ -9,6 +9,7 @@ const { safeReadFile, findPhaseInternal, resolveModelInternal, getRoadmapPhaseIn
 const { extractFrontmatter } = require('../lib/frontmatter');
 const { execGit } = require('../lib/git');
 const { getIntentDriftData, getIntentSummary } = require('./intent');
+const { autoTriggerEnvScan, formatEnvSummary, readEnvManifest } = require('./env');
 
 function cmdInitExecutePhase(cwd, phase, raw) {
   if (!phase) {
@@ -125,6 +126,20 @@ function cmdInitExecutePhase(cwd, phase, raw) {
     // Advisory — never crash. Leave intent_drift as null.
   }
 
+  // Environment context — auto-trigger scan if needed, inject compact summary
+  try {
+    const envManifest = autoTriggerEnvScan(cwd);
+    const envSummary = formatEnvSummary(envManifest);
+    result.env_summary = envSummary;
+    result.env_languages = envManifest?.languages?.length || 0;
+    result.env_stale = false;
+  } catch (e) {
+    debugLog('init.executePhase', 'env scan failed (non-blocking)', e);
+    result.env_summary = null;
+    result.env_languages = 0;
+    result.env_stale = false;
+  }
+
   if (global._gsdCompactMode) {
     const planPaths = (result.plans || []).map(p => typeof p === 'string' ? p : p.file || p);
     const compactResult = {
@@ -145,6 +160,7 @@ function cmdInitExecutePhase(cwd, phase, raw) {
         advisory: result.intent_drift.advisory,
       } : null,
       intent_summary: result.intent_summary || null,
+      env_summary: result.env_summary || null,
     };
     if (global._gsdManifestMode) {
       compactResult._manifest = {
@@ -463,6 +479,15 @@ function cmdInitQuick(cwd, description, raw) {
 
   };
 
+  // Environment context — inject compact summary
+  try {
+    const envManifest = autoTriggerEnvScan(cwd);
+    result.env_summary = formatEnvSummary(envManifest);
+  } catch (e) {
+    debugLog('init.quick', 'env scan failed (non-blocking)', e);
+    result.env_summary = null;
+  }
+
   if (global._gsdCompactMode) {
     const manifestFiles = [];
     if (pathExistsInternal(cwd, '.planning/STATE.md')) manifestFiles.push({ path: '.planning/STATE.md', sections: ['Current Position'], required: false });
@@ -474,6 +499,7 @@ function cmdInitQuick(cwd, description, raw) {
       task_dir: result.task_dir,
       date: result.date,
       planning_exists: result.planning_exists,
+      env_summary: result.env_summary || null,
     };
     if (global._gsdManifestMode) {
       compactResult._manifest = { files: manifestFiles };
@@ -513,6 +539,15 @@ function cmdInitResume(cwd, raw) {
     commit_docs: config.commit_docs,
   };
 
+  // Environment context — inject compact summary
+  try {
+    const envManifest = autoTriggerEnvScan(cwd);
+    result.env_summary = formatEnvSummary(envManifest);
+  } catch (e) {
+    debugLog('init.resume', 'env scan failed (non-blocking)', e);
+    result.env_summary = null;
+  }
+
   if (global._gsdCompactMode) {
     const manifestFiles = [];
     if (result.state_exists) manifestFiles.push({ path: '.planning/STATE.md', required: true });
@@ -523,6 +558,7 @@ function cmdInitResume(cwd, raw) {
       planning_exists: result.planning_exists,
       has_interrupted_agent: result.has_interrupted_agent,
       interrupted_agent_id: result.interrupted_agent_id,
+      env_summary: result.env_summary || null,
     };
     if (global._gsdManifestMode) {
       compactResult._manifest = { files: manifestFiles };
@@ -1028,6 +1064,19 @@ function cmdInitProgress(cwd, raw) {
     debugLog('init.progress', 'intent summary failed (non-blocking)', e);
   }
 
+  // Environment context — auto-trigger scan if needed, inject compact summary
+  try {
+    const envManifest = autoTriggerEnvScan(cwd);
+    result.env_summary = formatEnvSummary(envManifest);
+    result.env_languages = envManifest?.languages?.length || 0;
+    result.env_stale = false;
+  } catch (e) {
+    debugLog('init.progress', 'env scan failed (non-blocking)', e);
+    result.env_summary = null;
+    result.env_languages = 0;
+    result.env_stale = false;
+  }
+
   if (global._gsdCompactMode) {
     const manifestFiles = [];
     if (result.state_exists) manifestFiles.push({ path: '.planning/STATE.md', sections: ['Current Position'], required: false });
@@ -1045,6 +1094,7 @@ function cmdInitProgress(cwd, raw) {
       has_work_in_progress: result.has_work_in_progress,
       session_diff: result.session_diff,
       intent_summary: result.intent_summary || null,
+      env_summary: result.env_summary || null,
     };
     if (global._gsdManifestMode) {
       compactResult._manifest = { files: manifestFiles };
