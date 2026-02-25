@@ -71,31 +71,31 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| ICAP-01 | Pending | Pending |
-| ICAP-02 | Pending | Pending |
-| ICAP-03 | Pending | Pending |
-| ICAP-04 | Pending | Pending |
-| ICAP-05 | Pending | Pending |
-| ICAP-06 | Pending | Pending |
-| ITRC-01 | Pending | Pending |
-| ITRC-02 | Pending | Pending |
-| ITRC-03 | Pending | Pending |
-| IVAL-01 | Pending | Pending |
-| IVAL-02 | Pending | Pending |
-| IVAL-03 | Pending | Pending |
-| IVAL-04 | Pending | Pending |
-| IVAL-05 | Pending | Pending |
-| WINT-01 | Pending | Pending |
-| WINT-02 | Pending | Pending |
-| WINT-03 | Pending | Pending |
-| WINT-04 | Pending | Pending |
-| SELF-01 | Pending | Pending |
+| ICAP-01 | Phase 14 | Pending |
+| ICAP-02 | Phase 14 | Pending |
+| ICAP-03 | Phase 14 | Pending |
+| ICAP-04 | Phase 14 | Pending |
+| ICAP-05 | Phase 17 | Pending |
+| ICAP-06 | Phase 17 | Pending |
+| ITRC-01 | Phase 15 | Pending |
+| ITRC-02 | Phase 15 | Pending |
+| ITRC-03 | Phase 15 | Pending |
+| IVAL-01 | Phase 15 | Pending |
+| IVAL-02 | Phase 15 | Pending |
+| IVAL-03 | Phase 15 | Pending |
+| IVAL-04 | Phase 15 | Pending |
+| IVAL-05 | Phase 15 | Pending |
+| WINT-01 | Phase 16 | Pending |
+| WINT-02 | Phase 16 | Pending |
+| WINT-03 | Phase 16 | Pending |
+| WINT-04 | Phase 16 | Pending |
+| SELF-01 | Phase 16 | Pending |
 
 **Coverage:**
 - v3.0 requirements: 19 total
-- Mapped to phases: 0
-- Unmapped: 19 (roadmap not yet created)
+- Mapped to phases: 19
+- Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-02-24*
-*Last updated: 2026-02-24 after initial definition*
+*Last updated: 2026-02-24 after roadmap creation*
