@@ -775,6 +775,30 @@ Output: { total_commands, commands_with_tests, coverage_percent, covered, uncove
 Examples:
   gsd-tools test-coverage --raw`,
 
+  'intent': `Usage: gsd-tools intent <subcommand> [options] [--raw]
+
+Manage project intent in INTENT.md.
+
+Subcommands:
+  create                    Create a new INTENT.md in .planning/
+    --force                 Overwrite existing INTENT.md
+    --objective "text"      Set objective statement
+    --users "u1" "u2"      Set target users
+    --outcomes "DO-01 [P1]: desc"  Add desired outcomes
+    --criteria "SC-01: gate"       Add success criteria
+
+Creates .planning/INTENT.md with 6 structured sections:
+  objective, users, outcomes, criteria, constraints, health
+
+Auto-commits if commit_docs is enabled.
+
+Output: { created, path, revision, sections, commit }
+
+Examples:
+  gsd-tools intent create
+  gsd-tools intent create --force
+  gsd-tools intent create --objective "A CLI for project planning" --raw`,
+
   'extract-sections': `Usage: gsd-tools extract-sections <file-path> [section1] [section2] ... [--raw]
 
 Extract specific named sections from a markdown file.

@@ -741,6 +741,29 @@ Output: { total_commands, commands_with_tests, coverage_percent, covered, uncove
 
 Examples:
   gsd-tools test-coverage --raw`,
+      "intent": `Usage: gsd-tools intent <subcommand> [options] [--raw]
+
+Manage project intent in INTENT.md.
+
+Subcommands:
+  create                    Create a new INTENT.md in .planning/
+    --force                 Overwrite existing INTENT.md
+    --objective "text"      Set objective statement
+    --users "u1" "u2"      Set target users
+    --outcomes "DO-01 [P1]: desc"  Add desired outcomes
+    --criteria "SC-01: gate"       Add success criteria
+
+Creates .planning/INTENT.md with 6 structured sections:
+  objective, users, outcomes, criteria, constraints, health
+
+Auto-commits if commit_docs is enabled.
+
+Output: { created, path, revision, sections, commit }
+
+Examples:
+  gsd-tools intent create
+  gsd-tools intent create --force
+  gsd-tools intent create --objective "A CLI for project planning" --raw`,
       "extract-sections": `Usage: gsd-tools extract-sections <file-path> [section1] [section2] ... [--raw]
 
 Extract specific named sections from a markdown file.
@@ -1242,6 +1265,238 @@ var require_helpers = __commonJS({
       }
       return Array.from(refs);
     }
+    function parseIntentMd(content) {
+      if (!content || typeof content !== "string") {
+        return {
+          revision: null,
+          created: null,
+          updated: null,
+          objective: { statement: "", elaboration: "" },
+          users: [],
+          outcomes: [],
+          criteria: [],
+          constraints: { technical: [], business: [], timeline: [] },
+          health: { quantitative: [], qualitative: "" }
+        };
+      }
+      const revisionMatch = content.match(/\*\*Revision:\*\*\s*(\d+)/);
+      const createdMatch = content.match(/\*\*Created:\*\*\s*(\S+)/);
+      const updatedMatch = content.match(/\*\*Updated:\*\*\s*(\S+)/);
+      const revision = revisionMatch ? parseInt(revisionMatch[1], 10) : null;
+      const created = createdMatch ? createdMatch[1] : null;
+      const updated = updatedMatch ? updatedMatch[1] : null;
+      function extractSection(tag) {
+        const pattern = new RegExp(`<${tag}>([\\s\\S]*?)<\\/${tag}>`);
+        const match = content.match(pattern);
+        return match ? match[1].trim() : null;
+      }
+      const objectiveRaw = extractSection("objective");
+      const objective = { statement: "", elaboration: "" };
+      if (objectiveRaw) {
+        const lines = objectiveRaw.split("\n");
+        objective.statement = lines[0].trim();
+        objective.elaboration = lines.slice(1).join("\n").trim();
+      }
+      const usersRaw = extractSection("users");
+      const users = [];
+      if (usersRaw) {
+        const userLines = usersRaw.split("\n").filter((l) => l.match(/^\s*-\s+/));
+        for (const line of userLines) {
+          const text = line.replace(/^\s*-\s+/, "").trim();
+          if (text) users.push({ text });
+        }
+      }
+      const outcomesRaw = extractSection("outcomes");
+      const outcomes = [];
+      if (outcomesRaw) {
+        const outcomePattern = /^\s*-\s+(DO-\d+)\s+\[(P[123])\]:\s*(.+)/;
+        for (const line of outcomesRaw.split("\n")) {
+          const match = line.match(outcomePattern);
+          if (match) {
+            outcomes.push({ id: match[1], priority: match[2], text: match[3].trim() });
+          }
+        }
+      }
+      const criteriaRaw = extractSection("criteria");
+      const criteria = [];
+      if (criteriaRaw) {
+        const criteriaPattern = /^\s*-\s+(SC-\d+):\s*(.+)/;
+        for (const line of criteriaRaw.split("\n")) {
+          const match = line.match(criteriaPattern);
+          if (match) {
+            criteria.push({ id: match[1], text: match[2].trim() });
+          }
+        }
+      }
+      const constraintsRaw = extractSection("constraints");
+      const constraints = { technical: [], business: [], timeline: [] };
+      if (constraintsRaw) {
+        const constraintPattern = /^\s*-\s+(C-\d+):\s*(.+)/;
+        let currentType = null;
+        for (const line of constraintsRaw.split("\n")) {
+          if (/^###\s*Technical/i.test(line)) {
+            currentType = "technical";
+            continue;
+          }
+          if (/^###\s*Business/i.test(line)) {
+            currentType = "business";
+            continue;
+          }
+          if (/^###\s*Timeline/i.test(line)) {
+            currentType = "timeline";
+            continue;
+          }
+          if (currentType) {
+            const match = line.match(constraintPattern);
+            if (match) {
+              constraints[currentType].push({ id: match[1], text: match[2].trim() });
+            }
+          }
+        }
+      }
+      const healthRaw = extractSection("health");
+      const health = { quantitative: [], qualitative: "" };
+      if (healthRaw) {
+        const healthPattern = /^\s*-\s+(HM-\d+):\s*(.+)/;
+        let inQuantitative = false;
+        let inQualitative = false;
+        const qualLines = [];
+        for (const line of healthRaw.split("\n")) {
+          if (/^###\s*Quantitative/i.test(line)) {
+            inQuantitative = true;
+            inQualitative = false;
+            continue;
+          }
+          if (/^###\s*Qualitative/i.test(line)) {
+            inQualitative = true;
+            inQuantitative = false;
+            continue;
+          }
+          if (inQuantitative) {
+            const match = line.match(healthPattern);
+            if (match) {
+              health.quantitative.push({ id: match[1], text: match[2].trim() });
+            }
+          }
+          if (inQualitative && line.trim()) {
+            qualLines.push(line.trim());
+          }
+        }
+        health.qualitative = qualLines.join("\n");
+      }
+      return {
+        revision,
+        created,
+        updated,
+        objective,
+        users,
+        outcomes,
+        criteria,
+        constraints,
+        health
+      };
+    }
+    function generateIntentMd(data) {
+      const lines = [];
+      lines.push(`**Revision:** ${data.revision || 1}`);
+      lines.push(`**Created:** ${data.created || (/* @__PURE__ */ new Date()).toISOString().split("T")[0]}`);
+      lines.push(`**Updated:** ${data.updated || (/* @__PURE__ */ new Date()).toISOString().split("T")[0]}`);
+      lines.push("");
+      lines.push("<objective>");
+      if (data.objective && data.objective.statement) {
+        lines.push(data.objective.statement);
+        if (data.objective.elaboration) {
+          lines.push("");
+          lines.push(data.objective.elaboration);
+        }
+      } else {
+        lines.push("<!-- Single statement: what this project does and why -->");
+      }
+      lines.push("</objective>");
+      lines.push("");
+      lines.push("<users>");
+      if (data.users && data.users.length > 0) {
+        for (const u of data.users) {
+          lines.push(`- ${u.text}`);
+        }
+      } else {
+        lines.push("<!-- Brief audience descriptions, one per line -->");
+      }
+      lines.push("</users>");
+      lines.push("");
+      lines.push("<outcomes>");
+      if (data.outcomes && data.outcomes.length > 0) {
+        for (const o of data.outcomes) {
+          lines.push(`- ${o.id} [${o.priority}]: ${o.text}`);
+        }
+      } else {
+        lines.push("<!-- Bullet list: - DO-XX [PX]: description -->");
+      }
+      lines.push("</outcomes>");
+      lines.push("");
+      lines.push("<criteria>");
+      if (data.criteria && data.criteria.length > 0) {
+        for (const c of data.criteria) {
+          lines.push(`- ${c.id}: ${c.text}`);
+        }
+      } else {
+        lines.push("<!-- Bullet list: - SC-XX: launch gate -->");
+      }
+      lines.push("</criteria>");
+      lines.push("");
+      lines.push("<constraints>");
+      const hasTech = data.constraints && data.constraints.technical && data.constraints.technical.length > 0;
+      const hasBiz = data.constraints && data.constraints.business && data.constraints.business.length > 0;
+      const hasTime = data.constraints && data.constraints.timeline && data.constraints.timeline.length > 0;
+      if (hasTech || hasBiz || hasTime) {
+        if (hasTech) {
+          lines.push("### Technical");
+          for (const c of data.constraints.technical) {
+            lines.push(`- ${c.id}: ${c.text}`);
+          }
+          lines.push("");
+        }
+        if (hasBiz) {
+          lines.push("### Business");
+          for (const c of data.constraints.business) {
+            lines.push(`- ${c.id}: ${c.text}`);
+          }
+          lines.push("");
+        }
+        if (hasTime) {
+          lines.push("### Timeline");
+          for (const c of data.constraints.timeline) {
+            lines.push(`- ${c.id}: ${c.text}`);
+          }
+          lines.push("");
+        }
+      } else {
+        lines.push("<!-- Sub-headers: ### Technical, ### Business, ### Timeline. Items: - C-XX: constraint -->");
+      }
+      lines.push("</constraints>");
+      lines.push("");
+      lines.push("<health>");
+      const hasQuant = data.health && data.health.quantitative && data.health.quantitative.length > 0;
+      const hasQual = data.health && data.health.qualitative && data.health.qualitative.trim();
+      if (hasQuant || hasQual) {
+        if (hasQuant) {
+          lines.push("### Quantitative");
+          for (const m of data.health.quantitative) {
+            lines.push(`- ${m.id}: ${m.text}`);
+          }
+          lines.push("");
+        }
+        if (hasQual) {
+          lines.push("### Qualitative");
+          lines.push(data.health.qualitative);
+        }
+      } else {
+        lines.push("<!-- Sub-headers: ### Quantitative (- HM-XX: metric) and ### Qualitative (prose) -->");
+      }
+      lines.push("</health>");
+      lines.push("");
+      return lines.join("\n");
+    }
     module2.exports = {
       safeReadFile,
       cachedReadFile,
@@ -1258,7 +1513,9 @@ var require_helpers = __commonJS({
       pathExistsInternal,
       generateSlugInternal,
       getMilestoneInfo,
-      extractAtReferences
+      extractAtReferences,
+      parseIntentMd,
+      generateIntentMd
     };
   }
 });
@@ -8607,6 +8864,104 @@ var require_memory = __commonJS({
   }
 });
 
+// src/commands/intent.js
+var require_intent = __commonJS({
+  "src/commands/intent.js"(exports2, module2) {
+    var fs = require("fs");
+    var path = require("path");
+    var { output, error, debugLog } = require_output();
+    var { loadConfig } = require_config();
+    var { execGit } = require_git();
+    var { parseIntentMd, generateIntentMd } = require_helpers();
+    function cmdIntentCreate(cwd, args, raw) {
+      const planningDir = path.join(cwd, ".planning");
+      if (!fs.existsSync(planningDir)) {
+        error(".planning/ directory not found. Run project initialization first.");
+      }
+      const intentPath = path.join(planningDir, "INTENT.md");
+      const force = args.includes("--force");
+      if (fs.existsSync(intentPath) && !force) {
+        error("INTENT.md already exists. Use --force to overwrite.");
+      }
+      const getFlag = (flag) => {
+        const idx = args.indexOf(flag);
+        if (idx === -1 || idx + 1 >= args.length) return null;
+        return args[idx + 1];
+      };
+      const getMultiFlag = (flag) => {
+        const idx = args.indexOf(flag);
+        if (idx === -1) return [];
+        const values = [];
+        for (let i = idx + 1; i < args.length; i++) {
+          if (args[i].startsWith("--")) break;
+          values.push(args[i]);
+        }
+        return values;
+      };
+      const now = (/* @__PURE__ */ new Date()).toISOString().split("T")[0];
+      const data = {
+        revision: 1,
+        created: now,
+        updated: now,
+        objective: { statement: "", elaboration: "" },
+        users: [],
+        outcomes: [],
+        criteria: [],
+        constraints: { technical: [], business: [], timeline: [] },
+        health: { quantitative: [], qualitative: "" }
+      };
+      const objectiveText = getFlag("--objective");
+      if (objectiveText) {
+        const parts = objectiveText.split("\n");
+        data.objective.statement = parts[0] || "";
+        data.objective.elaboration = parts.slice(1).join("\n").trim();
+      }
+      const userArgs = getMultiFlag("--users");
+      for (const u of userArgs) {
+        data.users.push({ text: u });
+      }
+      const outcomeArgs = getMultiFlag("--outcomes");
+      for (const o of outcomeArgs) {
+        const match = o.match(/^(DO-\d+)\s+\[(P[123])\]:\s*(.+)$/);
+        if (match) {
+          data.outcomes.push({ id: match[1], priority: match[2], text: match[3] });
+        }
+      }
+      const criteriaArgs = getMultiFlag("--criteria");
+      for (const c of criteriaArgs) {
+        const match = c.match(/^(SC-\d+):\s*(.+)$/);
+        if (match) {
+          data.criteria.push({ id: match[1], text: match[2] });
+        }
+      }
+      const content = generateIntentMd(data);
+      fs.writeFileSync(intentPath, content, "utf-8");
+      const sections = ["objective", "users", "outcomes", "criteria", "constraints", "health"];
+      const config = loadConfig(cwd);
+      let commitHash = null;
+      if (config.commit_docs) {
+        execGit(cwd, ["add", ".planning/INTENT.md"]);
+        const commitResult = execGit(cwd, ["commit", "-m", "docs(intent): create INTENT.md"]);
+        if (commitResult.exitCode === 0) {
+          const hashResult = execGit(cwd, ["rev-parse", "--short", "HEAD"]);
+          commitHash = hashResult.exitCode === 0 ? hashResult.stdout : null;
+        }
+      }
+      const result = {
+        created: true,
+        path: ".planning/INTENT.md",
+        revision: 1,
+        sections,
+        commit: commitHash
+      };
+      output(result, raw, commitHash || "created");
+    }
+    module2.exports = {
+      cmdIntentCreate
+    };
+  }
+});
+
 // src/router.js
 var require_router = __commonJS({
   "src/router.js"(exports2, module2) {
@@ -8728,6 +9083,9 @@ var require_router = __commonJS({
       cmdMemoryEnsureDir,
       cmdMemoryCompact
     } = require_memory();
+    var {
+      cmdIntentCreate
+    } = require_intent();
     async function main2() {
       const args = process.argv.slice(2);
       const rawIndex = args.indexOf("--raw");
@@ -8762,7 +9120,7 @@ var require_router = __commonJS({
       const command = args[0];
       const cwd = process.cwd();
       if (!command) {
-        error("Usage: gsd-tools <command> [args] [--raw] [--verbose]\nCommands: codebase-impact, commit, config-ensure-section, config-get, config-migrate, config-set, context-budget, current-timestamp, extract-sections, find-phase, frontmatter, generate-slug, history-digest, init, list-todos, memory, milestone, phase, phase-plan-index, phases, progress, quick-summary, requirements, resolve-model, roadmap, rollback-info, scaffold, search-decisions, search-lessons, session-diff, state, state-snapshot, summary-extract, template, test-coverage, test-run, todo, token-budget, trace-requirement, validate, validate-config, validate-dependencies, velocity, verify, verify-path-exists, verify-summary, websearch");
+        error("Usage: gsd-tools <command> [args] [--raw] [--verbose]\nCommands: codebase-impact, commit, config-ensure-section, config-get, config-migrate, config-set, context-budget, current-timestamp, extract-sections, find-phase, frontmatter, generate-slug, history-digest, init, intent, list-todos, memory, milestone, phase, phase-plan-index, phases, progress, quick-summary, requirements, resolve-model, roadmap, rollback-info, scaffold, search-decisions, search-lessons, session-diff, state, state-snapshot, summary-extract, template, test-coverage, test-run, todo, token-budget, trace-requirement, validate, validate-config, validate-dependencies, velocity, verify, verify-path-exists, verify-summary, websearch");
       }
       if (args.includes("--help") || args.includes("-h")) {
         const helpKey = command || "";
@@ -9279,6 +9637,15 @@ Available: execute-phase, plan-phase, new-project, new-milestone, quick, resume,
             }, raw);
           } else {
             error("Unknown memory subcommand. Available: write, read, list, ensure-dir, compact");
+          }
+          break;
+        }
+        case "intent": {
+          const subcommand = args[1];
+          if (subcommand === "create") {
+            cmdIntentCreate(cwd, args.slice(2), raw);
+          } else {
+            error("Unknown intent subcommand. Available: create");
           }
           break;
         }

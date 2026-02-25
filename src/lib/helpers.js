@@ -432,6 +432,255 @@ function extractAtReferences(content) {
   return Array.from(refs);
 }
 
+// ─── Intent Parsing ─────────────────────────────────────────────────────────
+
+/**
+ * Parse INTENT.md content into structured JSON.
+ * Graceful degradation: missing sections return null/empty defaults.
+ */
+function parseIntentMd(content) {
+  if (!content || typeof content !== 'string') {
+    return {
+      revision: null, created: null, updated: null,
+      objective: { statement: '', elaboration: '' },
+      users: [], outcomes: [], criteria: [],
+      constraints: { technical: [], business: [], timeline: [] },
+      health: { quantitative: [], qualitative: '' },
+    };
+  }
+
+  // Extract revision, created, updated from metadata
+  const revisionMatch = content.match(/\*\*Revision:\*\*\s*(\d+)/);
+  const createdMatch = content.match(/\*\*Created:\*\*\s*(\S+)/);
+  const updatedMatch = content.match(/\*\*Updated:\*\*\s*(\S+)/);
+
+  const revision = revisionMatch ? parseInt(revisionMatch[1], 10) : null;
+  const created = createdMatch ? createdMatch[1] : null;
+  const updated = updatedMatch ? updatedMatch[1] : null;
+
+  // Extract XML-tagged sections
+  function extractSection(tag) {
+    const pattern = new RegExp(`<${tag}>([\\s\\S]*?)<\\/${tag}>`);
+    const match = content.match(pattern);
+    return match ? match[1].trim() : null;
+  }
+
+  // Parse objective: first line = statement, rest = elaboration
+  const objectiveRaw = extractSection('objective');
+  const objective = { statement: '', elaboration: '' };
+  if (objectiveRaw) {
+    const lines = objectiveRaw.split('\n');
+    objective.statement = lines[0].trim();
+    objective.elaboration = lines.slice(1).join('\n').trim();
+  }
+
+  // Parse users: bullet list items
+  const usersRaw = extractSection('users');
+  const users = [];
+  if (usersRaw) {
+    const userLines = usersRaw.split('\n').filter(l => l.match(/^\s*-\s+/));
+    for (const line of userLines) {
+      const text = line.replace(/^\s*-\s+/, '').trim();
+      if (text) users.push({ text });
+    }
+  }
+
+  // Parse outcomes: - DO-XX [PX]: description
+  const outcomesRaw = extractSection('outcomes');
+  const outcomes = [];
+  if (outcomesRaw) {
+    const outcomePattern = /^\s*-\s+(DO-\d+)\s+\[(P[123])\]:\s*(.+)/;
+    for (const line of outcomesRaw.split('\n')) {
+      const match = line.match(outcomePattern);
+      if (match) {
+        outcomes.push({ id: match[1], priority: match[2], text: match[3].trim() });
+      }
+    }
+  }
+
+  // Parse criteria: - SC-XX: description
+  const criteriaRaw = extractSection('criteria');
+  const criteria = [];
+  if (criteriaRaw) {
+    const criteriaPattern = /^\s*-\s+(SC-\d+):\s*(.+)/;
+    for (const line of criteriaRaw.split('\n')) {
+      const match = line.match(criteriaPattern);
+      if (match) {
+        criteria.push({ id: match[1], text: match[2].trim() });
+      }
+    }
+  }
+
+  // Parse constraints: split by ### Technical, ### Business, ### Timeline sub-headers
+  const constraintsRaw = extractSection('constraints');
+  const constraints = { technical: [], business: [], timeline: [] };
+  if (constraintsRaw) {
+    const constraintPattern = /^\s*-\s+(C-\d+):\s*(.+)/;
+    let currentType = null;
+    for (const line of constraintsRaw.split('\n')) {
+      if (/^###\s*Technical/i.test(line)) { currentType = 'technical'; continue; }
+      if (/^###\s*Business/i.test(line)) { currentType = 'business'; continue; }
+      if (/^###\s*Timeline/i.test(line)) { currentType = 'timeline'; continue; }
+      if (currentType) {
+        const match = line.match(constraintPattern);
+        if (match) {
+          constraints[currentType].push({ id: match[1], text: match[2].trim() });
+        }
+      }
+    }
+  }
+
+  // Parse health: split by ### Quantitative and ### Qualitative
+  const healthRaw = extractSection('health');
+  const health = { quantitative: [], qualitative: '' };
+  if (healthRaw) {
+    const healthPattern = /^\s*-\s+(HM-\d+):\s*(.+)/;
+    let inQuantitative = false;
+    let inQualitative = false;
+    const qualLines = [];
+    for (const line of healthRaw.split('\n')) {
+      if (/^###\s*Quantitative/i.test(line)) { inQuantitative = true; inQualitative = false; continue; }
+      if (/^###\s*Qualitative/i.test(line)) { inQualitative = true; inQuantitative = false; continue; }
+      if (inQuantitative) {
+        const match = line.match(healthPattern);
+        if (match) {
+          health.quantitative.push({ id: match[1], text: match[2].trim() });
+        }
+      }
+      if (inQualitative && line.trim()) {
+        qualLines.push(line.trim());
+      }
+    }
+    health.qualitative = qualLines.join('\n');
+  }
+
+  return {
+    revision, created, updated,
+    objective, users, outcomes, criteria, constraints, health,
+  };
+}
+
+/**
+ * Generate INTENT.md content from structured data.
+ * When data has empty sections, produces HTML comments as instructions.
+ */
+function generateIntentMd(data) {
+  const lines = [];
+
+  // Metadata
+  lines.push(`**Revision:** ${data.revision || 1}`);
+  lines.push(`**Created:** ${data.created || new Date().toISOString().split('T')[0]}`);
+  lines.push(`**Updated:** ${data.updated || new Date().toISOString().split('T')[0]}`);
+  lines.push('');
+
+  // Objective
+  lines.push('<objective>');
+  if (data.objective && data.objective.statement) {
+    lines.push(data.objective.statement);
+    if (data.objective.elaboration) {
+      lines.push('');
+      lines.push(data.objective.elaboration);
+    }
+  } else {
+    lines.push('<!-- Single statement: what this project does and why -->');
+  }
+  lines.push('</objective>');
+  lines.push('');
+
+  // Users
+  lines.push('<users>');
+  if (data.users && data.users.length > 0) {
+    for (const u of data.users) {
+      lines.push(`- ${u.text}`);
+    }
+  } else {
+    lines.push('<!-- Brief audience descriptions, one per line -->');
+  }
+  lines.push('</users>');
+  lines.push('');
+
+  // Outcomes
+  lines.push('<outcomes>');
+  if (data.outcomes && data.outcomes.length > 0) {
+    for (const o of data.outcomes) {
+      lines.push(`- ${o.id} [${o.priority}]: ${o.text}`);
+    }
+  } else {
+    lines.push('<!-- Bullet list: - DO-XX [PX]: description -->');
+  }
+  lines.push('</outcomes>');
+  lines.push('');
+
+  // Criteria
+  lines.push('<criteria>');
+  if (data.criteria && data.criteria.length > 0) {
+    for (const c of data.criteria) {
+      lines.push(`- ${c.id}: ${c.text}`);
+    }
+  } else {
+    lines.push('<!-- Bullet list: - SC-XX: launch gate -->');
+  }
+  lines.push('</criteria>');
+  lines.push('');
+
+  // Constraints
+  lines.push('<constraints>');
+  const hasTech = data.constraints && data.constraints.technical && data.constraints.technical.length > 0;
+  const hasBiz = data.constraints && data.constraints.business && data.constraints.business.length > 0;
+  const hasTime = data.constraints && data.constraints.timeline && data.constraints.timeline.length > 0;
+  if (hasTech || hasBiz || hasTime) {
+    if (hasTech) {
+      lines.push('### Technical');
+      for (const c of data.constraints.technical) {
+        lines.push(`- ${c.id}: ${c.text}`);
+      }
+      lines.push('');
+    }
+    if (hasBiz) {
+      lines.push('### Business');
+      for (const c of data.constraints.business) {
+        lines.push(`- ${c.id}: ${c.text}`);
+      }
+      lines.push('');
+    }
+    if (hasTime) {
+      lines.push('### Timeline');
+      for (const c of data.constraints.timeline) {
+        lines.push(`- ${c.id}: ${c.text}`);
+      }
+      lines.push('');
+    }
+  } else {
+    lines.push('<!-- Sub-headers: ### Technical, ### Business, ### Timeline. Items: - C-XX: constraint -->');
+  }
+  lines.push('</constraints>');
+  lines.push('');
+
+  // Health
+  lines.push('<health>');
+  const hasQuant = data.health && data.health.quantitative && data.health.quantitative.length > 0;
+  const hasQual = data.health && data.health.qualitative && data.health.qualitative.trim();
+  if (hasQuant || hasQual) {
+    if (hasQuant) {
+      lines.push('### Quantitative');
+      for (const m of data.health.quantitative) {
+        lines.push(`- ${m.id}: ${m.text}`);
+      }
+      lines.push('');
+    }
+    if (hasQual) {
+      lines.push('### Qualitative');
+      lines.push(data.health.qualitative);
+    }
+  } else {
+    lines.push('<!-- Sub-headers: ### Quantitative (- HM-XX: metric) and ### Qualitative (prose) -->');
+  }
+  lines.push('</health>');
+  lines.push('');
+
+  return lines.join('\n');
+}
+
 module.exports = {
   safeReadFile,
   cachedReadFile,
@@ -449,4 +698,6 @@ module.exports = {
   generateSlugInternal,
   getMilestoneInfo,
   extractAtReferences,
+  parseIntentMd,
+  generateIntentMd,
 };
