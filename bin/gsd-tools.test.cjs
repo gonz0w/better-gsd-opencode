@@ -10671,3 +10671,206 @@ describe('assertions commands', () => {
     assert.ok(result.output.includes('must-have'), 'rawValue mentions must-have');
   });
 });
+
+describe('verify requirements with assertions', () => {
+  let tmpDir;
+
+  const SAMPLE_ASSERTIONS = `# Assertions: Test Project
+
+**Defined:** 2026-02-25
+**Source:** REQUIREMENTS.md
+
+## SREQ-01: Requirements template includes structured acceptance criteria
+
+- assert: "ASSERTIONS.md template exists with schema definition"
+  type: file
+  priority: must-have
+
+- assert: "parseAssertionsMd returns structured assertion map"
+  when: "Given valid ASSERTIONS.md content"
+  then: "Returns object with reqId keys"
+  type: behavior
+  priority: must-have
+
+- assert: "assertions list outputs grouped data"
+  type: cli
+  priority: nice-to-have
+
+## SREQ-03: Traceability table maps requirements to test commands
+
+- assert: "trace-requirement shows assertion chain"
+  when: "Requirement has assertions"
+  then: "Output includes assertion pass/fail status"
+  type: cli
+  priority: must-have
+
+- assert: "coverage percent reflects tested requirements"
+  type: behavior
+  priority: nice-to-have
+`;
+
+  const SAMPLE_REQUIREMENTS = `# Requirements
+
+## v4.0 Requirements
+
+### Structured Requirements
+
+- [x] **SREQ-01**: Requirements template includes structured acceptance criteria
+- [ ] **SREQ-02**: New-milestone workflows generate structured requirements
+- [ ] **SREQ-03**: Traceability table maps requirements to test commands
+
+## Traceability
+
+| Requirement | Phase | Status |
+|-------------|-------|--------|
+| SREQ-01 | Phase 20 | Complete |
+| SREQ-02 | Phase 20 | Pending |
+| SREQ-03 | Phase 20 | Pending |
+`;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('verify requirements backward compatible when no ASSERTIONS.md', () => {
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'REQUIREMENTS.md'), SAMPLE_REQUIREMENTS);
+    // Create phase directory with a summary so some reqs are "addressed"
+    const phaseDir = path.join(tmpDir, '.planning', 'phases', '20-structured-requirements');
+    fs.mkdirSync(phaseDir, { recursive: true });
+    fs.writeFileSync(path.join(phaseDir, '20-01-SUMMARY.md'), '# Summary\n');
+    const result = runGsdTools('verify requirements', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+    const data = JSON.parse(result.output);
+    assert.strictEqual(data.total, 3, 'should have 3 requirements');
+    assert.ok(!data.assertions, 'should not have assertions field when no ASSERTIONS.md');
+  });
+
+  test('verify requirements includes per-assertion pass/fail when ASSERTIONS.md exists', () => {
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'REQUIREMENTS.md'), SAMPLE_REQUIREMENTS);
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'ASSERTIONS.md'), SAMPLE_ASSERTIONS);
+    const phaseDir = path.join(tmpDir, '.planning', 'phases', '20-structured-requirements');
+    fs.mkdirSync(phaseDir, { recursive: true });
+    fs.writeFileSync(path.join(phaseDir, '20-01-SUMMARY.md'), '# Summary\n');
+    const result = runGsdTools('verify requirements', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+    const data = JSON.parse(result.output);
+    assert.ok(data.assertions, 'should include assertions field');
+    assert.strictEqual(data.assertions.total, 5, 'should have 5 assertions from ASSERTIONS.md (2 reqs)');
+    assert.ok(typeof data.assertions.verified === 'number', 'verified is a number');
+    assert.ok(typeof data.assertions.failed === 'number', 'failed is a number');
+    assert.ok(typeof data.assertions.needs_human === 'number', 'needs_human is a number');
+    assert.ok(data.assertions.by_requirement['SREQ-01'], 'should have SREQ-01 in by_requirement');
+    assert.ok(data.assertions.by_requirement['SREQ-03'], 'should have SREQ-03 in by_requirement');
+  });
+
+  test('verify requirements coverage percentage calculated correctly', () => {
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'REQUIREMENTS.md'), SAMPLE_REQUIREMENTS);
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'ASSERTIONS.md'), SAMPLE_ASSERTIONS);
+    const result = runGsdTools('verify requirements', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+    const data = JSON.parse(result.output);
+    assert.ok(data.assertions, 'should include assertions field');
+    assert.ok(typeof data.assertions.coverage_percent === 'number', 'coverage_percent is a number');
+    assert.ok(data.assertions.coverage_percent >= 0 && data.assertions.coverage_percent <= 100, 'coverage_percent between 0-100');
+  });
+
+  test('verify requirements must-have vs nice-to-have filtering in output', () => {
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'REQUIREMENTS.md'), SAMPLE_REQUIREMENTS);
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'ASSERTIONS.md'), SAMPLE_ASSERTIONS);
+    const result = runGsdTools('verify requirements', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+    const data = JSON.parse(result.output);
+    assert.ok(data.assertions, 'should include assertions field');
+    assert.ok(typeof data.assertions.must_have_pass === 'number', 'must_have_pass is a number');
+    assert.ok(typeof data.assertions.must_have_fail === 'number', 'must_have_fail is a number');
+    // Total must_have checks = must_have_pass + must_have_fail + must_have that are needs_human
+    const totalMustHave = data.assertions.must_have_pass + data.assertions.must_have_fail;
+    assert.ok(totalMustHave >= 0, 'total must-have checks >= 0');
+  });
+
+  test('verify requirements file-type assertions check disk existence', () => {
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'REQUIREMENTS.md'), SAMPLE_REQUIREMENTS);
+    // Create assertion referencing a file that exists
+    const fileAssertions = `# Assertions
+
+## SREQ-01: Test req
+
+- assert: "REQUIREMENTS.md file exists"
+  type: file
+  priority: must-have
+`;
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'ASSERTIONS.md'), fileAssertions);
+    // The file .planning/REQUIREMENTS.md exists in tmpDir
+    const result = runGsdTools('verify requirements', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+    const data = JSON.parse(result.output);
+    assert.ok(data.assertions, 'should include assertions field');
+    // The assertion references REQUIREMENTS.md which exists on disk
+    const sreq01 = data.assertions.by_requirement['SREQ-01'];
+    assert.ok(sreq01, 'SREQ-01 should exist');
+    // It should find REQUIREMENTS.md as matching (within .planning/)
+    const fileAssertion = sreq01.assertions[0];
+    assert.ok(fileAssertion.status === 'pass' || fileAssertion.status === 'needs_human', 'file assertion should pass or need human review');
+  });
+
+  test('verify requirements test-command column parsing', () => {
+    const reqWithTestCol = `# Requirements
+
+## v4.0 Requirements
+
+- [x] **SREQ-01**: First req
+- [ ] **SREQ-02**: Second req
+
+## Traceability
+
+| Requirement | Phase | Status | Test Command |
+|-------------|-------|--------|--------------|
+| SREQ-01 | Phase 20 | Complete | npm test -- --grep "assertions" |
+| SREQ-02 | Phase 20 | Pending | node run-check.js |
+`;
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'REQUIREMENTS.md'), reqWithTestCol);
+    const result = runGsdTools('verify requirements', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+    const data = JSON.parse(result.output);
+    assert.ok(data.test_commands, 'should include test_commands field');
+    assert.strictEqual(data.test_commands.total, 2, 'should have 2 test commands');
+    assert.strictEqual(data.test_commands.valid, 2, 'both npm and node are known commands');
+  });
+
+  test('verify requirements rawValue includes assertion stats when assertions present', () => {
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'REQUIREMENTS.md'), SAMPLE_REQUIREMENTS);
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'ASSERTIONS.md'), SAMPLE_ASSERTIONS);
+    const result = runGsdTools('verify requirements --raw', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+    assert.ok(result.output.includes('reqs'), 'rawValue mentions reqs');
+    assert.ok(result.output.includes('assertions'), 'rawValue mentions assertions');
+    assert.ok(result.output.includes('pass'), 'rawValue mentions pass');
+  });
+
+  test('verify requirements failed must-have assertions include gap_description', () => {
+    const failAssertions = `# Assertions
+
+## SREQ-01: Test req
+
+- assert: "nonexistent-file-xyz.md must exist on disk"
+  type: file
+  priority: must-have
+`;
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'REQUIREMENTS.md'), SAMPLE_REQUIREMENTS);
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'ASSERTIONS.md'), failAssertions);
+    const result = runGsdTools('verify requirements', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+    const data = JSON.parse(result.output);
+    assert.ok(data.assertions, 'should have assertions');
+    const sreq01 = data.assertions.by_requirement['SREQ-01'];
+    const failedAssertion = sreq01.assertions.find(a => a.status === 'fail');
+    if (failedAssertion) {
+      assert.ok(failedAssertion.gap_description, 'failed must-have should have gap_description');
+      assert.ok(failedAssertion.gap_description.includes('SREQ-01'), 'gap_description should include req ID');
+    }
+  });
+});

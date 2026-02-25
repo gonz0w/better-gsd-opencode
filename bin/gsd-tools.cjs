@@ -892,6 +892,48 @@ MCP server management. Subcommands: profile [--window N] [--apply] [--restore]
 Examples:
   gsd-tools mcp profile --raw
   gsd-tools mcp profile --apply --raw`,
+      "assertions": `Usage: gsd-tools assertions <subcommand> [options] [--raw]
+
+Manage structured acceptance criteria in ASSERTIONS.md.
+
+Subcommands:
+  list [--req SREQ-01]    List all assertions, optionally filter by requirement ID
+  validate                Check assertion format, coverage, and consistency
+
+Output (list): { total_requirements, total_assertions, must_have_count, nice_to_have_count, requirements }
+Output (validate): { valid, issues, stats: { total_reqs, total_assertions, coverage_percent } }
+
+Examples:
+  gsd-tools assertions list --raw
+  gsd-tools assertions list --req SREQ-01 --raw
+  gsd-tools assertions validate --raw`,
+      "assertions list": `Usage: gsd-tools assertions list [--req <id>] [--raw]
+
+List all assertions from .planning/ASSERTIONS.md grouped by requirement ID.
+
+Options:
+  --req <id>    Filter to specific requirement (e.g., SREQ-01)
+
+Output: { total_requirements, total_assertions, must_have_count, nice_to_have_count, requirements }
+
+Examples:
+  gsd-tools assertions list --raw
+  gsd-tools assertions list --req SREQ-01 --raw`,
+      "assertions validate": `Usage: gsd-tools assertions validate [--raw]
+
+Validate ASSERTIONS.md format, coverage, and consistency with REQUIREMENTS.md.
+
+Checks:
+  - Every requirement ID exists in REQUIREMENTS.md
+  - Each requirement has 2-5 assertions (advisory)
+  - Every assertion has non-empty assert field
+  - type values are valid: api, cli, file, behavior
+  - priority values are valid: must-have, nice-to-have
+
+Output: { valid, issues: [{reqId, issue, severity}], stats: {total_reqs, total_assertions, coverage_percent} }
+
+Examples:
+  gsd-tools assertions validate --raw`,
       "env": `Usage: gsd-tools env <subcommand> [options] [--raw]
 
 Detect project languages, tools, and runtimes.
@@ -4366,10 +4408,17 @@ var require_verify = __commonJS({
           checked: match[1] === "x"
         });
       }
-      const tracePattern = /\| (\w+-\d+) \| Phase (\d+)/g;
+      const tracePattern = /\| (\w+-\d+) \| Phase (\d+)[^|\n]*\|[^|\n]*\|([^|\n]*)/g;
       const traceMap = {};
       while ((match = tracePattern.exec(content)) !== null) {
-        traceMap[match[1]] = match[2];
+        const testCommand = match[3] ? match[3].trim() : null;
+        traceMap[match[1]] = { phase: match[2], testCommand: testCommand || null };
+      }
+      if (Object.keys(traceMap).length === 0) {
+        const simpleTracePattern = /\| (\w+-\d+) \| Phase (\d+)/g;
+        while ((match = simpleTracePattern.exec(content)) !== null) {
+          traceMap[match[1]] = { phase: match[2], testCommand: null };
+        }
       }
       const unaddressedList = [];
       let addressedCount = 0;
@@ -4378,7 +4427,8 @@ var require_verify = __commonJS({
           addressedCount++;
           continue;
         }
-        const phase = traceMap[req.id];
+        const traceEntry = traceMap[req.id];
+        const phase = traceEntry ? traceEntry.phase : null;
         if (phase) {
           const phasePadded = phase.padStart(2, "0");
           const phasesDir = path.join(cwd, ".planning", "phases");
@@ -4406,12 +4456,153 @@ var require_verify = __commonJS({
           unaddressedList.push({ id: req.id, phase: null, reason: "Not in traceability table" });
         }
       }
-      output({
+      const testCommands = { total: 0, valid: 0, invalid: 0, coverage_percent: 0, commands: [] };
+      const knownCommands = /* @__PURE__ */ new Set(["npm", "node", "npx", "mix", "go", "cargo", "pytest", "python", "python3", "ruby", "bundle", "jest", "mocha", "vitest"]);
+      for (const [reqId, entry] of Object.entries(traceMap)) {
+        if (entry.testCommand) {
+          testCommands.total++;
+          const baseCommand = entry.testCommand.split(/\s+/)[0];
+          const valid = knownCommands.has(baseCommand);
+          if (valid) testCommands.valid++;
+          else testCommands.invalid++;
+          testCommands.commands.push({ reqId, command: entry.testCommand, valid });
+        }
+      }
+      testCommands.coverage_percent = requirements.length > 0 ? Math.round(testCommands.total / requirements.length * 100) : 0;
+      const assertionsPath = path.join(cwd, ".planning", "ASSERTIONS.md");
+      const assertionsContent = safeReadFile(assertionsPath);
+      const allAssertions = assertionsContent ? parseAssertionsMd(assertionsContent) : null;
+      let assertionsResult = null;
+      if (allAssertions && Object.keys(allAssertions).length > 0) {
+        let totalAssertions = 0;
+        let verified = 0;
+        let failed = 0;
+        let needsHuman = 0;
+        let mustHavePass = 0;
+        let mustHaveFail = 0;
+        const byRequirement = {};
+        for (const [reqId, data] of Object.entries(allAssertions)) {
+          const reqResult = { assertion_count: 0, pass: 0, fail: 0, needs_human: 0, assertions: [] };
+          for (const a of data.assertions) {
+            totalAssertions++;
+            reqResult.assertion_count++;
+            let status = "needs_human";
+            let evidence = null;
+            if (a.type === "file") {
+              const filePatterns = a.assert.match(/[\w./-]+\.\w{1,10}/g) || [];
+              const whenPatterns = a.when ? a.when.match(/[\w./-]+\.\w{1,10}/g) || [] : [];
+              const thenPatterns = a.then ? a.then.match(/[\w./-]+\.\w{1,10}/g) || [] : [];
+              const allPatterns = [...filePatterns, ...whenPatterns, ...thenPatterns];
+              if (allPatterns.length > 0) {
+                const existingFiles = allPatterns.filter((p) => {
+                  return fs.existsSync(path.join(cwd, p)) || fs.existsSync(path.join(cwd, ".planning", p)) || fs.existsSync(path.join(cwd, "templates", p));
+                });
+                if (existingFiles.length > 0) {
+                  status = "pass";
+                  evidence = `Files found: ${existingFiles.join(", ")}`;
+                } else {
+                  status = "fail";
+                  evidence = `No matching files on disk for: ${allPatterns.join(", ")}`;
+                }
+              } else {
+                status = "needs_human";
+                evidence = "No file path detected in assertion text";
+              }
+            } else if (a.type === "cli") {
+              const whenText = (a.when || a.assert || "").toLowerCase();
+              const gsdCommands = [
+                "assertions",
+                "verify",
+                "trace-requirement",
+                "env",
+                "mcp-profile",
+                "init",
+                "state",
+                "roadmap",
+                "phase",
+                "memory",
+                "intent",
+                "context-budget",
+                "test-run",
+                "search-decisions",
+                "validate-dependencies",
+                "search-lessons",
+                "codebase-impact",
+                "rollback-info",
+                "velocity",
+                "validate-config",
+                "quick-summary",
+                "extract-sections",
+                "test-coverage",
+                "token-budget",
+                "session-diff"
+              ];
+              const matchedCmd = gsdCommands.find((cmd) => whenText.includes(cmd));
+              if (matchedCmd) {
+                status = "pass";
+                evidence = `CLI command "${matchedCmd}" exists in gsd-tools`;
+              } else {
+                status = "needs_human";
+                evidence = "Could not map assertion to a known CLI command";
+              }
+            }
+            if (status === "pass") {
+              verified++;
+              reqResult.pass++;
+              if (a.priority === "must-have") mustHavePass++;
+            } else if (status === "fail") {
+              failed++;
+              reqResult.fail++;
+              if (a.priority === "must-have") mustHaveFail++;
+            } else {
+              needsHuman++;
+              reqResult.needs_human++;
+            }
+            const assertionEntry = {
+              assert: a.assert,
+              priority: a.priority,
+              type: a.type || null,
+              status,
+              evidence
+            };
+            if (status === "fail" && a.priority === "must-have") {
+              assertionEntry.gap_description = `[${reqId}] Must-have assertion failed: ${a.assert}`;
+            }
+            reqResult.assertions.push(assertionEntry);
+          }
+          byRequirement[reqId] = reqResult;
+        }
+        const coveragePercent = totalAssertions > 0 ? Math.round((verified + failed) / totalAssertions * 100) : 0;
+        assertionsResult = {
+          total: totalAssertions,
+          verified,
+          failed,
+          needs_human: needsHuman,
+          must_have_pass: mustHavePass,
+          must_have_fail: mustHaveFail,
+          coverage_percent: coveragePercent,
+          by_requirement: byRequirement
+        };
+      }
+      const result = {
         total: requirements.length,
         addressed: addressedCount,
         unaddressed: unaddressedList.length,
         unaddressed_list: unaddressedList
-      }, raw, unaddressedList.length === 0 ? "pass" : "fail");
+      };
+      if (assertionsResult) {
+        result.assertions = assertionsResult;
+      }
+      if (testCommands.total > 0) {
+        result.test_commands = testCommands;
+      }
+      let rawValue;
+      if (assertionsResult) {
+        rawValue = `${requirements.length} reqs (${addressedCount} addressed), ${assertionsResult.total} assertions (${assertionsResult.verified} pass, ${assertionsResult.failed} fail, ${assertionsResult.needs_human} human)`;
+      } else {
+        rawValue = unaddressedList.length === 0 ? "pass" : "fail";
+      }
+      output(result, raw, rawValue);
     }
     function cmdVerifyRegression(cwd, options, raw) {
       const memoryDir = path.join(cwd, ".planning", "memory");
@@ -4885,6 +5076,150 @@ var require_verify = __commonJS({
         phase: phaseNum || (planId ? planId.split("-")[0] : null)
       }, raw);
     }
+    function cmdAssertionsList(cwd, options, raw) {
+      const assertionsPath = path.join(cwd, ".planning", "ASSERTIONS.md");
+      const content = safeReadFile(assertionsPath);
+      if (!content) {
+        output({ error: "ASSERTIONS.md not found", path: ".planning/ASSERTIONS.md" }, raw, "ASSERTIONS.md not found");
+        return;
+      }
+      const parsed = parseAssertionsMd(content);
+      const reqId = options && options.reqId;
+      const requirements = {};
+      let totalAssertions = 0;
+      let mustHaveCount = 0;
+      let niceToHaveCount = 0;
+      for (const [id, data] of Object.entries(parsed)) {
+        if (reqId && id !== reqId) continue;
+        const assertions = data.assertions || [];
+        const must = assertions.filter((a) => a.priority === "must-have").length;
+        const nice = assertions.filter((a) => a.priority === "nice-to-have").length;
+        totalAssertions += assertions.length;
+        mustHaveCount += must;
+        niceToHaveCount += nice;
+        requirements[id] = {
+          description: data.description,
+          assertion_count: assertions.length,
+          assertions
+        };
+      }
+      const totalRequirements = Object.keys(requirements).length;
+      const rawValue = `${totalRequirements} requirements, ${totalAssertions} assertions (${mustHaveCount} must-have, ${niceToHaveCount} nice-to-have)`;
+      output({
+        total_requirements: totalRequirements,
+        total_assertions: totalAssertions,
+        must_have_count: mustHaveCount,
+        nice_to_have_count: niceToHaveCount,
+        requirements
+      }, raw, rawValue);
+    }
+    function cmdAssertionsValidate(cwd, raw) {
+      const assertionsPath = path.join(cwd, ".planning", "ASSERTIONS.md");
+      const content = safeReadFile(assertionsPath);
+      if (!content) {
+        output({ error: "ASSERTIONS.md not found", path: ".planning/ASSERTIONS.md" }, raw, "ASSERTIONS.md not found");
+        return;
+      }
+      const parsed = parseAssertionsMd(content);
+      const issues = [];
+      const reqPath = path.join(cwd, ".planning", "REQUIREMENTS.md");
+      const reqContent = safeReadFile(reqPath);
+      const reqIds = /* @__PURE__ */ new Set();
+      if (reqContent) {
+        const reqPattern = /- \[(x| )\] \*\*(\w+-\d+)\*\*/g;
+        let m;
+        while ((m = reqPattern.exec(reqContent)) !== null) {
+          reqIds.add(m[2]);
+        }
+      }
+      const validTypes = /* @__PURE__ */ new Set(["api", "cli", "file", "behavior"]);
+      const validPriorities = /* @__PURE__ */ new Set(["must-have", "nice-to-have"]);
+      let totalAssertions = 0;
+      for (const [reqId, data] of Object.entries(parsed)) {
+        if (reqIds.size > 0 && !reqIds.has(reqId)) {
+          issues.push({ reqId, issue: `Requirement ${reqId} not found in REQUIREMENTS.md`, severity: "warning" });
+        }
+        const assertions = data.assertions || [];
+        totalAssertions += assertions.length;
+        if (assertions.length < 2) {
+          issues.push({ reqId, issue: `Only ${assertions.length} assertion(s), recommended 2-5`, severity: "info" });
+        } else if (assertions.length > 5) {
+          issues.push({ reqId, issue: `${assertions.length} assertions, recommended max 5`, severity: "info" });
+        }
+        for (let i = 0; i < assertions.length; i++) {
+          const a = assertions[i];
+          if (!a.assert || !a.assert.trim()) {
+            issues.push({ reqId, issue: `Assertion ${i + 1} has empty assert field`, severity: "error" });
+          }
+          if (a.type && !validTypes.has(a.type)) {
+            issues.push({ reqId, issue: `Assertion ${i + 1} has invalid type "${a.type}"`, severity: "error" });
+          }
+          if (a.priority && !validPriorities.has(a.priority)) {
+            issues.push({ reqId, issue: `Assertion ${i + 1} has invalid priority "${a.priority}"`, severity: "error" });
+          }
+        }
+      }
+      const assertionReqCount = Object.keys(parsed).length;
+      const totalReqs = reqIds.size || assertionReqCount;
+      const coveragePercent = totalReqs > 0 ? Math.round(assertionReqCount / totalReqs * 100) : 0;
+      const valid = issues.filter((i) => i.severity === "error").length === 0;
+      const rawValue = valid ? "valid" : `${issues.length} issues found`;
+      output({
+        valid,
+        issues,
+        stats: {
+          total_reqs: totalReqs,
+          total_assertions: totalAssertions,
+          reqs_with_assertions: assertionReqCount,
+          coverage_percent: coveragePercent
+        }
+      }, raw, rawValue);
+    }
+    function parseAssertionsMd(content) {
+      if (!content || typeof content !== "string") return {};
+      const result = {};
+      const sections = content.split(/^## /m).slice(1);
+      for (const section of sections) {
+        const lines = section.split("\n");
+        const heading = lines[0].trim();
+        const idMatch = heading.match(/^([A-Z][\w]+-\d+)\s*:\s*(.+)/);
+        if (!idMatch) continue;
+        const reqId = idMatch[1];
+        const description = idMatch[2].trim();
+        const assertions = [];
+        let current = null;
+        for (let i = 1; i < lines.length; i++) {
+          const line = lines[i];
+          const assertMatch = line.match(/^- assert:\s*"?([^"]*)"?\s*$/);
+          if (assertMatch) {
+            if (current) assertions.push(current);
+            current = {
+              assert: assertMatch[1].trim(),
+              when: null,
+              then: null,
+              type: null,
+              priority: "must-have"
+            };
+            continue;
+          }
+          if (current) {
+            const fieldMatch = line.match(/^\s+(when|then|type|priority):\s*"?([^"]*)"?\s*$/);
+            if (fieldMatch) {
+              const key = fieldMatch[1];
+              const val = fieldMatch[2].trim();
+              if (key === "priority") {
+                current.priority = val === "nice-to-have" ? "nice-to-have" : "must-have";
+              } else {
+                current[key] = val || null;
+              }
+            }
+          }
+        }
+        if (current) assertions.push(current);
+        result[reqId] = { description, assertions };
+      }
+      return result;
+    }
     module2.exports = {
       cmdVerifyPlanStructure,
       cmdVerifyPhaseCompleteness,
@@ -4900,7 +5235,10 @@ var require_verify = __commonJS({
       cmdVerifyRegression,
       cmdVerifyPlanWave,
       cmdVerifyPlanDeps,
-      cmdVerifyQuality
+      cmdVerifyQuality,
+      parseAssertionsMd,
+      cmdAssertionsList,
+      cmdAssertionsValidate
     };
   }
 });
@@ -11704,7 +12042,9 @@ var require_router = __commonJS({
       cmdVerifyRegression,
       cmdVerifyPlanWave,
       cmdVerifyPlanDeps,
-      cmdVerifyQuality
+      cmdVerifyQuality,
+      cmdAssertionsList,
+      cmdAssertionsValidate
     } = require_verify();
     var {
       cmdInitExecutePhase,
@@ -11825,7 +12165,7 @@ var require_router = __commonJS({
       const command = args[0];
       const cwd = process.cwd();
       if (!command) {
-        error("Usage: gsd-tools <command> [args] [--raw] [--verbose]\nCommands: codebase-impact, commit, config-ensure-section, config-get, config-migrate, config-set, context-budget, current-timestamp, env, extract-sections, find-phase, frontmatter, generate-slug, history-digest, init, intent, list-todos, mcp, mcp-profile, memory, milestone, phase, phase-plan-index, phases, progress, quick-summary, requirements, resolve-model, roadmap, rollback-info, scaffold, search-decisions, search-lessons, session-diff, state, state-snapshot, summary-extract, template, test-coverage, test-run, todo, token-budget, trace-requirement, validate, validate-config, validate-dependencies, velocity, verify, verify-path-exists, verify-summary, websearch");
+        error("Usage: gsd-tools <command> [args] [--raw] [--verbose]\nCommands: assertions, codebase-impact, commit, config-ensure-section, config-get, config-migrate, config-set, context-budget, current-timestamp, env, extract-sections, find-phase, frontmatter, generate-slug, history-digest, init, intent, list-todos, mcp, mcp-profile, memory, milestone, phase, phase-plan-index, phases, progress, quick-summary, requirements, resolve-model, roadmap, rollback-info, scaffold, search-decisions, search-lessons, session-diff, state, state-snapshot, summary-extract, template, test-coverage, test-run, todo, token-budget, trace-requirement, validate, validate-config, validate-dependencies, velocity, verify, verify-path-exists, verify-summary, websearch");
       }
       if (args.includes("--help") || args.includes("-h")) {
         const subForHelp = args[1] && !args[1].startsWith("-") ? args[1] : "";
@@ -12389,6 +12729,20 @@ Available: execute-phase, plan-phase, new-project, new-milestone, quick, resume,
             cmdMcpProfile(cwd, args.slice(2), raw);
           } else {
             error("Unknown mcp subcommand. Available: profile");
+          }
+          break;
+        }
+        case "assertions": {
+          const subcommand = args[1];
+          if (subcommand === "list") {
+            const reqIdx = args.indexOf("--req");
+            cmdAssertionsList(cwd, {
+              reqId: reqIdx !== -1 ? args[reqIdx + 1] : null
+            }, raw);
+          } else if (subcommand === "validate") {
+            cmdAssertionsValidate(cwd, raw);
+          } else {
+            error("Unknown assertions subcommand. Available: list, validate");
           }
           break;
         }

@@ -1006,11 +1006,21 @@ function cmdVerifyRequirements(cwd, options, raw) {
     });
   }
 
-  // Parse traceability table: | REQ-01 | Phase 03 |
-  const tracePattern = /\| (\w+-\d+) \| Phase (\d+)/g;
+  // Parse traceability table with optional test-command column:
+  // | REQ-01 | Phase 03 | Status | test-command |
+  const tracePattern = /\| (\w+-\d+) \| Phase (\d+)[^|\n]*\|[^|\n]*\|([^|\n]*)/g;
   const traceMap = {};
   while ((match = tracePattern.exec(content)) !== null) {
-    traceMap[match[1]] = match[2];
+    const testCommand = match[3] ? match[3].trim() : null;
+    traceMap[match[1]] = { phase: match[2], testCommand: testCommand || null };
+  }
+
+  // Fallback: simpler pattern without test-command column
+  if (Object.keys(traceMap).length === 0) {
+    const simpleTracePattern = /\| (\w+-\d+) \| Phase (\d+)/g;
+    while ((match = simpleTracePattern.exec(content)) !== null) {
+      traceMap[match[1]] = { phase: match[2], testCommand: null };
+    }
   }
 
   const unaddressedList = [];
@@ -1023,7 +1033,8 @@ function cmdVerifyRequirements(cwd, options, raw) {
     }
 
     // Check if the phase has summaries
-    const phase = traceMap[req.id];
+    const traceEntry = traceMap[req.id];
+    const phase = traceEntry ? traceEntry.phase : null;
     if (phase) {
       const phasePadded = phase.padStart(2, '0');
       const phasesDir = path.join(cwd, '.planning', 'phases');
@@ -1054,12 +1065,168 @@ function cmdVerifyRequirements(cwd, options, raw) {
     }
   }
 
-  output({
+  // ── Test-command checking ──────────────────────────────────────────────
+  const testCommands = { total: 0, valid: 0, invalid: 0, coverage_percent: 0, commands: [] };
+  const knownCommands = new Set(['npm', 'node', 'npx', 'mix', 'go', 'cargo', 'pytest', 'python', 'python3', 'ruby', 'bundle', 'jest', 'mocha', 'vitest']);
+  for (const [reqId, entry] of Object.entries(traceMap)) {
+    if (entry.testCommand) {
+      testCommands.total++;
+      const baseCommand = entry.testCommand.split(/\s+/)[0];
+      const valid = knownCommands.has(baseCommand);
+      if (valid) testCommands.valid++;
+      else testCommands.invalid++;
+      testCommands.commands.push({ reqId, command: entry.testCommand, valid });
+    }
+  }
+  testCommands.coverage_percent = requirements.length > 0
+    ? Math.round((testCommands.total / requirements.length) * 100)
+    : 0;
+
+  // ── Per-assertion verification (when ASSERTIONS.md exists) ─────────────
+  const assertionsPath = path.join(cwd, '.planning', 'ASSERTIONS.md');
+  const assertionsContent = safeReadFile(assertionsPath);
+  const allAssertions = assertionsContent ? parseAssertionsMd(assertionsContent) : null;
+
+  let assertionsResult = null;
+
+  if (allAssertions && Object.keys(allAssertions).length > 0) {
+    let totalAssertions = 0;
+    let verified = 0;
+    let failed = 0;
+    let needsHuman = 0;
+    let mustHavePass = 0;
+    let mustHaveFail = 0;
+    const byRequirement = {};
+
+    for (const [reqId, data] of Object.entries(allAssertions)) {
+      const reqResult = { assertion_count: 0, pass: 0, fail: 0, needs_human: 0, assertions: [] };
+
+      for (const a of data.assertions) {
+        totalAssertions++;
+        reqResult.assertion_count++;
+
+        let status = 'needs_human';
+        let evidence = null;
+
+        if (a.type === 'file') {
+          // Check if referenced files/patterns exist on disk
+          // Look for file paths in the assert text (patterns like path/to/file or *.ext)
+          const filePatterns = a.assert.match(/[\w./-]+\.\w{1,10}/g) || [];
+          const whenPatterns = a.when ? (a.when.match(/[\w./-]+\.\w{1,10}/g) || []) : [];
+          const thenPatterns = a.then ? (a.then.match(/[\w./-]+\.\w{1,10}/g) || []) : [];
+          const allPatterns = [...filePatterns, ...whenPatterns, ...thenPatterns];
+
+          if (allPatterns.length > 0) {
+            const existingFiles = allPatterns.filter(p => {
+              // Try several path resolutions
+              return fs.existsSync(path.join(cwd, p)) ||
+                     fs.existsSync(path.join(cwd, '.planning', p)) ||
+                     fs.existsSync(path.join(cwd, 'templates', p));
+            });
+            if (existingFiles.length > 0) {
+              status = 'pass';
+              evidence = `Files found: ${existingFiles.join(', ')}`;
+            } else {
+              status = 'fail';
+              evidence = `No matching files on disk for: ${allPatterns.join(', ')}`;
+            }
+          } else {
+            // No file patterns detected; try checking common words as file/dir names
+            status = 'needs_human';
+            evidence = 'No file path detected in assertion text';
+          }
+        } else if (a.type === 'cli') {
+          // Check if the CLI command described in 'when' field is a valid gsd-tools command
+          const whenText = (a.when || a.assert || '').toLowerCase();
+          const gsdCommands = ['assertions', 'verify', 'trace-requirement', 'env', 'mcp-profile',
+            'init', 'state', 'roadmap', 'phase', 'memory', 'intent', 'context-budget',
+            'test-run', 'search-decisions', 'validate-dependencies', 'search-lessons',
+            'codebase-impact', 'rollback-info', 'velocity', 'validate-config', 'quick-summary',
+            'extract-sections', 'test-coverage', 'token-budget', 'session-diff'];
+          const matchedCmd = gsdCommands.find(cmd => whenText.includes(cmd));
+          if (matchedCmd) {
+            status = 'pass';
+            evidence = `CLI command "${matchedCmd}" exists in gsd-tools`;
+          } else {
+            status = 'needs_human';
+            evidence = 'Could not map assertion to a known CLI command';
+          }
+        }
+        // behavior and api types: always needs_human
+
+        if (status === 'pass') {
+          verified++;
+          reqResult.pass++;
+          if (a.priority === 'must-have') mustHavePass++;
+        } else if (status === 'fail') {
+          failed++;
+          reqResult.fail++;
+          if (a.priority === 'must-have') mustHaveFail++;
+        } else {
+          needsHuman++;
+          reqResult.needs_human++;
+        }
+
+        const assertionEntry = {
+          assert: a.assert,
+          priority: a.priority,
+          type: a.type || null,
+          status,
+          evidence,
+        };
+
+        // Failed must-have assertions include gap_description for --gaps workflow
+        if (status === 'fail' && a.priority === 'must-have') {
+          assertionEntry.gap_description = `[${reqId}] Must-have assertion failed: ${a.assert}`;
+        }
+
+        reqResult.assertions.push(assertionEntry);
+      }
+
+      byRequirement[reqId] = reqResult;
+    }
+
+    const coveragePercent = totalAssertions > 0
+      ? Math.round(((verified + failed) / totalAssertions) * 100)
+      : 0;
+
+    assertionsResult = {
+      total: totalAssertions,
+      verified,
+      failed,
+      needs_human: needsHuman,
+      must_have_pass: mustHavePass,
+      must_have_fail: mustHaveFail,
+      coverage_percent: coveragePercent,
+      by_requirement: byRequirement,
+    };
+  }
+
+  // ── Build output (backward compatible) ─────────────────────────────────
+  const result = {
     total: requirements.length,
     addressed: addressedCount,
     unaddressed: unaddressedList.length,
     unaddressed_list: unaddressedList,
-  }, raw, unaddressedList.length === 0 ? 'pass' : 'fail');
+  };
+
+  if (assertionsResult) {
+    result.assertions = assertionsResult;
+  }
+
+  if (testCommands.total > 0) {
+    result.test_commands = testCommands;
+  }
+
+  // Build rawValue
+  let rawValue;
+  if (assertionsResult) {
+    rawValue = `${requirements.length} reqs (${addressedCount} addressed), ${assertionsResult.total} assertions (${assertionsResult.verified} pass, ${assertionsResult.failed} fail, ${assertionsResult.needs_human} human)`;
+  } else {
+    rawValue = unaddressedList.length === 0 ? 'pass' : 'fail';
+  }
+
+  output(result, raw, rawValue);
 }
 
 // ─── Verify Regression (VRFY-03) ────────────────────────────────────────────
