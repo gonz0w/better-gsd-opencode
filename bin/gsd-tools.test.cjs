@@ -8553,4 +8553,124 @@ Test plan objective.
         'help should mention coverage signal');
     });
   });
+
+  // ── Intent Summary in Init Commands ────────────────────────────────────────
+
+  describe('intent summary in init commands', () => {
+    function createRoadmap(dir, phaseStart, phaseEnd) {
+      const roadmapContent = `# Roadmap
+
+## Milestones
+
+- 🔵 **v1.0 Test Milestone** — Phases ${phaseStart}-${phaseEnd} (active)
+
+## Phases
+
+### Phase ${phaseStart}: First Phase
+**Goal**: Test goal
+**Plans:** 1 plan
+
+### Phase ${phaseEnd}: Second Phase
+**Goal**: Another goal
+**Plans:** 1 plan
+`;
+      fs.writeFileSync(path.join(dir, '.planning', 'ROADMAP.md'), roadmapContent, 'utf-8');
+    }
+
+    test('getIntentSummary returns null when no INTENT.md', () => {
+      // No INTENT.md created — all init commands should have intent_summary: null
+      createRoadmap(tmpDir, 14, 17);
+      fs.writeFileSync(path.join(tmpDir, '.planning', 'config.json'), '{}', 'utf-8');
+      fs.writeFileSync(path.join(tmpDir, '.planning', 'STATE.md'), '# State\n## Current Position\n**Phase:** 14', 'utf-8');
+      fs.mkdirSync(path.join(tmpDir, '.planning', 'phases', '14-first-phase'), { recursive: true });
+      fs.writeFileSync(path.join(tmpDir, '.planning', 'phases', '14-first-phase', '14-01-PLAN.md'),
+        '---\nphase: 14-first-phase\nplan: 01\ntype: execute\n---\n<objective>Test</objective>\n<tasks><task type="auto"><name>T1</name><action>A</action><verify>V</verify><done>D</done></task></tasks>', 'utf-8');
+
+      const result = runGsdTools('init progress --raw', tmpDir);
+      assert.ok(result.success, `init progress failed: ${result.error}`);
+      const data = JSON.parse(result.output);
+      assert.strictEqual(data.intent_summary, null, 'intent_summary should be null when no INTENT.md');
+    });
+
+    test('getIntentSummary returns summary when INTENT.md exists', () => {
+      createPopulatedIntent(tmpDir);
+      createRoadmap(tmpDir, 14, 17);
+      fs.writeFileSync(path.join(tmpDir, '.planning', 'config.json'), '{}', 'utf-8');
+      fs.writeFileSync(path.join(tmpDir, '.planning', 'STATE.md'), '# State\n## Current Position\n**Phase:** 14', 'utf-8');
+      fs.mkdirSync(path.join(tmpDir, '.planning', 'phases', '14-first-phase'), { recursive: true });
+      fs.writeFileSync(path.join(tmpDir, '.planning', 'phases', '14-first-phase', '14-01-PLAN.md'),
+        '---\nphase: 14-first-phase\nplan: 01\ntype: execute\n---\n<objective>Test</objective>\n<tasks><task type="auto"><name>T1</name><action>A</action><verify>V</verify><done>D</done></task></tasks>', 'utf-8');
+
+      const result = runGsdTools('init progress --raw', tmpDir);
+      assert.ok(result.success, `init progress failed: ${result.error}`);
+      const data = JSON.parse(result.output);
+
+      assert.ok(data.intent_summary !== null, 'intent_summary should not be null when INTENT.md exists');
+      assert.strictEqual(data.intent_summary.objective, 'Build a CLI tool for project planning');
+      assert.strictEqual(data.intent_summary.outcome_count, 3);
+      assert.ok(Array.isArray(data.intent_summary.top_outcomes), 'top_outcomes should be array');
+      assert.strictEqual(data.intent_summary.top_outcomes.length, 2, 'should have 2 P1 outcomes');
+      assert.strictEqual(data.intent_summary.top_outcomes[0].id, 'DO-01');
+      assert.ok(Array.isArray(data.intent_summary.users), 'users should be array');
+      assert.strictEqual(data.intent_summary.users.length, 2);
+      assert.strictEqual(data.intent_summary.has_criteria, true);
+    });
+
+    test('init execute-phase includes intent_summary field', () => {
+      createPopulatedIntent(tmpDir);
+      createRoadmap(tmpDir, 14, 17);
+      fs.writeFileSync(path.join(tmpDir, '.planning', 'config.json'), '{}', 'utf-8');
+      fs.writeFileSync(path.join(tmpDir, '.planning', 'STATE.md'), '# State\n## Current Position\n**Phase:** 14', 'utf-8');
+      fs.mkdirSync(path.join(tmpDir, '.planning', 'phases', '14-first-phase'), { recursive: true });
+      fs.writeFileSync(path.join(tmpDir, '.planning', 'phases', '14-first-phase', '14-01-PLAN.md'),
+        '---\nphase: 14-first-phase\nplan: 01\ntype: execute\n---\n<objective>Test</objective>\n<tasks><task type="auto"><name>T1</name><action>A</action><verify>V</verify><done>D</done></task></tasks>', 'utf-8');
+
+      const result = runGsdTools('init execute-phase 14 --raw', tmpDir);
+      assert.ok(result.success, `init execute-phase failed: ${result.error}`);
+      const data = JSON.parse(result.output);
+
+      assert.ok('intent_summary' in data, 'intent_summary key must exist in execute-phase output');
+      assert.ok(data.intent_summary !== null, 'intent_summary should be populated');
+      assert.strictEqual(data.intent_summary.objective, 'Build a CLI tool for project planning');
+      assert.strictEqual(data.intent_summary.outcome_count, 3);
+    });
+
+    test('init plan-phase includes intent_summary and intent_path fields', () => {
+      createPopulatedIntent(tmpDir);
+      createRoadmap(tmpDir, 14, 17);
+      fs.writeFileSync(path.join(tmpDir, '.planning', 'config.json'), '{}', 'utf-8');
+      fs.writeFileSync(path.join(tmpDir, '.planning', 'STATE.md'), '# State\n## Current Position\n**Phase:** 14', 'utf-8');
+      fs.mkdirSync(path.join(tmpDir, '.planning', 'phases', '14-first-phase'), { recursive: true });
+      fs.writeFileSync(path.join(tmpDir, '.planning', 'phases', '14-first-phase', '14-01-PLAN.md'),
+        '---\nphase: 14-first-phase\nplan: 01\ntype: execute\n---\n<objective>Test</objective>\n<tasks><task type="auto"><name>T1</name><action>A</action><verify>V</verify><done>D</done></task></tasks>', 'utf-8');
+
+      const result = runGsdTools('init plan-phase 14 --raw', tmpDir);
+      assert.ok(result.success, `init plan-phase failed: ${result.error}`);
+      const data = JSON.parse(result.output);
+
+      assert.ok('intent_summary' in data, 'intent_summary key must exist in plan-phase output');
+      assert.ok('intent_path' in data, 'intent_path key must exist in plan-phase output');
+      assert.ok(data.intent_summary !== null, 'intent_summary should be populated');
+      assert.strictEqual(data.intent_path, '.planning/INTENT.md');
+      assert.strictEqual(data.intent_summary.objective, 'Build a CLI tool for project planning');
+    });
+
+    test('init plan-phase intent fields absent in compact mode when no INTENT.md', () => {
+      // Compact mode is default — null fields are omitted to save tokens
+      createRoadmap(tmpDir, 14, 17);
+      fs.writeFileSync(path.join(tmpDir, '.planning', 'config.json'), '{}', 'utf-8');
+      fs.writeFileSync(path.join(tmpDir, '.planning', 'STATE.md'), '# State\n## Current Position\n**Phase:** 14', 'utf-8');
+      fs.mkdirSync(path.join(tmpDir, '.planning', 'phases', '14-first-phase'), { recursive: true });
+      fs.writeFileSync(path.join(tmpDir, '.planning', 'phases', '14-first-phase', '14-01-PLAN.md'),
+        '---\nphase: 14-first-phase\nplan: 01\ntype: execute\n---\n<objective>Test</objective>\n<tasks><task type="auto"><name>T1</name><action>A</action><verify>V</verify><done>D</done></task></tasks>', 'utf-8');
+
+      const result = runGsdTools('init plan-phase 14 --raw', tmpDir);
+      assert.ok(result.success, `init plan-phase failed: ${result.error}`);
+      const data = JSON.parse(result.output);
+
+      // In compact mode (default), null intent fields are omitted
+      assert.ok(!data.intent_summary, 'intent_summary should be absent/falsy when no INTENT.md');
+      assert.ok(!data.intent_path, 'intent_path should be absent/falsy when no INTENT.md');
+    });
+  });
 });
