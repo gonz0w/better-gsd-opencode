@@ -99,7 +99,12 @@ Plans:
   3. Planner workflows reference intent when creating phase plans, deriving plan objectives from desired outcomes
   4. Verify-work workflow checks deliverables against desired outcomes and success criteria, not just requirements
   5. GSD's own `.planning/INTENT.md` exists and is actively used for its own milestone planning
-**Plans**: TBD
+**Plans:** 3 plans
+
+Plans:
+- [ ] 16-01-PLAN.md — Intent summary in init commands (getIntentSummary + 3 init commands)
+- [ ] 16-02-PLAN.md — Self-application: create GSD's own INTENT.md
+- [ ] 16-03-PLAN.md — Workflow intent injection (research, plan, verify-work, verify-phase)
 
 ### Phase 17: Intent Enhancement
 **Goal**: New projects start with a structured intent conversation, and intent changes are tracked with reasoning across milestones
@@ -130,5 +135,5 @@ Plans:
 | 13. Test Infrastructure & Polish | v2.0 | 4/4 | Complete | 2026-02-24 |
 | 14. Intent Capture Foundation | 3/3 | Complete    | 2026-02-25 | - |
 | 15. Intent Tracing & Validation | 2/2 | Complete    | 2026-02-25 | - |
-| 16. Workflow Integration & Self-Application | v3.0 | 0/? | Not started | - |
+| 16. Workflow Integration & Self-Application | v3.0 | 0/3 | Not started | - |
 | 17. Intent Enhancement | v3.0 | 0/? | Not started | - |
