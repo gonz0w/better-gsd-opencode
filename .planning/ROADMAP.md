@@ -83,7 +83,11 @@ Plans:
   3. Running intent validation detects objective mismatch (plan not tracing to any outcome), feature creep (tasks with no intent backing), and priority inversion (low-priority work before high-priority)
   4. Intent validation produces a numeric drift score (0-100) that summarizes alignment
   5. Intent validation runs as advisory pre-flight (warns, never blocks) before plan execution
-**Plans**: TBD
+**Plans:** 2 plans
+
+Plans:
+- [ ] 15-01-PLAN.md — Intent tracing: plan intent parser + traceability matrix + gap detection
+- [ ] 15-02-PLAN.md — Intent validation: 4 drift signals + score + advisory pre-flight
 
 ### Phase 16: Workflow Integration & Self-Application
 **Goal**: All GSD workflows see intent context automatically, and GSD's own development uses the intent system
@@ -125,6 +129,6 @@ Plans:
 | 12. Quality Gates | v2.0 | 4/4 | Complete | 2026-02-24 |
 | 13. Test Infrastructure & Polish | v2.0 | 4/4 | Complete | 2026-02-24 |
 | 14. Intent Capture Foundation | 3/3 | Complete    | 2026-02-25 | - |
-| 15. Intent Tracing & Validation | v3.0 | 0/? | Not started | - |
+| 15. Intent Tracing & Validation | v3.0 | 0/2 | Planned | - |
 | 16. Workflow Integration & Self-Application | v3.0 | 0/? | Not started | - |
 | 17. Intent Enhancement | v3.0 | 0/? | Not started | - |
