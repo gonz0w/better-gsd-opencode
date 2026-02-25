@@ -137,7 +137,9 @@ Plans:
 **Success Criteria** (what must be TRUE):
   1. `/gsd-complete-and-clear` generates a session summary from STATE.md showing what was completed, suggests the next command to run, and updates session continuity
   2. Running the workflow leaves STATE.md in a clean state ready for the next session to pick up without stale context
-**Plans**: TBD
+**Plans**: 1/1 plans
+Plans:
+- [ ] 22-01-PLAN.md — Session summary CLI command + complete-and-clear workflow
 
 ## Progress
 
@@ -164,4 +166,4 @@ Plans:
 | 19. MCP Server Profiling | v4.0 | Complete    | 2026-02-25 | 2026-02-25 |
 | 20. Structured Requirements | v4.0 | Complete    | 2026-02-25 | 2026-02-25 |
 | 21. Worktree Parallelism | 3/3 | Complete    | 2026-02-25 | - |
-| 22. Workflow Polish | v4.0 | 0/? | Not started | - |
+| 22. Workflow Polish | v4.0 | 0/1 | Planned | - |
