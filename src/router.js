@@ -60,6 +60,7 @@ const {
 
 const {
   cmdIntentCreate,
+  cmdIntentShow,
 } = require('./commands/intent');
 
 
@@ -682,8 +683,13 @@ async function main() {
       const subcommand = args[1];
       if (subcommand === 'create') {
         cmdIntentCreate(cwd, args.slice(2), raw);
+      } else if (subcommand === 'show') {
+        cmdIntentShow(cwd, args.slice(2), raw);
+      } else if (subcommand === 'read') {
+        // 'read' is syntactic sugar for 'show --raw' per user decision
+        cmdIntentShow(cwd, args.slice(2), true);
       } else {
-        error('Unknown intent subcommand. Available: create');
+        error('Unknown intent subcommand. Available: create, show, read');
       }
       break;
     }

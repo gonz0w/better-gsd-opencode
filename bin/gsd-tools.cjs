@@ -8956,8 +8956,201 @@ var require_intent = __commonJS({
       };
       output(result, raw, commitHash || "created");
     }
+    var SECTION_ALIASES = ["objective", "users", "outcomes", "criteria", "constraints", "health"];
+    function cmdIntentShow(cwd, args, raw) {
+      const planningDir = path.join(cwd, ".planning");
+      const intentPath = path.join(planningDir, "INTENT.md");
+      if (!fs.existsSync(intentPath)) {
+        error("No INTENT.md found. Run `intent create` first.");
+      }
+      const content = fs.readFileSync(intentPath, "utf-8");
+      const data = parseIntentMd(content);
+      const sectionFilter = args.length > 0 && SECTION_ALIASES.includes(args[0]) ? args[0] : null;
+      const fullFlag = args.includes("--full");
+      if (raw) {
+        if (sectionFilter) {
+          const sectionData = {};
+          sectionData[sectionFilter] = data[sectionFilter];
+          output(sectionData, false);
+        } else {
+          output(data, false);
+        }
+        return;
+      }
+      if (fullFlag) {
+        output(null, true, content);
+        return;
+      }
+      if (sectionFilter) {
+        const sectionContent = renderSection(data, sectionFilter);
+        output(null, true, sectionContent);
+        return;
+      }
+      const summary = renderCompactSummary(data);
+      output(null, true, summary);
+    }
+    function renderCompactSummary(data) {
+      const lines = [];
+      const isTTY = process.stdout.isTTY;
+      const updated = data.updated || "unknown";
+      lines.push(`INTENT \u2014 Revision ${data.revision || "?"} (updated ${updated})`);
+      lines.push("");
+      const obj = data.objective.statement || "(not set)";
+      const truncObj = obj.length > 80 ? obj.slice(0, 77) + "..." : obj;
+      lines.push(`Objective: ${truncObj}`);
+      lines.push("");
+      if (data.outcomes.length > 0) {
+        const sorted = [...data.outcomes].sort((a, b) => {
+          const pa = parseInt(a.priority.replace("P", ""), 10);
+          const pb = parseInt(b.priority.replace("P", ""), 10);
+          return pa - pb;
+        });
+        const counts = { P1: 0, P2: 0, P3: 0 };
+        for (const o of sorted) {
+          if (counts[o.priority] !== void 0) counts[o.priority]++;
+        }
+        const countParts = [];
+        if (counts.P1 > 0) countParts.push(`${counts.P1}\xD7P1`);
+        if (counts.P2 > 0) countParts.push(`${counts.P2}\xD7P2`);
+        if (counts.P3 > 0) countParts.push(`${counts.P3}\xD7P3`);
+        lines.push(`Outcomes (${sorted.length}): ${countParts.join("  ")}`);
+        for (const o of sorted) {
+          const priorityLabel = colorPriority(o.priority, isTTY);
+          lines.push(`  ${priorityLabel}: ${o.id} \u2014 ${o.text}`);
+        }
+      } else {
+        lines.push("Outcomes: none defined");
+      }
+      lines.push("");
+      lines.push(`Success Criteria: ${data.criteria.length} defined`);
+      const techCount = data.constraints.technical.length;
+      const bizCount = data.constraints.business.length;
+      const timeCount = data.constraints.timeline.length;
+      lines.push(`Constraints: ${techCount} technical, ${bizCount} business, ${timeCount} timeline`);
+      const quantCount = data.health.quantitative.length;
+      const hasQual = data.health.qualitative && data.health.qualitative.trim() ? "defined" : "none";
+      lines.push(`Health Metrics: ${quantCount} quantitative, qualitative ${hasQual}`);
+      lines.push(`Target Users: ${data.users.length} audience${data.users.length !== 1 ? "s" : ""}`);
+      return lines.join("\n") + "\n";
+    }
+    function renderSection(data, section) {
+      const isTTY = process.stdout.isTTY;
+      const lines = [];
+      switch (section) {
+        case "objective":
+          lines.push("## Objective");
+          lines.push("");
+          lines.push(data.objective.statement || "(not set)");
+          if (data.objective.elaboration) {
+            lines.push("");
+            lines.push(data.objective.elaboration);
+          }
+          break;
+        case "users":
+          lines.push("## Target Users");
+          lines.push("");
+          if (data.users.length > 0) {
+            for (const u of data.users) {
+              lines.push(`- ${u.text}`);
+            }
+          } else {
+            lines.push("(none defined)");
+          }
+          break;
+        case "outcomes":
+          lines.push("## Desired Outcomes");
+          lines.push("");
+          if (data.outcomes.length > 0) {
+            const sorted = [...data.outcomes].sort((a, b) => {
+              const pa = parseInt(a.priority.replace("P", ""), 10);
+              const pb = parseInt(b.priority.replace("P", ""), 10);
+              return pa - pb;
+            });
+            for (const o of sorted) {
+              const priorityLabel = colorPriority(o.priority, isTTY);
+              lines.push(`- ${o.id} [${priorityLabel}]: ${o.text}`);
+            }
+          } else {
+            lines.push("(none defined)");
+          }
+          break;
+        case "criteria":
+          lines.push("## Success Criteria");
+          lines.push("");
+          if (data.criteria.length > 0) {
+            for (const c of data.criteria) {
+              lines.push(`- ${c.id}: ${c.text}`);
+            }
+          } else {
+            lines.push("(none defined)");
+          }
+          break;
+        case "constraints":
+          lines.push("## Constraints");
+          if (data.constraints.technical.length > 0) {
+            lines.push("");
+            lines.push("### Technical");
+            for (const c of data.constraints.technical) {
+              lines.push(`- ${c.id}: ${c.text}`);
+            }
+          }
+          if (data.constraints.business.length > 0) {
+            lines.push("");
+            lines.push("### Business");
+            for (const c of data.constraints.business) {
+              lines.push(`- ${c.id}: ${c.text}`);
+            }
+          }
+          if (data.constraints.timeline.length > 0) {
+            lines.push("");
+            lines.push("### Timeline");
+            for (const c of data.constraints.timeline) {
+              lines.push(`- ${c.id}: ${c.text}`);
+            }
+          }
+          if (data.constraints.technical.length === 0 && data.constraints.business.length === 0 && data.constraints.timeline.length === 0) {
+            lines.push("");
+            lines.push("(none defined)");
+          }
+          break;
+        case "health":
+          lines.push("## Health Metrics");
+          if (data.health.quantitative.length > 0) {
+            lines.push("");
+            lines.push("### Quantitative");
+            for (const m of data.health.quantitative) {
+              lines.push(`- ${m.id}: ${m.text}`);
+            }
+          }
+          if (data.health.qualitative && data.health.qualitative.trim()) {
+            lines.push("");
+            lines.push("### Qualitative");
+            lines.push(data.health.qualitative);
+          }
+          if (data.health.quantitative.length === 0 && (!data.health.qualitative || !data.health.qualitative.trim())) {
+            lines.push("");
+            lines.push("(none defined)");
+          }
+          break;
+      }
+      return lines.join("\n") + "\n";
+    }
+    function colorPriority(priority, isTTY) {
+      if (!isTTY) return priority;
+      switch (priority) {
+        case "P1":
+          return "\x1B[31mP1\x1B[0m";
+        case "P2":
+          return "\x1B[33mP2\x1B[0m";
+        case "P3":
+          return "\x1B[2mP3\x1B[0m";
+        default:
+          return priority;
+      }
+    }
     module2.exports = {
-      cmdIntentCreate
+      cmdIntentCreate,
+      cmdIntentShow
     };
   }
 });
@@ -9084,7 +9277,8 @@ var require_router = __commonJS({
       cmdMemoryCompact
     } = require_memory();
     var {
-      cmdIntentCreate
+      cmdIntentCreate,
+      cmdIntentShow
     } = require_intent();
     async function main2() {
       const args = process.argv.slice(2);
@@ -9644,8 +9838,12 @@ Available: execute-phase, plan-phase, new-project, new-milestone, quick, resume,
           const subcommand = args[1];
           if (subcommand === "create") {
             cmdIntentCreate(cwd, args.slice(2), raw);
+          } else if (subcommand === "show") {
+            cmdIntentShow(cwd, args.slice(2), raw);
+          } else if (subcommand === "read") {
+            cmdIntentShow(cwd, args.slice(2), true);
           } else {
-            error("Unknown intent subcommand. Available: create");
+            error("Unknown intent subcommand. Available: create, show, read");
           }
           break;
         }
