@@ -673,8 +673,35 @@ function cmdWorktreeMerge(cwd, planId, raw) {
 
   // All clear (or only auto-resolvable conflicts) — proceed with merge
   const mergeResult = execGit(cwd, ['merge', worktreeBranch, '--no-ff', '-m', `merge: plan ${planId} worktree`]);
-  if (mergeResult.exitCode !== 0) {
-    // Merge failed at execution time (shouldn't happen after clean merge-tree, but handle it)
+
+  if (mergeResult.exitCode !== 0 && autoResolvable.length > 0) {
+    // Merge failed but we have auto-resolvable conflicts (lockfiles, generated files)
+    // Resolve them by accepting the worktree (theirs) version, then complete the merge
+    let resolved = true;
+    for (const c of autoResolvable) {
+      const checkoutResult = execGit(cwd, ['checkout', '--theirs', c.file]);
+      if (checkoutResult.exitCode !== 0) {
+        resolved = false;
+        break;
+      }
+      execGit(cwd, ['add', c.file]);
+    }
+
+    if (resolved) {
+      // Complete the merge commit
+      const commitResult = execGit(cwd, ['commit', '--no-edit']);
+      if (commitResult.exitCode !== 0) {
+        // Abort the failed merge
+        execGit(cwd, ['merge', '--abort']);
+        error(`Merge auto-resolution failed during commit: ${commitResult.stderr}`);
+      }
+    } else {
+      // Abort the failed merge
+      execGit(cwd, ['merge', '--abort']);
+      error(`Merge auto-resolution failed: could not checkout --theirs for lockfiles`);
+    }
+  } else if (mergeResult.exitCode !== 0) {
+    // Merge failed at execution time with no auto-resolvable conflicts
     error(`Merge execution failed: ${mergeResult.stderr}`);
   }
 
