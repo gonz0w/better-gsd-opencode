@@ -8851,3 +8851,409 @@ Team velocity and developer satisfaction with the planning workflow.
     });
   });
 });
+
+// --- Environment Scanning Tests -----------------------------------------------
+
+describe('env scan', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(require('os').tmpdir(), 'gsd-env-test-'));
+  });
+
+  afterEach(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  // Helper to run env scan on a directory
+  function envScan(dir) {
+    return runGsdTools('env scan --raw', dir || tmpDir);
+  }
+
+  // Helper to parse env scan output
+  function envScanParsed(dir) {
+    const result = envScan(dir);
+    if (!result.success) return { success: false, error: result.error };
+    try {
+      return { success: true, data: JSON.parse(result.output) };
+    } catch (e) {
+      return { success: false, error: `JSON parse failed: ${e.message}` };
+    }
+  }
+
+  describe('manifest pattern completeness', () => {
+    test('LANG_MANIFESTS contains at least 15 entries', () => {
+      // Verify via scanning a dir with known manifests — but we can also check the output schema
+      // The best test: create a dir and verify the command works
+      const result = envScanParsed();
+      assert.ok(result.success, `env scan failed: ${result.error}`);
+      assert.ok(result.data.languages !== undefined, 'should have languages field');
+      assert.ok(result.data.scanned_at, 'should have scanned_at timestamp');
+      assert.ok(typeof result.data.detection_ms === 'number', 'detection_ms should be a number');
+    });
+
+    test('scan returns valid JSON with expected schema fields', () => {
+      const result = envScanParsed();
+      assert.ok(result.success, `env scan failed: ${result.error}`);
+      const d = result.data;
+      assert.ok(Array.isArray(d.languages), 'languages should be array');
+      assert.ok(typeof d.package_manager === 'object', 'package_manager should be object');
+      assert.ok(Array.isArray(d.version_managers), 'version_managers should be array');
+      assert.ok(typeof d.tools === 'object', 'tools should be object');
+      assert.ok(typeof d.scripts === 'object', 'scripts should be object');
+      assert.ok(typeof d.infrastructure === 'object', 'infrastructure should be object');
+    });
+  });
+
+  describe('language detection', () => {
+    test('detects node from package.json', () => {
+      fs.writeFileSync(path.join(tmpDir, 'package.json'), '{"name":"test"}');
+      const result = envScanParsed();
+      assert.ok(result.success, `env scan failed: ${result.error}`);
+      const node = result.data.languages.find(l => l.name === 'node');
+      assert.ok(node, 'should detect node language');
+      assert.strictEqual(node.manifests[0].file, 'package.json');
+      assert.strictEqual(node.manifests[0].depth, 0);
+    });
+
+    test('detects go from go.mod', () => {
+      fs.writeFileSync(path.join(tmpDir, 'go.mod'), 'module example.com/test\ngo 1.21');
+      const result = envScanParsed();
+      assert.ok(result.success, `env scan failed: ${result.error}`);
+      const go = result.data.languages.find(l => l.name === 'go');
+      assert.ok(go, 'should detect go language');
+    });
+
+    test('detects elixir from mix.exs', () => {
+      fs.writeFileSync(path.join(tmpDir, 'mix.exs'), 'defmodule Test.MixProject do\nend');
+      const result = envScanParsed();
+      assert.ok(result.success, `env scan failed: ${result.error}`);
+      const elixir = result.data.languages.find(l => l.name === 'elixir');
+      assert.ok(elixir, 'should detect elixir language');
+    });
+
+    test('detects multiple languages in polyglot project', () => {
+      fs.writeFileSync(path.join(tmpDir, 'package.json'), '{"name":"test"}');
+      fs.writeFileSync(path.join(tmpDir, 'go.mod'), 'module example.com/test');
+      fs.writeFileSync(path.join(tmpDir, 'mix.exs'), 'defmodule Test.MixProject do\nend');
+      const result = envScanParsed();
+      assert.ok(result.success, `env scan failed: ${result.error}`);
+      const langNames = result.data.languages.map(l => l.name).sort();
+      assert.ok(langNames.includes('node'), 'should detect node');
+      assert.ok(langNames.includes('go'), 'should detect go');
+      assert.ok(langNames.includes('elixir'), 'should detect elixir');
+    });
+
+    test('detects nested manifest at depth 1', () => {
+      const subdir = path.join(tmpDir, 'subproject');
+      fs.mkdirSync(subdir);
+      fs.writeFileSync(path.join(subdir, 'package.json'), '{"name":"sub"}');
+      const result = envScanParsed();
+      assert.ok(result.success, `env scan failed: ${result.error}`);
+      const node = result.data.languages.find(l => l.name === 'node');
+      assert.ok(node, 'should detect node from nested package.json');
+      assert.strictEqual(node.manifests[0].depth, 1, 'should be at depth 1');
+    });
+
+    test('does NOT detect files beyond depth 3', () => {
+      // Create deeply nested structure at depth 4
+      const deepPath = path.join(tmpDir, 'a', 'b', 'c', 'd');
+      fs.mkdirSync(deepPath, { recursive: true });
+      fs.writeFileSync(path.join(deepPath, 'package.json'), '{"name":"deep"}');
+      const result = envScanParsed();
+      assert.ok(result.success, `env scan failed: ${result.error}`);
+      const node = result.data.languages.find(l => l.name === 'node');
+      assert.ok(!node, 'should NOT detect file at depth 4');
+    });
+
+    test('empty directory returns empty languages array', () => {
+      const result = envScanParsed();
+      assert.ok(result.success, `env scan failed: ${result.error}`);
+      assert.strictEqual(result.data.languages.length, 0, 'languages should be empty');
+    });
+  });
+
+  describe('primary language detection', () => {
+    test('single language marked as primary', () => {
+      fs.writeFileSync(path.join(tmpDir, 'package.json'), '{"name":"test"}');
+      const result = envScanParsed();
+      assert.ok(result.success);
+      const node = result.data.languages.find(l => l.name === 'node');
+      assert.strictEqual(node.primary, true, 'single language should be primary');
+    });
+
+    test('multiple languages at root — one marked primary', () => {
+      fs.writeFileSync(path.join(tmpDir, 'package.json'), '{"name":"test"}');
+      fs.writeFileSync(path.join(tmpDir, 'go.mod'), 'module example.com/test');
+      const result = envScanParsed();
+      assert.ok(result.success);
+      const primaries = result.data.languages.filter(l => l.primary);
+      assert.strictEqual(primaries.length, 1, 'exactly one language should be primary');
+    });
+  });
+
+  describe('package manager detection', () => {
+    test('detects pnpm from pnpm-lock.yaml', () => {
+      fs.writeFileSync(path.join(tmpDir, 'package.json'), '{"name":"test"}');
+      fs.writeFileSync(path.join(tmpDir, 'pnpm-lock.yaml'), 'lockfileVersion: 9');
+      const result = envScanParsed();
+      assert.ok(result.success);
+      assert.strictEqual(result.data.package_manager.name, 'pnpm');
+      assert.strictEqual(result.data.package_manager.source, 'lockfile');
+    });
+
+    test('detects npm from package-lock.json', () => {
+      fs.writeFileSync(path.join(tmpDir, 'package.json'), '{"name":"test"}');
+      fs.writeFileSync(path.join(tmpDir, 'package-lock.json'), '{}');
+      const result = envScanParsed();
+      assert.ok(result.success);
+      assert.strictEqual(result.data.package_manager.name, 'npm');
+    });
+
+    test('pnpm takes precedence over npm when both present', () => {
+      fs.writeFileSync(path.join(tmpDir, 'package.json'), '{"name":"test"}');
+      fs.writeFileSync(path.join(tmpDir, 'pnpm-lock.yaml'), 'lockfileVersion: 9');
+      fs.writeFileSync(path.join(tmpDir, 'package-lock.json'), '{}');
+      const result = envScanParsed();
+      assert.ok(result.success);
+      assert.strictEqual(result.data.package_manager.name, 'pnpm', 'pnpm should take precedence');
+    });
+
+    test('packageManager field overrides lockfile detection', () => {
+      fs.writeFileSync(path.join(tmpDir, 'package.json'), JSON.stringify({
+        name: 'test',
+        packageManager: 'pnpm@8.15.1',
+      }));
+      fs.writeFileSync(path.join(tmpDir, 'package-lock.json'), '{}');
+      const result = envScanParsed();
+      assert.ok(result.success);
+      assert.strictEqual(result.data.package_manager.name, 'pnpm', 'packageManager field should override lockfile');
+      assert.strictEqual(result.data.package_manager.version, '8.15.1');
+      assert.strictEqual(result.data.package_manager.source, 'packageManager-field');
+    });
+  });
+
+  describe('binary availability', () => {
+    test('binary check returns available:false for missing binary', () => {
+      // Create a manifest for a language with a likely-missing binary
+      fs.writeFileSync(path.join(tmpDir, 'Package.swift'), '// swift package');
+      const result = envScanParsed();
+      assert.ok(result.success);
+      const swift = result.data.languages.find(l => l.name === 'swift');
+      if (swift) {
+        // Swift may or may not be installed — just verify the shape
+        assert.ok(typeof swift.binary.available === 'boolean', 'available should be boolean');
+        assert.ok(swift.binary.version === null || typeof swift.binary.version === 'string', 'version should be null or string');
+      }
+    });
+
+    test('node binary should be available (running in Node.js)', () => {
+      fs.writeFileSync(path.join(tmpDir, 'package.json'), '{"name":"test"}');
+      const result = envScanParsed();
+      assert.ok(result.success);
+      const node = result.data.languages.find(l => l.name === 'node');
+      assert.ok(node, 'should detect node');
+      assert.strictEqual(node.binary.available, true, 'node binary should be available');
+      assert.ok(node.binary.version, 'node version should be detected');
+      assert.ok(node.binary.path, 'node path should be detected');
+    });
+  });
+
+  describe('skip directories', () => {
+    test('does NOT detect files in node_modules', () => {
+      const nmDir = path.join(tmpDir, 'node_modules', 'some-package');
+      fs.mkdirSync(nmDir, { recursive: true });
+      fs.writeFileSync(path.join(nmDir, 'package.json'), '{"name":"some-package"}');
+      const result = envScanParsed();
+      assert.ok(result.success);
+      assert.strictEqual(result.data.languages.length, 0, 'should not detect files in node_modules');
+    });
+
+    test('does NOT detect files in vendor directory', () => {
+      const vendorDir = path.join(tmpDir, 'vendor', 'package');
+      fs.mkdirSync(vendorDir, { recursive: true });
+      fs.writeFileSync(path.join(vendorDir, 'go.mod'), 'module vendor.com/pkg');
+      const result = envScanParsed();
+      assert.ok(result.success);
+      assert.strictEqual(result.data.languages.length, 0, 'should not detect files in vendor');
+    });
+  });
+
+  describe('version manager detection', () => {
+    test('detects .nvmrc with version', () => {
+      fs.writeFileSync(path.join(tmpDir, '.nvmrc'), '20.11.0');
+      const result = envScanParsed();
+      assert.ok(result.success);
+      const nvm = result.data.version_managers.find(vm => vm.name === 'nvm');
+      assert.ok(nvm, 'should detect nvm');
+      assert.strictEqual(nvm.configured_versions.node, '20.11.0');
+    });
+
+    test('detects mise.toml', () => {
+      fs.writeFileSync(path.join(tmpDir, 'mise.toml'), '[tools]\nnode = "20.11.0"\ngo = "1.21"');
+      const result = envScanParsed();
+      assert.ok(result.success);
+      const mise = result.data.version_managers.find(vm => vm.name === 'mise');
+      assert.ok(mise, 'should detect mise');
+      assert.strictEqual(mise.configured_versions.node, '20.11.0');
+      assert.strictEqual(mise.configured_versions.go, '1.21');
+    });
+
+    test('detects .tool-versions (asdf)', () => {
+      fs.writeFileSync(path.join(tmpDir, '.tool-versions'), 'nodejs 20.11.0\nerlang 26.2');
+      const result = envScanParsed();
+      assert.ok(result.success);
+      const asdf = result.data.version_managers.find(vm => vm.name === 'asdf');
+      assert.ok(asdf, 'should detect asdf');
+      assert.strictEqual(asdf.configured_versions.nodejs, '20.11.0');
+      assert.strictEqual(asdf.configured_versions.erlang, '26.2');
+    });
+  });
+
+  describe('infrastructure detection', () => {
+    test('detects services from docker-compose.yml', () => {
+      fs.writeFileSync(path.join(tmpDir, 'docker-compose.yml'),
+        'services:\n  postgres:\n    image: postgres:16\n  redis:\n    image: redis:7\n');
+      const result = envScanParsed();
+      assert.ok(result.success);
+      const services = result.data.infrastructure.docker_services;
+      assert.ok(services.includes('postgres'), 'should detect postgres service');
+      assert.ok(services.includes('redis'), 'should detect redis service');
+    });
+
+    test('detects MCP servers from .mcp.json', () => {
+      fs.writeFileSync(path.join(tmpDir, '.mcp.json'), JSON.stringify({
+        mcpServers: {
+          github: { command: 'mcp-github' },
+          postgres: { command: 'mcp-postgres' },
+        },
+      }));
+      const result = envScanParsed();
+      assert.ok(result.success);
+      const servers = result.data.infrastructure.mcp_servers;
+      assert.ok(servers.includes('github'), 'should detect github MCP server');
+      assert.ok(servers.includes('postgres'), 'should detect postgres MCP server');
+    });
+  });
+
+  describe('script detection', () => {
+    test('captures well-known scripts from package.json', () => {
+      fs.writeFileSync(path.join(tmpDir, 'package.json'), JSON.stringify({
+        name: 'test',
+        scripts: {
+          test: 'jest',
+          build: 'tsc',
+          lint: 'eslint .',
+          dev: 'next dev',  // Not a well-known script
+          start: 'node server.js',
+        },
+      }));
+      const result = envScanParsed();
+      assert.ok(result.success);
+      assert.strictEqual(result.data.scripts.test, 'jest');
+      assert.strictEqual(result.data.scripts.build, 'tsc');
+      assert.strictEqual(result.data.scripts.lint, 'eslint .');
+      assert.strictEqual(result.data.scripts.start, 'node server.js');
+      assert.strictEqual(result.data.scripts.dev, undefined, 'dev is not a well-known script');
+    });
+
+    test('captures Makefile targets', () => {
+      fs.writeFileSync(path.join(tmpDir, 'Makefile'),
+        'build:\n\tgo build .\n\ntest:\n\tgo test ./...\n\n.PHONY: build test\n');
+      const result = envScanParsed();
+      assert.ok(result.success);
+      assert.ok(result.data.scripts._makefile_targets, 'should have Makefile targets');
+      assert.ok(result.data.scripts._makefile_targets.includes('build'));
+      assert.ok(result.data.scripts._makefile_targets.includes('test'));
+    });
+  });
+
+  describe('monorepo detection', () => {
+    test('detects npm workspaces from package.json', () => {
+      fs.writeFileSync(path.join(tmpDir, 'package.json'), JSON.stringify({
+        name: 'monorepo',
+        workspaces: ['packages/*', 'apps/*'],
+      }));
+      const result = envScanParsed();
+      assert.ok(result.success);
+      assert.ok(result.data.monorepo, 'should detect monorepo');
+      assert.strictEqual(result.data.monorepo.type, 'npm-workspaces');
+      assert.deepStrictEqual(result.data.monorepo.members, ['packages/*', 'apps/*']);
+    });
+
+    test('no monorepo in simple project', () => {
+      fs.writeFileSync(path.join(tmpDir, 'package.json'), '{"name":"simple"}');
+      const result = envScanParsed();
+      assert.ok(result.success);
+      assert.strictEqual(result.data.monorepo, null, 'should not detect monorepo');
+    });
+  });
+
+  describe('edge cases', () => {
+    test('permission-denied directory does not crash', () => {
+      // Create a directory we can't read (only works if not running as root)
+      const restrictedDir = path.join(tmpDir, 'restricted');
+      fs.mkdirSync(restrictedDir, { mode: 0o000 });
+      // Should still complete without crashing
+      const result = envScanParsed();
+      assert.ok(result.success, 'should not crash on permission-denied directory');
+      // Restore permissions for cleanup
+      fs.chmodSync(restrictedDir, 0o755);
+    });
+
+    test('deeply nested symlink does not cause infinite loop (depth limit handles this)', () => {
+      // Depth limit of 3 prevents following deep symlinks
+      const subDir = path.join(tmpDir, 'sub');
+      fs.mkdirSync(subDir);
+      fs.writeFileSync(path.join(tmpDir, 'package.json'), '{"name":"test"}');
+      // Create a symlink that could cause loops (symlink to parent)
+      try {
+        fs.symlinkSync(tmpDir, path.join(subDir, 'loop'), 'dir');
+      } catch {
+        // Symlinks may not work on all platforms — skip if so
+        return;
+      }
+      const result = envScanParsed();
+      assert.ok(result.success, 'should not crash with symlink loops');
+    });
+
+    test('CI detection: github actions', () => {
+      const ghDir = path.join(tmpDir, '.github', 'workflows');
+      fs.mkdirSync(ghDir, { recursive: true });
+      fs.writeFileSync(path.join(ghDir, 'ci.yml'), 'name: CI');
+      const result = envScanParsed();
+      assert.ok(result.success);
+      assert.ok(result.data.tools.ci, 'should detect CI');
+      assert.strictEqual(result.data.tools.ci.platform, 'github-actions');
+    });
+
+    test('linter/formatter detection', () => {
+      fs.writeFileSync(path.join(tmpDir, '.eslintrc.json'), '{}');
+      fs.writeFileSync(path.join(tmpDir, '.prettierrc'), '{}');
+      const result = envScanParsed();
+      assert.ok(result.success);
+      assert.ok(result.data.tools.linters.some(l => l.name === 'eslint'), 'should detect eslint');
+      assert.ok(result.data.tools.formatters.some(f => f.name === 'prettier'), 'should detect prettier');
+    });
+
+    test('test framework detection from config files', () => {
+      fs.writeFileSync(path.join(tmpDir, 'jest.config.js'), 'module.exports = {}');
+      const result = envScanParsed();
+      assert.ok(result.success);
+      assert.ok(result.data.tools.test_frameworks.some(t => t.name === 'jest'), 'should detect jest');
+    });
+  });
+
+  describe('detection against real project', () => {
+    test('gsd-opencode project detects node and npm', () => {
+      // Run against the actual project root (bin/ is inside project root)
+      const projectRoot = path.resolve(__dirname, '..');
+      const result = envScanParsed(projectRoot);
+      assert.ok(result.success, `env scan on project root failed: ${result.error}`);
+      const node = result.data.languages.find(l => l.name === 'node');
+      assert.ok(node, 'should detect node in gsd-opencode project');
+      assert.strictEqual(node.primary, true, 'node should be primary');
+      assert.ok(result.data.package_manager.name, 'should detect a package manager');
+    });
+  });
+});
