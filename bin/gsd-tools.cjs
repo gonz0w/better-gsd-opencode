@@ -10896,9 +10896,119 @@ var require_env = __commonJS({
       }
       return null;
     }
-    function cmdEnvScan(cwd, args, raw) {
+    function getWatchedFiles(cwd, manifests) {
+      const watched = /* @__PURE__ */ new Set();
+      for (const m of manifests) {
+        if (m.depth === 0) {
+          watched.add(m.file);
+        }
+      }
+      for (const lf of PM_LOCKFILES) {
+        if (fs.existsSync(path.join(cwd, lf.file))) {
+          watched.add(lf.file);
+        }
+      }
+      for (const vm of VERSION_MANAGERS) {
+        if (fs.existsSync(path.join(cwd, vm.file))) {
+          watched.add(vm.file);
+        }
+      }
+      for (const dcFile of ["docker-compose.yml", "docker-compose.yaml", "compose.yml", "compose.yaml"]) {
+        if (fs.existsSync(path.join(cwd, dcFile))) {
+          watched.add(dcFile);
+        }
+      }
+      return Array.from(watched).sort();
+    }
+    function getWatchedFilesMtimes(cwd, watchedFiles) {
+      const mtimes = {};
+      for (const file of watchedFiles) {
+        try {
+          const stat = fs.statSync(path.join(cwd, file));
+          mtimes[file] = stat.mtimeMs;
+        } catch {
+        }
+      }
+      return mtimes;
+    }
+    function ensureManifestGitignored(cwd) {
+      const planningDir = path.join(cwd, ".planning");
+      if (!fs.existsSync(planningDir)) return;
+      const planningGitignore = path.join(planningDir, ".gitignore");
+      if (fs.existsSync(planningGitignore)) {
+        const content = fs.readFileSync(planningGitignore, "utf-8");
+        if (content.includes("env-manifest.json")) return;
+        const newContent = content.endsWith("\n") ? content + "env-manifest.json\n" : content + "\nenv-manifest.json\n";
+        fs.writeFileSync(planningGitignore, newContent);
+        return;
+      }
+      const rootGitignore = path.join(cwd, ".gitignore");
+      if (fs.existsSync(rootGitignore)) {
+        const content = fs.readFileSync(rootGitignore, "utf-8");
+        if (content.includes("env-manifest.json")) return;
+      }
+      fs.writeFileSync(planningGitignore, "env-manifest.json\n");
+    }
+    function writeProjectProfile(cwd, result) {
+      const planningDir = path.join(cwd, ".planning");
+      if (!fs.existsSync(planningDir)) return;
+      const ci = result.tools && result.tools.ci;
+      const infraServices = result.infrastructure && result.infrastructure.docker_services ? result.infrastructure.docker_services : [];
+      const profile = {
+        "$schema_version": "1.0",
+        generated_at: (/* @__PURE__ */ new Date()).toISOString(),
+        languages: result.languages.map((l) => l.name),
+        primary_language: (result.languages.find((l) => l.primary) || {}).name || null,
+        package_manager: result.package_manager ? result.package_manager.name : null,
+        monorepo: result.monorepo || null,
+        ci_platform: ci ? ci.platform : null,
+        infrastructure_services: infraServices
+      };
+      const profilePath = path.join(planningDir, "project-profile.json");
+      fs.writeFileSync(profilePath, JSON.stringify(profile, null, 2) + "\n");
+    }
+    function checkEnvManifestStaleness(cwd) {
+      const manifestPath = path.join(cwd, ".planning", "env-manifest.json");
+      if (!fs.existsSync(manifestPath)) {
+        return { stale: true, reason: "no_manifest" };
+      }
+      let manifest;
+      try {
+        manifest = JSON.parse(fs.readFileSync(manifestPath, "utf-8"));
+      } catch {
+        return { stale: true, reason: "corrupt_manifest" };
+      }
+      if (!manifest.watched_files_mtimes) {
+        return { stale: true, reason: "no_mtime_data" };
+      }
+      const changedFiles = [];
+      for (const file of manifest.watched_files || []) {
+        const filePath = path.join(cwd, file);
+        try {
+          const currentMtime = fs.statSync(filePath).mtimeMs;
+          const recordedMtime = manifest.watched_files_mtimes[file];
+          if (recordedMtime === void 0 || currentMtime > recordedMtime) {
+            changedFiles.push(file);
+          }
+        } catch {
+          if (manifest.watched_files_mtimes[file] !== void 0) {
+            changedFiles.push(file);
+          }
+        }
+      }
+      const currentWatched = getWatchedFiles(cwd, scanManifests(cwd, 0));
+      for (const file of currentWatched) {
+        if (!(file in manifest.watched_files_mtimes)) {
+          changedFiles.push(file);
+        }
+      }
+      if (changedFiles.length > 0) {
+        return { stale: true, reason: "files_changed", changed_files: [...new Set(changedFiles)] };
+      }
+      return { stale: false };
+    }
+    function performEnvScan(cwd) {
       const startMs = Date.now();
-      const force = args.includes("--force");
       const manifests = scanManifests(cwd, 3);
       const primaryLang = determinePrimaryLanguage(manifests);
       const languages = buildLanguageEntries(manifests, primaryLang);
@@ -10923,7 +11033,12 @@ var require_env = __commonJS({
       const mcpServers = detectMcpServers(cwd);
       const monorepo = detectMonorepo(cwd);
       const detectionMs = Date.now() - startMs;
-      const result = {
+      const watchedFiles = getWatchedFiles(cwd, manifests);
+      const watchedFilesMtimes = getWatchedFilesMtimes(cwd, watchedFiles);
+      return {
+        "$schema_version": "1.0",
+        scanned_at: (/* @__PURE__ */ new Date()).toISOString(),
+        detection_ms: detectionMs,
         languages,
         package_manager: packageManager,
         version_managers: versionManagers,
@@ -10939,12 +11054,92 @@ var require_env = __commonJS({
           mcp_servers: mcpServers
         },
         monorepo,
-        detection_ms: detectionMs,
-        scanned_at: (/* @__PURE__ */ new Date()).toISOString()
+        watched_files: watchedFiles,
+        watched_files_mtimes: watchedFilesMtimes
+      };
+    }
+    function writeManifest(cwd, result) {
+      const planningDir = path.join(cwd, ".planning");
+      if (!fs.existsSync(planningDir)) return false;
+      const manifestPath = path.join(planningDir, "env-manifest.json");
+      fs.writeFileSync(manifestPath, JSON.stringify(result, null, 2) + "\n");
+      return true;
+    }
+    function cmdEnvScan(cwd, args, raw) {
+      const force = args.includes("--force");
+      const verbose = global._gsdCompactMode === false;
+      if (!force) {
+        const staleness = checkEnvManifestStaleness(cwd);
+        if (!staleness.stale) {
+          const manifestPath = path.join(cwd, ".planning", "env-manifest.json");
+          const existing = JSON.parse(fs.readFileSync(manifestPath, "utf-8"));
+          if (verbose) {
+            process.stderr.write("Environment manifest is current\n");
+          }
+          if (raw) {
+            output(existing, raw);
+          }
+          process.exit(0);
+        }
+        if (staleness.reason === "files_changed" && verbose) {
+          const changed = staleness.changed_files || [];
+          process.stderr.write(`Environment changed (${changed.join(", ")} modified), rescanning...
+`);
+        }
+      }
+      const result = performEnvScan(cwd);
+      writeManifest(cwd, result);
+      ensureManifestGitignored(cwd);
+      writeProjectProfile(cwd, result);
+      if (verbose) {
+        const langNames = result.languages.map((l) => l.name).join(", ");
+        const pm = result.package_manager ? result.package_manager.name : "none";
+        process.stderr.write(`Scanned in ${result.detection_ms}ms: languages=[${langNames}], pm=${pm}, watched=${result.watched_files.length} files
+`);
+      }
+      if (raw) {
+        output(result, raw);
+      }
+      process.exit(0);
+    }
+    function cmdEnvStatus(cwd, args, raw) {
+      const manifestPath = path.join(cwd, ".planning", "env-manifest.json");
+      const exists = fs.existsSync(manifestPath);
+      let manifest = null;
+      if (exists) {
+        try {
+          manifest = JSON.parse(fs.readFileSync(manifestPath, "utf-8"));
+        } catch {
+        }
+      }
+      const staleness = checkEnvManifestStaleness(cwd);
+      const result = {
+        exists,
+        stale: staleness.stale,
+        reason: staleness.reason || null,
+        scanned_at: manifest ? manifest.scanned_at : null,
+        age_minutes: manifest ? Math.round((Date.now() - new Date(manifest.scanned_at).getTime()) / 6e4) : null,
+        languages_count: manifest ? (manifest.languages || []).length : 0,
+        changed_files: staleness.changed_files || []
       };
       output(result, raw);
     }
-    module2.exports = { cmdEnvScan, LANG_MANIFESTS, scanManifests, checkBinary, detectPackageManager, matchSimpleGlob };
+    module2.exports = {
+      cmdEnvScan,
+      cmdEnvStatus,
+      checkEnvManifestStaleness,
+      LANG_MANIFESTS,
+      scanManifests,
+      checkBinary,
+      detectPackageManager,
+      matchSimpleGlob,
+      performEnvScan,
+      writeManifest,
+      ensureManifestGitignored,
+      writeProjectProfile,
+      getWatchedFiles,
+      getWatchedFilesMtimes
+    };
   }
 });
 
@@ -11079,7 +11274,8 @@ var require_router = __commonJS({
       getIntentDriftData
     } = require_intent();
     var {
-      cmdEnvScan
+      cmdEnvScan,
+      cmdEnvStatus
     } = require_env();
     async function main2() {
       const args = process.argv.slice(2);
@@ -11662,8 +11858,10 @@ Available: execute-phase, plan-phase, new-project, new-milestone, quick, resume,
           const subcommand = args[1];
           if (subcommand === "scan") {
             cmdEnvScan(cwd, args.slice(2), raw);
+          } else if (subcommand === "status") {
+            cmdEnvStatus(cwd, args.slice(2), raw);
           } else {
-            error("Unknown env subcommand. Available: scan");
+            error("Unknown env subcommand. Available: scan, status");
           }
           break;
         }

@@ -69,7 +69,7 @@ const {
 } = require('./commands/intent');
 
 const {
-  cmdEnvScan,
+  cmdEnvScan, cmdEnvStatus,
 } = require('./commands/env');
 
 
@@ -718,8 +718,10 @@ async function main() {
       const subcommand = args[1];
       if (subcommand === 'scan') {
         cmdEnvScan(cwd, args.slice(2), raw);
+      } else if (subcommand === 'status') {
+        cmdEnvStatus(cwd, args.slice(2), raw);
       } else {
-        error('Unknown env subcommand. Available: scan');
+        error('Unknown env subcommand. Available: scan, status');
       }
       break;
     }

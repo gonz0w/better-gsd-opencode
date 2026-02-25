@@ -669,19 +669,187 @@ function detectMonorepo(rootDir) {
 }
 
 
-// --- Main Command Function ----------------------------------------------------
+// --- Watched Files & Staleness ------------------------------------------------
 
 /**
- * cmdEnvScan - Environment detection engine.
- * Scans a project for languages, package managers, tools, and binary availability.
- *
- * @param {string} cwd - Project root directory
- * @param {string[]} args - CLI arguments (after 'env scan')
- * @param {boolean} raw - Raw JSON output mode
+ * Determine which files should be watched for staleness.
+ * Includes: root-level manifest files (depth 0), lockfiles, version manager files,
+ * docker-compose files.
  */
-function cmdEnvScan(cwd, args, raw) {
+function getWatchedFiles(cwd, manifests) {
+  const watched = new Set();
+
+  // Root manifest files (depth 0 only)
+  for (const m of manifests) {
+    if (m.depth === 0) {
+      watched.add(m.file);
+    }
+  }
+
+  // Lockfiles
+  for (const lf of PM_LOCKFILES) {
+    if (fs.existsSync(path.join(cwd, lf.file))) {
+      watched.add(lf.file);
+    }
+  }
+
+  // Version manager files
+  for (const vm of VERSION_MANAGERS) {
+    if (fs.existsSync(path.join(cwd, vm.file))) {
+      watched.add(vm.file);
+    }
+  }
+
+  // Docker-compose files
+  for (const dcFile of ['docker-compose.yml', 'docker-compose.yaml', 'compose.yml', 'compose.yaml']) {
+    if (fs.existsSync(path.join(cwd, dcFile))) {
+      watched.add(dcFile);
+    }
+  }
+
+  return Array.from(watched).sort();
+}
+
+/**
+ * Get mtimes for watched files.
+ */
+function getWatchedFilesMtimes(cwd, watchedFiles) {
+  const mtimes = {};
+  for (const file of watchedFiles) {
+    try {
+      const stat = fs.statSync(path.join(cwd, file));
+      mtimes[file] = stat.mtimeMs;
+    } catch {
+      // File disappeared between check and stat — skip
+    }
+  }
+  return mtimes;
+}
+
+/**
+ * Ensure env-manifest.json is in gitignore.
+ * Checks .planning/.gitignore first, then creates it if needed.
+ */
+function ensureManifestGitignored(cwd) {
+  const planningDir = path.join(cwd, '.planning');
+  if (!fs.existsSync(planningDir)) return;
+
+  const planningGitignore = path.join(planningDir, '.gitignore');
+
+  // Check if already gitignored in .planning/.gitignore
+  if (fs.existsSync(planningGitignore)) {
+    const content = fs.readFileSync(planningGitignore, 'utf-8');
+    if (content.includes('env-manifest.json')) return; // Already there
+    // Append
+    const newContent = content.endsWith('\n') ? content + 'env-manifest.json\n' : content + '\nenv-manifest.json\n';
+    fs.writeFileSync(planningGitignore, newContent);
+    return;
+  }
+
+  // Check root .gitignore
+  const rootGitignore = path.join(cwd, '.gitignore');
+  if (fs.existsSync(rootGitignore)) {
+    const content = fs.readFileSync(rootGitignore, 'utf-8');
+    if (content.includes('env-manifest.json')) return; // Already there
+  }
+
+  // Create .planning/.gitignore with env-manifest.json
+  fs.writeFileSync(planningGitignore, 'env-manifest.json\n');
+}
+
+/**
+ * Write the committed project profile (non-machine-specific structure info).
+ */
+function writeProjectProfile(cwd, result) {
+  const planningDir = path.join(cwd, '.planning');
+  if (!fs.existsSync(planningDir)) return;
+
+  const ci = result.tools && result.tools.ci;
+  const infraServices = result.infrastructure && result.infrastructure.docker_services
+    ? result.infrastructure.docker_services
+    : [];
+
+  const profile = {
+    '$schema_version': '1.0',
+    generated_at: new Date().toISOString(),
+    languages: result.languages.map(l => l.name),
+    primary_language: (result.languages.find(l => l.primary) || {}).name || null,
+    package_manager: result.package_manager ? result.package_manager.name : null,
+    monorepo: result.monorepo || null,
+    ci_platform: ci ? ci.platform : null,
+    infrastructure_services: infraServices,
+  };
+
+  const profilePath = path.join(planningDir, 'project-profile.json');
+  fs.writeFileSync(profilePath, JSON.stringify(profile, null, 2) + '\n');
+}
+
+/**
+ * Check manifest staleness by comparing watched file mtimes.
+ * @param {string} cwd - Project root
+ * @returns {{ stale: boolean, reason?: string, changed_files?: string[] }}
+ */
+function checkEnvManifestStaleness(cwd) {
+  const manifestPath = path.join(cwd, '.planning', 'env-manifest.json');
+
+  if (!fs.existsSync(manifestPath)) {
+    return { stale: true, reason: 'no_manifest' };
+  }
+
+  let manifest;
+  try {
+    manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf-8'));
+  } catch {
+    return { stale: true, reason: 'corrupt_manifest' };
+  }
+
+  if (!manifest.watched_files_mtimes) {
+    return { stale: true, reason: 'no_mtime_data' };
+  }
+
+  // Compare mtimes
+  const changedFiles = [];
+  for (const file of (manifest.watched_files || [])) {
+    const filePath = path.join(cwd, file);
+    try {
+      const currentMtime = fs.statSync(filePath).mtimeMs;
+      const recordedMtime = manifest.watched_files_mtimes[file];
+      if (recordedMtime === undefined || currentMtime > recordedMtime) {
+        changedFiles.push(file);
+      }
+    } catch {
+      // File was deleted since last scan — that's a change
+      if (manifest.watched_files_mtimes[file] !== undefined) {
+        changedFiles.push(file);
+      }
+    }
+  }
+
+  // Also check for new watched files that weren't in the manifest
+  const currentWatched = getWatchedFiles(cwd, scanManifests(cwd, 0)); // Only depth 0 for speed
+  for (const file of currentWatched) {
+    if (!(file in manifest.watched_files_mtimes)) {
+      // New file appeared that wasn't tracked
+      changedFiles.push(file);
+    }
+  }
+
+  if (changedFiles.length > 0) {
+    return { stale: true, reason: 'files_changed', changed_files: [...new Set(changedFiles)] };
+  }
+
+  return { stale: false };
+}
+
+
+// --- Main Command Functions ---------------------------------------------------
+
+/**
+ * Perform the full environment scan and return the result object.
+ * Extracted so both cmdEnvScan and cmdEnvStatus can reuse detection logic.
+ */
+function performEnvScan(cwd) {
   const startMs = Date.now();
-  const force = args.includes('--force');
 
   // 1. Scan for manifest files (fast path — file existence only)
   const manifests = scanManifests(cwd, 3);
@@ -730,7 +898,14 @@ function cmdEnvScan(cwd, args, raw) {
 
   const detectionMs = Date.now() - startMs;
 
-  const result = {
+  // 11. Compute watched files and their mtimes
+  const watchedFiles = getWatchedFiles(cwd, manifests);
+  const watchedFilesMtimes = getWatchedFilesMtimes(cwd, watchedFiles);
+
+  return {
+    '$schema_version': '1.0',
+    scanned_at: new Date().toISOString(),
+    detection_ms: detectionMs,
     languages,
     package_manager: packageManager,
     version_managers: versionManagers,
@@ -746,11 +921,125 @@ function cmdEnvScan(cwd, args, raw) {
       mcp_servers: mcpServers,
     },
     monorepo,
-    detection_ms: detectionMs,
-    scanned_at: new Date().toISOString(),
+    watched_files: watchedFiles,
+    watched_files_mtimes: watchedFilesMtimes,
+  };
+}
+
+/**
+ * Write the manifest to disk if .planning/ exists.
+ */
+function writeManifest(cwd, result) {
+  const planningDir = path.join(cwd, '.planning');
+  if (!fs.existsSync(planningDir)) return false;
+
+  const manifestPath = path.join(planningDir, 'env-manifest.json');
+  fs.writeFileSync(manifestPath, JSON.stringify(result, null, 2) + '\n');
+  return true;
+}
+
+/**
+ * cmdEnvScan - Environment detection engine.
+ * Scans a project for languages, package managers, tools, and binary availability.
+ * Writes env-manifest.json to .planning/ and project-profile.json.
+ *
+ * @param {string} cwd - Project root directory
+ * @param {string[]} args - CLI arguments (after 'env scan')
+ * @param {boolean} raw - Raw JSON output mode
+ */
+function cmdEnvScan(cwd, args, raw) {
+  const force = args.includes('--force');
+  const verbose = global._gsdCompactMode === false; // --verbose flag parsed globally in router
+
+  // Staleness check (unless --force)
+  if (!force) {
+    const staleness = checkEnvManifestStaleness(cwd);
+    if (!staleness.stale) {
+      // Manifest is fresh — return existing data without re-scanning
+      const manifestPath = path.join(cwd, '.planning', 'env-manifest.json');
+      const existing = JSON.parse(fs.readFileSync(manifestPath, 'utf-8'));
+      if (verbose) {
+        process.stderr.write('Environment manifest is current\n');
+      }
+      if (raw) {
+        output(existing, raw);
+      }
+      // Silent exit (no stdout) when not --raw and manifest is fresh
+      process.exit(0);
+    }
+
+    // Stale — notify if verbose and reason is files_changed
+    if (staleness.reason === 'files_changed' && verbose) {
+      const changed = staleness.changed_files || [];
+      process.stderr.write(`Environment changed (${changed.join(', ')} modified), rescanning...\n`);
+    }
+  }
+
+  // Perform full scan
+  const result = performEnvScan(cwd);
+
+  // Write manifest to .planning/ if it exists
+  writeManifest(cwd, result);
+
+  // Ensure gitignore entry
+  ensureManifestGitignored(cwd);
+
+  // Write committed project profile
+  writeProjectProfile(cwd, result);
+
+  // Verbose summary to stderr
+  if (verbose) {
+    const langNames = result.languages.map(l => l.name).join(', ');
+    const pm = result.package_manager ? result.package_manager.name : 'none';
+    process.stderr.write(`Scanned in ${result.detection_ms}ms: languages=[${langNames}], pm=${pm}, watched=${result.watched_files.length} files\n`);
+  }
+
+  // Output: --raw prints JSON to stdout, otherwise silent
+  if (raw) {
+    output(result, raw);
+  }
+
+  process.exit(0);
+}
+
+/**
+ * cmdEnvStatus - Report manifest staleness without scanning.
+ *
+ * @param {string} cwd - Project root directory
+ * @param {string[]} args - CLI arguments (after 'env status')
+ * @param {boolean} raw - Raw JSON output mode
+ */
+function cmdEnvStatus(cwd, args, raw) {
+  const manifestPath = path.join(cwd, '.planning', 'env-manifest.json');
+  const exists = fs.existsSync(manifestPath);
+
+  let manifest = null;
+  if (exists) {
+    try {
+      manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf-8'));
+    } catch {
+      // corrupt
+    }
+  }
+
+  const staleness = checkEnvManifestStaleness(cwd);
+
+  const result = {
+    exists,
+    stale: staleness.stale,
+    reason: staleness.reason || null,
+    scanned_at: manifest ? manifest.scanned_at : null,
+    age_minutes: manifest ? Math.round((Date.now() - new Date(manifest.scanned_at).getTime()) / 60000) : null,
+    languages_count: manifest ? (manifest.languages || []).length : 0,
+    changed_files: staleness.changed_files || [],
   };
 
   output(result, raw);
 }
 
-module.exports = { cmdEnvScan, LANG_MANIFESTS, scanManifests, checkBinary, detectPackageManager, matchSimpleGlob };
+module.exports = {
+  cmdEnvScan, cmdEnvStatus, checkEnvManifestStaleness,
+  LANG_MANIFESTS, scanManifests, checkBinary, detectPackageManager, matchSimpleGlob,
+  performEnvScan, writeManifest, ensureManifestGitignored, writeProjectProfile,
+  getWatchedFiles, getWatchedFilesMtimes,
+};
