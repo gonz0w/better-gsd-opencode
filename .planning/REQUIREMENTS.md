@@ -75,7 +75,7 @@ Requirements for milestone v4.0 Environment & Execution Intelligence. Each maps 
   - Format: indented bullet list under each requirement
   - Each assertion is specific, testable, unambiguous
 
-- [ ] **SREQ-02**: New-milestone and new-project workflows generate structured requirements
+- [x] **SREQ-02**: New-milestone and new-project workflows generate structured requirements
   - Prompt user for acceptance criteria during requirement definition
   - Auto-suggest assertions based on requirement text
   - Validate: every v1 requirement has at least 2 assertions
@@ -90,7 +90,7 @@ Requirements for milestone v4.0 Environment & Execution Intelligence. Each maps 
   - Each assertion checked against codebase evidence
   - Report includes per-assertion pass/fail status
 
-- [ ] **SREQ-05**: Plan must_haves derive from structured acceptance criteria
+- [x] **SREQ-05**: Plan must_haves derive from structured acceptance criteria
   - Planner reads assertions for mapped requirements
   - `must_haves.truths` populated from assertions
   - Traceability: assertion → truth → verification result
@@ -181,10 +181,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 | MCP-04 | Phase 19 | Complete |
 | MCP-05 | Phase 19 | Complete |
 | SREQ-01 | Phase 20 | Complete |
-| SREQ-02 | Phase 20 | Pending |
+| SREQ-02 | Phase 20 | Complete |
 | SREQ-03 | Phase 20 | Pending |
 | SREQ-04 | Phase 20 | Pending |
-| SREQ-05 | Phase 20 | Pending |
+| SREQ-05 | Phase 20 | Complete |
 | WKTR-01 | Phase 21 | Pending |
 | WKTR-02 | Phase 21 | Pending |
 | WKTR-03 | Phase 21 | Pending |

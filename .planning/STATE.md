@@ -10,7 +10,7 @@ See: .planning/PROJECT.md (updated 2026-02-25)
 ## Current Position
 
 **Phase:** 20 of 22 (Structured Requirements)
-**Current Plan:** 2 of 3
+**Current Plan:** 3 of 3
 **Status:** In progress
 **Last Activity:** 2026-02-25
 
@@ -38,6 +38,7 @@ Progress: [██████░░░░] 60% (3/5 phases)
 | Phase 19 P02 | 4 min | 2 tasks | 3 files |
 | Phase 19 P03 | 9 min | 2 tasks | 4 files |
 | Phase 20 P01 | 8 min | 2 tasks | 6 files |
+| Phase 20 P03 | 2 min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -66,6 +67,9 @@ v4.0 decisions:
 - [Phase 20]: Bundle budget raised from 500KB to 525KB for assertion commands
 - [Phase 20]: Parser in verify.js (not helpers.js) since consumed by verifier
 - [Phase 20]: Heading-based section splitting for parseAssertionsMd (## REQ-ID: format)
+- [Phase 20]: Assertion reading integrated into existing plan-phase steps — 12 net new lines, under 20-line target
+- [Phase 20]: Planner derives must_haves.truths from assertions with fallback to requirement text
+- [Phase 20]: Test-command column added to requirements traceability table template
 
 ### Pending Todos
 
@@ -78,5 +82,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-02-25
-Stopped at: Completed 20-01-PLAN.md
+Stopped at: Completed 20-03-PLAN.md
 Resume file: None
