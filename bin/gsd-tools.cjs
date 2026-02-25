@@ -917,6 +917,40 @@ Output: { workflows: [{ name, path, tokens, budget, within_budget }], total_toke
 
 Examples:
   gsd-tools token-budget --raw`,
+      "mcp-profile": `Usage: gsd-tools mcp-profile [options] [--raw]
+
+Discover configured MCP servers and estimate their token cost.
+
+Reads server configurations from:
+  .mcp.json              Claude Code format (mcpServers key)
+  opencode.json          OpenCode format (mcp key)
+  ~/.config/opencode/opencode.json  User-level OpenCode config
+
+For each server, estimates token cost from a known-server database
+(15+ common servers) or falls back to a default estimate.
+
+Options:
+  --window <size>   Context window size in tokens (default: 200000)
+  --raw             Output raw JSON
+
+Output includes per-server token estimates, total context cost,
+and context window percentage breakdown.
+
+Also available as: gsd-tools mcp profile
+
+Examples:
+  gsd-tools mcp-profile --raw
+  gsd-tools mcp-profile --window 100000 --raw`,
+      "mcp": `Usage: gsd-tools mcp <subcommand> [options] [--raw]
+
+MCP server management commands.
+
+Subcommands:
+  profile [--window N]   Discover servers and estimate token costs
+
+Examples:
+  gsd-tools mcp profile --raw
+  gsd-tools mcp profile --window 100000 --raw`,
       "env": `Usage: gsd-tools env <subcommand> [options] [--raw]
 
 Detect project languages, tools, and runtimes.
@@ -11313,6 +11347,221 @@ var require_memory = __commonJS({
   }
 });
 
+// src/commands/mcp.js
+var require_mcp = __commonJS({
+  "src/commands/mcp.js"(exports2, module2) {
+    "use strict";
+    var fs = require("fs");
+    var path = require("path");
+    var { output, error, debugLog } = require_output();
+    var MCP_KNOWN_SERVERS = [
+      { name: "postgres", patterns: [/postgres/i, /toolbox.*postgres/i], tool_count: 12, base_tokens: 700, total_estimate: 4500 },
+      { name: "github", patterns: [/github/i], tool_count: 30, base_tokens: 1500, total_estimate: 46e3 },
+      { name: "brave-search", patterns: [/brave[_-]?search/i, /server-brave-search/i], tool_count: 3, base_tokens: 500, total_estimate: 2500 },
+      { name: "context7", patterns: [/context7/i], tool_count: 2, base_tokens: 300, total_estimate: 1500 },
+      { name: "terraform", patterns: [/terraform/i], tool_count: 8, base_tokens: 800, total_estimate: 6e3 },
+      { name: "docker", patterns: [/^docker$/i, /docker-mcp/i], tool_count: 10, base_tokens: 500, total_estimate: 5e3 },
+      { name: "podman", patterns: [/podman/i], tool_count: 10, base_tokens: 500, total_estimate: 5e3 },
+      { name: "filesystem", patterns: [/filesystem/i, /server-filesystem/i], tool_count: 8, base_tokens: 500, total_estimate: 3e3 },
+      { name: "puppeteer", patterns: [/puppeteer/i], tool_count: 12, base_tokens: 800, total_estimate: 8e3 },
+      { name: "sqlite", patterns: [/sqlite/i], tool_count: 6, base_tokens: 500, total_estimate: 3e3 },
+      { name: "redis", patterns: [/redis/i], tool_count: 8, base_tokens: 500, total_estimate: 3500 },
+      { name: "rabbitmq", patterns: [/rabbitmq/i, /queue[_-]?pilot/i], tool_count: 6, base_tokens: 500, total_estimate: 3e3 },
+      { name: "pulsar", patterns: [/pulsar/i, /snmcp/i], tool_count: 8, base_tokens: 500, total_estimate: 4e3 },
+      { name: "consul", patterns: [/consul/i], tool_count: 5, base_tokens: 400, total_estimate: 2500 },
+      { name: "vault", patterns: [/vault/i], tool_count: 8, base_tokens: 500, total_estimate: 4e3 },
+      { name: "slack", patterns: [/slack/i], tool_count: 15, base_tokens: 1e3, total_estimate: 12e3 },
+      { name: "linear", patterns: [/linear/i], tool_count: 20, base_tokens: 1e3, total_estimate: 15e3 },
+      { name: "notion", patterns: [/notion/i], tool_count: 12, base_tokens: 800, total_estimate: 6e3 },
+      { name: "sentry", patterns: [/sentry/i], tool_count: 8, base_tokens: 600, total_estimate: 4e3 },
+      { name: "datadog", patterns: [/datadog/i], tool_count: 10, base_tokens: 800, total_estimate: 5e3 }
+    ];
+    var DEFAULT_TOKENS_PER_TOOL = 150;
+    var DEFAULT_BASE_TOKENS = 400;
+    var DEFAULT_CONTEXT_WINDOW = 2e5;
+    function safeReadJson(filePath) {
+      try {
+        if (!fs.existsSync(filePath)) return null;
+        return JSON.parse(fs.readFileSync(filePath, "utf-8"));
+      } catch {
+        debugLog("mcp.discovery", `failed to parse ${filePath}`);
+        return null;
+      }
+    }
+    function extractFromMcpJson(filePath) {
+      const data = safeReadJson(filePath);
+      if (!data || !data.mcpServers || typeof data.mcpServers !== "object") return [];
+      const servers = [];
+      for (const [name, config] of Object.entries(data.mcpServers)) {
+        if (!config || typeof config !== "object") continue;
+        const command = typeof config.command === "string" ? config.command : null;
+        const args = Array.isArray(config.args) ? config.args : [];
+        servers.push({
+          name,
+          source: ".mcp.json",
+          transport: "stdio",
+          command: command || "unknown",
+          args
+        });
+      }
+      return servers;
+    }
+    function extractFromOpencodeJson(filePath, sourceName) {
+      const data = safeReadJson(filePath);
+      if (!data || !data.mcp || typeof data.mcp !== "object") return [];
+      const servers = [];
+      for (const [name, config] of Object.entries(data.mcp)) {
+        if (!config || typeof config !== "object") continue;
+        const transport = config.type === "remote" ? "remote" : "stdio";
+        let command = "unknown";
+        let args = [];
+        if (transport === "remote") {
+          command = config.url || "unknown";
+        } else if (Array.isArray(config.command)) {
+          command = config.command[0] || "unknown";
+          args = config.command.slice(1);
+        } else if (typeof config.command === "string") {
+          command = config.command;
+        }
+        servers.push({
+          name,
+          source: sourceName || path.basename(filePath),
+          transport,
+          command,
+          args
+        });
+      }
+      return servers;
+    }
+    function discoverMcpServers(cwd) {
+      const mcpJsonServers = extractFromMcpJson(path.join(cwd, ".mcp.json"));
+      const opencodeServers = extractFromOpencodeJson(
+        path.join(cwd, "opencode.json"),
+        "opencode.json"
+      );
+      const homeConfig = path.join(
+        process.env.HOME || process.env.USERPROFILE || "~",
+        ".config",
+        "opencode",
+        "opencode.json"
+      );
+      const userServers = extractFromOpencodeJson(homeConfig, "~/.config/opencode/opencode.json");
+      const serverMap = /* @__PURE__ */ new Map();
+      for (const s of mcpJsonServers) {
+        serverMap.set(s.name, s);
+      }
+      for (const s of opencodeServers) {
+        if (!serverMap.has(s.name)) {
+          serverMap.set(s.name, s);
+        }
+      }
+      for (const s of userServers) {
+        if (!serverMap.has(s.name)) {
+          serverMap.set(s.name, s);
+        }
+      }
+      return Array.from(serverMap.values()).sort((a, b) => a.name.localeCompare(b.name));
+    }
+    function estimateTokenCost(server, knownServers) {
+      const db = knownServers || MCP_KNOWN_SERVERS;
+      for (const known of db) {
+        for (const pattern of known.patterns) {
+          const testStr = `${server.name} ${server.command} ${(server.args || []).join(" ")}`;
+          if (pattern instanceof RegExp) {
+            if (pattern.test(server.name) || pattern.test(server.command) || pattern.test(testStr)) {
+              return {
+                matched: true,
+                server_name: known.name,
+                tool_count: known.tool_count,
+                token_estimate: known.total_estimate,
+                source: "known-db"
+              };
+            }
+          } else if (typeof pattern === "string") {
+            const lowerTest = testStr.toLowerCase();
+            if (lowerTest.includes(pattern.toLowerCase())) {
+              return {
+                matched: true,
+                server_name: known.name,
+                tool_count: known.tool_count,
+                token_estimate: known.total_estimate,
+                source: "known-db"
+              };
+            }
+          }
+        }
+      }
+      const defaultToolCount = 5;
+      const estimate = defaultToolCount * DEFAULT_TOKENS_PER_TOOL + DEFAULT_BASE_TOKENS;
+      return {
+        matched: false,
+        server_name: server.name,
+        tool_count: defaultToolCount,
+        token_estimate: estimate,
+        source: "default-estimate"
+      };
+    }
+    function cmdMcpProfile(cwd, args, raw) {
+      let contextWindow = DEFAULT_CONTEXT_WINDOW;
+      const windowIdx = args.indexOf("--window");
+      if (windowIdx !== -1 && args[windowIdx + 1]) {
+        const parsed = parseInt(args[windowIdx + 1], 10);
+        if (!isNaN(parsed) && parsed > 0) {
+          contextWindow = parsed;
+        }
+      }
+      const servers = discoverMcpServers(cwd);
+      let totalTokens = 0;
+      let knownCount = 0;
+      let unknownCount = 0;
+      const serverResults = servers.map((server) => {
+        const cost = estimateTokenCost(server);
+        totalTokens += cost.token_estimate;
+        if (cost.source === "known-db") {
+          knownCount++;
+        } else {
+          unknownCount++;
+        }
+        const contextPercent = (cost.token_estimate / contextWindow * 100).toFixed(1) + "%";
+        return {
+          name: server.name,
+          source: server.source,
+          transport: server.transport,
+          command: server.command,
+          tool_count: cost.tool_count,
+          token_estimate: cost.token_estimate,
+          token_source: cost.source,
+          context_percent: contextPercent
+        };
+      });
+      const totalContextPercent = (totalTokens / contextWindow * 100).toFixed(1) + "%";
+      const result = {
+        servers: serverResults,
+        total_tokens: totalTokens,
+        total_context_percent: totalContextPercent,
+        context_window: contextWindow,
+        server_count: servers.length,
+        known_count: knownCount,
+        unknown_count: unknownCount
+      };
+      output(result, raw);
+    }
+    module2.exports = {
+      cmdMcpProfile,
+      discoverMcpServers,
+      estimateTokenCost,
+      MCP_KNOWN_SERVERS,
+      DEFAULT_CONTEXT_WINDOW,
+      DEFAULT_TOKENS_PER_TOOL,
+      DEFAULT_BASE_TOKENS,
+      // Internal helpers exported for testing
+      extractFromMcpJson,
+      extractFromOpencodeJson,
+      safeReadJson
+    };
+  }
+});
+
 // src/router.js
 var require_router = __commonJS({
   "src/router.js"(exports2, module2) {
@@ -11447,6 +11696,9 @@ var require_router = __commonJS({
       cmdEnvScan,
       cmdEnvStatus
     } = require_env();
+    var {
+      cmdMcpProfile
+    } = require_mcp();
     async function main2() {
       const args = process.argv.slice(2);
       const rawIndex = args.indexOf("--raw");
@@ -11481,7 +11733,7 @@ var require_router = __commonJS({
       const command = args[0];
       const cwd = process.cwd();
       if (!command) {
-        error("Usage: gsd-tools <command> [args] [--raw] [--verbose]\nCommands: codebase-impact, commit, config-ensure-section, config-get, config-migrate, config-set, context-budget, current-timestamp, env, extract-sections, find-phase, frontmatter, generate-slug, history-digest, init, intent, list-todos, memory, milestone, phase, phase-plan-index, phases, progress, quick-summary, requirements, resolve-model, roadmap, rollback-info, scaffold, search-decisions, search-lessons, session-diff, state, state-snapshot, summary-extract, template, test-coverage, test-run, todo, token-budget, trace-requirement, validate, validate-config, validate-dependencies, velocity, verify, verify-path-exists, verify-summary, websearch");
+        error("Usage: gsd-tools <command> [args] [--raw] [--verbose]\nCommands: codebase-impact, commit, config-ensure-section, config-get, config-migrate, config-set, context-budget, current-timestamp, env, extract-sections, find-phase, frontmatter, generate-slug, history-digest, init, intent, list-todos, mcp, mcp-profile, memory, milestone, phase, phase-plan-index, phases, progress, quick-summary, requirements, resolve-model, roadmap, rollback-info, scaffold, search-decisions, search-lessons, session-diff, state, state-snapshot, summary-extract, template, test-coverage, test-run, todo, token-budget, trace-requirement, validate, validate-config, validate-dependencies, velocity, verify, verify-path-exists, verify-summary, websearch");
       }
       if (args.includes("--help") || args.includes("-h")) {
         const subForHelp = args[1] && !args[1].startsWith("-") ? args[1] : "";
@@ -12032,6 +12284,19 @@ Available: execute-phase, plan-phase, new-project, new-milestone, quick, resume,
             cmdEnvStatus(cwd, args.slice(2), raw);
           } else {
             error("Unknown env subcommand. Available: scan, status");
+          }
+          break;
+        }
+        case "mcp-profile": {
+          cmdMcpProfile(cwd, args.slice(1), raw);
+          break;
+        }
+        case "mcp": {
+          const subcommand = args[1];
+          if (subcommand === "profile") {
+            cmdMcpProfile(cwd, args.slice(2), raw);
+          } else {
+            error("Unknown mcp subcommand. Available: profile");
           }
           break;
         }

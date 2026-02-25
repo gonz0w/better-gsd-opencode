@@ -960,6 +960,42 @@ Output: { workflows: [{ name, path, tokens, budget, within_budget }], total_toke
 Examples:
   gsd-tools token-budget --raw`,
 
+  'mcp-profile': `Usage: gsd-tools mcp-profile [options] [--raw]
+
+Discover configured MCP servers and estimate their token cost.
+
+Reads server configurations from:
+  .mcp.json              Claude Code format (mcpServers key)
+  opencode.json          OpenCode format (mcp key)
+  ~/.config/opencode/opencode.json  User-level OpenCode config
+
+For each server, estimates token cost from a known-server database
+(15+ common servers) or falls back to a default estimate.
+
+Options:
+  --window <size>   Context window size in tokens (default: 200000)
+  --raw             Output raw JSON
+
+Output includes per-server token estimates, total context cost,
+and context window percentage breakdown.
+
+Also available as: gsd-tools mcp profile
+
+Examples:
+  gsd-tools mcp-profile --raw
+  gsd-tools mcp-profile --window 100000 --raw`,
+
+  'mcp': `Usage: gsd-tools mcp <subcommand> [options] [--raw]
+
+MCP server management commands.
+
+Subcommands:
+  profile [--window N]   Discover servers and estimate token costs
+
+Examples:
+  gsd-tools mcp profile --raw
+  gsd-tools mcp profile --window 100000 --raw`,
+
   'env': `Usage: gsd-tools env <subcommand> [options] [--raw]
 
 Detect project languages, tools, and runtimes.
