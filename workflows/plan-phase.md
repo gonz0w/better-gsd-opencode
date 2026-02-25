@@ -60,7 +60,8 @@ Read: {context_path}, {requirements_path}, {state_path}
 Also read: .planning/INTENT.md (if it exists — project intent, objective, desired outcomes. Scope research to align with stated intent.)
 Phase description: {phase_desc}
 Requirement IDs: {phase_req_ids}
-Read ./CLAUDE.md and .agents/skills/ if they exist.
+Read ./AGENTS.md and .agents/skills/ if they exist.
+If .planning/ASSERTIONS.md exists: note existing assertions for this phase's requirements. Research should inform whether existing assertions are sufficient.
 Write to: {phase_dir}/{phase_num}-RESEARCH.md",
   subagent_type="general", model="{researcher_model}", description="Research Phase {phase}"
 )
@@ -75,6 +76,7 @@ If plans exist: offer add more / view / replan.
 ## 7. Use Context Paths from INIT
 
 Extract file paths from INIT JSON for planner context.
+Check for `.planning/ASSERTIONS.md` existence. If present, set `assertions_path` for planner context.
 
 ## 8. Surface Relevant Lessons
 
@@ -82,6 +84,14 @@ Extract file paths from INIT JSON for planner context.
 LESSONS=$(node /home/cam/.config/opencode/get-shit-done/bin/gsd-tools.cjs search-lessons "${PHASE_NAME}" --raw 2>/dev/null)
 ```
 If found: display and include in planner context. If not: skip silently.
+
+## 8.5. Surface Assertions
+
+If `assertions_path` exists:
+```bash
+ASSERTIONS=$(node /home/cam/.config/opencode/get-shit-done/bin/gsd-tools.cjs assertions list --req ${PHASE_REQ_IDS} --raw 2>/dev/null)
+```
+Display assertion count and coverage. If none found: note "No assertions for {req_ids} — planner will derive must_haves from requirement text."
 
 ## 9. Spawn Planner
 
@@ -91,10 +101,12 @@ Task(
 
 Phase: {phase_number}, Mode: {standard|gap_closure}
 Read: {state_path}, {roadmap_path}, {requirements_path}, {context_path}, {research_path}, .planning/INTENT.md (if exists)
+Read: {assertions_path} (if exists — structured acceptance criteria for requirements)
 If --gaps: also read {verification_path}, {uat_path}
 Requirement IDs (MUST all appear in plans): {phase_req_ids}
-Read ./CLAUDE.md and .agents/skills/ if they exist.
+Read ./AGENTS.md and .agents/skills/ if they exist.
 If INTENT.md exists: derive plan objectives from desired outcomes (DO-XX). Each plan's objective should trace to at least one desired outcome. Include intent.outcome_ids in PLAN.md frontmatter.
+If ASSERTIONS.md exists: for each requirement this phase covers, find its assertions and use must-have assertions as source for must_haves.truths in PLAN.md frontmatter. If no assertions exist for a requirement, derive truths from requirement text + context.
 
 Output: PLAN.md files with frontmatter, XML tasks, verification, must_haves.",
   subagent_type="general", model="{planner_model}", description="Plan Phase {phase}"
