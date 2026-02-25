@@ -10,7 +10,7 @@ See: .planning/PROJECT.md (updated 2026-02-25)
 ## Current Position
 
 **Phase:** 21 of 22 (Worktree Parallelism)
-**Current Plan:** Plan 01 complete, Plan 02 next
+**Current Plan:** Plan 02 complete, Plan 03 next
 **Status:** In progress
 **Last Activity:** 2026-02-25
 
@@ -41,6 +41,7 @@ Progress: [████████░░] 80% (4/5 phases)
 | Phase 20 P02 | 11 min | 2 tasks | 4 files |
 | Phase 20 P03 | 2 min | 2 tasks | 3 files |
 | Phase 21 P01 | 14 min | 2 tasks | 7 files |
+| Phase 21 P02 | 8 min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -79,6 +80,8 @@ v4.0 decisions:
 - [Phase 21]: Bundle budget raised from 525KB to 550KB for worktree module
 - [Phase 21]: Worktree config read directly from config.json (not via loadConfig) since loadConfig only handles CONFIG_SCHEMA fields
 - [Phase 21]: Setup hook failures mark worktree as setup_failed but don't delete it — skip failing plan, let rest proceed
+- [Phase 21]: Lockfile auto-resolution uses checkout --theirs during conflicted merge — handles git merge machinery correctly
+- [Phase 21]: Static overlap analysis only flags same-wave plans — different waves are sequential by design
 
 ### Pending Todos
 
@@ -91,5 +94,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-02-25
-Stopped at: Completed 21-01-PLAN.md (worktree lifecycle commands + tests)
+Stopped at: Completed 21-02-PLAN.md (worktree merge + conflict detection + tests)
 Resume file: None

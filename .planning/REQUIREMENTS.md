@@ -108,7 +108,7 @@ Requirements for milestone v4.0 Environment & Execution Intelligence. Each maps 
   - `worktree remove <plan-id>` cleans up completed worktree
   - `worktree cleanup` removes all completed worktrees
 
-- [ ] **WKTR-03**: CLI performs conflict pre-check before merge
+- [x] **WKTR-03**: CLI performs conflict pre-check before merge
   - `worktree merge <plan-id>` runs `git merge-tree` dry-run first
   - Clean merge → auto-merge to base branch
   - Conflicts → report conflicting files, block merge, prompt for resolution
@@ -125,7 +125,7 @@ Requirements for milestone v4.0 Environment & Execution Intelligence. Each maps 
   - Merge sequentially after all wave agents complete, run tests after each merge
   - Cleanup and advance to wave N+1
 
-- [ ] **WKTR-06**: files_modified conflict detection integrates with worktree merge
+- [x] **WKTR-06**: files_modified conflict detection integrates with worktree merge
   - Static analysis at plan-time catches file overlap
   - `git merge-tree` at merge-time catches runtime conflicts
   - Both signals feed into merge decision (block or proceed)
@@ -187,10 +187,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 | SREQ-05 | Phase 20 | Complete |
 | WKTR-01 | Phase 21 | Complete |
 | WKTR-02 | Phase 21 | Complete |
-| WKTR-03 | Phase 21 | Pending |
+| WKTR-03 | Phase 21 | Complete |
 | WKTR-04 | Phase 21 | Complete |
 | WKTR-05 | Phase 21 | Pending |
-| WKTR-06 | Phase 21 | Pending |
+| WKTR-06 | Phase 21 | Complete |
 | WFLW-01 | Phase 22 | Pending |
 
 **Coverage:**
