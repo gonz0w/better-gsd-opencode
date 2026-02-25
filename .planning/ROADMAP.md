@@ -140,4 +140,4 @@ Plans:
 | 14. Intent Capture Foundation | 3/3 | Complete    | 2026-02-25 | - |
 | 15. Intent Tracing & Validation | 2/2 | Complete    | 2026-02-25 | - |
 | 16. Workflow Integration & Self-Application | 3/3 | Complete    | 2026-02-25 | - |
-| 17. Intent Enhancement | 2/2 | Complete   | 2026-02-25 | - |
+| 17. Intent Enhancement | 2/2 | Complete    | 2026-02-25 | - |
