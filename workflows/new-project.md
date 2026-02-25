@@ -63,6 +63,62 @@ mkdir -p .planning
 node /home/cam/.config/opencode/get-shit-done/bin/gsd-tools.cjs commit "docs: initialize project" --files .planning/PROJECT.md
 ```
 
+## 4.5. Capture Project Intent
+
+**Auto mode:** Extract intent from the idea document — synthesize objective, desired outcomes (3-5), and success criteria (2-4) from the document's goals and requirements. Create INTENT.md directly without asking questions.
+
+**Interactive mode:**
+
+```
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ GSD ► DEFINING INTENT
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+```
+
+Ask 4 guided questions to extract structured intent. Use PROJECT.md context to make questions specific to the user's project.
+
+**Q1 — Objective:** "In one sentence, what does this project do and why does it matter?"
+- Probe: "What problem does it solve? Who suffers without it?"
+- Maps to: `<objective>` section
+
+**Q2 — Desired Outcomes:** "What are the 3-5 most important things this project must achieve?"
+- Probe: "If this project succeeds, what's different? What can users do that they couldn't before?"
+- Prompt for prioritization: "Which of these are critical (P1), important (P2), or nice-to-have (P3)?"
+- Maps to: `<outcomes>` section (format: `DO-XX [PX]: description`)
+
+**Q3 — Success Criteria:** "How will you know this project is ready to ship?"
+- Probe: "What's the minimum bar? What tests would you run to prove it works?"
+- Maps to: `<criteria>` section (format: `SC-XX: measurable gate`)
+
+**Q4 — Constraints:** "Are there any hard limits — technical, business, or timeline?"
+- Probe: "Must-use technologies? Budget caps? Deadlines? Backward compatibility?"
+- Maps to: `<constraints>` section
+
+Also derive:
+- `<users>` from PROJECT.md target users / audience (already captured in deep questioning)
+- `<health>` metrics from success criteria where measurable numbers exist
+
+Write INTENT.md using `intent create` with the structured data from answers:
+
+```bash
+node /home/cam/.config/opencode/get-shit-done/bin/gsd-tools.cjs intent create --raw
+```
+
+Note: `intent create` reads from stdin when no arguments provided — pipe the structured intent data to it. Alternatively, write INTENT.md directly using the Write tool following the INTENT.md template format, then commit.
+
+```bash
+node /home/cam/.config/opencode/get-shit-done/bin/gsd-tools.cjs commit "docs: capture project intent" --files .planning/INTENT.md
+```
+
+Present intent summary:
+```
+✓ Intent captured:
+  Objective: {truncated objective}
+  Outcomes: {count} ({P1 count}×P1, {P2 count}×P2, {P3 count}×P3)
+  Criteria: {count} success gates
+  Constraints: {count} limits
+```
+
 ## 5. Workflow Preferences
 
 **Auto mode:** Skip (handled in 2a).
@@ -136,6 +192,8 @@ Display key findings from SUMMARY.md.
 
 ## 7. Define Requirements
 
+If INTENT.md exists: Read it and use desired outcomes to seed requirement categories. Each P1/P2 outcome should map to at least one requirement.
+
 Read PROJECT.md core value, constraints, scope. If research exists: read FEATURES.md categories.
 
 **Auto mode:** Include all table stakes + document-mentioned features. Skip category questions, additions question, approval gate. Generate and commit directly.
@@ -166,6 +224,7 @@ Task(prompt="
 - .planning/PROJECT.md
 - .planning/REQUIREMENTS.md
 - .planning/research/SUMMARY.md (if exists)
+- .planning/INTENT.md (if exists)
 - .planning/config.json
 </files_to_read>
 
@@ -199,13 +258,14 @@ Present completion: project name, artifact locations, phase/requirement counts.
 </process>
 
 <output>
-`.planning/PROJECT.md`, `config.json`, `research/` (if selected), `REQUIREMENTS.md`, `ROADMAP.md`, `STATE.md`
+`.planning/PROJECT.md`, `config.json`, `INTENT.md`, `research/` (if selected), `REQUIREMENTS.md`, `ROADMAP.md`, `STATE.md`
 </output>
 
 <success_criteria>
 - [ ] .planning/ created, git initialized
 - [ ] PROJECT.md captures full context → committed
 - [ ] config.json configured → committed
+- [ ] INTENT.md captures project intent (objective, outcomes, criteria) → committed
 - [ ] Research completed if selected → committed
 - [ ] Requirements gathered and scoped → committed
 - [ ] ROADMAP.md with phases, mappings, criteria → committed
