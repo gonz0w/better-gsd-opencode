@@ -7802,6 +7802,13 @@ var require_codebase_intel = __commonJS({
       if (intel.git_commit_hash) {
         const gitInfo = getGitInfo(cwd);
         if (gitInfo.commit_hash && gitInfo.commit_hash === intel.git_commit_hash) {
+          if (intel.generated_at) {
+            const ageMs = Date.now() - new Date(intel.generated_at).getTime();
+            const ONE_HOUR = 60 * 60 * 1e3;
+            if (ageMs > ONE_HOUR) {
+              return { stale: true, reason: "time_stale", changed_files: [] };
+            }
+          }
           return { stale: false };
         }
         const changedFiles = getChangedFilesSinceCommit(cwd, intel.git_commit_hash);
@@ -7930,6 +7937,22 @@ var require_codebase_intel = __commonJS({
       fs.writeFileSync(intelPath, JSON.stringify(intel, null, 2) + "\n");
       debugLog("codebase.writeIntel", `wrote ${intelPath}`);
     }
+    function getStalenessAge(intel, cwd) {
+      if (!intel || !intel.generated_at) return null;
+      const ageMs = Date.now() - new Date(intel.generated_at).getTime();
+      let commitsBehind = 0;
+      if (cwd && intel.git_commit_hash) {
+        try {
+          const result = execGit(cwd, ["rev-list", "--count", `${intel.git_commit_hash}..HEAD`]);
+          if (result.exitCode === 0 && result.stdout) {
+            commitsBehind = parseInt(result.stdout, 10) || 0;
+          }
+        } catch (e) {
+          debugLog("codebase.getStalenessAge", "git rev-list failed", e);
+        }
+      }
+      return { age_ms: ageMs, commits_behind: commitsBehind };
+    }
     module2.exports = {
       INTEL_PATH,
       LANGUAGE_MAP,
@@ -7941,6 +7964,7 @@ var require_codebase_intel = __commonJS({
       getGitInfo,
       getChangedFilesSinceCommit,
       checkStaleness,
+      getStalenessAge,
       performAnalysis,
       readIntel,
       writeIntel
@@ -8962,6 +8986,12 @@ var require_codebase = __commonJS({
           previousIntel: intel,
           changedFiles: staleness.changed_files || null
         });
+        if (intel.conventions && !newIntel.conventions) {
+          newIntel.conventions = intel.conventions;
+        }
+        if (intel.dependencies && !newIntel.dependencies) {
+          newIntel.dependencies = intel.dependencies;
+        }
         writeIntel(cwd, newIntel);
         return newIntel;
       } catch (e) {

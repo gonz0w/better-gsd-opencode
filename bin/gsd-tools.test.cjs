@@ -12506,7 +12506,7 @@ describe('codebase intelligence', () => {
   });
 
   describe('init integration', () => {
-    test('init execute-phase includes codebase_summary when intel exists', () => {
+    test('init execute-phase includes codebase_stats when intel exists', () => {
       // Create phase directory for init to find
       const phaseDir = path.join(tmpDir, '.planning', 'phases', '01-test');
       fs.mkdirSync(phaseDir, { recursive: true });
@@ -12518,12 +12518,13 @@ describe('codebase intelligence', () => {
       const result = runGsdTools('init execute-phase 01 --verbose', tmpDir);
       assert.ok(result.success, `Command failed: ${result.error}`);
       const data = JSON.parse(result.output);
-      assert.ok(data.codebase_summary, 'Should include codebase_summary field');
-      assert.ok(data.codebase_summary.total_files > 0, 'codebase_summary should have total_files');
-      assert.ok(data.codebase_summary.top_languages, 'codebase_summary should have top_languages');
+      assert.ok(data.codebase_stats, 'Should include codebase_stats field');
+      assert.ok(data.codebase_stats.total_files > 0, 'codebase_stats should have total_files');
+      assert.ok(data.codebase_stats.top_languages, 'codebase_stats should have top_languages');
+      assert.strictEqual(data.codebase_stats.confidence, 1.0, 'codebase_stats confidence should be 1.0');
     });
 
-    test('init execute-phase returns null codebase_summary without intel', () => {
+    test('init execute-phase returns null codebase fields without intel', () => {
       const phaseDir = path.join(tmpDir, '.planning', 'phases', '01-test');
       fs.mkdirSync(phaseDir, { recursive: true });
       fs.writeFileSync(path.join(phaseDir, '01-01-PLAN.md'), '# Plan\n');
@@ -12535,8 +12536,10 @@ describe('codebase intelligence', () => {
       const result = runGsdTools('init execute-phase 01 --verbose', tmpDir);
       assert.ok(result.success, `Command failed: ${result.error}`);
       const data = JSON.parse(result.output);
-      // codebase_summary should be null or undefined (trimmed from verbose output)
-      assert.ok(!data.codebase_summary, 'Should not include codebase_summary without intel');
+      // codebase fields should be null or undefined (trimmed from verbose output)
+      assert.ok(!data.codebase_stats, 'Should not include codebase_stats without intel');
+      assert.ok(!data.codebase_conventions, 'Should not include codebase_conventions without intel');
+      assert.ok(!data.codebase_dependencies, 'Should not include codebase_dependencies without intel');
     });
 
     test('init progress includes codebase_intel_exists flag', () => {

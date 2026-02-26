@@ -307,6 +307,14 @@ function checkStaleness(cwd) {
     // Check if HEAD matches stored hash
     const gitInfo = getGitInfo(cwd);
     if (gitInfo.commit_hash && gitInfo.commit_hash === intel.git_commit_hash) {
+      // Strategy 1.5: Time-based staleness (hybrid — even if git says fresh)
+      if (intel.generated_at) {
+        const ageMs = Date.now() - new Date(intel.generated_at).getTime();
+        const ONE_HOUR = 60 * 60 * 1000;
+        if (ageMs > ONE_HOUR) {
+          return { stale: true, reason: 'time_stale', changed_files: [] };
+        }
+      }
       return { stale: false };
     }
 
@@ -510,6 +518,38 @@ function writeIntel(cwd, intel) {
 }
 
 
+// ─── Staleness Age Helper ────────────────────────────────────────────────────
+
+/**
+ * Get the age of codebase intel data for freshness flagging.
+ * Returns age in milliseconds and commits behind HEAD.
+ * Used by formatCodebaseContext in init.js for the codebase_freshness field.
+ *
+ * @param {object|null} intel - Codebase intel data
+ * @param {string} [cwd] - Project root (for git commit counting)
+ * @returns {{ age_ms: number, commits_behind: number }|null}
+ */
+function getStalenessAge(intel, cwd) {
+  if (!intel || !intel.generated_at) return null;
+
+  const ageMs = Date.now() - new Date(intel.generated_at).getTime();
+
+  let commitsBehind = 0;
+  if (cwd && intel.git_commit_hash) {
+    try {
+      const result = execGit(cwd, ['rev-list', '--count', `${intel.git_commit_hash}..HEAD`]);
+      if (result.exitCode === 0 && result.stdout) {
+        commitsBehind = parseInt(result.stdout, 10) || 0;
+      }
+    } catch (e) {
+      debugLog('codebase.getStalenessAge', 'git rev-list failed', e);
+    }
+  }
+
+  return { age_ms: ageMs, commits_behind: commitsBehind };
+}
+
+
 // ─── Exports ─────────────────────────────────────────────────────────────────
 
 module.exports = {
@@ -523,6 +563,7 @@ module.exports = {
   getGitInfo,
   getChangedFilesSinceCommit,
   checkStaleness,
+  getStalenessAge,
   performAnalysis,
   readIntel,
   writeIntel,

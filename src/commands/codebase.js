@@ -211,6 +211,14 @@ function autoTriggerCodebaseIntel(cwd) {
       changedFiles: staleness.changed_files || null,
     });
 
+    // Preserve conventions and dependencies from previous intel (populated by separate commands)
+    if (intel.conventions && !newIntel.conventions) {
+      newIntel.conventions = intel.conventions;
+    }
+    if (intel.dependencies && !newIntel.dependencies) {
+      newIntel.dependencies = intel.dependencies;
+    }
+
     writeIntel(cwd, newIntel);
     return newIntel;
   } catch (e) {
