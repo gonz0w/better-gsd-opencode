@@ -2,7 +2,6 @@
 
 const fs = require('fs');
 const path = require('path');
-const { execSync } = require('child_process');
 const { output, error, debugLog } = require('../lib/output');
 const { loadConfig } = require('../lib/config');
 const { safeReadFile, cachedReadFile, findPhaseInternal, resolveModelInternal, getRoadmapPhaseInternal, getMilestoneInfo, getArchivedPhaseDirs, normalizePhaseName, isValidDateString, sanitizeShellArg, pathExistsInternal, generateSlugInternal, getPhaseTree } = require('../lib/helpers');
@@ -10,7 +9,29 @@ const { extractFrontmatter } = require('../lib/frontmatter');
 const { execGit } = require('../lib/git');
 const { getIntentDriftData, getIntentSummary } = require('./intent');
 const { autoTriggerEnvScan, formatEnvSummary, readEnvManifest } = require('./env');
+const { autoTriggerCodebaseIntel } = require('./codebase');
 const { getWorktreeConfig, parseWorktreeListPorcelain, getPhaseFilesModified } = require('./worktree');
+
+/**
+ * Format codebase intel into a compact summary (<500 tokens) for init injection.
+ * @param {object|null} intel - Codebase intel data from autoTriggerCodebaseIntel
+ * @returns {object|null} Compact summary or null
+ */
+function formatCodebaseSummary(intel) {
+  if (!intel || !intel.stats) return null;
+  const langs = Object.entries(intel.languages || {})
+    .sort((a, b) => b[1].count - a[1].count)
+    .slice(0, 5)
+    .map(([lang, info]) => `${lang}(${info.count})`)
+    .join(', ');
+  return {
+    total_files: intel.stats.total_files,
+    total_lines: intel.stats.total_lines,
+    top_languages: langs,
+    git_commit: intel.git_commit_hash,
+    generated_at: intel.generated_at,
+  };
+}
 
 function cmdInitExecutePhase(cwd, phase, raw) {
   if (!phase) {
@@ -152,6 +173,15 @@ function cmdInitExecutePhase(cwd, phase, raw) {
     result.env_stale = false;
   }
 
+  // Codebase intelligence — auto-trigger analysis if stale, inject compact summary
+  try {
+    const codebaseIntel = autoTriggerCodebaseIntel(cwd);
+    result.codebase_summary = formatCodebaseSummary(codebaseIntel);
+  } catch (e) {
+    debugLog('init.executePhase', 'codebase intel failed (non-blocking)', e);
+    result.codebase_summary = null;
+  }
+
   // Worktree context — populate active worktrees and file overlaps when enabled
   try {
     if (result.worktree_enabled) {
@@ -218,6 +248,7 @@ function cmdInitExecutePhase(cwd, phase, raw) {
       } : null,
       intent_summary: result.intent_summary || null,
       env_summary: result.env_summary || null,
+      codebase_summary: result.codebase_summary || null,
       worktree_enabled: result.worktree_enabled,
       worktree_config: result.worktree_config,
       worktree_active: result.worktree_active,
@@ -240,6 +271,7 @@ function cmdInitExecutePhase(cwd, phase, raw) {
   if (result.intent_drift === null) delete result.intent_drift;
   if (result.intent_summary === null) delete result.intent_summary;
   if (result.env_summary === null) { delete result.env_summary; delete result.env_languages; delete result.env_stale; }
+  if (result.codebase_summary === null) delete result.codebase_summary;
 
   output(result, raw);
 }
@@ -302,6 +334,15 @@ function cmdInitPlanPhase(cwd, phase, raw) {
     debugLog('init.planPhase', 'intent summary failed (non-blocking)', e);
   }
 
+  // Codebase intelligence — auto-trigger analysis if stale, inject compact summary
+  try {
+    const codebaseIntel = autoTriggerCodebaseIntel(cwd);
+    result.codebase_summary = formatCodebaseSummary(codebaseIntel);
+  } catch (e) {
+    debugLog('init.planPhase', 'codebase intel failed (non-blocking)', e);
+    result.codebase_summary = null;
+  }
+
   if (phaseInfo?.directory) {
     // Find *-CONTEXT.md in phase directory
     const phaseDirFull = path.join(cwd, phaseInfo.directory);
@@ -343,6 +384,7 @@ function cmdInitPlanPhase(cwd, phase, raw) {
     };
     if (result.intent_summary) compactResult.intent_summary = result.intent_summary;
     if (result.intent_path) compactResult.intent_path = result.intent_path;
+    if (result.codebase_summary) compactResult.codebase_summary = result.codebase_summary;
     if (result.context_path) compactResult.context_path = result.context_path;
     if (result.research_path) compactResult.research_path = result.research_path;
     if (result.verification_path) compactResult.verification_path = result.verification_path;
@@ -366,6 +408,7 @@ function cmdInitPlanPhase(cwd, phase, raw) {
   // Trim null intent fields from verbose output
   if (result.intent_summary === null) delete result.intent_summary;
   if (result.intent_path === null) delete result.intent_path;
+  if (result.codebase_summary === null) delete result.codebase_summary;
 
   output(result, raw);
 }
@@ -378,17 +421,26 @@ function cmdInitNewProject(cwd, raw) {
   const braveKeyFile = path.join(homedir, '.gsd', 'brave_api_key');
   const hasBraveSearch = !!(process.env.BRAVE_API_KEY || fs.existsSync(braveKeyFile));
 
-  // Detect existing code
+  // Detect existing code (use fs instead of spawning find + grep + head)
   let hasCode = false;
   let hasPackageFile = false;
+  const codeExts = new Set(['.ts', '.js', '.py', '.go', '.rs', '.swift', '.java']);
+  const skipDirs = new Set(['node_modules', '.git', 'dist', 'build', '__pycache__']);
   try {
-    const files = execSync('find . -maxdepth 3 \\( -name "*.ts" -o -name "*.js" -o -name "*.py" -o -name "*.go" -o -name "*.rs" -o -name "*.swift" -o -name "*.java" \\) 2>/dev/null | grep -v node_modules | grep -v .git | head -5', {
-      cwd,
-      encoding: 'utf-8',
-      stdio: ['pipe', 'pipe', 'pipe'],
-    });
-    hasCode = files.trim().length > 0;
-  } catch (e) { debugLog('init.newProject', 'exec failed', e); }
+    const scanForCode = (dir, depth) => {
+      if (hasCode || depth > 3) return;
+      const entries = fs.readdirSync(dir, { withFileTypes: true });
+      for (const e of entries) {
+        if (hasCode) return;
+        if (e.isDirectory() && !skipDirs.has(e.name)) {
+          scanForCode(path.join(dir, e.name), depth + 1);
+        } else if (e.isFile() && codeExts.has(path.extname(e.name))) {
+          hasCode = true;
+        }
+      }
+    };
+    scanForCode(cwd, 0);
+  } catch (e) { debugLog('init.newProject', 'code scan failed', e); }
 
   hasPackageFile = pathExistsInternal(cwd, 'package.json') ||
                    pathExistsInternal(cwd, 'requirements.txt') ||
@@ -778,6 +830,15 @@ function cmdInitPhaseOp(cwd, phase, raw) {
     } catch (e) { debugLog('init.phaseOp', 'read phase files failed', e); }
   }
 
+  // Codebase intelligence — auto-trigger analysis if stale, inject compact summary
+  try {
+    const codebaseIntel = autoTriggerCodebaseIntel(cwd);
+    result.codebase_summary = formatCodebaseSummary(codebaseIntel);
+  } catch (e) {
+    debugLog('init.phaseOp', 'codebase intel failed (non-blocking)', e);
+    result.codebase_summary = null;
+  }
+
   if (global._gsdCompactMode) {
     const compactResult = {
       phase_found: result.phase_found,
@@ -796,6 +857,7 @@ function cmdInitPhaseOp(cwd, phase, raw) {
     if (result.research_path) compactResult.research_path = result.research_path;
     if (result.verification_path) compactResult.verification_path = result.verification_path;
     if (result.uat_path) compactResult.uat_path = result.uat_path;
+    if (result.codebase_summary) compactResult.codebase_summary = result.codebase_summary;
 
     if (global._gsdManifestMode) {
       const manifestFiles = [
@@ -1124,6 +1186,17 @@ function cmdInitProgress(cwd, raw) {
     result.env_stale = false;
   }
 
+  // Codebase intelligence — auto-trigger analysis if stale, inject status
+  try {
+    const codebaseIntel = autoTriggerCodebaseIntel(cwd);
+    result.codebase_summary = formatCodebaseSummary(codebaseIntel);
+    result.codebase_intel_exists = !!codebaseIntel;
+  } catch (e) {
+    debugLog('init.progress', 'codebase intel failed (non-blocking)', e);
+    result.codebase_summary = null;
+    result.codebase_intel_exists = false;
+  }
+
   if (global._gsdCompactMode) {
     const manifestFiles = [];
     if (result.state_exists) manifestFiles.push({ path: '.planning/STATE.md', sections: ['Current Position'], required: false });
@@ -1142,6 +1215,7 @@ function cmdInitProgress(cwd, raw) {
       session_diff: result.session_diff,
       intent_summary: result.intent_summary || null,
       env_summary: result.env_summary || null,
+      codebase_intel_exists: result.codebase_intel_exists || false,
     };
     if (global._gsdManifestMode) {
       compactResult._manifest = { files: manifestFiles };
@@ -1152,6 +1226,7 @@ function cmdInitProgress(cwd, raw) {
   // Trim null/empty fields from verbose output to reduce token waste
   if (result.intent_summary === null) delete result.intent_summary;
   if (result.env_summary === null) { delete result.env_summary; delete result.env_languages; delete result.env_stale; }
+  if (result.codebase_summary === null) { delete result.codebase_summary; delete result.codebase_intel_exists; }
   if (result.paused_at === null) delete result.paused_at;
   if (result.session_diff === null) delete result.session_diff;
 
@@ -1390,9 +1465,8 @@ function getSessionDiffSummary(cwd) {
       return null;
     }
 
-    const log = execSync(`git log --since=${sanitizeShellArg(since)} --oneline --no-merges -- .planning/ 2>/dev/null`, {
-      cwd, encoding: 'utf-8', timeout: 5000
-    }).trim();
+    const gitResult = execGit(cwd, ['log', `--since=${since}`, '--oneline', '--no-merges', '--', '.planning/']);
+    const log = gitResult.stdout || '';
     const commits = log ? log.split('\n').filter(Boolean) : [];
     return { since, commit_count: commits.length, recent: commits.slice(0, 5) };
   } catch (e) {
