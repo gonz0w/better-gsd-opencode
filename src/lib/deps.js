@@ -541,12 +541,153 @@ function buildDependencyGraph(intel) {
 }
 
 
+// ─── Cycle Detection (Tarjan's SCC) ─────────────────────────────────────────
+
+/**
+ * Find circular dependencies using Tarjan's strongly connected components algorithm.
+ *
+ * @param {{ forward: Object<string, string[]> }} graph - Dependency graph with forward adjacency list
+ * @returns {{ cycles: string[][], cycle_count: number, files_in_cycles: number }}
+ */
+function findCycles(graph) {
+  const forward = graph.forward || {};
+  let index = 0;
+  const stack = [];
+  const onStack = new Set();
+  const indices = {};
+  const lowlinks = {};
+  const sccs = [];
+
+  function strongConnect(v) {
+    indices[v] = index;
+    lowlinks[v] = index;
+    index++;
+    stack.push(v);
+    onStack.add(v);
+
+    const neighbors = forward[v] || [];
+    for (const w of neighbors) {
+      if (indices[w] === undefined) {
+        strongConnect(w);
+        lowlinks[v] = Math.min(lowlinks[v], lowlinks[w]);
+      } else if (onStack.has(w)) {
+        lowlinks[v] = Math.min(lowlinks[v], indices[w]);
+      }
+    }
+
+    // If v is a root node, pop the SCC
+    if (lowlinks[v] === indices[v]) {
+      const scc = [];
+      let w;
+      do {
+        w = stack.pop();
+        onStack.delete(w);
+        scc.push(w);
+      } while (w !== v);
+
+      // Only report components with >= 2 nodes (actual cycles)
+      if (scc.length >= 2) {
+        sccs.push(scc);
+      }
+    }
+  }
+
+  // Collect all unique nodes (files that appear in forward or as targets)
+  const allNodes = new Set(Object.keys(forward));
+  for (const targets of Object.values(forward)) {
+    for (const t of targets) allNodes.add(t);
+  }
+
+  for (const node of allNodes) {
+    if (indices[node] === undefined) {
+      strongConnect(node);
+    }
+  }
+
+  // Sort cycles by length descending (largest first)
+  sccs.sort((a, b) => b.length - a.length);
+
+  // Count unique files in any cycle
+  const filesInCycles = new Set();
+  for (const scc of sccs) {
+    for (const f of scc) filesInCycles.add(f);
+  }
+
+  return {
+    cycles: sccs,
+    cycle_count: sccs.length,
+    files_in_cycles: filesInCycles.size,
+  };
+}
+
+
+// ─── Impact Analysis (Transitive Dependents) ────────────────────────────────
+
+/**
+ * Get all transitive dependents of a file via BFS on reverse edges.
+ *
+ * @param {{ reverse: Object<string, string[]> }} graph - Dependency graph with reverse adjacency list
+ * @param {string} filePath - Target file path
+ * @param {number} [maxDepth=10] - Maximum BFS depth to prevent infinite loops
+ * @returns {{ file: string, direct_dependents: string[], transitive_dependents: Array<{file: string, depth: number}>, fan_in: number, max_depth_reached: number }}
+ */
+function getTransitiveDependents(graph, filePath, maxDepth = 10) {
+  const reverse = graph.reverse || {};
+  const visited = new Set();
+  const directDependents = [];
+  const transitiveDependents = [];
+  let maxDepthReached = 0;
+
+  // BFS queue: [node, depth]
+  const queue = [[filePath, 0]];
+  visited.add(filePath);
+
+  while (queue.length > 0) {
+    const [current, depth] = queue.shift();
+
+    if (depth > maxDepth) continue;
+
+    const dependents = reverse[current] || [];
+    for (const dep of dependents) {
+      if (visited.has(dep)) continue;
+      visited.add(dep);
+
+      const depDepth = depth + 1;
+      if (depDepth > maxDepthReached) maxDepthReached = depDepth;
+
+      if (depDepth === 1) {
+        directDependents.push(dep);
+      } else {
+        transitiveDependents.push({ file: dep, depth: depDepth });
+      }
+
+      if (depDepth < maxDepth) {
+        queue.push([dep, depDepth]);
+      }
+    }
+  }
+
+  // Sort transitive dependents by depth ascending
+  transitiveDependents.sort((a, b) => a.depth - b.depth);
+
+  return {
+    file: filePath,
+    direct_dependents: directDependents,
+    transitive_dependents: transitiveDependents,
+    fan_in: directDependents.length + transitiveDependents.length,
+    max_depth_reached: maxDepthReached,
+  };
+}
+
+
 // ─── Exports ─────────────────────────────────────────────────────────────────
 
 module.exports = {
   IMPORT_PARSERS,
   parseImports,
   buildDependencyGraph,
+  findCycles,
+  getTransitiveDependents,
   // Expose individual parsers for testing
   parseJavaScript,
   parsePython,

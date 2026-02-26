@@ -394,14 +394,9 @@ function cmdCodebaseDeps(cwd, args, raw) {
     return;
   }
 
-  // --cycles flag stub: Plan 02 will implement Tarjan's SCC cycle detection
   const wantCycles = args.includes('--cycles');
-  if (wantCycles) {
-    error('Cycle detection not yet implemented. Coming in Plan 02.');
-    return;
-  }
 
-  const { buildDependencyGraph } = require('../lib/deps');
+  const { buildDependencyGraph, findCycles } = require('../lib/deps');
 
   // Build the dependency graph
   const graph = buildDependencyGraph(intel);
@@ -416,11 +411,67 @@ function cmdCodebaseDeps(cwd, args, raw) {
     .sort((a, b) => b.imported_by_count - a.imported_by_count)
     .slice(0, 10);
 
-  output({
+  const result = {
     success: true,
     stats: graph.stats,
     top_dependencies: topDeps,
     built_at: graph.built_at,
+  };
+
+  // Add cycle detection if requested
+  if (wantCycles) {
+    result.cycles = findCycles(graph);
+  }
+
+  output(result, raw);
+}
+
+
+/**
+ * cmdCodebaseImpact — Show transitive dependents for given files using dependency graph.
+ *
+ * Uses getTransitiveDependents for BFS traversal of reverse edges.
+ * Auto-builds dependency graph if not present in intel.
+ *
+ * @param {string} cwd - Project root
+ * @param {string[]} args - CLI arguments (file paths, after 'codebase impact')
+ * @param {boolean} raw - Raw JSON output mode
+ */
+function cmdCodebaseImpact(cwd, args, raw) {
+  const filePaths = args.filter(a => !a.startsWith('-'));
+
+  if (!filePaths || filePaths.length === 0) {
+    error('Usage: codebase impact <file1> [file2] ...');
+    return;
+  }
+
+  const intel = readIntel(cwd);
+
+  if (!intel) {
+    error('No codebase intel. Run: codebase analyze');
+    return;
+  }
+
+  const { buildDependencyGraph, getTransitiveDependents } = require('../lib/deps');
+
+  // Auto-build graph if not present in intel
+  let graph = intel.dependencies;
+  if (!graph) {
+    debugLog('codebase.impact', 'no dependency graph in intel, building...');
+    graph = buildDependencyGraph(intel);
+    intel.dependencies = graph;
+    writeIntel(cwd, intel);
+  }
+
+  const files = [];
+  for (const filePath of filePaths) {
+    const result = getTransitiveDependents(graph, filePath);
+    files.push(result);
+  }
+
+  output({
+    success: true,
+    files,
   }, raw);
 }
 
@@ -431,6 +482,7 @@ module.exports = {
   cmdCodebaseConventions,
   cmdCodebaseRules,
   cmdCodebaseDeps,
+  cmdCodebaseImpact,
   readCodebaseIntel,
   checkCodebaseIntelStaleness,
   autoTriggerCodebaseIntel,

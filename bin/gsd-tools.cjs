@@ -8715,10 +8715,104 @@ var require_deps = __commonJS({
         built_at: (/* @__PURE__ */ new Date()).toISOString()
       };
     }
+    function findCycles(graph) {
+      const forward = graph.forward || {};
+      let index = 0;
+      const stack = [];
+      const onStack = /* @__PURE__ */ new Set();
+      const indices = {};
+      const lowlinks = {};
+      const sccs = [];
+      function strongConnect(v) {
+        indices[v] = index;
+        lowlinks[v] = index;
+        index++;
+        stack.push(v);
+        onStack.add(v);
+        const neighbors = forward[v] || [];
+        for (const w of neighbors) {
+          if (indices[w] === void 0) {
+            strongConnect(w);
+            lowlinks[v] = Math.min(lowlinks[v], lowlinks[w]);
+          } else if (onStack.has(w)) {
+            lowlinks[v] = Math.min(lowlinks[v], indices[w]);
+          }
+        }
+        if (lowlinks[v] === indices[v]) {
+          const scc = [];
+          let w;
+          do {
+            w = stack.pop();
+            onStack.delete(w);
+            scc.push(w);
+          } while (w !== v);
+          if (scc.length >= 2) {
+            sccs.push(scc);
+          }
+        }
+      }
+      const allNodes = new Set(Object.keys(forward));
+      for (const targets of Object.values(forward)) {
+        for (const t of targets) allNodes.add(t);
+      }
+      for (const node of allNodes) {
+        if (indices[node] === void 0) {
+          strongConnect(node);
+        }
+      }
+      sccs.sort((a, b) => b.length - a.length);
+      const filesInCycles = /* @__PURE__ */ new Set();
+      for (const scc of sccs) {
+        for (const f of scc) filesInCycles.add(f);
+      }
+      return {
+        cycles: sccs,
+        cycle_count: sccs.length,
+        files_in_cycles: filesInCycles.size
+      };
+    }
+    function getTransitiveDependents(graph, filePath, maxDepth = 10) {
+      const reverse = graph.reverse || {};
+      const visited = /* @__PURE__ */ new Set();
+      const directDependents = [];
+      const transitiveDependents = [];
+      let maxDepthReached = 0;
+      const queue = [[filePath, 0]];
+      visited.add(filePath);
+      while (queue.length > 0) {
+        const [current, depth] = queue.shift();
+        if (depth > maxDepth) continue;
+        const dependents = reverse[current] || [];
+        for (const dep of dependents) {
+          if (visited.has(dep)) continue;
+          visited.add(dep);
+          const depDepth = depth + 1;
+          if (depDepth > maxDepthReached) maxDepthReached = depDepth;
+          if (depDepth === 1) {
+            directDependents.push(dep);
+          } else {
+            transitiveDependents.push({ file: dep, depth: depDepth });
+          }
+          if (depDepth < maxDepth) {
+            queue.push([dep, depDepth]);
+          }
+        }
+      }
+      transitiveDependents.sort((a, b) => a.depth - b.depth);
+      return {
+        file: filePath,
+        direct_dependents: directDependents,
+        transitive_dependents: transitiveDependents,
+        fan_in: directDependents.length + transitiveDependents.length,
+        max_depth_reached: maxDepthReached
+      };
+    }
     module2.exports = {
       IMPORT_PARSERS,
       parseImports,
       buildDependencyGraph,
+      findCycles,
+      getTransitiveDependents,
       // Expose individual parsers for testing
       parseJavaScript,
       parsePython,
@@ -8964,20 +9058,49 @@ var require_codebase = __commonJS({
         return;
       }
       const wantCycles = args.includes("--cycles");
-      if (wantCycles) {
-        error("Cycle detection not yet implemented. Coming in Plan 02.");
-        return;
-      }
-      const { buildDependencyGraph } = require_deps();
+      const { buildDependencyGraph, findCycles } = require_deps();
       const graph = buildDependencyGraph(intel);
       intel.dependencies = graph;
       writeIntel(cwd, intel);
       const topDeps = Object.entries(graph.reverse).map(([file, importers]) => ({ file, imported_by_count: importers.length })).sort((a, b) => b.imported_by_count - a.imported_by_count).slice(0, 10);
-      output({
+      const result = {
         success: true,
         stats: graph.stats,
         top_dependencies: topDeps,
         built_at: graph.built_at
+      };
+      if (wantCycles) {
+        result.cycles = findCycles(graph);
+      }
+      output(result, raw);
+    }
+    function cmdCodebaseImpact(cwd, args, raw) {
+      const filePaths = args.filter((a) => !a.startsWith("-"));
+      if (!filePaths || filePaths.length === 0) {
+        error("Usage: codebase impact <file1> [file2] ...");
+        return;
+      }
+      const intel = readIntel(cwd);
+      if (!intel) {
+        error("No codebase intel. Run: codebase analyze");
+        return;
+      }
+      const { buildDependencyGraph, getTransitiveDependents } = require_deps();
+      let graph = intel.dependencies;
+      if (!graph) {
+        debugLog("codebase.impact", "no dependency graph in intel, building...");
+        graph = buildDependencyGraph(intel);
+        intel.dependencies = graph;
+        writeIntel(cwd, intel);
+      }
+      const files = [];
+      for (const filePath of filePaths) {
+        const result = getTransitiveDependents(graph, filePath);
+        files.push(result);
+      }
+      output({
+        success: true,
+        files
       }, raw);
     }
     module2.exports = {
@@ -8986,6 +9109,7 @@ var require_codebase = __commonJS({
       cmdCodebaseConventions,
       cmdCodebaseRules,
       cmdCodebaseDeps,
+      cmdCodebaseImpact,
       readCodebaseIntel,
       checkCodebaseIntelStaleness,
       autoTriggerCodebaseIntel
