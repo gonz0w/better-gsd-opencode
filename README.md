@@ -1,212 +1,310 @@
-# GSD (Get Shit Done) — Planning Plugin for OpenCode
+# GSD (Get Shit Done) — AI Project Planning for OpenCode
 
-A structured project planning and execution plugin for [OpenCode](https://github.com/opencode-ai/opencode). GSD brings milestone-driven planning, phase execution, progress tracking, quality verification, and developer workflow automation to AI-assisted coding sessions.
+A structured project planning and execution system for [OpenCode](https://github.com/opencode-ai/opencode). GSD turns AI-assisted coding from ad-hoc prompting into milestone-driven development with planning, execution, verification, and memory that persists across sessions.
 
-**348 tests** | **457KB bundle** | **Zero runtime dependencies** | **25,500+ lines of source**
+**348 tests** | **Zero runtime dependencies** | **32 slash commands** | **100+ CLI operations** | **11 specialized AI agents**
 
-## What It Does
+---
 
-GSD turns chaotic development into structured execution:
+## The Problem
 
-- **Milestone & Phase Planning** — Break projects into milestones with phases, goals, dependencies, and requirements
-- **Execution Tracking** — Track progress at milestone, phase, and plan level with automatic state management
-- **Quality Gates** — Test gating, requirement verification, regression detection, and multi-dimensional quality scoring
-- **Intent Engineering** — Capture *why* a project exists and *what success looks like* in structured INTENT.md, trace plans to outcomes, detect drift
-- **Session Memory** — Decisions, bookmarks, lessons, and codebase knowledge persist across sessions
-- **State Intelligence** — Drift detection between declared state and filesystem/git reality with auto-fix
-- **Plan Analysis** — Single-responsibility scoring, dependency cycle detection, wave conflict validation
-- **Git-Aware** — Session diffs, commit tracking, rollback info, and velocity metrics
-- **Context Management** — Token budget estimation, bundle size tracking, codebase impact analysis
-- **MCP Discovery** — Discover available MCP servers and surface their capabilities to workflows
+AI coding assistants are powerful but chaotic. Without structure, you get:
+- Lost context between sessions
+- No traceability from requirements to code
+- No verification that what was built matches what was asked for
+- No way to pause, resume, or hand off work
+- No learning from past decisions
 
-## Project Structure
+## The Solution
+
+GSD provides a complete project lifecycle inside your AI editor:
 
 ```
-bin/gsd-tools.cjs          # Built CLI (457KB, single file, zero runtime deps)
-src/
-  commands/                # 9 command modules (init, intent, state, phase, roadmap, verify, memory, features, misc)
-  lib/                     # 7 library modules (config, constants, context, frontmatter, git, helpers, output)
-  router.js                # Command routing with --verbose/--compact/--fields flags
-  index.js                 # Entry point
-workflows/*.md             # 43 workflow definitions (invoked by slash commands)
-templates/*.md             # 25 document templates (plans, summaries, roadmaps, dependency eval, etc.)
-references/*.md            # Reference docs loaded by agents
-build.js                   # esbuild pipeline with bundle size tracking (450KB budget)
-deploy.sh                  # Deploy to ~/.config/opencode/get-shit-done/
+Idea  -->  Requirements  -->  Roadmap  -->  Plans  -->  Execution  -->  Verification
+  |                                                                         |
+  +--  Intent tracking, session memory, quality gates, progress metrics  ---+
 ```
 
-## Installation
+Every step produces structured documents in `.planning/` that agents read for context. Decisions persist. Progress is tracked. Quality is measured.
+
+---
+
+## Quick Start
 
 ```bash
-# Clone the repo
-git clone https://github.com/gonz0w/gsd-opencode.git
-
-# Install dev dependencies
-cd gsd-opencode
-npm install
-
-# Build the CLI
-npm run build
-
-# Deploy to OpenCode config
-./deploy.sh
+npx get-shit-done-cc
 ```
 
-## Usage
-
-GSD is used through slash commands inside OpenCode sessions:
-
-### Core Workflow
+Then in OpenCode:
 
 ```
-/gsd-new-project          # Start a new project with milestone planning
-/gsd-plan-phase           # Plan the next phase with task breakdown
-/gsd-execute-phase        # Execute a planned phase
-/gsd-progress             # View current milestone/phase progress
-/gsd-quick                # Quick summary of where things stand
+/gsd-new-project
 ```
 
-### Intent & Alignment
+That's it. GSD walks you through everything: what you want to build, how to break it down, and then executes it phase by phase.
+
+See the **[Getting Started Guide](docs/getting-started.md)** for the full walkthrough, or the **[Expert Guide](docs/expert-guide.md)** if you want full control.
+
+---
+
+## How It Works
+
+### Two Flows
+
+**Easy Flow** — Let GSD drive. Answer questions, approve plans, watch execution:
 
 ```
-/gsd-intent-create        # Create INTENT.md with structured sections
-/gsd-intent-show          # Display intent summary or specific section
-/gsd-intent-update        # Update a section with automatic history tracking
-/gsd-intent-validate      # Validate intent structure and completeness
-/gsd-intent-trace         # Traceability matrix: outcomes → plans
-/gsd-intent-drift         # Drift score: how aligned is current work?
+/gsd-new-project           # Answer "what do you want to build?"
+                            # GSD creates requirements, roadmap, phases
+/gsd-plan-phase 1           # GSD creates executable plans for phase 1
+/gsd-execute-phase 1        # GSD builds it, commits per-task, verifies
+/gsd-progress               # See where things stand, get routed to next action
 ```
 
-### Quality & Verification
+**Expert Flow** — Control every decision. Research domains, discuss assumptions, tune agents:
 
 ```
-/gsd-verify-phase         # Run full phase verification suite
-/gsd-test-run             # Parse test output with pass/fail gating
-/gsd-validate-deps        # Validate phase dependency graph
-/gsd-validate-config      # Schema validation for config.json
-/gsd-trace-requirement    # Trace requirement to files on disk
+/gsd-map-codebase                       # Analyze existing code first (brownfield)
+/gsd-new-project                        # Full questioning + parallel research
+/gsd-discuss-phase 1                    # Lock down implementation decisions
+/gsd-list-phase-assumptions 1           # See what the AI assumes before planning
+/gsd-research-phase 1                   # Deep domain research
+/gsd-plan-phase 1 --research            # Plan with integrated research
+/gsd-execute-phase 1                    # Execute with wave parallelism
+/gsd-verify-work 1                      # Manual UAT testing
+/gsd-audit-milestone                    # Cross-phase integration check
 ```
 
-### Session & Memory
+### What Gets Created
 
 ```
-/gsd-session-diff         # Git commits since last activity
-/gsd-search-decisions     # Search past decisions
-/gsd-search-lessons       # Search lessons learned
-/gsd-velocity             # Plans/day + completion forecast
-/gsd-rollback-info        # Show commits + revert command
+.planning/
+  PROJECT.md              # What this project is, core decisions
+  INTENT.md               # Why it exists, desired outcomes, success criteria
+  REQUIREMENTS.md         # Checkable requirements with IDs (REQ-01, REQ-02...)
+  ROADMAP.md              # Phases with goals, dependencies, progress
+  STATE.md                # Living memory: position, metrics, decisions, blockers
+  config.json             # Workflow settings, model profiles, gates
+
+  phases/
+    01-setup/
+      01-01-PLAN.md       # Executable plan with tasks, dependencies, waves
+      01-01-SUMMARY.md    # What was built, decisions made, files changed
+      01-02-PLAN.md       # Next plan in this phase
+      01-02-SUMMARY.md
+      01-VERIFICATION.md  # Phase goal verification report
+
+  research/               # Domain research (optional)
+  codebase/               # Codebase analysis documents (brownfield)
+  memory/                 # Persistent stores (decisions, bookmarks, lessons)
+  todos/                  # Captured ideas and tasks
+  debug/                  # Debug session state files
+  quick/                  # Quick task plans and summaries
 ```
 
-### Analysis & Budget
+---
+
+## Core Commands
+
+### Project Lifecycle
+
+| Command | What It Does |
+|---------|-------------|
+| `/gsd-new-project` | Initialize project: questioning, requirements, roadmap |
+| `/gsd-map-codebase` | Analyze existing codebase (brownfield projects) |
+| `/gsd-plan-phase [N]` | Create executable plans for a phase |
+| `/gsd-execute-phase N` | Execute all plans in a phase |
+| `/gsd-progress` | View progress, get routed to next action |
+| `/gsd-verify-work [N]` | Manual UAT testing with gap tracking |
+| `/gsd-new-milestone` | Start next milestone cycle |
+| `/gsd-complete-milestone` | Archive completed milestone |
+
+### Session Management
+
+| Command | What It Does |
+|---------|-------------|
+| `/gsd-resume-work` | Restore context from previous session |
+| `/gsd-pause-work` | Create handoff file for later |
+| `/gsd-quick` | Execute small tasks with GSD guarantees |
+| `/gsd-debug` | Systematic debugging with persistent state |
+
+### Configuration
+
+| Command | What It Does |
+|---------|-------------|
+| `/gsd-settings` | Interactive workflow configuration |
+| `/gsd-set-profile [quality\|balanced\|budget]` | Switch AI model tier |
+| `/gsd-health` | Check `.planning/` integrity |
+| `/gsd-update` | Update GSD to latest version |
+
+See the **[Full Command Reference](docs/commands.md)** for all 32 commands with options and examples.
+
+---
+
+## Key Features
+
+### 11 Specialized AI Agents
+
+GSD doesn't use one generic agent for everything. Each task gets a purpose-built agent:
+
+| Agent | Role |
+|-------|------|
+| **gsd-planner** | Creates executable plans with task breakdown, dependencies, waves |
+| **gsd-executor** | Implements code, runs tests, commits per-task |
+| **gsd-verifier** | Verifies phase goals were actually achieved (not just tasks completed) |
+| **gsd-debugger** | Systematic debugging with hypothesis testing |
+| **gsd-phase-researcher** | Researches implementation approaches for a phase |
+| **gsd-project-researcher** | Parallel domain research (stack, features, architecture, pitfalls) |
+| **gsd-roadmapper** | Creates phased roadmaps from requirements |
+| **gsd-plan-checker** | Reviews plan quality with revision loop |
+| **gsd-codebase-mapper** | Parallel codebase analysis (4 agents, 7 documents) |
+| **gsd-integration-checker** | Cross-phase wiring verification |
+| **gsd-research-synthesizer** | Merges parallel research outputs |
+
+### Model Profiles
+
+Control cost vs quality with three profiles:
+
+| Profile | Planning | Execution | Verification |
+|---------|----------|-----------|-------------|
+| **quality** | Opus | Opus | Sonnet |
+| **balanced** (default) | Opus | Sonnet | Sonnet |
+| **budget** | Sonnet | Sonnet | Haiku |
 
 ```
-/gsd-context-budget       # Token estimation for a plan
-/gsd-codebase-impact      # Show module dependencies
+/gsd-set-profile budget    # Switch to budget mode
 ```
 
-Or run the CLI directly:
-
-```bash
-node bin/gsd-tools.cjs <command> [args] --raw
+Override individual agents in `.planning/config.json`:
+```json
+{
+  "model_profile": "balanced",
+  "model_profiles": {
+    "gsd-executor": "opus"
+  }
+}
 ```
 
-## CLI Commands
+### Wave-Based Parallel Execution
 
-The CLI exposes 70+ commands organized by domain:
+Plans within a phase are organized into dependency waves. Independent plans execute in parallel:
 
-| Domain | Commands | Description |
-|--------|----------|-------------|
-| **init** | `init progress`, `init plan-phase`, `init execute-phase`, `init memory`, ... | Context injection for workflow sessions |
-| **intent** | `intent create`, `intent show`, `intent update`, `intent validate`, `intent trace`, `intent drift` | Intent capture, display, evolution tracking, traceability, and drift scoring |
-| **state** | `state validate`, `state validate --fix`, `state-snapshot` | State drift detection and auto-repair |
-| **memory** | `memory write`, `memory read`, `memory list`, `memory compact` | Cross-session persistence (decisions, bookmarks, lessons, todos) |
-| **verify** | `verify deliverables`, `verify requirements`, `verify regression`, `verify quality` | Quality gates with A-F grading and trend tracking |
-| **analyze** | `analyze plan`, `verify plan-wave`, `verify plan-deps`, `verify plan-structure` | Plan decomposition analysis and validation |
-| **roadmap** | `roadmap analyze`, `roadmap phase-status`, `requirements` | Roadmap parsing and requirement tracking |
-| **features** | `test-coverage`, `token-budget`, `mcp discover` | Test coverage, token budgets, MCP discovery |
-| **misc** | `velocity`, `session-diff`, `search-decisions`, `search-lessons`, `codebase-impact`, `rollback-info`, `trace-requirement` | Developer productivity tools |
+```
+Wave 1: [Plan 01-01] [Plan 01-02]    # No dependencies, run parallel
+Wave 2: [Plan 01-03]                   # Depends on 01-01, waits
+Wave 3: [Plan 01-04] [Plan 01-05]    # Depend on 01-03, run parallel
+```
 
-## Key Features by Version
+### Quality Gates
 
-### v3.0 — Intent Engineering (current)
+- **Test gating** — Plans fail if tests fail
+- **Requirement verification** — Track REQ-01 through plans to files on disk
+- **Regression detection** — Compare test results before/after changes
+- **Quality scoring** — A-F grades across 4 dimensions with trend tracking
+- **Intent drift** — Numeric score (0-100) measuring alignment with project goals
 
-- **INTENT.md** — Structured document capturing project objective, desired outcomes (prioritized P1-P3), success criteria, constraints, target users, and health metrics. Machine-readable, human-friendly.
-- **Intent CRUD** — `intent create` with guided questionnaire or auto-synthesis from documents. `intent show` renders compact summary or specific sections. `intent update` modifies sections with automatic diff detection. `intent validate` checks structure and completeness.
-- **Traceability Matrix** — `intent trace` maps every desired outcome to the phases and plans that address it. Detects outcome coverage gaps — outcomes with no plan addressing them.
-- **Drift Detection** — `intent drift` produces a numeric alignment score (0-100) across 4 signals: objective mismatch, feature creep, priority inversion, and outcome coverage. Runs as advisory pre-flight before plan execution (warns, never blocks).
-- **Workflow Integration** — Init commands automatically include intent summary in agent context. Research, planning, and verification workflows receive intent for scope alignment. All injections are conditional — projects without INTENT.md see zero changes.
-- **Intent Evolution** — `<history>` section in INTENT.md tracks what changed, why, and in which milestone. `intent update --reason` logs reasoning automatically. `intent show history` displays evolution timeline.
-- **Guided Capture** — New-project workflow asks 4 structured questions (objective, outcomes, criteria, constraints) before requirements. New-milestone workflow reviews and evolves existing intent section-by-section.
-- **Self-Application** — GSD's own development uses INTENT.md, proving the system works on itself.
+### Session Memory
 
-### v2.0 — Quality & Intelligence
+Decisions, lessons, and bookmarks persist across `/clear` and session restarts:
 
-- **State Intelligence** — `state validate` detects drift between ROADMAP.md claims and actual files on disk, with `--fix` for auto-correction. Pre-flight validation runs automatically before phase execution.
-- **Session Memory** — Dual-store pattern (STATE.md + memory.json) with sacred data protection. Decisions and lessons are never pruned. Bookmarks record exact position for seamless resume.
-- **Quality Gates** — `verify deliverables` runs tests and fails on failure. `verify requirements` checks REQUIREMENTS.md coverage. `verify regression` detects new test failures. `verify quality` produces A-F scores across 4 dimensions (tests 30%, must_haves 30%, requirements 20%, regression 20%) with trend tracking.
-- **Plan Analysis** — `analyze plan` scores plans 1-5 on single-responsibility using union-find concern grouping. `verify plan-wave` detects file conflicts in parallel execution. `verify plan-deps` finds dependency cycles via DFS.
-- **Test Infrastructure** — 348 tests across 76 suites. Integration tests cover workflow sequences, state round-trips, config migration, intent operations, and E2E simulation. Snapshot tests for init output stability.
-- **Build Pipeline** — Bundle size tracked on every build (457KB / 450KB budget). Token budgets assigned per workflow with overage flagging.
-- **Compact Default** — `--compact` output is now the default for all init commands (optimized for AI consumers). Use `--verbose` for full output.
-- **MCP Discovery** — `mcp discover` scans .mcp.json configs and surfaces server capabilities.
+```
+/gsd-search-decisions "database choice"   # Find past decisions
+/gsd-search-lessons "auth"                # Find lessons learned
+/gsd-velocity                             # Plans/day, completion forecast
+```
 
-### v1.1 — Context Reduction & Tech Debt
+### Git Integration
 
-- **Token Measurement** — BPE-based token estimation via tokenx (~96% accuracy)
-- **Output Compaction** — `--compact` profiles reduce init output by 40-60%
-- **Context Manifests** — `--manifest` flag for structured context loading
-- **Workflow Compression** — All 43 workflows compressed for token efficiency
-- **`--fields` Flag** — Filter any JSON output with dot-notation (e.g., `--fields phase_count,phases.name`)
-- **Section Extraction** — `extract-sections` pulls specific sections from markdown files
+- Per-task atomic commits during execution
+- Session diffs showing what happened since last activity
+- Rollback info with exact revert commands
+- Optional branch-per-phase or branch-per-milestone strategies
 
-### v1.0 — Performance & Quality
+---
 
-- **Multi-strategy milestone detection** — Finds active milestone via markers, tags, sections, or fallback
-- **esbuild pipeline** — Source split into 16 modules, bundled to single CJS file
-- **In-memory file cache** — `cachedReadFile` eliminates redundant disk reads
-- **Session diff tracking** — Git commits since last activity in progress reports
-- **Config validation** — Schema validation with typo detection for config.json
+## Configuration
+
+GSD is configured through `.planning/config.json`:
+
+| Setting | Default | Options |
+|---------|---------|---------|
+| `model_profile` | `"balanced"` | `"quality"`, `"balanced"`, `"budget"` |
+| `mode` | `"interactive"` | `"interactive"` (confirms), `"yolo"` (auto-approves) |
+| `commit_docs` | `true` | Auto-commit planning documents |
+| `research` | `true` | Enable research phase before planning |
+| `plan_checker` | `true` | Enable plan quality review |
+| `verifier` | `true` | Enable phase verification |
+| `parallelization` | `true` | Parallel plan execution within waves |
+| `test_gate` | `true` | Block on test failure |
+| `branching_strategy` | `"none"` | `"none"`, `"phase"`, `"milestone"` |
+| `brave_search` | `false` | Enable web search in research |
+
+Interactive configuration: `/gsd-settings`
+
+---
+
+## Documentation
+
+| Guide | Description |
+|-------|-------------|
+| **[Getting Started](docs/getting-started.md)** | First project walkthrough, easy flow, minimal decisions |
+| **[Expert Guide](docs/expert-guide.md)** | Full control flow, all options, advanced patterns |
+| **[Command Reference](docs/commands.md)** | Every command with arguments, options, and examples |
+| **[Architecture](docs/architecture.md)** | How GSD works internally, agent system, tool design |
+
+---
 
 ## Development
 
 ```bash
-# Build (includes bundle size check)
+# Clone
+git clone https://github.com/gonz0w/gsd-opencode.git
+cd gsd-opencode
+
+# Install & build
+npm install
 npm run build
 
-# Run tests (node:test runner, 348 tests)
+# Run tests (node:test, 348 tests)
 npm test
 
 # Test a specific command
 node bin/gsd-tools.cjs state validate --raw
 
-# Deploy to live config
+# Deploy to live OpenCode config
 ./deploy.sh
 ```
 
 ### Source Architecture
 
 ```
-src/index.js           # Entry point, CLI argument parsing
-src/router.js          # Command routing, global flags (--raw, --verbose, --fields)
-src/commands/
-  init.js              # 12 init subcommands + init memory
-  intent.js            # Intent CRUD, tracing, drift scoring, validation, history
-  state.js             # State management, validation, snapshots
-  phase.js             # Phase operations, plan indexing
-  roadmap.js           # Roadmap analysis, requirement tracking
-  verify.js            # Quality gates, plan analysis, deliverable verification
-  memory.js            # Memory store CRUD (decisions, bookmarks, lessons, todos)
-  features.js          # Test coverage, token budgets, MCP discovery
-  misc.js              # Velocity, search, impact, rollback, tracing
-src/lib/
-  config.js            # Config loading, migration, schema validation
-  constants.js         # Command help text, schemas, defaults
-  context.js           # Token estimation (tokenx integration)
-  frontmatter.js       # YAML frontmatter parsing and validation
-  git.js               # Git operations (log, diff, status, commit)
-  helpers.js           # File I/O, caching, path resolution
-  output.js            # JSON output formatting, field filtering
+src/
+  index.js                 # Entry point
+  router.js                # Command routing, global flags
+  commands/
+    init.js                # 13 init subcommands (context injection for workflows)
+    intent.js              # Intent CRUD, tracing, drift scoring
+    state.js               # State management, validation, snapshots
+    phase.js               # Phase lifecycle, plan indexing
+    roadmap.js             # Roadmap parsing, requirement tracking
+    verify.js              # Quality gates, plan analysis
+    memory.js              # Persistent memory stores
+    features.js            # Test coverage, token budgets, MCP
+    misc.js                # Velocity, search, impact, rollback
+    worktree.js            # Git worktree isolation
+    codebase.js            # Codebase intelligence
+    env.js                 # Environment detection
+  lib/
+    config.js              # Config loading, migration, schema validation
+    constants.js           # Command help, schemas, model profiles
+    context.js             # Token estimation (tokenx)
+    frontmatter.js         # YAML frontmatter parsing
+    git.js                 # Git operations
+    helpers.js             # File I/O, caching, paths
+    output.js              # JSON formatting, field filtering
 ```
+
+Built with esbuild into a single `bin/gsd-tools.cjs` file (zero runtime dependencies). Workflows are markdown files that agents follow as step-by-step prompts, calling gsd-tools for structured data.
 
 ## Requirements
 
