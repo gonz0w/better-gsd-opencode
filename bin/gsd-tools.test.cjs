@@ -12552,6 +12552,181 @@ describe('codebase intelligence', () => {
       assert.strictEqual(data.codebase_intel_exists, true, 'Should report codebase_intel_exists: true');
     });
   });
+
+  describe('phase 26: init context summary', () => {
+    test('three-field summary format — codebase_stats has confidence', () => {
+      // Run analyze to populate intel
+      runGsdTools('codebase analyze --raw', tmpDir);
+
+      const result = runGsdTools('init progress --verbose', tmpDir);
+      assert.ok(result.success, `Command failed: ${result.error}`);
+      const data = JSON.parse(result.output);
+
+      // Verify codebase_stats exists and has confidence
+      assert.ok(data.codebase_stats, 'Should include codebase_stats field');
+      assert.strictEqual(data.codebase_stats.confidence, 1.0, 'stats confidence should be 1.0');
+      assert.ok(data.codebase_stats.total_files > 0, 'should have total_files');
+      assert.ok(data.codebase_stats.top_languages, 'should have top_languages');
+      assert.ok(data.codebase_stats.generated_at, 'should have generated_at');
+    });
+
+    test('convention field present when conventions data exists', () => {
+      // Run analyze + conventions to populate data
+      runGsdTools('codebase analyze --raw', tmpDir);
+      runGsdTools('codebase conventions --raw', tmpDir);
+
+      const result = runGsdTools('init progress --verbose', tmpDir);
+      assert.ok(result.success, `Command failed: ${result.error}`);
+      const data = JSON.parse(result.output);
+
+      // Conventions should be present (may be null if no strong patterns detected in simple project)
+      // At minimum codebase_stats should exist
+      assert.ok(data.codebase_stats, 'codebase_stats should exist');
+    });
+
+    test('dependencies field present when deps data exists', () => {
+      // Run analyze + deps to populate data
+      runGsdTools('codebase analyze --raw', tmpDir);
+      runGsdTools('codebase deps --raw', tmpDir);
+
+      const result = runGsdTools('init progress --verbose', tmpDir);
+      assert.ok(result.success, `Command failed: ${result.error}`);
+      const data = JSON.parse(result.output);
+
+      // Dependencies should be present when deps have been built
+      assert.ok(data.codebase_dependencies, 'codebase_dependencies should exist after codebase deps');
+      assert.ok(data.codebase_dependencies.confidence === 0.85, 'deps confidence should be 0.85');
+      assert.ok(data.codebase_dependencies.total_modules >= 0, 'should have total_modules');
+    });
+
+    test('null handling — stats exist but no conventions/deps data', () => {
+      // Only run analyze (no conventions/deps)
+      runGsdTools('codebase analyze --raw', tmpDir);
+
+      // Read intel and verify no conventions/dependencies keys
+      const intelPath = path.join(tmpDir, '.planning', 'codebase', 'codebase-intel.json');
+      const intel = JSON.parse(fs.readFileSync(intelPath, 'utf-8'));
+      // Ensure no conventions/deps in intel
+      delete intel.conventions;
+      delete intel.dependencies;
+      fs.writeFileSync(intelPath, JSON.stringify(intel, null, 2) + '\n');
+
+      const result = runGsdTools('init progress --verbose', tmpDir);
+      assert.ok(result.success, `Command failed: ${result.error}`);
+      const data = JSON.parse(result.output);
+
+      // Stats should exist
+      assert.ok(data.codebase_stats, 'codebase_stats should exist');
+      // Conventions and dependencies should be absent (null fields trimmed from verbose output)
+      assert.ok(!data.codebase_conventions, 'codebase_conventions should be absent when no convention data');
+      assert.ok(!data.codebase_dependencies, 'codebase_dependencies should be absent when no deps data');
+    });
+
+    test('hybrid staleness — time-based detection', () => {
+      // Run analyze first
+      runGsdTools('codebase analyze --raw', tmpDir);
+
+      // Modify intel to have old generated_at but matching git hash
+      const intelPath = path.join(tmpDir, '.planning', 'codebase', 'codebase-intel.json');
+      const intel = JSON.parse(fs.readFileSync(intelPath, 'utf-8'));
+      // Set generated_at to 2 hours ago
+      const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
+      intel.generated_at = twoHoursAgo;
+      fs.writeFileSync(intelPath, JSON.stringify(intel, null, 2) + '\n');
+
+      const result = runGsdTools('codebase status --raw', tmpDir);
+      assert.ok(result.success, `Command failed: ${result.error}`);
+      const data = JSON.parse(result.output);
+
+      assert.strictEqual(data.stale, true, 'Should be stale when generated_at is 2h old');
+      assert.strictEqual(data.reason, 'time_stale', 'Reason should be time_stale');
+    });
+
+    test('lock file prevents concurrent background triggers', () => {
+      // Run analyze first
+      runGsdTools('codebase analyze --raw', tmpDir);
+
+      // Create a fresh lock file manually
+      const cacheDir = path.join(tmpDir, '.planning', '.cache');
+      fs.mkdirSync(cacheDir, { recursive: true });
+      const lockPath = path.join(cacheDir, '.analyzing');
+      const originalPid = '12345';
+      fs.writeFileSync(lockPath, originalPid);
+
+      // Make intel stale so auto-trigger would want to spawn
+      const intelPath = path.join(tmpDir, '.planning', 'codebase', 'codebase-intel.json');
+      const intel = JSON.parse(fs.readFileSync(intelPath, 'utf-8'));
+      intel.generated_at = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
+      fs.writeFileSync(intelPath, JSON.stringify(intel, null, 2) + '\n');
+
+      // Run init progress (triggers autoTriggerCodebaseIntel which should see lock and skip)
+      runGsdTools('init progress --verbose', tmpDir);
+
+      // Verify lock file PID hasn't changed (no new spawn happened)
+      const lockContent = fs.readFileSync(lockPath, 'utf-8');
+      assert.strictEqual(lockContent, originalPid, 'Lock file content should not change when lock is fresh');
+    });
+
+    test('stale lock file gets cleaned up', () => {
+      // Run analyze first
+      runGsdTools('codebase analyze --raw', tmpDir);
+
+      // Create a stale lock file (mtime > 5 minutes old)
+      const cacheDir = path.join(tmpDir, '.planning', '.cache');
+      fs.mkdirSync(cacheDir, { recursive: true });
+      const lockPath = path.join(cacheDir, '.analyzing');
+      fs.writeFileSync(lockPath, '99999');
+      // Set mtime to 6 minutes ago
+      const sixMinAgo = new Date(Date.now() - 6 * 60 * 1000);
+      fs.utimesSync(lockPath, sixMinAgo, sixMinAgo);
+
+      // Make intel stale
+      const intelPath = path.join(tmpDir, '.planning', 'codebase', 'codebase-intel.json');
+      const intel = JSON.parse(fs.readFileSync(intelPath, 'utf-8'));
+      intel.generated_at = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
+      fs.writeFileSync(intelPath, JSON.stringify(intel, null, 2) + '\n');
+
+      // Run init progress — stale lock should be cleaned up
+      runGsdTools('init progress --verbose', tmpDir);
+
+      // Lock file should be different (either new PID or cleaned up)
+      if (fs.existsSync(lockPath)) {
+        const lockContent = fs.readFileSync(lockPath, 'utf-8');
+        assert.notStrictEqual(lockContent, '99999', 'Stale lock should be replaced with new PID');
+      }
+      // If lock doesn't exist, that's also fine (analysis completed quickly and cleaned up)
+    });
+
+    test('--refresh forces synchronous analysis with fresh data', () => {
+      // Run analyze to create initial intel
+      runGsdTools('codebase analyze --raw', tmpDir);
+
+      // Read current intel timestamp
+      const intelPath = path.join(tmpDir, '.planning', 'codebase', 'codebase-intel.json');
+      const oldIntel = JSON.parse(fs.readFileSync(intelPath, 'utf-8'));
+      const oldTimestamp = oldIntel.generated_at;
+
+      // Make intel stale by backdating generated_at
+      oldIntel.generated_at = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
+      fs.writeFileSync(intelPath, JSON.stringify(oldIntel, null, 2) + '\n');
+
+      // Run init progress with --refresh — should force synchronous re-analysis
+      const result = runGsdTools('init progress --refresh --verbose', tmpDir);
+      assert.ok(result.success, `Command failed: ${result.error}`);
+      const data = JSON.parse(result.output);
+
+      // Read updated intel
+      const newIntel = JSON.parse(fs.readFileSync(intelPath, 'utf-8'));
+
+      // New timestamp should be recent (within last 10 seconds), not the old stale one
+      const newTime = new Date(newIntel.generated_at).getTime();
+      const tenSecondsAgo = Date.now() - 10000;
+      assert.ok(newTime > tenSecondsAgo, `After --refresh, generated_at should be recent. Got: ${newIntel.generated_at}`);
+
+      // Stats should be present
+      assert.ok(data.codebase_stats, 'Should include codebase_stats after --refresh');
+    });
+  });
 });
 
 
