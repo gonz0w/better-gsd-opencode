@@ -183,7 +183,7 @@ Success criteria:
 | 22. Workflow Polish | v4.0 | 1/1 | Complete | 2026-02-25 |
 | 23. Infrastructure & Storage | 2/2 | Complete    | 2026-02-26 | — |
 | 24. Convention Extraction | 2/2 | Complete    | 2026-02-26 | — |
-| 25. Dependency Graph | v5.0 | 2/2 | Complete | 2026-02-26 |
+| 25. Dependency Graph | v5.0 | Complete    | 2026-02-26 | 2026-02-26 |
 | 26. Init Integration & Context Summary | v5.0 | 0/0 | Planned | — |
 | 27. Task-Scoped Context | v5.0 | 0/0 | Planned | — |
 | 28. Lifecycle Analysis | v5.0 | 0/0 | Planned | — |
