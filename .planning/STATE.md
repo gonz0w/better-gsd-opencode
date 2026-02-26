@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-02-25)
 ## Current Position
 
 **Phase:** Phase 28 of 29: Lifecycle Analysis
-**Current Plan:** Plan 1 of 2 complete
-**Status:** In Progress
+**Current Plan:** Plan 2 of 2 complete
+**Status:** Phase Complete
 **Last Activity:** 2026-02-26
 
-Progress: 6/7 phases complete (27 done, 28 in progress).
+Progress: 7/7 phases complete (28 done).
 
 ## Performance Metrics
 
@@ -43,6 +43,7 @@ Progress: 6/7 phases complete (27 done, 28 in progress).
 | Phase 27 P01 | 2 min | 2 tasks | 3 files |
 | Phase 27 P02 | 12 min | 2 tasks | 3 files |
 | Phase 28 P01 | 4 min | 2 tasks | 1 files |
+| Phase 28 P02 | 7 min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -86,6 +87,9 @@ All v1.0-v4.0 decisions recorded in PROJECT.md Key Decisions table with outcomes
 - [Phase 28-01]: Migration cap at 20 most recent per directory — keeps token budget manageable for large projects
 - [Phase 28-01]: Phoenix detector gates on intel.conventions.frameworks — skips if conventions not yet extracted
 - [Phase 28-01]: Symmetry enforcement as post-processing step rather than per-detector to avoid duplicate logic
+- [Phase 28-02]: Fixed cmdCodebaseAnalyze preservation gap — conventions/dependencies/lifecycle all preserved after re-analysis
+- [Phase 28-02]: CLI output truncates chains >5 nodes showing first 3 + count + last
+- [Phase 28-02]: 11 test cases covering detector registry, chain ordering, capping, caching, and CLI integration
 
 ### Pending Todos
 
@@ -104,5 +108,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-02-26
-Stopped at: Completed 28-01-PLAN.md
+Stopped at: Completed 28-02-PLAN.md (Phase 28 complete)
 Resume file: None

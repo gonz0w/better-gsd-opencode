@@ -93,9 +93,9 @@ Requirements for codebase intelligence milestone. Each maps to roadmap phases.
 | DEPS-03 | Phase 25 | Complete | node bin/gsd-tools.cjs codebase deps --raw |
 | DEPS-04 | Phase 25 | Complete | node bin/gsd-tools.cjs codebase impact src/lib/state.js --raw |
 | DEPS-05 | Phase 25 | Complete | node bin/gsd-tools.cjs codebase deps --cycles --raw |
-| LIFE-01 | Phase 28 | Pending | node bin/gsd-tools.cjs codebase lifecycle --raw |
-| LIFE-02 | Phase 28 | Pending | node bin/gsd-tools.cjs codebase lifecycle --raw |
-| LIFE-03 | Phase 28 | Pending | node bin/gsd-tools.cjs codebase lifecycle --raw |
+| LIFE-01 | Phase 28 | Complete | node bin/gsd-tools.cjs codebase lifecycle --raw |
+| LIFE-02 | Phase 28 | Complete | node bin/gsd-tools.cjs codebase lifecycle --raw |
+| LIFE-03 | Phase 28 | Complete | node bin/gsd-tools.cjs codebase lifecycle --raw |
 | CTXI-01 | Phase 26 | Complete | node bin/gsd-tools.cjs init progress --raw |
 | CTXI-02 | Phase 27 | Complete | node bin/gsd-tools.cjs codebase context --files src/index.js --raw |
 | CTXI-03 | Phase 27 | Complete | node bin/gsd-tools.cjs codebase context --files src/index.js --raw |
