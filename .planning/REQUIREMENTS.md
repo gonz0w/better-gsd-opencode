@@ -9,11 +9,11 @@ Requirements for UX overhaul milestone. Each maps to roadmap phases.
 
 ### Formatting Infrastructure
 
-- [ ] **FMT-01**: User gets a shared `formatTable(headers, rows, options)` utility with column alignment, truncation, and optional borders
-- [ ] **FMT-02**: User gets a TTY-aware color utility (~2KB picocolors pattern) with bold, dim, red, green, yellow, cyan, and auto-disable for non-TTY
-- [ ] **FMT-03**: User gets a shared `progressBar(percent, width)` utility replacing the 2 duplicated implementations
-- [ ] **FMT-04**: User gets `banner(title)` and `box(content, type)` renderers implementing the ui-brand.md visual spec
-- [ ] **FMT-05**: User gets exported status symbol constants (`SYMBOLS.check`, `SYMBOLS.cross`, `SYMBOLS.progress`, etc.) used consistently across all output
+- [x] **FMT-01**: User gets a shared `formatTable(headers, rows, options)` utility with column alignment, truncation, and optional borders
+- [x] **FMT-02**: User gets a TTY-aware color utility (~2KB picocolors pattern) with bold, dim, red, green, yellow, cyan, and auto-disable for non-TTY
+- [x] **FMT-03**: User gets a shared `progressBar(percent, width)` utility replacing the 2 duplicated implementations
+- [x] **FMT-04**: User gets `banner(title)` and `box(content, type)` renderers implementing the ui-brand.md visual spec
+- [x] **FMT-05**: User gets exported status symbol constants (`SYMBOLS.check`, `SYMBOLS.cross`, `SYMBOLS.progress`, etc.) used consistently across all output
 
 ### Smart Output
 
@@ -80,11 +80,11 @@ Requirements for UX overhaul milestone. Each maps to roadmap phases.
 
 | Requirement | Phase | Status | Test Command |
 |-------------|-------|--------|--------------|
-| FMT-01 | Phase 30 | Pending | — |
-| FMT-02 | Phase 30 | Pending | — |
-| FMT-03 | Phase 30 | Pending | — |
-| FMT-04 | Phase 30 | Pending | — |
-| FMT-05 | Phase 30 | Pending | — |
+| FMT-01 | Phase 30 | Complete | — |
+| FMT-02 | Phase 30 | Complete | — |
+| FMT-03 | Phase 30 | Complete | — |
+| FMT-04 | Phase 30 | Complete | — |
+| FMT-05 | Phase 30 | Complete | — |
 | OUT-01 | Phase 30 | Pending | — |
 | OUT-02 | Phase 30 | Pending | — |
 | OUT-03 | Phase 30 | Pending | — |

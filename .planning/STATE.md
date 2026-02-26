@@ -10,12 +10,13 @@ See: .planning/PROJECT.md (updated 2026-02-26)
 ## Current Position
 
 **Phase:** 30 — Formatting Foundation & Smart Output
-**Current Plan:** —
-**Status:** Not started
-**Last Activity:** 2026-02-26 — Roadmap created for v6.0
+**Current Plan:** 2 of 2
+**Status:** In progress
+**Last Activity:** 2026-02-26 — Completed 30-01 (formatting primitives module)
 
 ```
 v6.0 Progress: [░░░░░░░░░░░░░░░░░░░░] 0/7 phases (0%)
+Phase 30: [██████████░░░░░░░░░░] 1/2 plans
 ```
 
 ## Performance Metrics
@@ -36,12 +37,15 @@ v6.0 Progress: [░░░░░░░░░░░░░░░░░░░░] 0/
 | v4.0 | 5 | 13 | 1 day |
 | v5.0 | 7 | 14 | 2 days |
 | v6.0 | 7 | 14 | — |
+| Phase 30 P01 | 2 min | 2 tasks | 1 files |
 
 ## Accumulated Context
 
 ### Decisions
 
 All v1.0-v5.0 decisions recorded in PROJECT.md Key Decisions table with outcomes.
+
+- **Phase 30-01:** Single-module format.js design — all primitives in one file, picocolors inline pattern, PSql-style tables, bGSD subtle branding
 
 ### Pending Todos
 
@@ -54,5 +58,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-02-26
-Stopped at: v6.0 roadmap created, ready for Phase 30 planning
+Stopped at: Completed 30-01-PLAN.md (formatting primitives)
 Resume file: None
