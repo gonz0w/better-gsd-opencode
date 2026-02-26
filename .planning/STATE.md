@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-02-25)
 
 **Core value:** Manage and deliver high-quality software with high-quality documentation, while continuously reducing token usage and improving performance
-**Current focus:** v5.0 Codebase Intelligence — executing phase 24
+**Current focus:** v5.0 Codebase Intelligence — executing phase 25
 
 ## Current Position
 
-**Phase:** Phase 24 of 29: Convention Extraction
-**Current Plan:** Not started
-**Status:** Milestone complete
+**Phase:** Phase 25 of 29: Dependency Graph
+**Current Plan:** Plan 01 complete, Plan 02 next
+**Status:** In progress
 **Last Activity:** 2026-02-26
 
-Progress: 3/7 phases complete.
+Progress: 3/7 phases complete (25-01 done).
 
 ## Performance Metrics
 
@@ -36,6 +36,7 @@ Progress: 3/7 phases complete.
 | Phase 23 P02 | 16 min | 2 tasks | 3 files |
 | Phase 24 P01 | 3 min | 2 tasks | 4 files |
 | Phase 24 P02 | 6 min | 2 tasks | 5 files |
+| Phase 25 P01 | 3 min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -56,6 +57,9 @@ All v1.0-v4.0 decisions recorded in PROJECT.md Key Decisions table with outcomes
 - [Phase 24-02]: Rules capped at 15 by default with --max override — prevents agent context bloat
 - [Phase 24-02]: codebase rules --raw outputs plain text for direct prompt injection
 - [Phase 24-02]: Auto-detect conventions on demand if intel has no cached conventions
+- [Phase 25-01]: Regex-based import parsing over AST — zero dependencies, 85-90% accuracy for module-level analysis
+- [Phase 25-01]: Resolution only for relative/local imports — external packages excluded from project graph
+- [Phase 25-01]: Forward + reverse adjacency lists for O(1) lookup in both directions
 
 ### Pending Todos
 
@@ -74,5 +78,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-02-26
-Stopped at: Completed 24-02-PLAN.md (Phase 24 complete)
+Stopped at: Completed 25-01-PLAN.md
 Resume file: None

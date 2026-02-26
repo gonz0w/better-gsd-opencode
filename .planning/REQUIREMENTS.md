@@ -24,9 +24,9 @@ Requirements for codebase intelligence milestone. Each maps to roadmap phases.
 
 ### Dependency Analysis
 
-- [ ] **DEPS-01**: User can run `codebase deps` to build a module dependency graph from import/require/use statements
-- [ ] **DEPS-02**: Import parsing covers 6 languages via regex: JavaScript, TypeScript, Python, Go, Elixir, Rust
-- [ ] **DEPS-03**: Dependency graph uses adjacency-list representation with forward and reverse edges
+- [x] **DEPS-01**: User can run `codebase deps` to build a module dependency graph from import/require/use statements
+- [x] **DEPS-02**: Import parsing covers 6 languages via regex: JavaScript, TypeScript, Python, Go, Elixir, Rust
+- [x] **DEPS-03**: Dependency graph uses adjacency-list representation with forward and reverse edges
 - [ ] **DEPS-04**: User can run `codebase impact <file>` to see transitive dependents (what breaks if this file changes)
 - [ ] **DEPS-05**: Cycle detection identifies circular dependencies using Tarjan's strongly connected components
 
@@ -88,9 +88,9 @@ Requirements for codebase intelligence milestone. Each maps to roadmap phases.
 | CONV-03 | Phase 24 | Complete | node bin/gsd-tools.cjs codebase conventions --raw |
 | CONV-04 | Phase 24 | Complete | node bin/gsd-tools.cjs codebase conventions --raw |
 | CONV-05 | Phase 24 | Complete | node bin/gsd-tools.cjs codebase rules --raw |
-| DEPS-01 | Phase 25 | Pending | node bin/gsd-tools.cjs codebase deps --raw |
-| DEPS-02 | Phase 25 | Pending | node bin/gsd-tools.cjs codebase deps --raw |
-| DEPS-03 | Phase 25 | Pending | node bin/gsd-tools.cjs codebase deps --raw |
+| DEPS-01 | Phase 25 | Complete | node bin/gsd-tools.cjs codebase deps --raw |
+| DEPS-02 | Phase 25 | Complete | node bin/gsd-tools.cjs codebase deps --raw |
+| DEPS-03 | Phase 25 | Complete | node bin/gsd-tools.cjs codebase deps --raw |
 | DEPS-04 | Phase 25 | Pending | node bin/gsd-tools.cjs codebase impact src/lib/state.js --raw |
 | DEPS-05 | Phase 25 | Pending | node bin/gsd-tools.cjs codebase deps --cycles --raw |
 | LIFE-01 | Phase 28 | Pending | node bin/gsd-tools.cjs codebase lifecycle --raw |
