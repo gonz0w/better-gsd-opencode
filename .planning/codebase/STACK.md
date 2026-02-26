@@ -5,151 +5,176 @@
 ## Languages
 
 **Primary:**
-- JavaScript (CommonJS) — All source code in `src/`, build tooling, tests
+- JavaScript (ES2020+ / CommonJS) — All source code in `src/`, build tooling in `build.js`
 
 **Secondary:**
-- Bash — `deploy.sh` deployment script
-- Markdown — 44 workflow files in `workflows/`, 28 template files in `templates/`, 13 reference files in `references/`
+- Markdown — Workflow definitions (`workflows/*.md`), templates (`templates/*.md`), reference docs (`references/*.md`)
+- JSON — Configuration (`templates/config.json`, `.planning/config.json`, `package.json`)
+- Shell (Bash) — Deployment script (`deploy.sh`)
 
 ## Runtime
 
 **Environment:**
-- Node.js >= 18 (specified in `package.json` `engines` field)
-- Uses `node:test` built-in test runner (no external test framework)
-- Uses `fetch()` global (available in Node 18+) for HTTP requests
+- Node.js >= 18 (specified in `package.json` engines field)
+- Current dev environment: Node.js v25.6.1
 
 **Package Manager:**
 - npm
-- Lockfile: `package-lock.json` present
+- Lockfile: `package-lock.json` (present, lockfileVersion 3)
 
 ## Frameworks
 
 **Core:**
-- None — This is a zero-framework CLI tool. Pure Node.js with only built-in modules for core functionality.
-
-**Build:**
-- esbuild ^0.27.3 (devDependency) — Bundles `src/index.js` → `bin/gsd-tools.cjs`
-  - Config: `build.js` (94 lines)
-  - Target: `node18`, format: `cjs`, platform: `node`
-  - Externalizes all Node.js built-ins, bundles npm dependencies (tokenx)
-  - Bundle budget: 700KB enforced in `build.js` (line 60)
-  - Outputs size record to `.planning/baselines/bundle-size.json`
-  - Smoke test runs `current-timestamp --raw` after each build
+- None — This is a zero-framework CLI tool. Pure Node.js with standard library only.
 
 **Testing:**
-- `node:test` (Node.js built-in test runner)
-  - Test file: `bin/gsd-tools.test.cjs` (13,040 lines)
-  - Run: `node --test bin/gsd-tools.test.cjs` or `npm test`
-  - Assertions: `node:assert` built-in
-  - Pattern: `describe()` / `test()` blocks, temp directory fixtures
+- `node:test` (built-in) — Node's native test runner, used in `bin/gsd-tools.test.cjs`
+- `node:assert` (built-in) — Assertion library used alongside `node:test`
+- Test count: 348 tests (per `README.md`)
+
+**Build/Dev:**
+- esbuild `^0.27.3` (devDependency) — Bundles `src/index.js` into `bin/gsd-tools.cjs`
 
 ## Key Dependencies
 
-**Runtime (Production):**
-- `tokenx` ^1.3.0 — Token count estimation for LLM context budget analysis
-  - Used in: `src/lib/context.js` (lazy-loaded)
-  - Fallback: `Math.ceil(text.length / 4)` if tokenx fails to load
-  - Bundled into `bin/gsd-tools.cjs` by esbuild
+**Critical (runtime):**
+- `tokenx` `^1.3.0` — Fast token estimation (~96% accuracy, 2KB) for context budget calculations. Used in `src/lib/context.js`. Bundled into `bin/gsd-tools.cjs` via esbuild. Falls back to `Math.ceil(text.length / 4)` if tokenx fails to load.
 
-**Development:**
-- `esbuild` ^0.27.3 — JavaScript bundler (build tool only, not shipped)
+**Infrastructure (devDependency):**
+- `esbuild` `^0.27.3` — Build system. Bundles all source + tokenx into a single CJS file. Config in `build.js`.
 
 **Node.js Built-in Modules Used:**
-- `fs` — File system operations (read/write planning docs, config)
-- `path` — Path resolution and manipulation
-- `child_process` (`execSync`, `execFileSync`) — Git commands, test execution, binary version detection
-- `os` — Home directory (`~/.gsd/`), temp directories
-- `crypto` — (externalized but available)
-- `node:test` — Test runner
-- `node:assert` — Test assertions
+- `fs` — File system operations (read/write planning docs, codebase analysis)
+- `path` — Path resolution throughout
+- `child_process` (`execFileSync`, `execSync`, `spawn`) — Git operations, test execution, environment detection, worktree management
+- `os` — Temp directory paths, homedir for config
+- `crypto` — Not directly imported (no crypto operations)
 
-## Source Code Metrics
+## Build System
 
-**Source files:** 24 JavaScript files in `src/`
-- `src/index.js` — Entry point (5 lines)
-- `src/router.js` — Command routing with lazy-loaded modules (772 lines)
-- `src/commands/` — 13 command modules
-- `src/lib/` — 11 library modules
+**Entry Point:** `src/index.js`
+**Output:** `bin/gsd-tools.cjs` (single bundled file, ~657KB, 16,436 lines)
+**Bundle Budget:** 1000KB (enforced in `build.js`)
 
-**Total source lines:** ~23,134 lines across all `.js` files
+**Build Configuration (`build.js`):**
+- Platform: `node`
+- Format: `cjs` (CommonJS)
+- Target: `node18`
+- Minify: `false` (kept readable for debugging)
+- Sourcemaps: `false`
+- External: All Node.js built-ins (`node:*`, `fs`, `path`, `os`, `child_process`, etc.)
+- Bundled: `tokenx` (npm dependency bundled into output)
+- Custom plugin: `stripShebangPlugin` — removes shebangs from source files to avoid duplicates
+- Banner: `#!/usr/bin/env node` added to output
+- Post-build: Smoke test (`current-timestamp --raw`), bundle size tracking to `.planning/baselines/bundle-size.json`
 
-**Built bundle:** `bin/gsd-tools.cjs` — ~614KB, 15,348 lines (gitignored, regenerated on build)
+**Build Command:**
+```bash
+npm run build          # Runs: node build.js
+```
+
+**Test Command:**
+```bash
+npm test               # Runs: node --test bin/gsd-tools.test.cjs
+```
+
+## Source Architecture
+
+**Total Source Lines:** ~25,500+ (across `src/` directory)
+**Source Modules:** 20 files total:
+- `src/index.js` (5 lines) — Entry point
+- `src/router.js` (776 lines) — Command dispatch with lazy module loading
+- `src/commands/*.js` (13 modules) — Command implementations
+- `src/lib/*.js` (9 modules) — Shared libraries
+
+**Key source files by size (descending):**
+- `src/commands/verify.js` — 1,984 lines (verification suite)
+- `src/commands/features.js` — Large (session-diff, context-budget, codebase-impact, velocity, etc.)
+- `src/commands/init.js` — Large (compound initialization for all workflows)
+- `src/commands/env.js` — 1,177 lines (environment detection)
+- `src/lib/constants.js` — 1,088 lines (model profiles, config schema, command help)
+- `src/lib/helpers.js` — 946 lines (file I/O, phase helpers, intent parsing)
+- `src/commands/worktree.js` — 791 lines (git worktree management)
+- `src/router.js` — 776 lines (command routing)
+- `src/lib/deps.js` — 697 lines (import parsing, dependency graphs, cycle detection)
+- `src/commands/state.js` — 652 lines (STATE.md management)
+- `src/lib/conventions.js` — 644 lines (naming/framework convention detection)
+- `src/lib/lifecycle.js` — 569 lines (lifecycle ordering detection)
+- `src/lib/codebase-intel.js` — 570 lines (codebase analysis engine)
 
 ## Configuration
 
-**Project-level (per-project):**
-- `.planning/config.json` — Project settings with schema validation
-  - Schema defined in: `src/lib/constants.js` (`CONFIG_SCHEMA`)
-  - Template: `templates/config.json`
-  - Key settings: `model_profile`, `commit_docs`, `research`, `parallelization`, `brave_search`, `test_commands`, `context_window`
+**Project-Level Config:**
+- `.planning/config.json` — Per-project settings (mode, depth, model profiles, gates, parallelization, worktree, etc.)
+- Template: `templates/config.json` (default config with all sections)
+- Schema: `CONFIG_SCHEMA` in `src/lib/constants.js` — 17 validated keys with types, defaults, aliases, and nested path lookups
 
-**User-level (global):**
-- `~/.gsd/defaults.json` — User-level config overrides (optional)
-- `~/.gsd/brave_api_key` — Brave Search API key file (optional)
+**Key config sections:**
+- `model_profile` — Agent model selection: `quality` / `balanced` / `budget`
+- `mode` — Execution mode: `interactive` / `yolo`
+- `depth` — Planning depth: `standard`
+- `parallelization` — Parallel plan execution settings
+- `gates` — Confirmation gates for workflow steps
+- `worktree` — Git worktree isolation settings
+- `test_commands` — Custom test commands by framework
+- `test_gate` — Block plan completion on test failure
+- `context_window` — Token budget (default: 200,000)
+- `context_target_percent` — Target utilization (default: 50%)
+- `brave_search` — Enable Brave Search API integration
+
+**User-Level Config:**
+- `~/.gsd/defaults.json` — User-wide default settings (applied during `config-ensure-section`)
+- `~/.gsd/brave_api_key` — Brave Search API key file
 
 **Environment Variables:**
-- `BRAVE_API_KEY` — Brave Search API authentication (optional)
+- `BRAVE_API_KEY` — Brave Search API authentication
 - `GSD_DEBUG` — Enable debug logging to stderr
-- `GSD_NO_TMPFILE` — Skip file redirect for large JSON output
+- `GSD_NO_TMPFILE` — Disable temp file output for large payloads
 
-**Build Configuration:**
-- `build.js` — esbuild config (entry: `src/index.js`, output: `bin/gsd-tools.cjs`)
-- `package.json` — npm scripts: `build`, `test`
-
-## Architecture: Single-File CLI Bundle
-
-The source is developed as modular files in `src/` but built into a single CJS bundle:
-
-```
-src/index.js          → entry point
-src/router.js         → command dispatch (lazy-loading)
-src/commands/*.js     → 13 command modules
-src/lib/*.js          → 11 shared libraries
-        ↓ (esbuild)
-bin/gsd-tools.cjs     → single executable (gitignored)
-```
-
-**Lazy loading:** All 13 command modules are lazy-loaded in `src/router.js` (lines 10-24). Only the module needed for the invoked command is loaded per execution.
-
-**Caching layers:**
-- File content cache: `src/lib/helpers.js` (`fileCache` Map)
-- Directory listing cache: `src/lib/helpers.js` (`dirCache` Map)
-- Phase tree cache: `src/lib/helpers.js` (`_phaseTreeCache`)
-- Frontmatter parse cache: `src/lib/frontmatter.js` (`_fmCache` Map, LRU, max 100)
-- Regex cache: `src/lib/regex-cache.js` (`_dynamicRegexCache` Map, LRU, max 200)
-- Config cache: `src/lib/config.js` (`_configCache` Map)
-- Milestone cache: `src/lib/helpers.js` (`_milestoneCache`)
-- Token estimator: `src/lib/context.js` (`_estimateTokenCount` singleton)
-
-All caches live for a single CLI invocation (no TTL needed since the process exits).
+**Global CLI Flags:**
+- `--raw` — JSON output mode
+- `--verbose` — Full output (default is compact)
+- `--compact` — Compact output (default, backward-compat)
+- `--manifest` — Include context manifest in compact output
+- `--fields <f1,f2>` — Filter JSON output to specified fields (dot-notation supported)
 
 ## Deployment
 
-**Development → Production pipeline:**
-1. Edit source in `src/`
-2. `npm run build` (esbuild bundles → `bin/gsd-tools.cjs`, runs smoke test, checks bundle budget)
-3. `./deploy.sh` copies `bin/`, `workflows/`, `templates/`, `references/`, `src/`, `VERSION` to `~/.config/opencode/get-shit-done/`
-4. Deploy includes backup + smoke test + rollback on failure
+**Development:**
+```bash
+node bin/gsd-tools.cjs <command> [args] --raw    # Run from dev workspace
+npm run build                                      # Rebuild bundle
+npm test                                           # Run test suite
+```
 
-**Target installation:**
-- `~/.config/opencode/get-shit-done/` — OpenCode plugin directory
-- Invoked by OpenCode (AI coding assistant) via workflow markdown files that call `gsd-tools` commands
+**Production Deployment:**
+- Target: `~/.config/opencode/get-shit-done/` (OpenCode plugin directory)
+- Script: `deploy.sh` — Builds, backs up existing install, copies `bin/`, `workflows/`, `templates/`, `references/`, `src/`, `VERSION`, runs smoke test, auto-rollback on failure
+- Version tracking: `VERSION` file (current: `1.20.5`)
 
-**Versioning:**
-- `VERSION` file contains version string: `1.20.5`
+**What Gets Deployed:**
+```
+~/.config/opencode/get-shit-done/
+  bin/gsd-tools.cjs     # Built CLI bundle
+  workflows/*.md        # 44 workflow definitions
+  templates/*.md        # 28 document templates
+  references/*.md       # 13 reference docs
+  src/                  # Source code (for build reproducibility)
+  VERSION               # Version identifier
+```
 
 ## Platform Requirements
 
 **Development:**
 - Node.js >= 18
-- npm
-- Git (for git operations, tests)
+- Git (required for git operations, commit tracking, worktree management)
+- npm (for dependency management)
 
-**Production (runtime):**
+**Production (Runtime):**
 - Node.js >= 18
-- Git (CLI tool heavily uses `git` commands via `execFileSync`)
-- No network access required (Brave Search is optional)
-- File system access to `.planning/` directory in target projects
+- Git (required — execFileSync('git', ...) called in `src/lib/git.js` and `src/lib/config.js`)
+- OpenCode CLI (host application that loads GSD as a plugin)
+- Standard POSIX tools: `which`, `du`, `df` (used by `src/commands/env.js`, `src/commands/worktree.js`)
 
 ---
 
