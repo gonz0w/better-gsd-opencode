@@ -1,6 +1,14 @@
 // ─── Format Module ───────────────────────────────────────────────────────────
 // Shared formatting primitives for bGSD CLI output.
 // Zero external dependencies. TTY-aware color with NO_COLOR support.
+//
+// Exports:
+//   Terminal:  getTerminalWidth, isTTY
+//   Color:     color, colorByPercent
+//   Symbols:   SYMBOLS
+//   Helpers:   stripAnsi, truncate, relativeTime, pad
+//   Renderers: formatTable, progressBar, sectionHeader, banner, box,
+//              summaryLine, actionHint, listWithTruncation
 
 'use strict';
 
