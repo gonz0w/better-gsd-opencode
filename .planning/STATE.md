@@ -11,10 +11,10 @@ See: .planning/PROJECT.md (updated 2026-02-25)
 
 **Phase:** Phase 29 of 29: Workflow Integration
 **Current Plan:** Plan 2 of 2
-**Status:** In Progress
+**Status:** Complete
 **Last Activity:** 2026-02-26
 
-Progress: 7/7 phases in progress (29-01 complete, 29-02 pending).
+Progress: 7/7 phases complete (all plans done).
 
 ## Performance Metrics
 
@@ -45,6 +45,7 @@ Progress: 7/7 phases in progress (29-01 complete, 29-02 pending).
 | Phase 28 P01 | 4 min | 2 tasks | 1 files |
 | Phase 28 P02 | 7 min | 2 tasks | 4 files |
 | Phase 29 P01 | 2 min | 2 tasks | 1 files |
+| Phase 29 P02 | 5 min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -93,6 +94,8 @@ All v1.0-v4.0 decisions recorded in PROJECT.md Key Decisions table with outcomes
 - [Phase 28-02]: 11 test cases covering detector registry, chain ordering, capping, caching, and CLI integration
 - [Phase 29-01]: Context block placed between <files_to_read> and <success_criteria> for natural prompt flow
 - [Phase 29-01]: Convention check is advisory-only with >80% confidence threshold to avoid noise
+- [Phase 29]: Map getTransitiveDependents return format to features output format — flat dependents array from direct + transitive
+- [Phase 29]: Add source: 'cached_graph' field to distinguish graph path from grep fallback — backward compatible
 
 ### Pending Todos
 
@@ -111,5 +114,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-02-26
-Stopped at: Completed 29-01-PLAN.md
+Stopped at: Completed 29-02-PLAN.md
 Resume file: None

@@ -47,7 +47,7 @@ Requirements for codebase intelligence milestone. Each maps to roadmap phases.
 
 - [x] **WKFL-01**: Execute-phase workflow auto-injects relevant codebase context based on plan file references
 - [x] **WKFL-02**: Pre-flight convention check warns before execution if plan touches files with known conventions
-- [ ] **WKFL-03**: Existing `codebase-impact` command is updated to use cached dependency graph when available
+- [x] **WKFL-03**: Existing `codebase-impact` command is updated to use cached dependency graph when available
 
 ## Future Requirements
 
@@ -102,7 +102,7 @@ Requirements for codebase intelligence milestone. Each maps to roadmap phases.
 | CTXI-04 | Phase 27 | Complete | node bin/gsd-tools.cjs codebase context --files src/index.js --raw |
 | WKFL-01 | Phase 29 | Complete | 29-01-SUMMARY.md |
 | WKFL-02 | Phase 29 | Complete | 29-01-SUMMARY.md |
-| WKFL-03 | Phase 29 | Pending | node bin/gsd-tools.cjs codebase-impact src/lib/state.js --raw |
+| WKFL-03 | Phase 29 | Complete | node bin/gsd-tools.cjs codebase-impact src/lib/state.js --raw |
 
 **Coverage:**
 - v5.0 requirements: 20 total
