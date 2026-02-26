@@ -9678,16 +9678,89 @@ var require_init = __commonJS({
     var { autoTriggerEnvScan, formatEnvSummary, readEnvManifest } = require_env();
     var { autoTriggerCodebaseIntel } = require_codebase();
     var { getWorktreeConfig, parseWorktreeListPorcelain, getPhaseFilesModified } = require_worktree();
-    function formatCodebaseSummary(intel) {
-      if (!intel || !intel.stats) return null;
+    var { getStalenessAge } = require_codebase_intel();
+    function formatCodebaseContext(intel, cwd) {
+      if (!intel || !intel.stats) {
+        return { codebase_stats: null, codebase_conventions: null, codebase_dependencies: null, codebase_freshness: null };
+      }
       const langs = Object.entries(intel.languages || {}).sort((a, b) => b[1].count - a[1].count).slice(0, 5).map(([lang, info]) => `${lang}(${info.count})`).join(", ");
-      return {
+      const codebase_stats = {
         total_files: intel.stats.total_files,
         total_lines: intel.stats.total_lines,
         top_languages: langs,
         git_commit: intel.git_commit_hash,
-        generated_at: intel.generated_at
+        generated_at: intel.generated_at,
+        confidence: 1
       };
+      let codebase_conventions = null;
+      try {
+        const conv = intel.conventions;
+        if (conv) {
+          const overallNaming = conv.naming?.overall || {};
+          const namingEntries = Object.values(overallNaming);
+          let naming = null;
+          if (namingEntries.length > 0) {
+            const dominant = namingEntries.sort((a, b) => b.confidence - a.confidence)[0];
+            const alternatives = namingEntries.filter((e) => e.pattern !== dominant.pattern && e.confidence >= 20).map((e) => e.pattern);
+            naming = { dominant: dominant.pattern, confidence: Math.round(dominant.confidence), alternatives };
+          }
+          const org = conv.file_organization;
+          let structure = null;
+          if (org) {
+            structure = {
+              type: org.structure_type || "flat",
+              test_placement: org.test_placement || "unknown",
+              config_placement: "root"
+            };
+          }
+          let framework = null;
+          if (conv.frameworks && conv.frameworks.length > 0) {
+            const fw = conv.frameworks[0];
+            framework = { name: fw.framework || fw.name || "unknown", patterns_detected: conv.frameworks.length };
+          }
+          const scores = [];
+          if (naming) scores.push(naming.confidence / 100);
+          if (structure) scores.push(0.7);
+          const avgConfidence = scores.length > 0 ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length * 100) / 100 : 0.5;
+          codebase_conventions = { naming, structure, framework, confidence: avgConfidence };
+        }
+      } catch (e) {
+        debugLog("formatCodebaseContext", "conventions formatting failed", e);
+      }
+      let codebase_dependencies = null;
+      try {
+        const deps = intel.dependencies;
+        if (deps) {
+          const rev = deps.reverse || {};
+          const topImported = Object.entries(rev).sort((a, b) => b[1].length - a[1].length).slice(0, 5).map(([file, importers]) => `${file}(${importers.length})`);
+          codebase_dependencies = {
+            total_modules: deps.stats?.total_files_parsed || 0,
+            total_edges: deps.stats?.total_edges || 0,
+            top_imported: topImported,
+            has_cycles: (deps.stats?.cycles || 0) > 0,
+            confidence: 0.85
+          };
+        }
+      } catch (e) {
+        debugLog("formatCodebaseContext", "dependencies formatting failed", e);
+      }
+      let codebase_freshness = null;
+      try {
+        if (cwd && typeof getStalenessAge === "function") {
+          const age = getStalenessAge(intel, cwd);
+          if (age) {
+            const ONE_DAY = 24 * 60 * 60 * 1e3;
+            if (age.age_ms > ONE_DAY) {
+              codebase_freshness = { stale: true, reason: `${Math.round(age.age_ms / (60 * 60 * 1e3))}h old` };
+            } else if (age.commits_behind > 10) {
+              codebase_freshness = { stale: true, reason: `${age.commits_behind} commits behind` };
+            }
+          }
+        }
+      } catch (e) {
+        debugLog("formatCodebaseContext", "freshness check failed", e);
+      }
+      return { codebase_stats, codebase_conventions, codebase_dependencies, codebase_freshness };
     }
     function cmdInitExecutePhase(cwd, phase, raw) {
       if (!phase) {
@@ -9800,10 +9873,17 @@ var require_init = __commonJS({
       }
       try {
         const codebaseIntel = autoTriggerCodebaseIntel(cwd);
-        result.codebase_summary = formatCodebaseSummary(codebaseIntel);
+        const ctx = formatCodebaseContext(codebaseIntel, cwd);
+        result.codebase_stats = ctx.codebase_stats;
+        result.codebase_conventions = ctx.codebase_conventions;
+        result.codebase_dependencies = ctx.codebase_dependencies;
+        result.codebase_freshness = ctx.codebase_freshness;
       } catch (e) {
         debugLog("init.executePhase", "codebase intel failed (non-blocking)", e);
-        result.codebase_summary = null;
+        result.codebase_stats = null;
+        result.codebase_conventions = null;
+        result.codebase_dependencies = null;
+        result.codebase_freshness = null;
       }
       try {
         if (result.worktree_enabled) {
@@ -9864,7 +9944,10 @@ var require_init = __commonJS({
           } : null,
           intent_summary: result.intent_summary || null,
           env_summary: result.env_summary || null,
-          codebase_summary: result.codebase_summary || null,
+          codebase_stats: result.codebase_stats || null,
+          codebase_conventions: result.codebase_conventions || null,
+          codebase_dependencies: result.codebase_dependencies || null,
+          codebase_freshness: result.codebase_freshness || null,
           worktree_enabled: result.worktree_enabled,
           worktree_config: result.worktree_config,
           worktree_active: result.worktree_active,
@@ -9893,7 +9976,10 @@ var require_init = __commonJS({
         delete result.env_languages;
         delete result.env_stale;
       }
-      if (result.codebase_summary === null) delete result.codebase_summary;
+      if (result.codebase_stats === null) delete result.codebase_stats;
+      if (result.codebase_conventions === null) delete result.codebase_conventions;
+      if (result.codebase_dependencies === null) delete result.codebase_dependencies;
+      if (result.codebase_freshness === null) delete result.codebase_freshness;
       output(result, raw);
     }
     function cmdInitPlanPhase(cwd, phase, raw) {
@@ -9945,10 +10031,17 @@ var require_init = __commonJS({
       }
       try {
         const codebaseIntel = autoTriggerCodebaseIntel(cwd);
-        result.codebase_summary = formatCodebaseSummary(codebaseIntel);
+        const ctx = formatCodebaseContext(codebaseIntel, cwd);
+        result.codebase_stats = ctx.codebase_stats;
+        result.codebase_conventions = ctx.codebase_conventions;
+        result.codebase_dependencies = ctx.codebase_dependencies;
+        result.codebase_freshness = ctx.codebase_freshness;
       } catch (e) {
         debugLog("init.planPhase", "codebase intel failed (non-blocking)", e);
-        result.codebase_summary = null;
+        result.codebase_stats = null;
+        result.codebase_conventions = null;
+        result.codebase_dependencies = null;
+        result.codebase_freshness = null;
       }
       if (phaseInfo?.directory) {
         const phaseDirFull = path.join(cwd, phaseInfo.directory);
@@ -9991,7 +10084,10 @@ var require_init = __commonJS({
         };
         if (result.intent_summary) compactResult.intent_summary = result.intent_summary;
         if (result.intent_path) compactResult.intent_path = result.intent_path;
-        if (result.codebase_summary) compactResult.codebase_summary = result.codebase_summary;
+        if (result.codebase_stats) compactResult.codebase_stats = result.codebase_stats;
+        if (result.codebase_conventions) compactResult.codebase_conventions = result.codebase_conventions;
+        if (result.codebase_dependencies) compactResult.codebase_dependencies = result.codebase_dependencies;
+        if (result.codebase_freshness) compactResult.codebase_freshness = result.codebase_freshness;
         if (result.context_path) compactResult.context_path = result.context_path;
         if (result.research_path) compactResult.research_path = result.research_path;
         if (result.verification_path) compactResult.verification_path = result.verification_path;
@@ -10011,7 +10107,10 @@ var require_init = __commonJS({
       }
       if (result.intent_summary === null) delete result.intent_summary;
       if (result.intent_path === null) delete result.intent_path;
-      if (result.codebase_summary === null) delete result.codebase_summary;
+      if (result.codebase_stats === null) delete result.codebase_stats;
+      if (result.codebase_conventions === null) delete result.codebase_conventions;
+      if (result.codebase_dependencies === null) delete result.codebase_dependencies;
+      if (result.codebase_freshness === null) delete result.codebase_freshness;
       output(result, raw);
     }
     function cmdInitNewProject(cwd, raw) {
@@ -10365,10 +10464,17 @@ var require_init = __commonJS({
       }
       try {
         const codebaseIntel = autoTriggerCodebaseIntel(cwd);
-        result.codebase_summary = formatCodebaseSummary(codebaseIntel);
+        const ctx = formatCodebaseContext(codebaseIntel, cwd);
+        result.codebase_stats = ctx.codebase_stats;
+        result.codebase_conventions = ctx.codebase_conventions;
+        result.codebase_dependencies = ctx.codebase_dependencies;
+        result.codebase_freshness = ctx.codebase_freshness;
       } catch (e) {
         debugLog("init.phaseOp", "codebase intel failed (non-blocking)", e);
-        result.codebase_summary = null;
+        result.codebase_stats = null;
+        result.codebase_conventions = null;
+        result.codebase_dependencies = null;
+        result.codebase_freshness = null;
       }
       if (global._gsdCompactMode) {
         const compactResult = {
@@ -10388,7 +10494,10 @@ var require_init = __commonJS({
         if (result.research_path) compactResult.research_path = result.research_path;
         if (result.verification_path) compactResult.verification_path = result.verification_path;
         if (result.uat_path) compactResult.uat_path = result.uat_path;
-        if (result.codebase_summary) compactResult.codebase_summary = result.codebase_summary;
+        if (result.codebase_stats) compactResult.codebase_stats = result.codebase_stats;
+        if (result.codebase_conventions) compactResult.codebase_conventions = result.codebase_conventions;
+        if (result.codebase_dependencies) compactResult.codebase_dependencies = result.codebase_dependencies;
+        if (result.codebase_freshness) compactResult.codebase_freshness = result.codebase_freshness;
         if (global._gsdManifestMode) {
           const manifestFiles = [
             { path: ".planning/STATE.md", sections: ["Current Position"], required: true },
@@ -10658,11 +10767,18 @@ var require_init = __commonJS({
       }
       try {
         const codebaseIntel = autoTriggerCodebaseIntel(cwd);
-        result.codebase_summary = formatCodebaseSummary(codebaseIntel);
+        const ctx = formatCodebaseContext(codebaseIntel, cwd);
+        result.codebase_stats = ctx.codebase_stats;
+        result.codebase_conventions = ctx.codebase_conventions;
+        result.codebase_dependencies = ctx.codebase_dependencies;
+        result.codebase_freshness = ctx.codebase_freshness;
         result.codebase_intel_exists = !!codebaseIntel;
       } catch (e) {
         debugLog("init.progress", "codebase intel failed (non-blocking)", e);
-        result.codebase_summary = null;
+        result.codebase_stats = null;
+        result.codebase_conventions = null;
+        result.codebase_dependencies = null;
+        result.codebase_freshness = null;
         result.codebase_intel_exists = false;
       }
       if (global._gsdCompactMode) {
@@ -10682,8 +10798,16 @@ var require_init = __commonJS({
           session_diff: result.session_diff,
           intent_summary: result.intent_summary || null,
           env_summary: result.env_summary || null,
+          codebase_stats: result.codebase_stats || null,
+          codebase_conventions: result.codebase_conventions || null,
+          codebase_dependencies: result.codebase_dependencies || null,
+          codebase_freshness: result.codebase_freshness || null,
           codebase_intel_exists: result.codebase_intel_exists || false
         };
+        if (!compactResult.codebase_stats) delete compactResult.codebase_stats;
+        if (!compactResult.codebase_conventions) delete compactResult.codebase_conventions;
+        if (!compactResult.codebase_dependencies) delete compactResult.codebase_dependencies;
+        if (!compactResult.codebase_freshness) delete compactResult.codebase_freshness;
         if (global._gsdManifestMode) {
           compactResult._manifest = { files: manifestFiles };
         }
@@ -10695,10 +10819,13 @@ var require_init = __commonJS({
         delete result.env_languages;
         delete result.env_stale;
       }
-      if (result.codebase_summary === null) {
-        delete result.codebase_summary;
+      if (result.codebase_stats === null) {
+        delete result.codebase_stats;
         delete result.codebase_intel_exists;
       }
+      if (result.codebase_conventions === null) delete result.codebase_conventions;
+      if (result.codebase_dependencies === null) delete result.codebase_dependencies;
+      if (result.codebase_freshness === null) delete result.codebase_freshness;
       if (result.paused_at === null) delete result.paused_at;
       if (result.session_diff === null) delete result.session_diff;
       output(result, raw);
