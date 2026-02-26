@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-02-25)
 
 **Core value:** Manage and deliver high-quality software with high-quality documentation, while continuously reducing token usage and improving performance
-**Current focus:** v5.0 Codebase Intelligence — phase 27 plan 01 complete, plan 02 next
+**Current focus:** v5.0 Codebase Intelligence — phase 27 complete (both plans done), phase 28 next
 
 ## Current Position
 
-**Phase:** Phase 27 of 29: Task-Scoped Context
-**Current Plan:** Plan 02 of 2
-**Status:** In progress
+**Phase:** Phase 28 of 29: Workflow Context Injection
+**Current Plan:** Plan 01
+**Status:** Ready
 **Last Activity:** 2026-02-26
 
-Progress: 5/7 phases complete (27 in progress, plan 01 done).
+Progress: 6/7 phases complete (27 done, 28 next).
 
 ## Performance Metrics
 
@@ -41,6 +41,7 @@ Progress: 5/7 phases complete (27 in progress, plan 01 done).
 | Phase 26 P01 | 16 min | 2 tasks | 5 files |
 | Phase 26 P02 | 16 min | 2 tasks | 5 files |
 | Phase 27 P01 | 2 min | 2 tasks | 3 files |
+| Phase 27 P02 | 12 min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -76,6 +77,10 @@ All v1.0-v4.0 decisions recorded in PROJECT.md Key Decisions table with outcomes
 - [Phase 27-01]: Convention matching: directory-level naming first, overall fallback — per CONTEXT.md
 - [Phase 27-01]: --plan flag parsed but unused (reserved for Plan 02 scoring)
 - [Phase 27-01]: Framework matching by evidence file extension/directory overlap
+- [Phase 27-02]: Target files always get relevance_score 1.0 — they are what was requested
+- [Phase 27-02]: Imports/dependents sorted by relevance score with fan-in/fan-out tiebreaker
+- [Phase 27-02]: Degradation applied to ALL files equally per CONTEXT.md atomic rule
+- [Phase 27-02]: Last resort drops lowest-scored files one by one until budget fits
 
 ### Pending Todos
 
@@ -94,5 +99,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-02-26
-Stopped at: Completed 27-01-PLAN.md
+Stopped at: Completed 27-02-PLAN.md
 Resume file: None

@@ -40,8 +40,8 @@ Requirements for codebase intelligence milestone. Each maps to roadmap phases.
 
 - [x] **CTXI-01**: Init commands include a compact codebase summary (<500 tokens) when codebase-intel.json exists
 - [x] **CTXI-02**: User can run `codebase context --files <paths>` to get task-scoped architectural context for specific files
-- [ ] **CTXI-03**: Task-scoped context uses heuristic scoring (graph distance + plan scope + git recency) for relevance ranking
-- [ ] **CTXI-04**: Total injected codebase context never exceeds 5K tokens per invocation
+- [x] **CTXI-03**: Task-scoped context uses heuristic scoring (graph distance + plan scope + git recency) for relevance ranking
+- [x] **CTXI-04**: Total injected codebase context never exceeds 5K tokens per invocation
 
 ### Workflow Integration
 
@@ -98,8 +98,8 @@ Requirements for codebase intelligence milestone. Each maps to roadmap phases.
 | LIFE-03 | Phase 28 | Pending | node bin/gsd-tools.cjs codebase lifecycle --raw |
 | CTXI-01 | Phase 26 | Complete | node bin/gsd-tools.cjs init progress --raw |
 | CTXI-02 | Phase 27 | Complete | node bin/gsd-tools.cjs codebase context --files src/index.js --raw |
-| CTXI-03 | Phase 27 | Pending | node bin/gsd-tools.cjs codebase context --files src/index.js --raw |
-| CTXI-04 | Phase 27 | Pending | node bin/gsd-tools.cjs codebase context --files src/index.js --raw |
+| CTXI-03 | Phase 27 | Complete | node bin/gsd-tools.cjs codebase context --files src/index.js --raw |
+| CTXI-04 | Phase 27 | Complete | node bin/gsd-tools.cjs codebase context --files src/index.js --raw |
 | WKFL-01 | Phase 29 | Pending | manual verification |
 | WKFL-02 | Phase 29 | Pending | manual verification |
 | WKFL-03 | Phase 29 | Pending | node bin/gsd-tools.cjs codebase-impact src/lib/state.js --raw |
