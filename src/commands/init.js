@@ -278,7 +278,12 @@ function cmdInitExecutePhase(cwd, phase, raw) {
 
   // Codebase intelligence — auto-trigger analysis if stale, inject structured context
   try {
-    const codebaseIntel = autoTriggerCodebaseIntel(cwd);
+    const refreshMode = process.argv.includes('--refresh');
+    if (refreshMode) {
+      // Clear stale lock file before synchronous re-analysis
+      try { fs.unlinkSync(path.join(cwd, '.planning', '.cache', '.analyzing')); } catch { /* ignore */ }
+    }
+    const codebaseIntel = autoTriggerCodebaseIntel(cwd, { synchronous: refreshMode });
     const ctx = formatCodebaseContext(codebaseIntel, cwd);
     result.codebase_stats = ctx.codebase_stats;
     result.codebase_conventions = ctx.codebase_conventions;
@@ -452,7 +457,11 @@ function cmdInitPlanPhase(cwd, phase, raw) {
 
   // Codebase intelligence — auto-trigger analysis if stale, inject structured context
   try {
-    const codebaseIntel = autoTriggerCodebaseIntel(cwd);
+    const refreshMode = process.argv.includes('--refresh');
+    if (refreshMode) {
+      try { fs.unlinkSync(path.join(cwd, '.planning', '.cache', '.analyzing')); } catch { /* ignore */ }
+    }
+    const codebaseIntel = autoTriggerCodebaseIntel(cwd, { synchronous: refreshMode });
     const ctx = formatCodebaseContext(codebaseIntel, cwd);
     result.codebase_stats = ctx.codebase_stats;
     result.codebase_conventions = ctx.codebase_conventions;
@@ -961,7 +970,11 @@ function cmdInitPhaseOp(cwd, phase, raw) {
 
   // Codebase intelligence — auto-trigger analysis if stale, inject structured context
   try {
-    const codebaseIntel = autoTriggerCodebaseIntel(cwd);
+    const refreshMode = process.argv.includes('--refresh');
+    if (refreshMode) {
+      try { fs.unlinkSync(path.join(cwd, '.planning', '.cache', '.analyzing')); } catch { /* ignore */ }
+    }
+    const codebaseIntel = autoTriggerCodebaseIntel(cwd, { synchronous: refreshMode });
     const ctx = formatCodebaseContext(codebaseIntel, cwd);
     result.codebase_stats = ctx.codebase_stats;
     result.codebase_conventions = ctx.codebase_conventions;
@@ -1327,7 +1340,11 @@ function cmdInitProgress(cwd, raw) {
 
   // Codebase intelligence — auto-trigger analysis if stale, inject structured context
   try {
-    const codebaseIntel = autoTriggerCodebaseIntel(cwd);
+    const refreshMode = process.argv.includes('--refresh');
+    if (refreshMode) {
+      try { fs.unlinkSync(path.join(cwd, '.planning', '.cache', '.analyzing')); } catch { /* ignore */ }
+    }
+    const codebaseIntel = autoTriggerCodebaseIntel(cwd, { synchronous: refreshMode });
     const ctx = formatCodebaseContext(codebaseIntel, cwd);
     result.codebase_stats = ctx.codebase_stats;
     result.codebase_conventions = ctx.codebase_conventions;

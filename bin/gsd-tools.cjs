@@ -8851,6 +8851,8 @@ var require_deps = __commonJS({
 var require_codebase = __commonJS({
   "src/commands/codebase.js"(exports2, module2) {
     "use strict";
+    var fs = require("fs");
+    var path = require("path");
     var { output, error, debugLog } = require_output();
     var {
       checkStaleness,
@@ -8898,6 +8900,10 @@ var require_codebase = __commonJS({
       writeIntel(cwd, intel);
       const durationMs = Date.now() - startMs;
       const filesAnalyzed = mode === "incremental" && changedFiles ? changedFiles.length : intel.stats.total_files;
+      try {
+        fs.unlinkSync(path.join(cwd, ".planning", ".cache", ".analyzing"));
+      } catch {
+      }
       output({
         success: true,
         mode,
@@ -8964,9 +8970,60 @@ var require_codebase = __commonJS({
       }
       return { added, modified, deleted };
     }
-    function autoTriggerCodebaseIntel(cwd) {
-      const fs = require("fs");
-      const path = require("path");
+    function spawnBackgroundAnalysis(cwd) {
+      try {
+        const lockPath = path.join(cwd, ".planning", ".cache", ".analyzing");
+        try {
+          const lockStat = fs.statSync(lockPath);
+          const lockAgeMs = Date.now() - lockStat.mtimeMs;
+          const LOCK_TIMEOUT = 5 * 60 * 1e3;
+          if (lockAgeMs < LOCK_TIMEOUT) {
+            debugLog("codebase.bgAnalysis", "lock file exists, skipping");
+            return;
+          }
+          debugLog("codebase.bgAnalysis", "stale lock detected, cleaning up");
+          fs.unlinkSync(lockPath);
+        } catch (e) {
+          if (e.code !== "ENOENT") {
+            debugLog("codebase.bgAnalysis", "lock check error", e);
+            return;
+          }
+        }
+        const cacheDir = path.join(cwd, ".planning", ".cache");
+        try {
+          fs.mkdirSync(cacheDir, { recursive: true });
+        } catch {
+        }
+        try {
+          fs.writeFileSync(lockPath, String(process.pid));
+        } catch {
+          return;
+        }
+        try {
+          const { spawn } = require("child_process");
+          const gsdBin = path.resolve(__dirname, "../../bin/gsd-tools.cjs");
+          const child = spawn(process.execPath, [gsdBin, "codebase", "analyze", "--raw"], {
+            cwd,
+            detached: true,
+            stdio: "ignore",
+            env: { ...process.env, GSD_BG_ANALYSIS: "1" }
+          });
+          child.unref();
+          debugLog("codebase.bgAnalysis", `spawned background analysis (pid: ${child.pid})`);
+        } catch (e) {
+          debugLog("codebase.bgAnalysis", "spawn failed", e);
+          try {
+            fs.unlinkSync(lockPath);
+          } catch {
+          }
+        }
+      } catch (e) {
+        debugLog("codebase.bgAnalysis", "unexpected error", e);
+      }
+    }
+    function autoTriggerCodebaseIntel(cwd, options) {
+      const opts = options || {};
+      const synchronous = opts.synchronous || false;
       const planningDir = path.join(cwd, ".planning");
       if (!fs.existsSync(planningDir)) return null;
       const intel = readIntel(cwd);
@@ -8980,20 +9037,25 @@ var require_codebase = __commonJS({
           debugLog("codebase.autoTrigger", "intel is fresh");
           return intel;
         }
-        debugLog("codebase.autoTrigger", `stale (${staleness.reason}), running incremental analysis`);
-        const newIntel = performAnalysis(cwd, {
-          incremental: !!(staleness.changed_files && staleness.changed_files.length > 0),
-          previousIntel: intel,
-          changedFiles: staleness.changed_files || null
-        });
-        if (intel.conventions && !newIntel.conventions) {
-          newIntel.conventions = intel.conventions;
+        if (synchronous) {
+          debugLog("codebase.autoTrigger", `stale (${staleness.reason}), running synchronous analysis (--refresh)`);
+          const newIntel = performAnalysis(cwd, {
+            incremental: !!(staleness.changed_files && staleness.changed_files.length > 0),
+            previousIntel: intel,
+            changedFiles: staleness.changed_files || null
+          });
+          if (intel.conventions && !newIntel.conventions) {
+            newIntel.conventions = intel.conventions;
+          }
+          if (intel.dependencies && !newIntel.dependencies) {
+            newIntel.dependencies = intel.dependencies;
+          }
+          writeIntel(cwd, newIntel);
+          return newIntel;
         }
-        if (intel.dependencies && !newIntel.dependencies) {
-          newIntel.dependencies = intel.dependencies;
-        }
-        writeIntel(cwd, newIntel);
-        return newIntel;
+        debugLog("codebase.autoTrigger", `stale (${staleness.reason}), returning cached + spawning background`);
+        spawnBackgroundAnalysis(cwd);
+        return intel;
       } catch (e) {
         debugLog("codebase.autoTrigger", `analysis failed: ${e.message}`);
         return intel;
@@ -9142,7 +9204,8 @@ var require_codebase = __commonJS({
       cmdCodebaseImpact,
       readCodebaseIntel,
       checkCodebaseIntelStaleness,
-      autoTriggerCodebaseIntel
+      autoTriggerCodebaseIntel,
+      spawnBackgroundAnalysis
     };
   }
 });
@@ -9902,7 +9965,14 @@ var require_init = __commonJS({
         result.env_stale = false;
       }
       try {
-        const codebaseIntel = autoTriggerCodebaseIntel(cwd);
+        const refreshMode = process.argv.includes("--refresh");
+        if (refreshMode) {
+          try {
+            fs.unlinkSync(path.join(cwd, ".planning", ".cache", ".analyzing"));
+          } catch {
+          }
+        }
+        const codebaseIntel = autoTriggerCodebaseIntel(cwd, { synchronous: refreshMode });
         const ctx = formatCodebaseContext(codebaseIntel, cwd);
         result.codebase_stats = ctx.codebase_stats;
         result.codebase_conventions = ctx.codebase_conventions;
@@ -10060,7 +10130,14 @@ var require_init = __commonJS({
         debugLog("init.planPhase", "intent summary failed (non-blocking)", e);
       }
       try {
-        const codebaseIntel = autoTriggerCodebaseIntel(cwd);
+        const refreshMode = process.argv.includes("--refresh");
+        if (refreshMode) {
+          try {
+            fs.unlinkSync(path.join(cwd, ".planning", ".cache", ".analyzing"));
+          } catch {
+          }
+        }
+        const codebaseIntel = autoTriggerCodebaseIntel(cwd, { synchronous: refreshMode });
         const ctx = formatCodebaseContext(codebaseIntel, cwd);
         result.codebase_stats = ctx.codebase_stats;
         result.codebase_conventions = ctx.codebase_conventions;
@@ -10493,7 +10570,14 @@ var require_init = __commonJS({
         }
       }
       try {
-        const codebaseIntel = autoTriggerCodebaseIntel(cwd);
+        const refreshMode = process.argv.includes("--refresh");
+        if (refreshMode) {
+          try {
+            fs.unlinkSync(path.join(cwd, ".planning", ".cache", ".analyzing"));
+          } catch {
+          }
+        }
+        const codebaseIntel = autoTriggerCodebaseIntel(cwd, { synchronous: refreshMode });
         const ctx = formatCodebaseContext(codebaseIntel, cwd);
         result.codebase_stats = ctx.codebase_stats;
         result.codebase_conventions = ctx.codebase_conventions;
@@ -10796,7 +10880,14 @@ var require_init = __commonJS({
         result.env_stale = false;
       }
       try {
-        const codebaseIntel = autoTriggerCodebaseIntel(cwd);
+        const refreshMode = process.argv.includes("--refresh");
+        if (refreshMode) {
+          try {
+            fs.unlinkSync(path.join(cwd, ".planning", ".cache", ".analyzing"));
+          } catch {
+          }
+        }
+        const codebaseIntel = autoTriggerCodebaseIntel(cwd, { synchronous: refreshMode });
         const ctx = formatCodebaseContext(codebaseIntel, cwd);
         result.codebase_stats = ctx.codebase_stats;
         result.codebase_conventions = ctx.codebase_conventions;

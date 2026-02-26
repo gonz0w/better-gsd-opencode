@@ -1,5 +1,7 @@
 'use strict';
 
+const fs = require('fs');
+const path = require('path');
 const { output, error, debugLog } = require('../lib/output');
 const {
   checkStaleness,
@@ -70,6 +72,9 @@ function cmdCodebaseAnalyze(cwd, args, raw) {
   const filesAnalyzed = mode === 'incremental' && changedFiles
     ? changedFiles.length
     : intel.stats.total_files;
+
+  // Clean up lock file after analysis completes (background or foreground)
+  try { fs.unlinkSync(path.join(cwd, '.planning', '.cache', '.analyzing')); } catch { /* ignore */ }
 
   output({
     success: true,
@@ -170,22 +175,85 @@ function groupChangedFiles(cwd, fromCommit, changedFiles) {
 
 
 /**
+ * spawnBackgroundAnalysis — Spawn a detached child process to run codebase analysis.
+ *
+ * Uses a lock file (.planning/.cache/.analyzing) to prevent concurrent triggers.
+ * Lock file auto-expires after 5 minutes (stale lock cleanup).
+ * Never throws — all errors are caught and logged.
+ *
+ * @param {string} cwd - Project root
+ */
+function spawnBackgroundAnalysis(cwd) {
+  try {
+    const lockPath = path.join(cwd, '.planning', '.cache', '.analyzing');
+
+    // Check lock file — skip if already running
+    try {
+      const lockStat = fs.statSync(lockPath);
+      const lockAgeMs = Date.now() - lockStat.mtimeMs;
+      const LOCK_TIMEOUT = 5 * 60 * 1000; // 5 minutes
+      if (lockAgeMs < LOCK_TIMEOUT) {
+        debugLog('codebase.bgAnalysis', 'lock file exists, skipping');
+        return;
+      }
+      // Lock is stale — clean up and proceed
+      debugLog('codebase.bgAnalysis', 'stale lock detected, cleaning up');
+      fs.unlinkSync(lockPath);
+    } catch (e) {
+      if (e.code !== 'ENOENT') {
+        debugLog('codebase.bgAnalysis', 'lock check error', e);
+        return;
+      }
+    }
+
+    // Ensure .cache directory exists
+    const cacheDir = path.join(cwd, '.planning', '.cache');
+    try { fs.mkdirSync(cacheDir, { recursive: true }); } catch { /* ignore */ }
+
+    // Create lock file
+    try { fs.writeFileSync(lockPath, String(process.pid)); } catch { return; }
+
+    // Spawn detached analysis
+    try {
+      const { spawn } = require('child_process');
+      const gsdBin = path.resolve(__dirname, '../../bin/gsd-tools.cjs');
+      const child = spawn(process.execPath, [gsdBin, 'codebase', 'analyze', '--raw'], {
+        cwd,
+        detached: true,
+        stdio: 'ignore',
+        env: { ...process.env, GSD_BG_ANALYSIS: '1' },
+      });
+      child.unref();
+      debugLog('codebase.bgAnalysis', `spawned background analysis (pid: ${child.pid})`);
+    } catch (e) {
+      debugLog('codebase.bgAnalysis', 'spawn failed', e);
+      // Clean up lock on spawn failure
+      try { fs.unlinkSync(lockPath); } catch { /* ignore */ }
+    }
+  } catch (e) {
+    debugLog('codebase.bgAnalysis', 'unexpected error', e);
+  }
+}
+
+
+/**
  * autoTriggerCodebaseIntel — Auto-trigger function for init command integration.
- * Plan 02 will wire this into init commands.
  *
  * Behavior:
  * - If no .planning/ dir: return null
  * - If no existing intel: return null (first run requires explicit `codebase analyze`)
  * - If fresh: return existing intel
- * - If stale: run incremental analysis, write results, return new intel
+ * - If stale + synchronous mode (--refresh): run full analysis, write, return new intel
+ * - If stale + non-blocking (default): return stale data immediately, spawn background analysis
  * - Never crashes (wrapped in try/catch)
  *
  * @param {string} cwd - Project root
+ * @param {{ synchronous?: boolean }} [options] - Options
  * @returns {object|null} Intel data or null
  */
-function autoTriggerCodebaseIntel(cwd) {
-  const fs = require('fs');
-  const path = require('path');
+function autoTriggerCodebaseIntel(cwd, options) {
+  const opts = options || {};
+  const synchronous = opts.synchronous || false;
   const planningDir = path.join(cwd, '.planning');
 
   if (!fs.existsSync(planningDir)) return null;
@@ -203,24 +271,32 @@ function autoTriggerCodebaseIntel(cwd) {
       return intel;
     }
 
-    debugLog('codebase.autoTrigger', `stale (${staleness.reason}), running incremental analysis`);
+    if (synchronous) {
+      // --refresh mode: block and run full analysis
+      debugLog('codebase.autoTrigger', `stale (${staleness.reason}), running synchronous analysis (--refresh)`);
 
-    const newIntel = performAnalysis(cwd, {
-      incremental: !!(staleness.changed_files && staleness.changed_files.length > 0),
-      previousIntel: intel,
-      changedFiles: staleness.changed_files || null,
-    });
+      const newIntel = performAnalysis(cwd, {
+        incremental: !!(staleness.changed_files && staleness.changed_files.length > 0),
+        previousIntel: intel,
+        changedFiles: staleness.changed_files || null,
+      });
 
-    // Preserve conventions and dependencies from previous intel (populated by separate commands)
-    if (intel.conventions && !newIntel.conventions) {
-      newIntel.conventions = intel.conventions;
+      // Preserve conventions and dependencies from previous intel (populated by separate commands)
+      if (intel.conventions && !newIntel.conventions) {
+        newIntel.conventions = intel.conventions;
+      }
+      if (intel.dependencies && !newIntel.dependencies) {
+        newIntel.dependencies = intel.dependencies;
+      }
+
+      writeIntel(cwd, newIntel);
+      return newIntel;
     }
-    if (intel.dependencies && !newIntel.dependencies) {
-      newIntel.dependencies = intel.dependencies;
-    }
 
-    writeIntel(cwd, newIntel);
-    return newIntel;
+    // Non-blocking: return stale data, spawn background analysis
+    debugLog('codebase.autoTrigger', `stale (${staleness.reason}), returning cached + spawning background`);
+    spawnBackgroundAnalysis(cwd);
+    return intel; // Return existing (stale) data immediately
   } catch (e) {
     debugLog('codebase.autoTrigger', `analysis failed: ${e.message}`);
     return intel; // Return stale data rather than nothing
@@ -494,4 +570,5 @@ module.exports = {
   readCodebaseIntel,
   checkCodebaseIntelStaleness,
   autoTriggerCodebaseIntel,
+  spawnBackgroundAnalysis,
 };
