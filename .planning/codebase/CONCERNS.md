@@ -1,250 +1,234 @@
 # Codebase Concerns
 
-**Analysis Date:** 2026-02-21
+**Analysis Date:** 2026-02-26
 
-## Architecture Concerns
+## Tech Debt
 
-**Single-File Monolith (6,495 lines):**
-- Issue: All 79 command functions, helpers, parsers, and the CLI router live in one file: `bin/gsd-tools.cjs`
-- Files: `bin/gsd-tools.cjs`
-- Impact: Navigating, debugging, and modifying the file is increasingly difficult. Finding a specific function requires searching through 6,495 lines. No module boundaries enforce separation of concerns.
-- Fix approach: This is an **intentional design choice** documented in `AGENTS.md` line 36 ("Single-file CLI: gsd-tools.cjs stays as one file (Node.js, zero dependencies)"). Splitting would require rethinking deployment (deploy.sh copies `bin/` wholesale). If ever refactored, consider splitting by domain (state, roadmap, phase, verify, scaffold, init, features) while bundling to a single file at deploy time.
+### Duplicate module.exports in router.js
 
-**Duplicated Config Defaults:**
-- Issue: Default configuration values are defined in two separate locations with slightly different shapes — `loadConfig()` at line 158 and `cmdConfigEnsureSection()` at line 616
-- Files: `bin/gsd-tools.cjs` lines 158–206 and 616–635
-- Impact: When a new config key is added, both locations must be updated. The shape differs: `loadConfig()` flattens `workflow.*` keys to top-level (`research`, `plan_checker`, `verifier`), while `cmdConfigEnsureSection()` preserves the nested `workflow: { research, plan_check, verifier }` structure. This mismatch means config written by `config-ensure-section` has different key names than what `loadConfig()` looks for.
-- Fix approach: Extract a single `CONFIG_DEFAULTS` constant at module level. Both functions should reference it. Use a normalize step that handles nested→flat translation consistently.
+- Issue: `src/router.js` has `module.exports = { main };` on both line 770 and line 772. Harmless (second overwrites first) but indicates copy-paste artifact.
+- Files: `src/router.js:770-772`
+- Impact: None (no bug). Signals sloppy editing that could compound.
+- Fix approach: Delete the duplicate line.
 
-**Two Config Loading Approaches:**
-- Issue: `loadConfig()` (line 156) reads config from `.planning/config.json` with a flat key model, but `cmdValidateConfig()` (line 5932) has its own `knownKeys` schema definition with different field names (e.g., `research_enabled` vs `research`, `mode` vs `model_profile`)
-- Files: `bin/gsd-tools.cjs` lines 156–206 and 5932–5945
-- Impact: The validation command may report false "unknown key" warnings for keys that `loadConfig()` actually reads (like `workflow` nested keys). Schema drift is inevitable without a single source of truth.
-- Fix approach: Define one canonical schema that both `loadConfig()` and `cmdValidateConfig()` reference.
+### Global State for CLI Flags
 
-## Code Quality
+- Issue: CLI flags (`_gsdCompactMode`, `_gsdRequestedFields`, `_gsdManifestMode`) are stored on `global`, creating implicit coupling between `src/router.js` and 13+ consumer sites across `src/commands/init.js`, `src/commands/features.js`, `src/commands/env.js`, and `src/lib/output.js`. The `cmdContextBudgetMeasure` function in `src/commands/features.js:1550-1598` directly mutates `global._gsdCompactMode` to swap modes mid-execution, then restores — a fragile save/restore pattern.
+- Files: `src/router.js:40-65`, `src/commands/init.js` (30+ references), `src/commands/features.js:1550-1598`, `src/lib/output.js:82-83`
+- Impact: Makes functions impure and hard to test. The save/restore pattern in `cmdContextBudgetMeasure` is error-prone if any called function throws before restore.
+- Fix approach: Create a `RunContext` object in `src/lib/context.js` that holds flags, pass it through the call chain, or use a thread-local-like pattern (module-level singleton with getter/setter). At minimum, wrap the save/restore in try/finally (already partially done in `features.js` but the finally blocks could still fail since `output()` calls `process.exit(0)`).
 
-**55 Silent Catch Blocks:**
-- Issue: There are 55 instances of `} catch {}` throughout the code — empty catch blocks that silently swallow errors
-- Files: `bin/gsd-tools.cjs` — lines 553, 555, 750, 1068, 2593, 2758, 2829, 2897, 2955, 3311, 3420, 3423, 3503, 3560, 3622, 3642, 3720, 3761, 3780, 3802, 3934, 4108, 4190, 4442, 4466, 4555, 4596, 4725, 4760, 4762, 4809, 4811, 4820, 4859, 4941, 4949, 5024, 5043, 5064, 5295, 5312, 5372, 5413, 5494, 5612, 5640, 5691, 5714, 5731, 5771, 5790, 5803, 5851, 5900, 6011
-- Impact: When parsing fails, file reads fail, or git commands fail, errors are silently ignored. This makes debugging extremely difficult — a corrupted STATE.md or malformed ROADMAP.md will produce incorrect output with no indication of what went wrong. For example, `cmdStateLoad()` (line 1066–1068) silently returns empty string if STATE.md read fails, and `getSessionDiffSummary()` (line 5002–5008) silently returns null if git log fails.
-- Fix approach: Replace empty catches with at minimum a debug log. For functions that return data, use explicit null/error sentinel values. Most of these are "optional data" patterns where `null` is valid, but at least 10–15 of them mask genuine bugs.
+### process.stdout.write Monkeypatching
 
-**Regex-Heavy Markdown Parsing — Fragility Risk:**
-- Issue: Over 309 regex patterns are used for parsing markdown structure (headings, checkboxes, bold fields, frontmatter, tables). The core abstraction is `**FieldName:** value` pattern matching, which appears in ~20 variations across the codebase.
-- Files: `bin/gsd-tools.cjs` — throughout, especially lines 920–935 (phase section extraction), 966–972 (goal/criteria parsing), 1117–1129 (state field extraction), 2544–2598 (roadmap analysis), 4244–4311 (milestone detection)
-- Impact: Markdown is not a formally specified data format for structured data. Minor formatting changes (extra whitespace, different heading levels, inconsistent bold markers) can break parsing. The backward compatibility rule (`AGENTS.md` line 34: "All regex/parser changes must accept both old and new formats") means patterns accumulate complexity over time — e.g., `**Goal:?**:?` accepts 4 format variations. This is manageable today but becomes increasingly fragile.
-- Fix approach: Continue with regex (the alternative — a markdown AST parser — would add dependencies violating the zero-dependency constraint). Improve resilience by adding more test coverage for edge cases. Consider moving structured data to frontmatter YAML (which already has a parser) rather than inline bold fields.
+- Issue: `cmdContextBudgetMeasure` in `src/commands/features.js:1479-1484` temporarily replaces `process.stdout.write` to capture JSON output from functions that were designed to write to stdout and exit. This is a hack to reuse command functions as in-process measurement targets.
+- Files: `src/commands/features.js:1470-1493`
+- Impact: Brittle — if the measured function throws, stdout stays patched. The `finally` block restores it, but the measured functions call `output()` which calls `process.exit(0)` at `src/lib/output.js:98`, so the measurement actually catches the exit exception.
+- Fix approach: Refactor command functions to return data objects, with the output/exit handling as a thin wrapper. This would eliminate the need for stdout monkeypatching.
 
-**Custom YAML Parser:**
-- Issue: The `extractFrontmatter()` function (lines 251–323) is a hand-rolled YAML parser that handles a subset of YAML: simple key-value, inline arrays, nested objects, and array items. It does NOT handle: multi-line strings, anchors/aliases, flow mappings, comments, or type coercion (numbers stay as strings).
-- Files: `bin/gsd-tools.cjs` lines 251–323
-- Impact: Frontmatter with complex YAML features will silently misparsed or ignored. For example, a value like `name: "Phase: Setup"` works, but `name: Phase: Setup` would be parsed as key="name", value="Phase", losing ": Setup". The parser handles the project's current usage well but is brittle for edge cases.
-- Fix approach: This is acceptable given the zero-dependency constraint. Add more test cases covering edge cases. Document what YAML subset is supported.
+### output() Always Calls process.exit(0)
 
-**Test Coverage Gap:**
-- Issue: The test file (`bin/gsd-tools.test.cjs`, 2,302 lines) covers 19 `describe` blocks, but the main file has 79 `cmd*` functions. That means ~60 command functions have zero test coverage, including security-sensitive ones like `cmdCommit`, `cmdTestRun`, `cmdWebsearch`, and `cmdCodebaseImpact`.
-- Files: `bin/gsd-tools.test.cjs` — covers: history-digest, phases-list, roadmap-get-phase, phase-next-decimal, phase-plan-index, state-snapshot, summary-extract, init, roadmap-analyze, phase-add, phase-insert, phase-remove, phase-complete, milestone-complete, validate-consistency, progress, todo-complete, scaffold
-- Impact: Regressions in untested commands go undetected. The state management commands (`state update`, `state patch`, `state add-decision`, etc.), all verify commands, frontmatter CRUD, template fill, websearch, and all 15 new feature commands (session-diff through quick-summary) have no tests.
-- Fix approach: Prioritize testing for: (1) state mutation commands (data loss risk), (2) commit command (side effects), (3) frontmatter CRUD (data corruption risk), (4) verify commands (false positive/negative risk).
+- Issue: The central `output()` function at `src/lib/output.js:98` calls `process.exit(0)` unconditionally. Every command that calls `output()` terminates the process. This makes it impossible to compose commands, run multiple commands in sequence, or use command logic in tests without subprocess spawning.
+- Files: `src/lib/output.js:77-99`
+- Impact: Forces test suite (`bin/gsd-tools.test.cjs`) to spawn subprocesses for every test (13,040 lines of tests, all using `execSync`). Slows tests significantly. Also forces the stdout monkeypatching hack in `features.js`.
+- Fix approach: Split into `output()` (return data) and `outputAndExit()` (write + exit). Have the router call `outputAndExit()` while internal callers use `output()` to get data back.
 
-**Stale Documentation:**
-- Issue: `AGENTS.md` line 11 says "5400+ lines" but the file is 6,495 lines. Line 91 notes this discrepancy but it hasn't been fixed.
-- Files: `AGENTS.md` line 11
-- Impact: Minor — misleading documentation only.
-- Fix approach: Update line count in AGENTS.md.
+### Cross-Module Command Dependencies
 
-## Security
+- Issue: Command modules import from sibling command modules, creating a web of cross-dependencies:
+  - `src/commands/init.js` imports from `intent.js`, `env.js`, `codebase.js`, `worktree.js`
+  - `src/commands/features.js` imports from `verify.js`, `misc.js`, `init.js`
+- Files: `src/commands/init.js:10-13`, `src/commands/features.js:9,1496-1497`
+- Impact: Lazy-loading in `src/router.js` becomes less effective when loading one command transitively loads others. `init.js` eager-loads 4 other command modules at require time, meaning `init` commands load ~6 of 13 modules.
+- Fix approach: Extract shared helper functions (like `parseAssertionsMd`, `getIntentDriftData`, `formatEnvSummary`) into `src/lib/` modules instead of importing between command files. This preserves lazy-loading isolation.
 
-**Shell Command Injection Surface (Low Risk):**
-- Risk: Low (CLI tool run by developer, not a server)
-- Issue: Several places pass user-derived strings directly into shell commands via `execSync()`:
-  - `getSessionDiffSummary()` line 5002: `git log --since="${since}"` where `since` comes from STATE.md parsing (attacker would need to modify STATE.md)
-  - `cmdSessionDiff()` line 5034: Same pattern with `since` from STATE.md
-  - `cmdCodebaseImpact()` line 5628: `grep -rl "${pattern}"` where `pattern` is derived from file content (module names)
-  - `cmdTestRun()` line 5213: Executes `command` from `config.json test_commands` — this is intentionally user-controlled
-  - Line 4460: `find . -maxdepth 3 ...` — hardcoded, no user input
-- Files: `bin/gsd-tools.cjs` lines 5002, 5034, 5048, 5057, 5628
-- Mitigation: The `execGit()` helper (line 221) properly escapes arguments. The `since` variable is validated by regex (`\d{4}-\d{2}-\d{2}`) before use in most cases. The `grep` pattern (line 5628) in `cmdCodebaseImpact()` uses double-quotes which prevents most injection but a module name containing `$(...)` or backticks could execute arbitrary code.
-- Recommendations: (1) Validate `since` dates with a strict regex before shell interpolation. (2) Use `execSync` with array-style arguments where possible. (3) For `grep` patterns, sanitize or use `--fixed-strings` flag.
+### Custom YAML Frontmatter Parser
 
-**Temp File Not Cleaned Up:**
-- Risk: Low
-- Issue: The `output()` function (line 472–475) writes large JSON payloads to temp files at `os.tmpdir()/gsd-{timestamp}.json` but never cleans them up. These accumulate over time.
-- Files: `bin/gsd-tools.cjs` lines 472–476
-- Impact: Minor disk usage. Temp files may contain planning data (phase info, roadmap analysis) that persists on disk indefinitely.
-- Fix approach: Add cleanup on exit or use a fixed filename that gets overwritten.
+- Issue: `src/lib/frontmatter.js` implements a custom YAML parser (166 lines) that handles only a subset of YAML. It works for the project's frontmatter format but silently produces incorrect results for valid YAML features like multi-line strings, anchors/aliases, or complex nesting beyond 3 levels.
+- Files: `src/lib/frontmatter.js:15-91`
+- Impact: Low immediate risk since the project controls the YAML it generates. However, if users edit frontmatter with YAML features the parser doesn't support, data is silently lost or corrupted. The `reconstructFrontmatter()` function at lines 93-154 has deeply nested if/else chains (4+ levels) for serialization.
+- Fix approach: Acceptable trade-off for zero-dependency design. Document the supported YAML subset. Consider adding warnings when parsing encounters unsupported constructs.
 
-**Brave API Key Storage:**
-- Risk: Low
-- Issue: The Brave Search API key can be stored in a plaintext file at `~/.gsd/brave_api_key` (line 601). This is a common pattern for CLI tools but worth noting.
-- Files: `bin/gsd-tools.cjs` lines 601–602, 2114
-- Impact: API key exposed to any process that can read the user's home directory.
-- Fix approach: Acceptable for CLI tool usage. The `process.env.BRAVE_API_KEY` alternative is preferred.
+### Constants File is 1,088 Lines
 
-## Performance
+- Issue: `src/lib/constants.js` contains both machine data (MODEL_PROFILES, CONFIG_SCHEMA) and human-readable help text (COMMAND_HELP at ~1,000 lines). The help text is static content that dominates the file.
+- Files: `src/lib/constants.js`
+- Impact: Makes the constants file hard to navigate. Help text changes (common) require editing a file shared with critical schema definitions.
+- Fix approach: Split into `src/lib/constants.js` (machine data) and `src/lib/help.js` (COMMAND_HELP text).
 
-**Synchronous File I/O Throughout:**
-- Problem: Every file operation uses synchronous calls (`fs.readFileSync`, `fs.readdirSync`, `fs.writeFileSync`, `execSync`). The entire tool blocks on each operation.
-- Files: `bin/gsd-tools.cjs` — throughout (the only `async` function is `cmdWebsearch()` which uses `fetch`)
-- Cause: Simpler code, and the tool is a short-lived CLI process, not a server.
-- Impact: For typical usage (reading a few markdown files), this is imperceptible. For commands like `cmdHistoryDigest()` or `cmdRoadmapAnalyze()` that scan many phase directories, or `cmdCodebaseImpact()` that runs multiple `grep` commands, it could be noticeable on large projects. Not a real problem today.
-- Improvement path: Not worth changing — synchronous I/O is appropriate for a CLI tool.
+## Known Bugs
 
-**`cmdCodebaseImpact()` Runs Multiple Greps:**
-- Problem: For each file analyzed, runs `grep -rl` across the entire codebase (line 5628), potentially multiple times per file (one per search pattern). Each grep spawns a child process.
-- Files: `bin/gsd-tools.cjs` lines 5626–5641
-- Cause: No dependency graph; relies on text search.
-- Impact: On large codebases with many source files, this could take several seconds per file. The 15-second timeout (line 5630) limits worst-case but multiple files could still take a minute.
-- Improvement path: Batch all patterns into a single grep call. Consider using a dependency graph (for Elixir: parse `defmodule`/`alias`/`import`; for TS/JS: parse import statements) instead of brute-force text search.
+### Frontmatter Cache Key Collision Risk
 
-**Repeated File Reads:**
-- Problem: Some commands re-read the same files multiple times. For example, `cmdPhaseComplete()` reads `ROADMAP.md`, `STATE.md`, and phase directories independently, then `cmdRoadmapAnalyze()` (if called later) reads them all again. Within a single CLI invocation this isn't an issue, but the init commands (e.g., `cmdInitProgress()` at line ~4700) often call multiple internal functions that each read the same files.
-- Files: `bin/gsd-tools.cjs` — init commands (~lines 4313–4990)
-- Impact: Negligible for current usage — each command runs once per invocation.
+- Issue: The frontmatter parse cache in `src/lib/frontmatter.js:20` uses `content.length + ':' + content.slice(0, 200)` as its cache key. Two files with the same length and identical first 200 characters but different frontmatter after that would produce a cache collision, returning wrong frontmatter.
+- Symptoms: Silent wrong data returned from `extractFrontmatter()` for the second file.
+- Files: `src/lib/frontmatter.js:20-23`
+- Trigger: Two different frontmatter files with identical first 200 characters (unlikely but possible, especially with generated files that share a common header template).
+- Workaround: The cache only lives for one CLI invocation and is bounded to 100 entries, so the window for collision is small.
 
-## Known Limitations
+## Security Considerations
 
-**Zero Dependencies:**
-- Limitation: The tool deliberately uses no npm dependencies (`AGENTS.md` line 36). This means no proper YAML parser, no markdown AST, no argument parser library, no test framework dependencies.
-- Context: Simplifies deployment (just copy files), eliminates supply chain risk, but forces hand-rolled parsing for everything.
+### execSync with User-Provided Commands
 
-**No Argument Parsing Library:**
-- Limitation: CLI arguments are parsed manually in the `main()` function (lines 6022–6492) using index-based lookups (`args.indexOf('--flag')`). There's no validation, no help text generation, no type coercion, no required argument checking at the router level.
-- Files: `bin/gsd-tools.cjs` lines 6022–6492
-- Context: Works fine for current command set but error messages for misused commands are inconsistent — some commands check for missing args, others silently use `null`.
+- Risk: Four call sites use `execSync()` with commands sourced from user configuration (`config.json`):
+  1. `src/commands/features.js:206` — `test_commands` values from config
+  2. `src/commands/verify.js:862` — auto-detected test commands
+  3. `src/commands/verify.js:1532` — auto-detected test commands
+  4. `src/commands/worktree.js:284` — `setup_hooks` values from config
+- Files: `src/commands/features.js:206`, `src/commands/verify.js:862,1532`, `src/commands/worktree.js:284`
+- Current mitigation: Config files are local to the project (`.planning/config.json`), so an attacker would need write access to the project to inject malicious commands. Commands have timeouts (5min for tests, 2min for hooks). However, there is NO sanitization or validation of the command strings.
+- Recommendations: Add a config schema validation that rejects `test_commands` and `setup_hooks` values containing shell metacharacters like `$()`, backticks, or pipes. Alternatively, document that these config values are treated as trusted shell commands (which is the current implicit contract).
 
-**Markdown Format Lock-in:**
-- Limitation: All project state (ROADMAP.md, STATE.md, PLAN.md, SUMMARY.md) is stored in markdown with specific formatting conventions. Moving to a different format would require rewriting all 309+ regex patterns.
-- Context: Markdown is human-readable and git-friendly, which are core requirements. But the parsing is inherently fragile.
+### Worktree Setup Hooks Execute Arbitrary Shell Commands
 
-**No Concurrent Write Protection:**
-- Limitation: Multiple processes/sessions writing to the same STATE.md or ROADMAP.md simultaneously could corrupt them. There's no file locking or atomic write mechanism.
-- Files: `bin/gsd-tools.cjs` — all `fs.writeFileSync` calls
-- Context: In practice, only one AI session runs at a time per project, so this is unlikely. But `cmdCommit()` could race with a human `git add`.
+- Risk: `src/commands/worktree.js:282-295` iterates `config.setup_hooks` (an array of strings from config.json) and passes each to `execSync()` directly. These execute in the worktree directory with the user's full permissions.
+- Files: `src/commands/worktree.js:282-295`
+- Current mitigation: Worktree feature is off by default (`enabled: false` in `WORKTREE_DEFAULTS`). Must be explicitly opted in via config.
+- Recommendations: Log which hooks are about to execute before running them. Consider requiring explicit user confirmation for first-time hook execution.
 
-**Context Window Assumptions Hardcoded:**
-- Limitation: `cmdContextBudget()` assumes a 200K context window and 50% target usage (lines 5137–5139). These values are hardcoded rather than configurable.
-- Files: `bin/gsd-tools.cjs` lines 5137–5139
-- Context: Different models have different context sizes. This should be configurable via `config.json`.
+### Brave Search API Key in Environment
 
-**Elixir-Biased Codebase Analysis:**
-- Limitation: `cmdCodebaseImpact()` (line 5570) has the most sophisticated analysis for Elixir (defmodule extraction, alias matching). Go, TypeScript, and Python support is basic (directory name or filename matching).
-- Files: `bin/gsd-tools.cjs` lines 5593–5623
-- Context: Reflects the tool's origin project (EventPipeline is Elixir-based). Should be improved for Go and TypeScript if used broadly.
+- Risk: `process.env.BRAVE_API_KEY` is read directly at `src/commands/misc.js:1137` and passed as an HTTP header. If the key leaks into error messages or logs, it could be exposed.
+- Files: `src/commands/misc.js:1137,1166`, `src/commands/misc.js:127`, `src/commands/init.js:422`
+- Current mitigation: The key is only sent to the Brave API endpoint. Error handling returns generic messages. The key file path (`~/.gsd/brave_api_key`) is not logged.
+- Recommendations: Acceptable for a local CLI tool. No changes needed.
 
-## TODOs in Code
+### Path Traversal via CLI Arguments
 
-- No `TODO`, `FIXME`, `HACK`, or `XXX` comments exist in `bin/gsd-tools.cjs` or `bin/gsd-tools.test.cjs`.
-- TODOs referenced in workflow/template files are example content for templates, not actual debt markers.
+- Risk: Many commands accept file paths from CLI arguments (e.g., `verify-path-exists`, `frontmatter get`, `context-budget`) and join them with `cwd` using `path.join()`. A malicious argument like `../../etc/passwd` would resolve outside the project.
+- Files: `src/commands/misc.js:89`, `src/commands/verify.js:12,166`, `src/commands/features.js:79`
+- Current mitigation: This is a local CLI tool invoked by the user (or by AI agents under user supervision). The tool runs with the user's permissions, so path traversal doesn't grant additional access. `execGit()` in `src/lib/git.js` uses `execFileSync` (no shell injection) and passes `cwd` correctly.
+- Recommendations: For read-only operations, this is acceptable. For write operations (commit, scaffold, config-set), consider validating that resolved paths stay within the project root.
+
+## Performance Bottlenecks
+
+### Large File Reads Without Streaming
+
+- Problem: Many functions read entire files into memory using `fs.readFileSync`. For large STATE.md, ROADMAP.md, or SUMMARY.md files, this is fine (typically <100KB). However, `cmdCodebaseAnalyze` in `src/lib/codebase-intel.js` can scan thousands of source files.
+- Files: `src/lib/codebase-intel.js`, `src/lib/helpers.js:16-22`
+- Cause: Synchronous file I/O is used throughout. File cache (`src/lib/helpers.js:12`) helps but only within a single invocation.
+- Improvement path: Current approach is acceptable for typical project sizes. The file cache and directory cache (`dirCache` in helpers.js) already prevent redundant reads. The `getPhaseTree()` function at `src/lib/helpers.js:93-150` replaces 100+ individual readdirSync calls with a single tree scan — good optimization already in place.
+
+### Test Suite Uses Subprocess Spawning
+
+- Problem: The 13,040-line test file `bin/gsd-tools.test.cjs` runs every test by spawning `node bin/gsd-tools.cjs` via `execSync`. Each test creates a new Node.js process.
+- Files: `bin/gsd-tools.test.cjs:14-29`
+- Cause: The `output()` function calls `process.exit(0)`, making it impossible to call commands in-process during tests.
+- Improvement path: Refactor `output()` to separate data return from process exit (see Tech Debt section). Then tests can import and call command functions directly, dramatically reducing test execution time.
+
+### Regex Compilation in Hot Paths
+
+- Problem: Most dynamic regex patterns are now cached via `src/lib/regex-cache.js:21-40` (LRU-bounded, 200 entries). However, `src/commands/state.js:12-27` maintains its own separate regex cache (`_fieldRegexCache`), and some functions still create `new RegExp()` inline — e.g., `src/commands/state.js:99` creates a section-matching regex each time `cmdStateGet` is called.
+- Files: `src/lib/regex-cache.js`, `src/commands/state.js:10-27,99`
+- Cause: The regex-cache module was added after some patterns were already cached locally.
+- Improvement path: Low priority. The state.js local cache works fine. Consolidating to use `cachedRegex()` everywhere would be a cleanup but not a performance win.
 
 ## Fragile Areas
 
-**Milestone Detection (`getMilestoneInfo()`):**
-- Files: `bin/gsd-tools.cjs` lines 4244–4311
-- Why fragile: Uses 5 fallback strategies with increasingly loose pattern matching. Strategy 5 (line 4300) just grabs any `v\d+.\d+` pattern. Each strategy depends on specific emoji (🔵, ✅) and markdown formatting. If ROADMAP.md uses slightly different milestone formatting, wrong milestone could be detected.
-- Safe modification: Always test with the real event-pipeline ROADMAP.md (as documented in `AGENTS.md` line 33).
-- Test coverage: Partially covered via `init` command tests, but milestone-specific edge cases not directly tested.
+### Markdown Structure Parsing
 
-**Phase Section Extraction (`cmdRoadmapGetPhase()`):**
-- Files: `bin/gsd-tools.cjs` lines 916–987
-- Why fragile: Extracts a section between two heading-level phase markers. If headings use inconsistent levels (## vs ### vs ####), the section boundary detection fails. The `#{2,4}` pattern handles 3 levels but not `#` (h1) or `#####` (h5+).
-- Safe modification: Test with phases that have decimal numbers (e.g., 12.1, 12.2) as these have additional complexity.
+- Files: `src/lib/helpers.js:466-535` (milestone detection), `src/commands/features.js:16-76` (session diff), `src/commands/state.js:77-100` (state field extraction), `src/commands/features.js:247-268` (test output parsing)
+- Why fragile: Multiple functions parse markdown using regex patterns that depend on specific formatting conventions (e.g., `**Field:** value`, `## Section`, `- 🔵 **vX.Y Name**`). If users manually edit STATE.md or ROADMAP.md in ways that break these patterns, data extraction silently fails and returns null/empty.
+- Safe modification: Always test regex changes against the actual markdown files in `.planning/`. The milestone detection in `src/lib/helpers.js:466-535` has a 5-strategy fallback chain specifically because markdown format varies.
+- Test coverage: The test file covers many markdown parsing scenarios but cannot cover all possible human edits to markdown files.
 
-**`cmdPhaseInsert()` — Roadmap Manipulation:**
-- Files: `bin/gsd-tools.cjs` lines ~2700–2830
-- Why fragile: Inserts text into ROADMAP.md at calculated positions. Uses regex to find insertion points. If the roadmap has unexpected structure (missing checklist, different heading format), insertion could corrupt the file.
-- Test coverage: Has dedicated test suite.
+### Custom YAML Parser Edge Cases
+
+- Files: `src/lib/frontmatter.js:15-91`
+- Why fragile: The parser uses indent tracking with a manual stack. It handles `key: value`, `key: [inline, array]`, `key:` (object start), and `- item` (array items). It does NOT handle: multi-line strings (`|`, `>`), quoted keys, inline objects (`{a: 1}`), YAML comments (`#`), empty values followed by non-child content, or more than ~3 levels of nesting.
+- Safe modification: Add new test cases to `bin/gsd-tools.test.cjs` before modifying the parser. The frontmatter test section starts around line 64.
+- Test coverage: Moderate — tests cover the happy path. No tests for edge cases like trailing comments in values, keys with special characters, or deeply nested objects.
+
+### 5-Strategy Milestone Detection
+
+- Files: `src/lib/helpers.js:466-535`
+- Why fragile: The `_getMilestoneInfoUncached()` function tries 5 different strategies to find the active milestone from ROADMAP.md, in priority order: (1) 🔵 marker, (2) `(active)` tag, (3) `Active Milestone` section, (4) last non-✅ milestone, (5) generic version match. Each strategy has its own regex. If the roadmap format evolves, a wrong strategy may match first.
+- Safe modification: Test against multiple ROADMAP.md formats. Each strategy is clearly delineated with comments.
+- Test coverage: Well-tested in the test suite with multiple roadmap format variations.
+
+### Router Switch Statement (770+ lines)
+
+- Files: `src/router.js:90-767`
+- Why fragile: The `main()` function is a 677-line switch statement mapping CLI commands to handler functions. Each case manually parses arguments by index (`args[1]`, `args[2]`, etc.) with per-command flag parsing (e.g., `args.indexOf('--phase')`). Adding a new command or flag requires adding another case block with manual index arithmetic.
+- Safe modification: Follow the existing pattern exactly. New commands should be added as new case blocks. Complex subcommand routing (like `state`, `verify`) should follow the nested if/else pattern.
+- Test coverage: Good — the test suite covers most commands.
+
+### Test Output Parsing Heuristics
+
+- Files: `src/commands/features.js:247-268`
+- Why fragile: `parseTestOutput()` tries to match ExUnit, Go test, and pytest output formats using regex. The Go test parser counts `ok` and `FAIL` lines, which could match non-test output. The pytest parser uses a loose pattern that could match log messages containing "passed" or "failed".
+- Safe modification: Only add new framework parsers; don't modify existing ones without running against real test output from each framework.
+- Test coverage: Basic pattern matching is tested but not against real framework output.
+
+## Scaling Limits
+
+### Single-File Bundle Size Budget
+
+- Current capacity: ~470KB bundle (bin/gsd-tools.cjs, 15,348 lines), budget cap at 700KB
+- Limit: `build.js:60` enforces a 700KB hard limit. Build fails if exceeded.
+- Scaling path: The codebase has already been modularized from a true single-file into `src/` with 24 source files that get bundled by esbuild. Adding new features adds to bundle size. The 700KB limit provides ~230KB headroom. If needed, split into a core bundle and optional feature bundles that lazy-load.
+
+### Phase Tree Scan
+
+- Current capacity: Works well for projects with <100 phases
+- Limit: `getPhaseTree()` at `src/lib/helpers.js:93-150` scans every phase directory synchronously. For a project with 500+ phases, startup time would increase linearly.
+- Scaling path: Add incremental phase tree updates (only rescan changed directories). Current approach is fine for expected usage (<50 phases per milestone).
 
 ## Dependencies at Risk
 
-**Node.js Built-in `fetch()`:**
-- Risk: `cmdWebsearch()` uses global `fetch()` which requires Node.js 18+ (or 17.5+ with `--experimental-fetch`). No version check or graceful fallback.
-- Files: `bin/gsd-tools.cjs` line 2140
-- Impact: On Node.js < 18, the websearch command throws a `ReferenceError: fetch is not defined`.
-- Migration plan: Add a version check, or use `require('https')` as fallback.
+### tokenx (Token Estimation)
 
-**No package.json:**
-- Risk: There's no `package.json` in the project, so no declared Node.js version requirement, no `engines` field, no scripts.
-- Impact: Users have no way to know the minimum Node.js version required. No `npm test` script for running tests.
+- Risk: `tokenx` is the sole runtime dependency (`package.json:20`). If it breaks or becomes unavailable, token estimation degrades to `Math.ceil(text.length / 4)`.
+- Impact: Token budget calculations become less accurate (~75% accuracy instead of ~96%).
+- Migration plan: The fallback at `src/lib/context.js:21` already handles this gracefully. No action needed unless tokenx is abandoned.
+
+### esbuild (Build Tool)
+
+- Risk: `esbuild` is a dev dependency used by `build.js` to bundle the source into a single CJS file. It's actively maintained by the Go team.
+- Impact: Build breaks if esbuild has a breaking change. The `build.js` config at line 28-42 is straightforward with no exotic features.
+- Migration plan: Low risk. Could switch to another bundler (rollup, webpack) if needed.
 
 ## Missing Critical Features
 
-**No `--help` Per Command:**
-- Problem: Running `node gsd-tools.cjs state` shows available subcommands, but there's no per-command help. `node gsd-tools.cjs state patch --help` doesn't work — it would try to use `--help` as a field name.
-- Blocks: New users have to read source code or AGENTS.md to understand argument format.
+### No Input Validation on CLI Arguments
 
-**No Config Migration:**
-- Problem: When new config keys are added, existing `config.json` files don't get them. `loadConfig()` handles this via defaults, but `cmdValidateConfig()` may report them as missing without providing upgrade commands.
-- Blocks: Smooth upgrades between versions.
+- Problem: The router at `src/router.js:90-767` does no validation of argument types or counts before passing to command handlers. Missing required arguments produce cryptic errors deep in the command logic.
+- Blocks: Clean error messages for misuse. Currently, passing wrong args can cause `undefined` to propagate through multiple function calls before failing.
 
-**Workflow Integration Gaps (from AGENTS.md):**
-- Problem: Several features built in `gsd-tools.cjs` are not wired into workflows:
-  - `validate-dependencies` is not called by `execute-phase` workflow as a pre-flight check
-  - `search-lessons` is not called by `plan-phase` to auto-surface relevant lessons
-  - `context-budget` is not called by `execute-plan` to warn about large plans
-  - 11 new commands have no corresponding slash commands in `~/.config/opencode/command/`
-- Files: `AGENTS.md` lines 83–91 (documents these as "Optional Next Steps")
-- Blocks: Features exist but are unreachable unless manually invoked.
+### No Automated Integration Tests
+
+- Problem: The test suite at `bin/gsd-tools.test.cjs` tests individual commands in isolation with synthetic `.planning/` directories. There are no tests that simulate a full workflow (new-project → plan → execute → verify → complete-milestone).
+- Blocks: Confidence that multi-step workflows work end-to-end. Regressions in command sequencing go undetected.
 
 ## Test Coverage Gaps
 
-**State Mutation Commands:**
-- What's not tested: `cmdStateUpdate`, `cmdStatePatch`, `cmdStateAdvancePlan`, `cmdStateRecordMetric`, `cmdStateAddDecision`, `cmdStateAddBlocker`, `cmdStateResolveBlocker`, `cmdStateRecordSession`
-- Files: `bin/gsd-tools.cjs` lines 1108–1424
-- Risk: These modify STATE.md in place. A regex pattern error could corrupt or lose state data without detection.
-- Priority: **High** — data mutation without tests is the highest-risk gap.
+### Worktree Commands Untested in CI
 
-**Frontmatter CRUD:**
-- What's not tested: `cmdFrontmatterGet`, `cmdFrontmatterSet`, `cmdFrontmatterMerge`, `cmdFrontmatterValidate`
-- Files: `bin/gsd-tools.cjs` lines 2177–2260
-- Risk: Frontmatter set/merge modify files in place. The `reconstructFrontmatter()` function could lose data if it doesn't handle a YAML structure that `extractFrontmatter()` parsed.
-- Priority: **High** — round-trip data integrity not verified.
+- What's not tested: The worktree module at `src/commands/worktree.js` (791 lines) involves git worktree operations that require a real git repository with specific state.
+- Files: `src/commands/worktree.js`
+- Risk: Worktree creation, merging, and cleanup could fail in edge cases (detached HEAD, merge conflicts, stale worktrees).
+- Priority: Medium — worktree feature is opt-in and off by default.
 
-**Verify Suite:**
-- What's not tested: `cmdVerifyPlanStructure`, `cmdVerifyReferences`, `cmdVerifyCommits`, `cmdVerifyArtifacts`, `cmdVerifyKeyLinks`
-- Files: `bin/gsd-tools.cjs` lines 2260–2528
-- Risk: False positives or false negatives in verification could lead to premature phase completion or unnecessary rework.
-- Priority: **Medium**
+### Codebase Intelligence Incremental Mode
 
-**New Features (session-diff through quick-summary):**
-- What's not tested: All 15 feature commands added in commit `6212eeb`: `cmdSessionDiff`, `cmdContextBudget`, `cmdTestRun`, `cmdSearchDecisions`, `cmdValidateDependencies`, `cmdSearchLessons`, `cmdCodebaseImpact`, `cmdRollbackInfo`, `cmdVelocity`, `cmdTraceRequirement`, `cmdValidateConfig`, `cmdQuickTaskSummary`
-- Files: `bin/gsd-tools.cjs` lines 5012–6018
-- Risk: These are newer and less battle-tested. Edge cases with missing data, empty results, or unexpected file formats are likely.
-- Priority: **Medium** — most are read-only so risk is lower than mutation commands.
+- What's not tested: `src/commands/codebase.js` and `src/lib/codebase-intel.js` have an incremental analysis mode that updates only changed files. The logic for merging incremental results with previous full analysis is complex.
+- Files: `src/lib/codebase-intel.js`, `src/commands/codebase.js:33-40`
+- Risk: Incremental updates could produce stale or inconsistent language statistics if the merge logic mishandles deleted/renamed files.
+- Priority: Medium — stale intel causes suboptimal but not broken behavior.
 
-**Template Fill:**
-- What's not tested: `cmdTemplateFill` — generates pre-filled PLAN.md, SUMMARY.md, and VERIFICATION.md files
-- Files: `bin/gsd-tools.cjs` lines ~1700–1900
-- Risk: Generated templates might have incorrect structure that fails later verification.
-- Priority: **Low** — templates are starting points, not final artifacts.
+### Convention Extraction Accuracy
 
-## Recommended Improvements
+- What's not tested: `src/lib/conventions.js` (644 lines) classifies naming patterns, detects import organization, and identifies code style patterns across multiple languages. The classification heuristics (camelCase vs PascalCase detection at lines 10-16) have edge cases.
+- Files: `src/lib/conventions.js`
+- Risk: Wrong convention detection could lead to generated code that doesn't match the project's actual style.
+- Priority: Low — conventions are advisory, not enforced.
 
-**1. Extract Config Schema (Priority: High)**
-- Rationale: Three places define config defaults/schema independently. A single `CONFIG_SCHEMA` object would eliminate drift and simplify `loadConfig()`, `cmdConfigEnsureSection()`, and `cmdValidateConfig()`.
+### Error Paths in State Manipulation
 
-**2. Add State Mutation Tests (Priority: High)**
-- Rationale: The 8 state mutation commands modify STATE.md in place with regex replacement. Any regression silently corrupts project state.
-
-**3. Replace Silent Catches with Debug Logging (Priority: Medium)**
-- Rationale: 55 `} catch {}` blocks mask errors. Add `if (process.env.GSD_DEBUG) console.error(...)` to at least the 15 most critical ones (state reads, git operations, roadmap parsing).
-
-**4. Add Frontmatter Round-Trip Tests (Priority: Medium)**
-- Rationale: `extractFrontmatter()` → `reconstructFrontmatter()` round-trip must be lossless. Currently untested.
-
-**5. Sanitize Shell Interpolation in Git Commands (Priority: Medium)**
-- Rationale: `since` dates from STATE.md are interpolated into `git log --since="${since}"`. While currently validated by regex in most paths, a centralized sanitizer function would be safer.
-
-**6. Add package.json With engines Field (Priority: Low)**
-- Rationale: No declared Node.js version requirement. `fetch()` requires Node 18+. A package.json with `"engines": { "node": ">=18" }` and test scripts would formalize requirements.
-
-**7. Wire Features Into Workflows (Priority: Low)**
-- Rationale: 11+ commands exist but aren't accessible via slash commands or automatically invoked by workflows. This is documented in `AGENTS.md` lines 83–91 as "Optional Next Steps."
-
-**8. Tmp File Cleanup (Priority: Low)**
-- Rationale: Large JSON outputs create temp files in `os.tmpdir()` that are never cleaned up. Add cleanup or use a fixed path.
+- What's not tested: `src/commands/state.js` reads and writes STATE.md with field replacement using regex. Error paths (corrupt STATE.md, concurrent writes, disk full) are handled with try/catch but not tested.
+- Files: `src/commands/state.js`
+- Risk: Corrupt STATE.md could cause silent data loss on the next write operation.
+- Priority: Medium — STATE.md is the primary continuity mechanism between sessions.
 
 ---
 
-*Concerns audit: 2026-02-21*
+*Concerns audit: 2026-02-26*

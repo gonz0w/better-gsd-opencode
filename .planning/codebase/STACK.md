@@ -1,132 +1,156 @@
 # Technology Stack
 
-**Analysis Date:** 2026-02-21
+**Analysis Date:** 2026-02-26
 
 ## Languages
 
 **Primary:**
-- JavaScript (Node.js CommonJS) — All application logic in `bin/gsd-tools.cjs` (6,495 lines) and `bin/gsd-tools.test.cjs` (2,302 lines)
-- Markdown — 79 files (20,542 lines) comprising workflows, templates, and references that serve as LLM prompts and document templates
+- JavaScript (CommonJS) — All source code in `src/`, build tooling, tests
 
 **Secondary:**
-- Bash — `deploy.sh` (29 lines) for deployment; also embedded bash snippets inside workflow `.md` files for gsd-tools CLI invocations
-- JSON — `templates/config.json` for project configuration template
+- Bash — `deploy.sh` deployment script
+- Markdown — 44 workflow files in `workflows/`, 28 template files in `templates/`, 13 reference files in `references/`
 
 ## Runtime
 
 **Environment:**
-- Node.js (tested on v25.6.1, requires `>=18` for native `fetch` API and `node:test` module)
-- No `.nvmrc` or `.node-version` file present — version managed externally
+- Node.js >= 18 (specified in `package.json` `engines` field)
+- Uses `node:test` built-in test runner (no external test framework)
+- Uses `fetch()` global (available in Node 18+) for HTTP requests
 
 **Package Manager:**
-- None — **zero dependencies**. No `package.json`, no `node_modules/`, no lockfile.
-- All code uses only Node.js built-in modules.
+- npm
+- Lockfile: `package-lock.json` present
 
-## Frameworks & Libraries
+## Frameworks
 
-**Core Application:**
-- No frameworks. `bin/gsd-tools.cjs` is a zero-dependency, single-file CLI tool.
+**Core:**
+- None — This is a zero-framework CLI tool. Pure Node.js with only built-in modules for core functionality.
+
+**Build:**
+- esbuild ^0.27.3 (devDependency) — Bundles `src/index.js` → `bin/gsd-tools.cjs`
+  - Config: `build.js` (94 lines)
+  - Target: `node18`, format: `cjs`, platform: `node`
+  - Externalizes all Node.js built-ins, bundles npm dependencies (tokenx)
+  - Bundle budget: 700KB enforced in `build.js` (line 60)
+  - Outputs size record to `.planning/baselines/bundle-size.json`
+  - Smoke test runs `current-timestamp --raw` after each build
 
 **Testing:**
-- `node:test` (built-in) — Test runner via `require('node:test')` in `bin/gsd-tools.test.cjs`
-- `node:assert` (built-in) — Assertions via `require('node:assert')`
-
-**Build/Dev:**
-- No build step. Code is interpreted directly via `node bin/gsd-tools.cjs`.
-- No transpilation, bundling, or compilation required.
-
-## Node.js Built-in Module Usage
-
-The CLI relies exclusively on Node.js standard library:
-
-| Module | Import | Purpose |
-|--------|--------|---------|
-| `fs` | `require('fs')` | All file system operations (read/write/exists/mkdir/readdir) |
-| `path` | `require('path')` | Path joining, resolution, basename extraction |
-| `child_process` | `require('child_process').execSync` | Git commands, shell commands (`find`, `grep`) |
-| `os` | `require('os')` (inline) | `homedir()` for `~/.gsd/` paths, `tmpdir()` for large JSON overflow |
-| `fetch` | Global `fetch()` (Node 18+) | Brave Search API HTTP requests |
-| `node:test` | Test file only | Test runner (`describe`, `test`, `beforeEach`, `afterEach`) |
-| `node:assert` | Test file only | Test assertions (`deepStrictEqual`, `ok`, `strictEqual`) |
+- `node:test` (Node.js built-in test runner)
+  - Test file: `bin/gsd-tools.test.cjs` (13,040 lines)
+  - Run: `node --test bin/gsd-tools.test.cjs` or `npm test`
+  - Assertions: `node:assert` built-in
+  - Pattern: `describe()` / `test()` blocks, temp directory fixtures
 
 ## Key Dependencies
 
-**None.** This is a deliberately zero-dependency project. The `AGENTS.md` explicitly states:
-> "Single-file CLI: `gsd-tools.cjs` stays as one file (Node.js, zero dependencies)"
+**Runtime (Production):**
+- `tokenx` ^1.3.0 — Token count estimation for LLM context budget analysis
+  - Used in: `src/lib/context.js` (lazy-loaded)
+  - Fallback: `Math.ceil(text.length / 4)` if tokenx fails to load
+  - Bundled into `bin/gsd-tools.cjs` by esbuild
+
+**Development:**
+- `esbuild` ^0.27.3 — JavaScript bundler (build tool only, not shipped)
+
+**Node.js Built-in Modules Used:**
+- `fs` — File system operations (read/write planning docs, config)
+- `path` — Path resolution and manipulation
+- `child_process` (`execSync`, `execFileSync`) — Git commands, test execution, binary version detection
+- `os` — Home directory (`~/.gsd/`), temp directories
+- `crypto` — (externalized but available)
+- `node:test` — Test runner
+- `node:assert` — Test assertions
+
+## Source Code Metrics
+
+**Source files:** 24 JavaScript files in `src/`
+- `src/index.js` — Entry point (5 lines)
+- `src/router.js` — Command routing with lazy-loaded modules (772 lines)
+- `src/commands/` — 13 command modules
+- `src/lib/` — 11 library modules
+
+**Total source lines:** ~23,134 lines across all `.js` files
+
+**Built bundle:** `bin/gsd-tools.cjs` — ~614KB, 15,348 lines (gitignored, regenerated on build)
 
 ## Configuration
 
-**Project-level config (per-project):**
-- `.planning/config.json` — Created from `templates/config.json` template. Controls:
-  - `model_profile`: `"quality"` | `"balanced"` | `"budget"` — AI model selection tier
-  - `commit_docs`: boolean — Whether to git-commit planning artifacts
-  - `search_gitignored`: boolean — Include `.planning/` in broad searches
-  - `branching_strategy`: `"none"` | `"phase"` | `"milestone"` — Git branching approach
-  - `phase_branch_template` / `milestone_branch_template` — Branch name patterns
-  - `workflow.research` / `workflow.plan_check` / `workflow.verifier` — Toggle workflow steps
-  - `parallelization` — Enable parallel plan execution (boolean or `{ enabled, max_concurrent_agents }`)
-  - `brave_search` — Enable web search integration
-  - `gates.*` — User confirmation gates for various operations
-  - `safety.*` — Safety confirmations for destructive/external operations
+**Project-level (per-project):**
+- `.planning/config.json` — Project settings with schema validation
+  - Schema defined in: `src/lib/constants.js` (`CONFIG_SCHEMA`)
+  - Template: `templates/config.json`
+  - Key settings: `model_profile`, `commit_docs`, `research`, `parallelization`, `brave_search`, `test_commands`, `context_window`
 
-**User-level config (global):**
-- `~/.gsd/defaults.json` — User-level defaults merged into new project configs
-- `~/.gsd/brave_api_key` — File-based Brave API key storage (alternative to env var)
+**User-level (global):**
+- `~/.gsd/defaults.json` — User-level config overrides (optional)
+- `~/.gsd/brave_api_key` — Brave Search API key file (optional)
 
 **Environment Variables:**
 - `BRAVE_API_KEY` — Brave Search API authentication (optional)
-- `HOME` — Used for `~` path expansion in file references
+- `GSD_DEBUG` — Enable debug logging to stderr
+- `GSD_NO_TMPFILE` — Skip file redirect for large JSON output
 
-## Build & Deploy
+**Build Configuration:**
+- `build.js` — esbuild config (entry: `src/index.js`, output: `bin/gsd-tools.cjs`)
+- `package.json` — npm scripts: `build`, `test`
 
-**Development:**
-```bash
-# Run any CLI command directly
-node bin/gsd-tools.cjs <command> [args] [--raw]
+## Architecture: Single-File CLI Bundle
 
-# Run tests
-node --test bin/gsd-tools.test.cjs
+The source is developed as modular files in `src/` but built into a single CJS bundle:
+
+```
+src/index.js          → entry point
+src/router.js         → command dispatch (lazy-loading)
+src/commands/*.js     → 13 command modules
+src/lib/*.js          → 11 shared libraries
+        ↓ (esbuild)
+bin/gsd-tools.cjs     → single executable (gitignored)
 ```
 
-**Deployment:**
-- `deploy.sh` copies `bin/`, `workflows/`, `templates/`, `references/`, and `VERSION` to `~/.config/opencode/get-shit-done/`
-- Creates timestamped backup of existing installation before overwriting
-- No build step — raw source files are the deployed artifacts
+**Lazy loading:** All 13 command modules are lazy-loaded in `src/router.js` (lines 10-24). Only the module needed for the invoked command is loaded per execution.
+
+**Caching layers:**
+- File content cache: `src/lib/helpers.js` (`fileCache` Map)
+- Directory listing cache: `src/lib/helpers.js` (`dirCache` Map)
+- Phase tree cache: `src/lib/helpers.js` (`_phaseTreeCache`)
+- Frontmatter parse cache: `src/lib/frontmatter.js` (`_fmCache` Map, LRU, max 100)
+- Regex cache: `src/lib/regex-cache.js` (`_dynamicRegexCache` Map, LRU, max 200)
+- Config cache: `src/lib/config.js` (`_configCache` Map)
+- Milestone cache: `src/lib/helpers.js` (`_milestoneCache`)
+- Token estimator: `src/lib/context.js` (`_estimateTokenCount` singleton)
+
+All caches live for a single CLI invocation (no TTL needed since the process exits).
+
+## Deployment
+
+**Development → Production pipeline:**
+1. Edit source in `src/`
+2. `npm run build` (esbuild bundles → `bin/gsd-tools.cjs`, runs smoke test, checks bundle budget)
+3. `./deploy.sh` copies `bin/`, `workflows/`, `templates/`, `references/`, `src/`, `VERSION` to `~/.config/opencode/get-shit-done/`
+4. Deploy includes backup + smoke test + rollback on failure
+
+**Target installation:**
+- `~/.config/opencode/get-shit-done/` — OpenCode plugin directory
+- Invoked by OpenCode (AI coding assistant) via workflow markdown files that call `gsd-tools` commands
 
 **Versioning:**
-- `VERSION` file contains current version: `1.20.5`
-- Plain text, single line, semver format
+- `VERSION` file contains version string: `1.20.5`
 
 ## Platform Requirements
 
 **Development:**
-- Linux (developed and tested on Linux)
-- Node.js >=18 (for native `fetch` and `node:test`)
-- Git (required for commit operations, history analysis, rollback features)
+- Node.js >= 18
+- npm
+- Git (for git operations, tests)
 
-**Production (plugin runtime):**
-- OpenCode AI assistant — the host environment that invokes workflows
-- Node.js >=18 available on `PATH`
-- Git repository in the target project
-- Write access to `~/.config/opencode/get-shit-done/` for installation
-
-## File Organization
-
-**Source files:**
-- `bin/gsd-tools.cjs` — Single-file CLI (6,495 lines, all application logic)
-- `bin/gsd-tools.test.cjs` — Test suite (2,302 lines)
-
-**Content files (Markdown):**
-- `workflows/*.md` — 32 workflow definitions (10,266 lines total) — LLM prompt scripts
-- `templates/*.md` + `templates/**/*.md` — 24 document templates
-- `references/*.md` — 13 reference documents loaded by workflows
-
-**Config/Meta:**
-- `templates/config.json` — Default project configuration template
-- `VERSION` — Current version identifier
-- `deploy.sh` — Deployment script
-- `AGENTS.md` — Development workspace documentation
+**Production (runtime):**
+- Node.js >= 18
+- Git (CLI tool heavily uses `git` commands via `execFileSync`)
+- No network access required (Brave Search is optional)
+- File system access to `.planning/` directory in target projects
 
 ---
 
-*Stack analysis: 2026-02-21*
+*Stack analysis: 2026-02-26*

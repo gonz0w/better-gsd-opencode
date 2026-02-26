@@ -1,231 +1,238 @@
 # Architecture
 
-**Analysis Date:** 2026-02-21
+**Analysis Date:** 2026-02-26
 
 ## Pattern Overview
 
-**Overall:** CLI-Driven Orchestrator-Agent Architecture
-
-The GSD plugin uses a single-file Node.js CLI (`bin/gsd-tools.cjs`) as a data/operations backend, with markdown workflow files (`workflows/*.md`) acting as orchestration prompts for AI agents. The CLI provides structured JSON data; the workflows define decision logic and agent coordination. This separation means the CLI never makes creative decisions — it parses, computes, and validates. The AI agents (driven by workflow prompts) handle reasoning, planning, and code generation.
+**Overall:** CLI-driven workflow orchestration with prompt-based agent delegation
 
 **Key Characteristics:**
-- Zero-dependency Node.js CLI as the data layer (6,495 lines, single file)
-- Markdown-as-code: workflows are executable prompts, not documentation
-- Agent orchestration via `Task()` subagent spawning described in workflow files
-- JSON-over-stdout as the universal data exchange format between CLI and agents
-- File-system-as-database: all state lives in `.planning/` directory as markdown files with YAML frontmatter
+- Monolithic CLI tool (`bin/gsd-tools.cjs`) built from modular source (`src/`) via esbuild bundling
+- Prompt-as-code workflows: markdown files define step-by-step agent instructions, calling the CLI for data
+- Three-tier architecture: CLI commands (data layer) → workflow prompts (orchestration layer) → AI agents (execution layer)
+- All persistent state lives in `.planning/` directory as markdown and JSON files — no database, no server
+- Single-invocation lifecycle: each CLI call loads config, executes one command, exits. Caching is per-invocation only.
 
 ## Layers
 
-**Layer 1 — CLI Tool (`bin/gsd-tools.cjs`)**
-- Purpose: Data access, parsing, validation, git operations, state mutations
-- Location: `bin/gsd-tools.cjs`
-- Contains: ~85 command functions, ~15 internal helpers, YAML frontmatter parser, CLI router
-- Depends on: Node.js stdlib only (`fs`, `path`, `child_process`), `.planning/` filesystem
-- Used by: Workflow markdown files (via `node gsd-tools.cjs <command>` shell invocations)
+**Entry Point Layer:**
+- Purpose: Bootstrap and route CLI arguments to command handlers
+- Location: `src/index.js`, `src/router.js`
+- Contains: Argument parsing, global flag extraction (`--raw`, `--compact`, `--verbose`, `--fields`, `--manifest`), lazy module loading, command dispatch via switch/case
+- Depends on: `src/lib/constants.js` (for `COMMAND_HELP`), `src/lib/output.js` (for `error()`)
+- Used by: `bin/gsd-tools.cjs` (the bundled artifact)
 
-**Layer 2 — Workflow Prompts (`workflows/*.md`)**
-- Purpose: Orchestration logic — define multi-step processes, agent spawning, user interactions
-- Location: `workflows/*.md` (32 files)
-- Contains: XML-structured prompts with `<process>`, `<step>`, `<purpose>` tags
-- Depends on: CLI tool for data, references for behavioral rules, templates for document structure
-- Used by: OpenCode slash commands (in `~/.config/opencode/command/`)
+**Command Layer:**
+- Purpose: Implement CLI commands — each function gathers data, transforms it, and outputs JSON
+- Location: `src/commands/*.js` (13 modules)
+- Contains: Command handler functions prefixed with `cmd` (e.g., `cmdInitExecutePhase`, `cmdStateLoad`, `cmdCodebaseAnalyze`)
+- Depends on: `src/lib/` modules for parsing, config, git, output
+- Used by: `src/router.js` via lazy-loading functions
 
-**Layer 3 — Templates (`templates/*.md`, `templates/config.json`)**
-- Purpose: Document structure definitions for all `.planning/` artifacts
-- Location: `templates/*.md` (24+ files), `templates/codebase/` (7 files), `templates/research-project/` (5 files)
-- Contains: File templates with placeholders, validation schemas, usage guidelines
-- Depends on: Nothing (static definitions)
-- Used by: Workflows (via `@` file references), CLI tool (`template fill` command)
+**Command Modules:**
+| Module | Lines | Responsibility |
+|--------|-------|----------------|
+| `src/commands/verify.js` | 1984 | Plan structure, artifacts, requirements, quality gates, regression |
+| `src/commands/features.js` | 1904 | Session diff, context budget, test run, velocity, search, extract sections |
+| `src/commands/intent.js` | 1592 | INTENT.md CRUD: create, show, update, validate, trace, drift |
+| `src/commands/init.js` | 1493 | Compound initialization for workflows (execute-phase, plan-phase, etc.) |
+| `src/commands/misc.js` | 1431 | Utility commands: commit, scaffold, template, config, progress, todos |
+| `src/commands/env.js` | 1177 | Environment detection: languages, tools, runtimes, CI, Docker |
+| `src/commands/phase.js` | 901 | Phase lifecycle: add, insert, remove, complete, milestone complete |
+| `src/commands/worktree.js` | 791 | Git worktree management for parallel plan execution |
+| `src/commands/state.js` | 652 | STATE.md CRUD: load, update, patch, validate, decisions, blockers |
+| `src/commands/codebase.js` | 489 | Codebase analysis: analyze, status, conventions, rules, deps, impact |
+| `src/commands/mcp.js` | 405 | MCP server profiling and optimization |
+| `src/commands/memory.js` | 307 | Persistent memory stores: decisions, bookmarks, lessons, todos |
+| `src/commands/roadmap.js` | 295 | ROADMAP.md parsing: get-phase, analyze, update-plan-progress |
 
-**Layer 4 — References (`references/*.md`)**
-- Purpose: Behavioral rules and patterns that agents must follow
-- Location: `references/*.md` (13 files)
-- Contains: UI branding rules, git integration patterns, checkpoint definitions, model profiles
-- Depends on: Nothing (static definitions)
-- Used by: Workflows (via `@` file references in `<required_reading>` blocks)
+**Library Layer:**
+- Purpose: Shared utilities, parsers, and infrastructure used across commands
+- Location: `src/lib/*.js` (10 modules)
+- Contains: File I/O, config loading, git operations, frontmatter parsing, token estimation, regex caching, codebase intelligence, convention detection, dependency graph analysis
+- Depends on: Node.js built-ins (`fs`, `path`, `child_process`), one npm dependency (`tokenx`)
+- Used by: All command modules
 
-**Layer 5 — Deployment & Configuration**
-- Purpose: Deploy plugin to live install, version tracking
-- Location: `deploy.sh`, `VERSION`
-- Contains: Copy script, version string
-- Depends on: Source workspace
-- Used by: Developer (manual deployment)
+**Library Modules:**
+| Module | Lines | Responsibility |
+|--------|-------|----------------|
+| `src/lib/constants.js` | 1088 | Model profiles, config schema, command help text |
+| `src/lib/helpers.js` | 946 | File caching, phase tree, milestone detection, intent parsing, slug generation |
+| `src/lib/deps.js` | 697 | Multi-language import parsing (JS/TS/Python/Go/Elixir/Rust), dependency graph, cycle detection |
+| `src/lib/conventions.js` | 644 | Naming pattern detection, file organization analysis, framework-specific convention extraction |
+| `src/lib/codebase-intel.js` | 529 | Source dir detection, file walking, analysis, staleness detection, intel read/write |
+| `src/lib/frontmatter.js` | 166 | YAML frontmatter parser/serializer (custom, no YAML dependency) |
+| `src/lib/output.js` | 113 | JSON output, field filtering, tmpfile overflow, error handling, debug logging |
+| `src/lib/context.js` | 97 | Token estimation (via `tokenx`), budget checking |
+| `src/lib/regex-cache.js` | 83 | LRU regex cache, pre-compiled patterns for phases, milestones, commits |
+| `src/lib/config.js` | 76 | Config loading with schema defaults, alias resolution, nested key lookup |
+| `src/lib/git.js` | 29 | Shell-free git execution via `execFileSync('git', args)` |
+
+**Workflow Layer:**
+- Purpose: Define agent instructions as structured markdown prompts
+- Location: `workflows/*.md` (44 files, ~8,400 lines total)
+- Contains: XML-tagged process steps, bash command snippets calling `gsd-tools.cjs`, subagent spawn instructions
+- Depends on: `bin/gsd-tools.cjs` (invoked via bash), `references/*.md` (loaded for context), `templates/*.md` (used as scaffolds)
+- Used by: OpenCode commands → load workflow → agent follows instructions
+
+**Template Layer:**
+- Purpose: Document scaffolds for planning artifacts
+- Location: `templates/*.md`, `templates/codebase/*.md`, `templates/plans/*.md`, `templates/research-project/*.md`
+- Contains: Markdown templates with placeholders for STATE.md, ROADMAP.md, PLAN.md, SUMMARY.md, INTENT.md, codebase analysis docs, etc.
+- Depends on: Nothing
+- Used by: `src/commands/misc.js` (`cmdTemplateFill`, `cmdScaffold`), workflow agents
+
+**Reference Layer:**
+- Purpose: Shared knowledge documents loaded by agents for consistent behavior
+- Location: `references/*.md` (13 files, ~2,960 lines total)
+- Contains: Guidelines for checkpoints, git integration, verification patterns, TDD, model profiles, UI branding
+- Depends on: Nothing
+- Used by: Workflow markdown files via `@references/` paths, agents via `extract-sections` command
 
 ## Data Flow
 
-**Primary Flow — Workflow Initialization:**
+**Command Execution Flow (CLI → JSON):**
 
-1. User invokes slash command (e.g., `/gsd-execute-phase 3`)
-2. Command resolves to workflow file (`workflows/execute-phase.md`)
-3. Workflow's first step calls CLI: `node gsd-tools.cjs init execute-phase 3`
-4. CLI reads `.planning/config.json`, filesystem state, `ROADMAP.md`, `STATE.md`
-5. CLI returns comprehensive JSON blob with all context needed for the workflow
-6. Workflow parses JSON and branches based on conditions (`phase_found`, `plan_count`, etc.)
-7. Workflow spawns subagents with `Task()` calls, passing file paths (not content)
-8. Subagents read files themselves using their fresh context window
+1. User/agent invokes: `node bin/gsd-tools.cjs <command> [args] --raw`
+2. `src/index.js` calls `main()` from `src/router.js`
+3. Router parses global flags (`--raw`, `--compact`, `--fields`, `--verbose`, `--manifest`)
+4. Switch/case dispatches to lazy-loaded command module
+5. Command function reads `.planning/` files, runs git commands, computes result
+6. `output(result, raw)` writes JSON to stdout (or `@file:/tmp/gsd-*.json` if >50KB)
+7. Process exits with code 0 (success) or 1 (error via `error()`)
 
-**State Mutation Flow:**
+**Workflow Execution Flow (Agent-driven):**
 
-1. Agent completes work (code changes, document creation)
-2. Workflow calls CLI to update state: `node gsd-tools.cjs state update-progress`
-3. CLI modifies `.planning/STATE.md` in place (regex-based field updates)
-4. Workflow calls CLI to commit: `node gsd-tools.cjs commit "message" --files path1 path2`
-5. CLI handles git add + commit, respecting `commit_docs` config flag
+1. OpenCode slash command triggers workflow markdown (e.g., `/gsd-execute-phase 03`)
+2. Workflow's first step runs `init` command to gather all context:
+   ```bash
+   INIT=$(node .../gsd-tools.cjs init execute-phase "03" --compact)
+   ```
+3. Agent parses JSON response, extracts configuration flags and phase data
+4. Workflow steps call additional CLI commands as needed (validate, scaffold, commit)
+5. For complex work, workflow spawns subagents with `Task(prompt="...", model="...")`:
+   - Each subagent gets fresh context (200k tokens)
+   - Subagent reads agent definition from `agents/` directory
+   - Subagent executes the plan, writes code/docs, returns results
+6. Orchestrator collects subagent results, updates state, commits planning docs
 
-**Large Output Handling:**
+**Init Command Pattern (Context Aggregation):**
 
-1. CLI generates JSON output
-2. If output > 50KB, writes to tmpfile and returns `@file:/tmp/gsd-TIMESTAMP.json`
-3. Caller detects `@file:` prefix and reads from disk instead of stdout
+The `init` commands in `src/commands/init.js` are the critical bridge between CLI and workflows. Each `cmdInit*` function pre-aggregates all context a workflow needs into a single JSON payload:
+
+1. Loads `.planning/config.json` via `loadConfig()`
+2. Resolves model assignments via `resolveModelInternal()`
+3. Finds phase directory via `findPhaseInternal()`
+4. Reads milestone info via `getMilestoneInfo()`
+5. Optionally triggers auto-scans (env scan, codebase intel)
+6. Reads STATE.md, ROADMAP.md, INTENT.md as needed
+7. Assembles everything into one JSON object
+8. Applies compact mode filtering if `--compact` flag present
+
+This eliminates multiple sequential CLI calls — one `init` call replaces 5-10 individual reads.
 
 **State Management:**
-- `STATE.md` is the project's "short-term memory" — current position, metrics, decisions, blockers
-- `ROADMAP.md` is the project's "plan of record" — phases, goals, requirements mapping
-- `config.json` controls behavior — mode (interactive/yolo), depth, parallelization, gates
-- Phase directories (`phases/XX-name/`) contain all artifacts for a phase: PLAN.md, SUMMARY.md, RESEARCH.md, CONTEXT.md, VERIFICATION.md, UAT.md
+- All state is file-based in `.planning/` directory
+- `STATE.md` is the primary mutable state (position, decisions, blockers, metrics, session info)
+- `ROADMAP.md` tracks phase status (checkboxes, plan counts)
+- `config.json` stores project configuration
+- `memory/` directory has JSON stores for decisions, bookmarks, lessons, todos
+- `codebase/codebase-intel.json` caches source analysis (staleness-checked via git commit hash)
+- `env-manifest.json` caches environment detection (machine-specific, gitignored)
+- `project-profile.json` stores team-visible project profile (committed)
 
 ## Key Abstractions
 
-**Phase:**
-- Purpose: Unit of project progress containing related work items
-- Examples: `.planning/phases/01-foundation/`, `.planning/phases/02-auth/`
-- Pattern: Numbered directories (01-99), optionally decimal (02.1) for insertions. Each contains PLAN.md files (execution prompts) and SUMMARY.md files (completion records). Phase is "complete" when all plans have summaries.
+**Phase Tree (`getPhaseTree`):**
+- Purpose: Single scan of all `.planning/phases/` directories, cached for the invocation
+- Location: `src/lib/helpers.js`
+- Returns: `Map<normalizedPhaseNum, phaseEntry>` with plans, summaries, metadata
+- Pattern: Replaces 100+ individual `readdirSync` calls with one tree scan
 
-**Plan (PLAN.md):**
-- Purpose: Executable prompt for a single unit of work within a phase
-- Examples: `.planning/phases/01-foundation/01-01-PLAN.md`, `.planning/phases/01-foundation/01-02-PLAN.md`
-- Pattern: YAML frontmatter (wave, depends_on, autonomous, files_modified) + XML task definitions + verification criteria + `must_haves` block for goal-backward verification
+**Config Schema (`CONFIG_SCHEMA`):**
+- Purpose: Define all config keys with types, defaults, aliases, and nested path lookups
+- Location: `src/lib/constants.js`
+- Pattern: Schema-driven config — `loadConfig()` resolves flat keys, nested paths, and aliases against this schema
+- Examples: `model_profile`, `commit_docs`, `parallelization`, `context_window`
 
-**Summary (SUMMARY.md):**
-- Purpose: Completion record documenting what was built, decisions made, tech added
-- Examples: `.planning/phases/01-foundation/01-01-SUMMARY.md`
-- Pattern: YAML frontmatter (dependency graph, tech-stack, key-decisions, metrics) + markdown body (accomplishments, issues, decisions)
+**Frontmatter Parser:**
+- Purpose: Extract/modify YAML frontmatter from markdown files without a YAML library dependency
+- Location: `src/lib/frontmatter.js`
+- Pattern: Custom stack-based parser handling nested objects, arrays, inline arrays. LRU cache (max 100 entries)
+- Functions: `extractFrontmatter(content)`, `reconstructFrontmatter(obj)`, `spliceFrontmatter(content, newObj)`
 
-**Milestone:**
-- Purpose: Collection of phases that together deliver a version
-- Pattern: Tracked in `ROADMAP.md` with markers (🔵 active, ✅ complete). Completed milestones archived to `.planning/milestones/vX.Y-phases/`
+**Output Abstraction:**
+- Purpose: Unified JSON output with field filtering, tmpfile overflow, and raw mode
+- Location: `src/lib/output.js`
+- Pattern: `output(result, raw, rawValue)` → writes to stdout. If JSON >50KB, writes to tmpfile and outputs `@file:/tmp/gsd-*.json`. Global `_gsdRequestedFields` enables `--fields` filtering.
 
-**Init Command (Compound Command):**
-- Purpose: Single CLI call that gathers all context a workflow needs
-- Examples: `init execute-phase`, `init plan-phase`, `init new-project`, `init quick`
-- Pattern: Returns JSON with resolved models, config flags, phase info, file paths, file existence checks. Minimizes round-trips between workflow and CLI.
+**Lazy Module Loading:**
+- Purpose: Only load command modules when their commands are invoked
+- Location: `src/router.js`
+- Pattern: `lazyState()`, `lazyInit()`, etc. return cached module on first call. Avoids parsing all 13 command modules on startup.
 
-**Model Profile:**
-- Purpose: Maps agent types to model tiers based on budget preference
-- Implementation: `MODEL_PROFILES` lookup table in `bin/gsd-tools.cjs` (line 132)
-- Pattern: Three profiles (`quality`, `balanced`, `budget`) map 11 agent types to `opus`/`sonnet`/`haiku`. Per-agent overrides via `config.json`.
+**Codebase Intel:**
+- Purpose: Full or incremental source analysis with git-based staleness detection
+- Location: `src/lib/codebase-intel.js`
+- Pattern: `checkStaleness()` compares stored git hash vs HEAD. If stale, `performAnalysis()` runs full or incremental scan. Results cached in `.planning/codebase/codebase-intel.json`.
 
 ## Entry Points
 
 **CLI Entry (`bin/gsd-tools.cjs`):**
-- Location: `bin/gsd-tools.cjs` line 6022 (`async function main()`)
-- Triggers: `node gsd-tools.cjs <command> [args] [--raw]`
-- Responsibilities: Parse argv, route to command function, output JSON to stdout
+- Location: `bin/gsd-tools.cjs` (15,348 lines — esbuild bundle of `src/`)
+- Triggers: Direct invocation by agents, workflows, tests, deploy script
+- Responsibilities: All CLI operations — the single executable artifact
 
-**CLI Router (`main()` switch statement):**
-- Location: `bin/gsd-tools.cjs` lines 6035-6492
-- Pattern: Top-level `switch(command)` dispatches to command groups. Commands with subcommands (e.g., `state`, `phase`, `roadmap`, `verify`, `frontmatter`, `init`) use nested `if/else` chains on `args[1]`.
-- Top-level commands: `state`, `resolve-model`, `find-phase`, `commit`, `verify-summary`, `template`, `frontmatter`, `verify`, `generate-slug`, `current-timestamp`, `list-todos`, `verify-path-exists`, `config-ensure-section`, `config-set`, `config-get`, `history-digest`, `phases`, `roadmap`, `requirements`, `phase`, `milestone`, `validate`, `progress`, `todo`, `scaffold`, `init`, `phase-plan-index`, `state-snapshot`, `summary-extract`, `websearch`, `session-diff`, `context-budget`, `test-run`, `search-decisions`, `validate-dependencies`, `search-lessons`, `codebase-impact`, `rollback-info`, `velocity`, `trace-requirement`, `validate-config`, `quick-summary`
+**Source Entry (`src/index.js`):**
+- Location: `src/index.js` (5 lines)
+- Triggers: esbuild build process entry point
+- Responsibilities: `require('./router').main()` — minimal bootstrap
 
-**Workflow Entry (workflow markdown files):**
-- Location: `workflows/*.md` (32 files)
-- Triggers: OpenCode slash commands (e.g., `/gsd-execute-phase`, `/gsd-plan-phase`)
-- Responsibilities: Define the orchestration logic, agent spawning, user interaction, and state transitions
+**Build Entry (`build.js`):**
+- Location: `build.js` (94 lines)
+- Triggers: `npm run build`
+- Responsibilities: esbuild bundling `src/index.js` → `bin/gsd-tools.cjs`, smoke test, bundle size tracking (700KB budget)
 
 **Deploy Entry (`deploy.sh`):**
-- Location: `deploy.sh`
-- Triggers: Manual execution by developer
-- Responsibilities: Back up current install, copy `bin/`, `workflows/`, `templates/`, `references/`, `VERSION` to `~/.config/opencode/get-shit-done/`
+- Location: `deploy.sh` (50 lines)
+- Triggers: Manual deployment to `~/.config/opencode/get-shit-done/`
+- Responsibilities: Build, backup, copy artifacts, smoke test, rollback on failure
 
-## Command System
-
-The CLI has ~50 commands organized into functional categories:
-
-**Atomic Commands (lines 488-2110):**
-Simple operations that read/write one thing:
-- `generate-slug`, `current-timestamp` — Pure utility functions
-- `list-todos`, `verify-path-exists` — Filesystem queries
-- `config-ensure-section`, `config-set`, `config-get` — Config CRUD
-- `history-digest`, `summary-extract`, `state-snapshot`, `phase-plan-index` — Data extraction
-- `phases list` — Phase directory listing with filtering
-
-**State Progression Engine (lines 1191-2110):**
-State mutation commands that modify `STATE.md`:
-- `state load`, `state get`, `state update`, `state patch` — Basic CRUD
-- `state advance-plan` — Increment plan counter
-- `state record-metric` — Record execution metrics
-- `state update-progress` — Recalculate progress bar
-- `state add-decision`, `state add-blocker`, `state resolve-blocker` — Accumulated context
-- `state record-session` — Session continuity tracking
-
-**Frontmatter CRUD (lines 2175-2237):**
-YAML frontmatter operations on any markdown file:
-- `frontmatter get`, `set`, `merge`, `validate`
-
-**Verification Suite (lines 2239-2530):**
-Validation commands for quality gates:
-- `verify plan-structure` — Check PLAN.md structure
-- `verify phase-completeness` — All plans have summaries
-- `verify references` — @-refs resolve to real files
-- `verify commits` — Git hashes exist
-- `verify artifacts`, `verify key-links` — must_haves validation
-
-**Roadmap Analysis (lines 2531-2662):**
-Parse and analyze ROADMAP.md:
-- `roadmap get-phase` — Extract one phase section
-- `roadmap analyze` — Full roadmap parse with disk status comparison
-
-**Phase Operations (lines 2663-3132):**
-Modify phase structure:
-- `phase add` — Append new phase to roadmap + create directory
-- `phase insert` — Insert decimal phase (e.g., 2.1 between 2 and 3)
-- `phase remove` — Remove phase + renumber subsequent phases
-- `phase complete` — Mark phase done, update state + roadmap
-
-**Compound/Init Commands (lines 4059-5010):**
-Single-call context gathering for workflows:
-- `init execute-phase`, `init plan-phase`, `init new-project`, `init new-milestone`
-- `init quick`, `init resume`, `init verify-work`, `init phase-op`
-- `init todos`, `init milestone-op`, `init map-codebase`, `init progress`
-
-Each returns a comprehensive JSON object with all context a workflow needs (models, config flags, phase info, file paths, existence checks).
-
-**Extended Features (lines 5012-6018):**
-Additional capabilities added post-initial release:
-- `session-diff` — Git commits since last activity
-- `context-budget` — Token estimation for context window
-- `test-run` — Parse test output (ExUnit/Go/pytest)
-- `search-decisions`, `search-lessons` — Full-text search across archives
-- `validate-dependencies` — Phase dependency graph validation
-- `codebase-impact` — Module dependency analysis
-- `rollback-info` — Rollback plan with git revert commands
-- `velocity` — Plans/day + completion forecast
-- `trace-requirement` — Requirement-to-file traceability
-- `validate-config` — Config schema validation
-- `quick-summary` — Milestone progress summary
+**Test Entry (`bin/gsd-tools.test.cjs`):**
+- Location: `bin/gsd-tools.test.cjs` (13,040 lines)
+- Triggers: `npm test` → `node --test bin/gsd-tools.test.cjs`
+- Responsibilities: Integration tests via subprocess spawning of the built bundle
 
 ## Error Handling
 
-**Strategy:** Fail-fast with stderr error messages
+**Strategy:** Fail-fast with descriptive stderr messages and exit code 1
 
 **Patterns:**
-- `error(message)` helper writes to stderr and exits with code 1
-- `safeReadFile(path)` returns `null` on any read failure (never throws)
-- `execGit(cwd, args)` catches errors and returns `{ exitCode, stdout, stderr }`
-- Command functions check preconditions early and call `error()` for invalid input
-- Output function `output(result, raw)` always exits with code 0 after successful JSON output
+- `error(message)` in `src/lib/output.js`: writes to stderr, calls `process.exit(1)` — used for argument validation and missing data
+- `debugLog(context, message, err)` in `src/lib/output.js`: conditional debug output when `GSD_DEBUG` env var is set — never visible in production
+- `safeReadFile(path)` returns `null` on error rather than throwing — commands check for null and handle gracefully
+- `execGit(cwd, args)` returns `{ exitCode, stdout, stderr }` object — callers check exitCode rather than catching exceptions
+- Try/catch blocks wrap git, file, and JSON operations throughout command modules — failures degrade gracefully with `debugLog`
 
 ## Cross-Cutting Concerns
 
-**Logging:** No logging framework. CLI outputs JSON to stdout only. Errors go to stderr. Workflows display user-facing messages using UI brand patterns from `references/ui-brand.md`.
+**Logging:** `debugLog()` to stderr, gated by `GSD_DEBUG` environment variable. No production logging framework — tool is silent unless errors occur.
 
-**Validation:** Multi-layered — `verify` command suite for structural validation, `validate` commands for consistency checks, `frontmatter validate` for schema conformance, `validate-config` for config.json schema.
+**Validation:** Schema-driven via `CONFIG_SCHEMA` for config, `cmdStateValidate()` for state consistency, `cmdVerify*()` family for planning document structure, `cmdIntentValidate()` for intent format.
 
-**Configuration:** Hierarchical — defaults hardcoded in `loadConfig()`, overridden by `.planning/config.json` with support for flat and nested key formats, per-agent model overrides.
+**Authentication:** Not applicable — CLI tool runs locally with filesystem permissions. Git operations use existing git credentials.
 
-**Git Integration:** All git operations go through `execGit()` helper and `cmdCommit()`. Respects `commit_docs` config flag. Auto-detects gitignored `.planning/` directories. Branching strategies: `none`, `phase`, `milestone`.
+**Caching:** Per-invocation caching at multiple levels:
+- `fileCache` (Map) in `src/lib/helpers.js` — file content by path
+- `dirCache` (Map) in `src/lib/helpers.js` — directory listings
+- `_phaseTreeCache` in `src/lib/helpers.js` — entire phase directory tree
+- `_milestoneCache` in `src/lib/helpers.js` — milestone info from ROADMAP.md
+- `_configCache` (Map) in `src/lib/config.js` — parsed config by cwd
+- `_fmCache` (Map) in `src/lib/frontmatter.js` — parsed frontmatter (LRU, max 100)
+- `_dynamicRegexCache` (Map) in `src/lib/regex-cache.js` — compiled regexes (LRU, max 200)
+
+**Token Budget Awareness:** `src/lib/context.js` provides `estimateTokens()` via `tokenx` library. Used by `--compact` mode and `context-budget` commands to keep workflow payloads within context window limits.
 
 ---
 
-*Architecture analysis: 2026-02-21*
+*Architecture analysis: 2026-02-26*

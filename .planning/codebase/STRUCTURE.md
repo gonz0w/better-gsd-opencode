@@ -1,257 +1,295 @@
 # Codebase Structure
 
-**Analysis Date:** 2026-02-21
+**Analysis Date:** 2026-02-26
 
 ## Directory Layout
 
 ```
 gsd-opencode/
-├── bin/                           # CLI tool (the "brain")
-│   ├── gsd-tools.cjs             # Main CLI — 6,495 lines, zero dependencies
-│   └── gsd-tools.test.cjs        # Test suite — 2,302 lines, node:test runner
-├── workflows/                     # Orchestration prompts (32 files)
-│   ├── new-project.md            # Project initialization (1,116 lines)
-│   ├── execute-phase.md          # Phase execution orchestrator (430 lines)
-│   ├── execute-plan.md           # Single plan execution
-│   ├── plan-phase.md             # Phase planning orchestrator (426 lines)
-│   ├── verify-work.md            # UAT testing workflow (569 lines)
-│   ├── quick.md                  # Quick ad-hoc task workflow (453 lines)
-│   ├── progress.md               # Progress report + routing (381 lines)
-│   ├── resume-project.md         # Session resume workflow
-│   ├── map-codebase.md           # Codebase mapping orchestrator
-│   ├── research-phase.md         # Phase research workflow
-│   ├── discovery-phase.md        # Phase discovery workflow
-│   ├── discuss-phase.md          # Capture design decisions
-│   ├── verify-phase.md           # Phase verification
-│   ├── help.md                   # Command reference (486 lines)
-│   ├── health.md                 # Project health check
-│   ├── settings.md               # View/edit config
-│   ├── set-profile.md            # Change model profile
-│   ├── update.md                 # Plugin update workflow
-│   ├── transition.md             # Phase transition
-│   ├── complete-milestone.md     # Milestone completion
-│   ├── new-milestone.md          # New milestone creation
-│   ├── audit-milestone.md        # Milestone audit
-│   ├── plan-milestone-gaps.md    # Gap planning for milestone
-│   ├── add-phase.md              # Add phase to roadmap
-│   ├── insert-phase.md           # Insert decimal phase
-│   ├── remove-phase.md           # Remove phase from roadmap
-│   ├── add-todo.md               # Capture todo item
-│   ├── check-todos.md            # Review pending todos
-│   ├── list-phase-assumptions.md # List phase assumptions
-│   ├── cleanup.md                # Project cleanup
-│   ├── diagnose-issues.md        # Troubleshooting
-│   └── pause-work.md             # Save WIP state
-├── templates/                     # Document templates (24+ files)
-│   ├── config.json               # Default config.json template
-│   ├── state.md                  # STATE.md template + usage guide
-│   ├── roadmap.md                # ROADMAP.md template (202 lines)
-│   ├── project.md                # PROJECT.md template
-│   ├── requirements.md           # REQUIREMENTS.md template
-│   ├── summary.md                # SUMMARY.md template (248 lines)
-│   ├── summary-minimal.md        # Minimal summary variant
-│   ├── summary-standard.md       # Standard summary variant
-│   ├── summary-complex.md        # Complex summary variant
-│   ├── research.md               # RESEARCH.md template
-│   ├── discovery.md              # DISCOVERY.md template
-│   ├── context.md                # CONTEXT.md template
-│   ├── milestone.md              # Milestone tracking template
-│   ├── milestone-archive.md      # Milestone archive template
-│   ├── verification-report.md    # VERIFICATION.md template
-│   ├── UAT.md                    # UAT.md template
-│   ├── DEBUG.md                  # DEBUG.md template
-│   ├── continue-here.md          # Session resume template
-│   ├── phase-prompt.md           # Phase prompt template
-│   ├── planner-subagent-prompt.md  # Planner agent spawn template
-│   ├── debug-subagent-prompt.md  # Debugger agent spawn template
-│   ├── user-setup.md             # First-run setup guide
-│   ├── codebase/                 # Codebase mapping templates (7 files)
-│   │   ├── architecture.md       # Architecture analysis template
-│   │   ├── concerns.md           # Technical debt template
-│   │   ├── conventions.md        # Coding conventions template
-│   │   ├── integrations.md       # External integrations template
-│   │   ├── stack.md              # Technology stack template
-│   │   ├── structure.md          # Directory structure template
-│   │   └── testing.md            # Testing patterns template
-│   └── research-project/         # Research project templates (5 files)
-│       ├── ARCHITECTURE.md       # Architecture research template
-│       ├── FEATURES.md           # Features research template
-│       ├── PITFALLS.md           # Pitfalls research template
-│       ├── STACK.md              # Stack research template
-│       └── SUMMARY.md            # Research summary template
-├── references/                    # Behavioral rules for agents (13 files)
-│   ├── ui-brand.md               # UI patterns: banners, checkpoints, symbols (160 lines)
-│   ├── checkpoints.md            # Checkpoint types: human-verify, decision, action (776 lines)
-│   ├── git-integration.md        # Git commit strategy and formats (248 lines)
-│   ├── git-planning-commit.md    # Planning-specific commit patterns
-│   ├── model-profiles.md         # Model profile definitions and resolution (92 lines)
-│   ├── model-profile-resolution.md # Detailed model resolution logic
-│   ├── planning-config.md        # Config schema and behavior (196 lines)
-│   ├── phase-argument-parsing.md # How to parse phase arguments
-│   ├── decimal-phase-calculation.md # Decimal phase numbering rules
-│   ├── continuation-format.md    # Session continuation format
-│   ├── verification-patterns.md  # Verification and quality patterns
-│   ├── questioning.md            # Deep questioning methodology
-│   └── tdd.md                    # Test-driven development patterns
-├── .planning/                     # Plugin's own planning directory
-│   └── codebase/                 # Codebase analysis documents
-├── AGENTS.md                      # Development workspace README (91 lines)
-├── VERSION                        # Plugin version: 1.20.5
-└── deploy.sh                      # Deploy to ~/.config/opencode/get-shit-done/ (29 lines)
+├── bin/                    # Built artifacts (bundle + tests)
+│   ├── gsd-tools.cjs      # Bundled CLI (15,348 lines, esbuild output)
+│   └── gsd-tools.test.cjs # Integration test suite (13,040 lines)
+├── src/                    # Source code (modular, pre-build)
+│   ├── index.js            # Entry point (5 lines)
+│   ├── router.js           # Command dispatch + arg parsing (772 lines)
+│   ├── commands/           # Command handler modules (13 files)
+│   └── lib/                # Shared libraries (10 files)
+├── workflows/              # Agent workflow definitions (44 .md files)
+├── templates/              # Document templates
+│   ├── *.md                # Planning document templates
+│   ├── codebase/           # Codebase analysis templates (7 files)
+│   ├── plans/              # Plan type templates (3 files)
+│   └── research-project/   # Research output templates (5 files)
+├── references/             # Agent reference documents (13 .md files)
+├── .planning/              # Project's own planning state
+│   ├── config.json         # Project configuration
+│   ├── STATE.md            # Current project state
+│   ├── ROADMAP.md          # Phase tracking
+│   ├── REQUIREMENTS.md     # Requirements document
+│   ├── INTENT.md           # Project intent document
+│   ├── PROJECT.md          # Project description
+│   ├── MILESTONES.md       # Milestone history
+│   ├── baselines/          # Performance baselines (JSON)
+│   ├── codebase/           # Codebase analysis output
+│   ├── memory/             # Persistent memory stores (JSON)
+│   ├── milestones/         # Archived milestone data
+│   ├── phases/             # Active phase directories
+│   ├── quick/              # Quick task directories
+│   └── research/           # Research output
+├── build.js                # esbuild bundler script
+├── deploy.sh               # Deploy to ~/.config/opencode/get-shit-done/
+├── package.json            # Project manifest
+├── AGENTS.md               # Development workspace instructions
+├── README.md               # Public documentation
+└── VERSION                 # Semantic version (1.20.5)
 ```
 
 ## Directory Purposes
 
+**`src/`:**
+- Purpose: All source code, organized by layer
+- Contains: JavaScript modules (.js) — CommonJS format (`require`/`module.exports`)
+- Key files:
+  - `src/index.js`: Entry point — requires router, calls `main()`
+  - `src/router.js`: Central dispatch — lazy-loads command modules, routes by command name
+
+**`src/commands/`:**
+- Purpose: Command handler implementations, one module per domain
+- Contains: 13 .js files, each exporting multiple `cmd*` functions
+- Key files:
+  - `src/commands/init.js` (1493 lines): Compound context aggregation for workflows
+  - `src/commands/verify.js` (1984 lines): All verification/validation commands
+  - `src/commands/features.js` (1904 lines): Utility commands (session, budget, search, etc.)
+  - `src/commands/intent.js` (1592 lines): INTENT.md lifecycle management
+  - `src/commands/misc.js` (1431 lines): Smaller utility commands (commit, scaffold, template, config)
+  - `src/commands/env.js` (1177 lines): Environment detection and scanning
+  - `src/commands/state.js` (652 lines): STATE.md read/write operations
+  - `src/commands/codebase.js` (489 lines): Codebase analysis orchestration
+  - `src/commands/phase.js` (901 lines): Phase lifecycle (add, insert, remove, complete)
+  - `src/commands/worktree.js` (791 lines): Git worktree management
+  - `src/commands/roadmap.js` (295 lines): ROADMAP.md parsing
+  - `src/commands/memory.js` (307 lines): Memory store operations
+  - `src/commands/mcp.js` (405 lines): MCP server profiling
+
+**`src/lib/`:**
+- Purpose: Shared utilities and parsers used across command modules
+- Contains: 10 .js files
+- Key files:
+  - `src/lib/helpers.js` (946 lines): File caching, phase tree, milestone detection, intent parsing
+  - `src/lib/constants.js` (1088 lines): Model profiles, config schema, all command help text
+  - `src/lib/deps.js` (697 lines): Multi-language import parsing and dependency graph
+  - `src/lib/conventions.js` (644 lines): Convention detection and rules generation
+  - `src/lib/codebase-intel.js` (529 lines): Source analysis engine
+  - `src/lib/frontmatter.js` (166 lines): YAML frontmatter parser (custom, zero-dep)
+  - `src/lib/output.js` (113 lines): Output formatting, field filtering, tmpfile handling
+  - `src/lib/context.js` (97 lines): Token estimation and budget checking
+  - `src/lib/regex-cache.js` (83 lines): LRU regex cache + pre-compiled patterns
+  - `src/lib/config.js` (76 lines): Config loading with schema-driven defaults
+  - `src/lib/git.js` (29 lines): Shell-free git execution wrapper
+
 **`bin/`:**
-- Purpose: CLI tool executable and tests
-- Contains: Single-file Node.js CLI (`gsd-tools.cjs`) and its test suite (`gsd-tools.test.cjs`)
-- Key constraint: Must remain a single file with zero npm dependencies
-- Key files: `gsd-tools.cjs` (6,495 lines — the entire backend logic)
+- Purpose: Built artifacts — the deployable CLI bundle and its test suite
+- Contains: 2 .cjs files
+- Key files:
+  - `bin/gsd-tools.cjs` (15,348 lines): esbuild bundle of `src/` — the single deployable artifact
+  - `bin/gsd-tools.test.cjs` (13,040 lines): Integration tests using `node:test`
 
 **`workflows/`:**
-- Purpose: Orchestration prompts that define multi-step AI agent workflows
-- Contains: 32 markdown files, each defining one workflow/command
-- Pattern: XML-tagged sections (`<purpose>`, `<process>`, `<step>`) with embedded shell commands calling `gsd-tools.cjs`
-- Key files: `execute-phase.md` (phase execution), `plan-phase.md` (phase planning), `new-project.md` (project initialization), `quick.md` (ad-hoc tasks)
+- Purpose: Agent workflow definitions — structured markdown prompts that agents follow
+- Contains: 44 .md files (~8,400 lines total)
+- Categories:
+  - Core workflows: `execute-phase.md`, `plan-phase.md`, `new-project.md`, `new-milestone.md`
+  - Lifecycle workflows: `progress.md`, `resume-project.md`, `pause-work.md`, `complete-milestone.md`
+  - Phase operations: `add-phase.md`, `insert-phase.md`, `remove-phase.md`, `verify-phase.md`
+  - Utility commands: `cmd-*.md` (11 files — thin wrappers for CLI features)
+  - Discovery/research: `discovery-phase.md`, `discuss-phase.md`, `research-phase.md`
+  - Admin: `settings.md`, `health.md`, `help.md`, `cleanup.md`, `update.md`
+  - Codebase: `map-codebase.md`
 
 **`templates/`:**
-- Purpose: Document structure definitions for all `.planning/` artifacts
-- Contains: Markdown templates with placeholder patterns, a default `config.json`
-- Subdirectories: `codebase/` (7 templates for codebase mapping), `research-project/` (5 templates for research output)
-- Used by: Workflows via `@` file references, CLI `template fill` command
+- Purpose: Document scaffolds for all planning artifacts
+- Contains: 24 root .md files + 3 subdirectories with 15 more files
+- Key files:
+  - `templates/state.md`: STATE.md template
+  - `templates/roadmap.md`: ROADMAP.md template
+  - `templates/requirements.md`: REQUIREMENTS.md template
+  - `templates/intent.md`: INTENT.md template
+  - `templates/phase-prompt.md` (569 lines): Full plan execution prompt template
+  - `templates/summary.md` (248 lines): SUMMARY.md template with sections
+  - `templates/verification-report.md` (322 lines): Phase verification report
+  - `templates/research.md` (602 lines): Research phase template
+  - `templates/plans/execute.md`: Standard plan template
+  - `templates/plans/tdd.md`: TDD-focused plan template
+  - `templates/plans/discovery.md`: Discovery plan template
+  - `templates/codebase/*.md` (7 files): Templates for codebase analysis docs
 
 **`references/`:**
-- Purpose: Behavioral rules, patterns, and guidelines that agents must follow
-- Contains: 13 markdown files defining UI branding, git strategy, model profiles, checkpoint types, etc.
-- Pattern: Loaded by workflows via `<required_reading>` blocks with `@` file references
-- Key files: `ui-brand.md` (visual output patterns), `checkpoints.md` (interaction patterns), `git-integration.md` (commit strategy)
+- Purpose: Shared knowledge documents loaded by agents for behavior consistency
+- Contains: 13 .md files (~2,960 lines total)
+- Key files:
+  - `references/checkpoints.md` (782 lines): Checkpoint guidelines for plan execution
+  - `references/verification-patterns.md` (620 lines): How to verify completed work
+  - `references/tdd.md` (263 lines): TDD workflow patterns
+  - `references/continuation-format.md` (254 lines): Session continuation format
+  - `references/git-integration.md` (248 lines): Git branching and commit patterns
+  - `references/planning-config.md` (196 lines): Config documentation
+  - `references/ui-brand.md` (160 lines): UI/UX branding guidelines
+  - `references/questioning.md` (145 lines): Deep questioning methodology
+  - `references/model-profiles.md` (92 lines): Model assignment profiles
+
+**`.planning/`:**
+- Purpose: This project's own planning state (GSD manages itself)
+- Contains: Planning documents, phase directories, memory stores, baselines
+- Key files:
+  - `.planning/config.json`: Project configuration (mode, profile, workflow flags)
+  - `.planning/STATE.md`: Current project state
+  - `.planning/ROADMAP.md`: Phase tracking across 6 milestones (v1.0–v5.0)
+  - `.planning/INTENT.md`: Project intent document
+  - `.planning/PROJECT.md`: Project description
+  - `.planning/env-manifest.json`: Machine-specific env detection (gitignored)
+  - `.planning/project-profile.json`: Team-visible project profile
+  - `.planning/baselines/bundle-size.json`: Bundle size tracking
+  - `.planning/memory/bookmarks.json`: Session bookmarks
+  - `.planning/codebase/codebase-intel.json`: Source code analysis cache
 
 ## Key File Locations
 
 **Entry Points:**
-- `bin/gsd-tools.cjs`: Main CLI entry point — `main()` function at line 6022, router at line 6035
-- `deploy.sh`: Deployment script — copies source to `~/.config/opencode/get-shit-done/`
+- `src/index.js`: Source entry — `require('./router').main()`
+- `bin/gsd-tools.cjs`: Built bundle — the artifact deployed and invoked by agents
+- `build.js`: Build script — esbuild configuration + smoke test + size tracking
+- `deploy.sh`: Deploy script — build, backup, copy, smoke test, rollback
 
 **Configuration:**
-- `templates/config.json`: Default project configuration template (modes, gates, parallelization)
-- `VERSION`: Plugin version string (currently `1.20.5`)
+- `package.json`: Node.js manifest (name: `gsd-tools`, node >=18, zero runtime deps except `tokenx`)
+- `VERSION`: Semantic version string (currently `1.20.5`)
+- `.planning/config.json`: Per-project GSD configuration
+- `src/lib/constants.js`: `CONFIG_SCHEMA` object defines all valid config keys, types, defaults, aliases
 
-**Core Logic (all inside `bin/gsd-tools.cjs`):**
-- Lines 130-144: `MODEL_PROFILES` — Agent-to-model mapping table
-- Lines 146-487: Helpers — `loadConfig()`, `execGit()`, `extractFrontmatter()`, `output()`, `error()`
-- Lines 488-1190: Atomic commands — slug, timestamp, todos, config, history
-- Lines 1191-2110: State progression engine — state CRUD, metrics, decisions, blockers
-- Lines 2111-2174: Web search (Brave API)
-- Lines 2175-2237: Frontmatter CRUD
-- Lines 2239-2530: Verification suite — 6 verify commands
-- Lines 2531-3132: Roadmap analysis + phase operations (add, insert, remove)
-- Lines 3133-3525: Requirements + phase complete + milestone complete
-- Lines 3526-3895: Validation (consistency, health)
-- Lines 3896-4058: Progress render, todo complete, scaffold
-- Lines 4059-5010: Compound init commands (12 workflows)
-- Lines 5012-6018: Extended features (15 additional commands)
-- Lines 6020-6495: CLI router (`main()` function)
+**Core Logic:**
+- `src/router.js`: Command routing and argument parsing
+- `src/commands/init.js`: Context aggregation for workflow initialization
+- `src/commands/verify.js`: Plan/phase/artifact/requirement verification
+- `src/commands/features.js`: Session, context, search, and analysis features
+- `src/lib/helpers.js`: File caching, phase tree, milestone detection
+- `src/lib/frontmatter.js`: YAML frontmatter parsing (custom implementation)
+- `src/lib/codebase-intel.js`: Source code analysis engine
+- `src/lib/deps.js`: Multi-language dependency graph construction
 
 **Testing:**
-- `bin/gsd-tools.test.cjs`: 2,302-line test suite using `node:test` runner
-
-**Primary Workflow Files:**
-- `workflows/new-project.md`: Full project initialization (questioning → research → requirements → roadmap)
-- `workflows/plan-phase.md`: Phase planning (research → plan → verify loop, max 3 iterations)
-- `workflows/execute-phase.md`: Phase execution (discover plans → group waves → spawn executors)
-- `workflows/execute-plan.md`: Single plan execution (task-by-task with checkpoints)
-- `workflows/progress.md`: Progress report with intelligent routing to next action
-- `workflows/quick.md`: Quick ad-hoc tasks with GSD guarantees
+- `bin/gsd-tools.test.cjs`: 13,040-line integration test suite using `node:test`
 
 ## Naming Conventions
 
-**Workflow Files:**
-- Pattern: `kebab-case.md` — matches the slash command name minus the `/gsd-` prefix
-- Examples: `execute-phase.md` → `/gsd-execute-phase`, `new-project.md` → `/gsd-new-project`
+**Files:**
+- Source modules: `kebab-case.js` (e.g., `codebase-intel.js`, `regex-cache.js`)
+- Command modules: `single-word.js` matching domain (e.g., `init.js`, `state.js`, `verify.js`)
+- Workflows: `kebab-case.md` (e.g., `execute-phase.md`, `map-codebase.md`)
+- Utility command workflows: `cmd-<name>.md` prefix (e.g., `cmd-velocity.md`, `cmd-test-run.md`)
+- Templates: `kebab-case.md` (e.g., `phase-prompt.md`, `summary-complex.md`)
+- References: `kebab-case.md` (e.g., `verification-patterns.md`, `git-integration.md`)
+- Planning docs: `UPPER-CASE.md` (e.g., `STATE.md`, `ROADMAP.md`, `INTENT.md`)
+- Phase plans: `NN-MM-PLAN.md` / `NN-MM-SUMMARY.md` (e.g., `01-01-PLAN.md`, `01-01-SUMMARY.md`)
+- Phase context: `NN-CONTEXT.md`, `NN-VERIFICATION.md`, `NN-RESEARCH.md`
 
-**Template Files:**
-- Pattern: `kebab-case.md` for main templates, matching the document they generate
-- Examples: `state.md` → generates `STATE.md`, `roadmap.md` → generates `ROADMAP.md`
-- Variants use suffixes: `summary-minimal.md`, `summary-standard.md`, `summary-complex.md`
+**Directories:**
+- Phase directories: `NN-descriptive-slug/` (e.g., `01-foundation-safety-nets/`, `06-token-measurement-output-infrastructure/`)
+- Milestone archives: `vX.Y-phases/` (e.g., `v1.0-phases/`, `v4.0-phases/`)
+- Quick task directories: `N-slug/` (e.g., `1-research-and-optimize-gsd-tool-performan/`)
 
-**Reference Files:**
-- Pattern: `kebab-case.md` — descriptive of the behavioral domain they cover
-- Examples: `ui-brand.md`, `git-integration.md`, `model-profiles.md`
+**Functions:**
+- Command handlers: `cmd` prefix + PascalCase domain + action (e.g., `cmdInitExecutePhase`, `cmdStateLoad`, `cmdCodebaseAnalyze`)
+- Internal helpers: camelCase (e.g., `findPhaseInternal`, `resolveModelInternal`, `getMilestoneInfo`)
+- Lazy loaders: `lazy` prefix + PascalCase module name (e.g., `lazyState()`, `lazyInit()`)
 
-**CLI Functions (inside `gsd-tools.cjs`):**
-- Command functions: `cmd` prefix + PascalCase — `cmdStateLoad()`, `cmdPhaseAdd()`, `cmdInitExecutePhase()`
-- Internal helpers: camelCase — `findPhaseInternal()`, `resolveModelInternal()`, `getMilestoneInfo()`
-- Parser helpers: camelCase — `extractFrontmatter()`, `parseMustHavesBlock()`, `reconstructFrontmatter()`
-
-**Phase Directories (in target projects):**
-- Pattern: `XX-kebab-case-name` where `XX` is zero-padded phase number
-- Examples: `01-foundation`, `02-auth`, `02.1-critical-fix`
-
-**Plan/Summary Files (in target projects):**
-- Pattern: `XX-YY-PLAN.md` and `XX-YY-SUMMARY.md` where `XX` = phase, `YY` = plan
-- Examples: `01-01-PLAN.md`, `01-01-SUMMARY.md`, `01-02-PLAN.md`
+**Variables:**
+- Module-level caches: underscore prefix (e.g., `_configCache`, `_phaseTreeCache`, `_milestoneCache`, `_fmCache`)
+- Constants: `UPPER_SNAKE_CASE` (e.g., `CONFIG_SCHEMA`, `MODEL_PROFILES`, `SKIP_DIRS`, `BINARY_EXTENSIONS`)
+- Cache size limits: `*_MAX` or `MAX_*` suffix/prefix (e.g., `FM_CACHE_MAX`, `MAX_CACHE_SIZE`)
 
 ## Where to Add New Code
 
 **New CLI Command:**
-1. Write the command function in `bin/gsd-tools.cjs` (place in appropriate section by category)
-2. Add a `case` entry in the `main()` switch router (line 6035+)
-3. Add test cases in `bin/gsd-tools.test.cjs`
-4. Update the header comment (lines 9-123) with usage documentation
+1. Create handler function(s) in appropriate `src/commands/*.js` module (or new module if new domain)
+2. Add case to switch in `src/router.js` — use lazy-loading pattern: `function lazyNewModule() { return _modules.newmodule || (_modules.newmodule = require('./commands/newmodule')); }`
+3. Add help text to `COMMAND_HELP` in `src/lib/constants.js`
+4. Add tests in `bin/gsd-tools.test.cjs`
+5. Run `npm run build` to bundle, then `npm test` to verify
 
 **New Workflow:**
-1. Create `workflows/your-workflow.md` with `<purpose>`, `<process>`, `<step>` structure
-2. Start with an `init` call to `gsd-tools.cjs` if the workflow needs project context
-3. Reference behavioral rules from `references/` via `<required_reading>` blocks
-4. Add corresponding slash command in `~/.config/opencode/command/` (outside this repo)
+1. Create `workflows/<name>.md` with `<purpose>`, `<process>`, and `<step>` tags
+2. First step should call `init` command to gather context
+3. Reference `gsd-tools.cjs` commands via full path: `node /home/cam/.config/opencode/get-shit-done/bin/gsd-tools.cjs <command>`
+4. Deploy via `./deploy.sh` to make available in OpenCode
 
 **New Template:**
-1. Create `templates/your-template.md` with the template content
-2. If the CLI should fill it, add support in `cmdTemplateFill()` (line 1681)
-3. Reference from workflows using `@` file references
+1. Add to `templates/` (root for planning docs, `templates/codebase/` for analysis docs, `templates/plans/` for plan types)
+2. Use markdown with placeholders in `[brackets]`
+3. Register in `cmdTemplateFill()` in `src/commands/misc.js` if template supports programmatic fill
 
-**New Reference:**
-1. Create `references/your-reference.md` with behavioral rules
-2. Reference from workflows via `<required_reading>` blocks
+**New Reference Document:**
+1. Add to `references/<name>.md`
+2. Reference from workflows via `@references/<name>.md` or load via `extract-sections`
 
-**New Init Command (compound context gatherer):**
-1. Write `cmdInitYourWorkflow(cwd, args, raw)` in the compound commands section (after line 4059)
-2. Add routing in the `init` case of the CLI router (line 6356)
-3. Return a comprehensive JSON object with all context the workflow needs
+**New Library Module:**
+1. Add to `src/lib/<name>.js`
+2. Export functions via `module.exports`
+3. Import from command modules: `const { fn } = require('../lib/<name>')`
+4. Keep modules focused — one responsibility per file
+
+**New Init Workflow Command:**
+1. Add handler `cmdInit<Workflow>` in `src/commands/init.js`
+2. Add case to `init` switch in `src/router.js`
+3. Aggregate all context the workflow needs into single JSON payload
+4. Support `--compact` flag for reduced output
+
+**New Verification Subcommand:**
+1. Add handler `cmdVerify<Check>` in `src/commands/verify.js`
+2. Add case to `verify` switch in `src/router.js`
+3. Add help text to `COMMAND_HELP` under `'verify'` key
+
+**New Framework Detector (conventions):**
+1. Add detector object to `FRAMEWORK_DETECTORS` array in `src/lib/conventions.js`
+2. Implement `detect(intel)` → boolean and `extractPatterns(intel, cwd)` → patterns array
+3. Follows existing Elixir/Phoenix pattern as reference
+
+**New Import Parser (deps):**
+1. Add parser function `parse<Language>(content)` in `src/lib/deps.js`
+2. Add resolver function `resolve<Language>Import()` in `src/lib/deps.js`
+3. Register in `IMPORT_PARSERS` map
 
 ## Special Directories
 
-**`.planning/`:**
-- Purpose: Plugin's own planning artifacts (if using GSD to develop GSD)
-- Generated: Partially (codebase analysis documents)
+**`bin/`:**
+- Purpose: Built artifacts — the bundle and tests
+- Generated: Yes — `bin/gsd-tools.cjs` is generated by `build.js`
+- Committed: Yes — the bundle is version-controlled and deployed directly
+
+**`.planning/baselines/`:**
+- Purpose: Performance baselines for context budget tracking and bundle size
+- Generated: Yes — created by `context-budget baseline` and `build.js`
 - Committed: Yes
 
-**`templates/codebase/`:**
-- Purpose: Templates for the `/gsd-map-codebase` workflow output
-- Contains: 7 markdown templates (architecture, concerns, conventions, integrations, stack, structure, testing)
-- Generated: No (static templates)
+**`.planning/memory/`:**
+- Purpose: Persistent agent memory (JSON stores)
+- Generated: Yes — created by `memory write` commands
+- Committed: Partially — `bookmarks.json` committed, some stores may be gitignored
+
+**`.planning/codebase/`:**
+- Purpose: Codebase analysis output (intel JSON + structured markdown docs)
+- Generated: Yes — by `codebase analyze` and `map-codebase` workflow
+- Committed: Yes (markdown docs committed, `codebase-intel.json` committed)
+
+**`.planning/milestones/`:**
+- Purpose: Archived milestone roadmaps, requirements, and phase directories
+- Generated: Yes — by `milestone complete` command
 - Committed: Yes
 
-**`templates/research-project/`:**
-- Purpose: Templates for parallel research agent outputs during project initialization
-- Contains: 5 markdown templates (ARCHITECTURE.md, FEATURES.md, PITFALLS.md, STACK.md, SUMMARY.md)
-- Generated: No (static templates)
-- Committed: Yes
-
-## File Organization
-
-The plugin follows a clear separation between code (behavior) and content (structure):
-
-**Code lives in `bin/`:** All executable logic is in `gsd-tools.cjs`. The single-file constraint is intentional — zero dependencies, zero build step, copy-deploy model.
-
-**Prompts live in `workflows/`:** Each workflow is a self-contained orchestration script. Workflows call `gsd-tools.cjs` for data but make all creative/routing decisions themselves.
-
-**Structure lives in `templates/`:** Document templates define what `.planning/` artifacts look like. Templates are both filled programmatically (via `template fill` command) and referenced by agents for manual creation.
-
-**Rules live in `references/`:** Behavioral constraints that multiple workflows share. Extracted to avoid duplication — `ui-brand.md` is referenced by 5+ workflows, `checkpoints.md` by 3+ workflows.
-
-**Deployment is copy-based:** `deploy.sh` copies `bin/`, `workflows/`, `templates/`, `references/`, and `VERSION` to `~/.config/opencode/get-shit-done/`. No build, no compilation, no package manager.
+**`node_modules/`:**
+- Purpose: npm dependencies (only `esbuild` dev + `tokenx` runtime)
+- Generated: Yes — by `npm install`
+- Committed: No — gitignored
 
 ---
 
-*Structure analysis: 2026-02-21*
+*Structure analysis: 2026-02-26*
