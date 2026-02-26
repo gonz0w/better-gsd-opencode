@@ -238,7 +238,7 @@ After (Phase 2 shipped JWT auth, discovered rate limiting needed):
 Verify the updates are correct by reading STATE.md. If the progress bar needs updating, use:
 
 ```bash
-PROGRESS=$(node /home/cam/.config/opencode/get-shit-done/bin/gsd-tools.cjs progress bar --raw)
+PROGRESS=$(node /home/cam/.config/opencode/get-shit-done/bin/gsd-tools.cjs progress bar)
 ```
 
 Update the progress bar line in STATE.md with the result.

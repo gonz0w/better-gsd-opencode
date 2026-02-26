@@ -2,7 +2,7 @@
 
 ## What This Is
 
-Development workspace for improving the Get Shit Done (GSD) planning plugin for OpenCode.
+Development workspace for improving the Get Stuff Done (bGSD) planning plugin for OpenCode.
 The production install lives at `~/.config/opencode/get-shit-done/`.
 
 ## Project Structure

@@ -34,7 +34,7 @@ Returns: `{ truths: [...], artifacts: [...], key_links: [...] }`. Aggregate acro
 
 **Option B — ROADMAP Success Criteria** (if no must_haves):
 ```bash
-node /home/cam/.config/opencode/get-shit-done/bin/gsd-tools.cjs roadmap get-phase "${phase_number}" --raw
+node /home/cam/.config/opencode/get-shit-done/bin/gsd-tools.cjs roadmap get-phase "${phase_number}"
 ```
 Use each criterion as a truth, derive artifacts and key links.
 

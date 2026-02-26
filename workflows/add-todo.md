@@ -83,7 +83,7 @@ Use values from init context: `timestamp` and `date` are already available.
 
 Generate slug for the title:
 ```bash
-slug=$(node /home/cam/.config/opencode/get-shit-done/bin/gsd-tools.cjs generate-slug "$title" --raw)
+slug=$(node /home/cam/.config/opencode/get-shit-done/bin/gsd-tools.cjs generate-slug "$title")
 ```
 
 Write to `.planning/todos/pending/${date}-${slug}.md`:

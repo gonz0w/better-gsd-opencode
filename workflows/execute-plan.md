@@ -34,7 +34,7 @@ PLAN_START_EPOCH=$(date +%s)
 
 <step name="context_budget_check">
 ```bash
-BUDGET=$(node /home/cam/.config/opencode/get-shit-done/bin/gsd-tools.cjs context-budget "${PLAN_PATH}" --raw 2>/dev/null)
+BUDGET=$(node /home/cam/.config/opencode/get-shit-done/bin/gsd-tools.cjs context-budget "${PLAN_PATH}" 2>/dev/null)
 ```
 
 If `warning` truthy: yolo → log and continue. Interactive → ask proceed/stop.

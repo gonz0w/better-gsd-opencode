@@ -1,4 +1,4 @@
-# GSD (Get Shit Done) — AI Project Planning for OpenCode
+# bGSD (Get Stuff Done) — AI Project Planning for OpenCode
 
 A structured project planning and execution system for [OpenCode](https://github.com/opencode-ai/opencode). GSD turns AI-assisted coding from ad-hoc prompting into milestone-driven development with planning, execution, verification, and memory that persists across sessions.
 

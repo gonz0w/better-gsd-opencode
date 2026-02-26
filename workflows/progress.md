@@ -88,7 +88,7 @@ Use this instead of manually reading/parsing ROADMAP.md.
 
 ```bash
 # Get formatted progress bar
-PROGRESS_BAR=$(node /home/cam/.config/opencode/get-shit-done/bin/gsd-tools.cjs progress bar --raw)
+PROGRESS_BAR=$(node /home/cam/.config/opencode/get-shit-done/bin/gsd-tools.cjs progress bar)
 ```
 
 Present:

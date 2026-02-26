@@ -101,7 +101,7 @@ Also derive:
 Write INTENT.md using `intent create` with the structured data from answers:
 
 ```bash
-node /home/cam/.config/opencode/get-shit-done/bin/gsd-tools.cjs intent create --raw
+node /home/cam/.config/opencode/get-shit-done/bin/gsd-tools.cjs intent create
 ```
 
 Note: `intent create` reads from stdin when no arguments provided — pipe the structured intent data to it. Alternatively, write INTENT.md directly using the Write tool following the INTENT.md template format, then commit.

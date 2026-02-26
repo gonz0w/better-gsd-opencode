@@ -37,7 +37,7 @@ Report: "Found {plan_count} plans in {phase_dir} ({incomplete_count} incomplete)
 
 <step name="preflight_dependency_check">
 ```bash
-DEPS=$(node /home/cam/.config/opencode/get-shit-done/bin/gsd-tools.cjs validate-dependencies "${PHASE_NUMBER}" --raw 2>/dev/null)
+DEPS=$(node /home/cam/.config/opencode/get-shit-done/bin/gsd-tools.cjs validate-dependencies "${PHASE_NUMBER}" 2>/dev/null)
 ```
 
 Parse for `valid` (bool) and `issues` (array). If valid or command fails: continue silently.
@@ -52,9 +52,9 @@ Otherwise, run auto-fix first, then validate:
 
 ```bash
 # Auto-fix what we can
-FIX_RESULT=$(node /home/cam/.config/opencode/get-shit-done/bin/gsd-tools.cjs state validate --fix --raw 2>/dev/null)
+FIX_RESULT=$(node /home/cam/.config/opencode/get-shit-done/bin/gsd-tools.cjs state validate --fix 2>/dev/null)
 # Then check for remaining issues
-VALIDATE_RESULT=$(node /home/cam/.config/opencode/get-shit-done/bin/gsd-tools.cjs state validate --raw 2>/dev/null)
+VALIDATE_RESULT=$(node /home/cam/.config/opencode/get-shit-done/bin/gsd-tools.cjs state validate 2>/dev/null)
 ```
 
 Parse `FIX_RESULT` for `fixes_applied` array. If non-empty: display "Pre-flight auto-fixed: {count} issue(s)".
@@ -113,7 +113,7 @@ Advisory check for naming convention mismatches across all files the phase will 
    # For each plan in incomplete_plans from init JSON:
    ALL_FILES=""
    for PLAN_PATH in ${INCOMPLETE_PLANS}; do
-     PLAN_FILES=$(node gsd-tools.cjs frontmatter "${PLAN_PATH}" --field files_modified --raw 2>/dev/null)
+     PLAN_FILES=$(node gsd-tools.cjs frontmatter "${PLAN_PATH}" --field files_modified 2>/dev/null)
      ALL_FILES="${ALL_FILES} ${PLAN_FILES}"
    done
    # Deduplicate
@@ -123,7 +123,7 @@ Advisory check for naming convention mismatches across all files the phase will 
 2. **Run codebase context for all files:**
    ```bash
    if [ -n "$ALL_FILES" ]; then
-     CONV_CTX=$(node gsd-tools.cjs codebase context --files ${ALL_FILES} --raw 2>/dev/null)
+     CONV_CTX=$(node gsd-tools.cjs codebase context --files ${ALL_FILES} 2>/dev/null)
    fi
    ```
    If command fails or returns empty: skip silently. No warning, no error.
@@ -194,9 +194,9 @@ Execute each wave in sequence. Within a wave: parallel if `PARALLELIZATION=true`
 
    b. **Inject codebase context** (same as Mode B):
       ```bash
-      PLAN_FILES=$(node gsd-tools.cjs frontmatter "${PLAN_PATH}" --field files_modified --raw 2>/dev/null)
+      PLAN_FILES=$(node gsd-tools.cjs frontmatter "${PLAN_PATH}" --field files_modified 2>/dev/null)
       if [ -n "$PLAN_FILES" ]; then
-        CODEBASE_CTX=$(node gsd-tools.cjs codebase context --files ${PLAN_FILES} --plan ${PLAN_PATH} --raw 2>/dev/null)
+        CODEBASE_CTX=$(node gsd-tools.cjs codebase context --files ${PLAN_FILES} --plan ${PLAN_PATH} 2>/dev/null)
       fi
       ```
       If `CODEBASE_CTX` is non-empty, include the `<codebase_context>` block in the spawn prompt. If commands fail or return empty, omit the block entirely (graceful no-op).
@@ -263,9 +263,9 @@ Execute each wave in sequence. Within a wave: parallel if `PARALLELIZATION=true`
 
    **Before spawning each executor**, inject codebase context if available:
    ```bash
-   PLAN_FILES=$(node gsd-tools.cjs frontmatter "${PLAN_PATH}" --field files_modified --raw 2>/dev/null)
+   PLAN_FILES=$(node gsd-tools.cjs frontmatter "${PLAN_PATH}" --field files_modified 2>/dev/null)
    if [ -n "$PLAN_FILES" ]; then
-     CODEBASE_CTX=$(node gsd-tools.cjs codebase context --files ${PLAN_FILES} --plan ${PLAN_PATH} --raw 2>/dev/null)
+     CODEBASE_CTX=$(node gsd-tools.cjs codebase context --files ${PLAN_FILES} --plan ${PLAN_PATH} 2>/dev/null)
    fi
    ```
    If `CODEBASE_CTX` is non-empty, include the `<codebase_context>` block below. If the commands fail or return empty, omit the block entirely (graceful no-op).

@@ -8,7 +8,7 @@ Show execution velocity metrics: plans completed per day, average duration, and 
 Run the velocity command:
 
 ```bash
-RESULT=$(node /home/cam/.config/opencode/get-shit-done/bin/gsd-tools.cjs velocity --raw 2>/dev/null)
+RESULT=$(node /home/cam/.config/opencode/get-shit-done/bin/gsd-tools.cjs velocity 2>/dev/null)
 ```
 
 Parse the JSON output which includes:

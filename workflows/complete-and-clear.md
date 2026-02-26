@@ -13,7 +13,7 @@ Read STATE.md before starting. No other files needed — session-summary CLI pro
 Call session-summary to get structured session data:
 
 ```bash
-SUMMARY=$(node /home/cam/.config/opencode/get-shit-done/bin/gsd-tools.cjs session-summary --raw)
+SUMMARY=$(node /home/cam/.config/opencode/get-shit-done/bin/gsd-tools.cjs session-summary)
 ```
 
 Parse the JSON response. If error field present, display "No session data available" and suggest `/gsd-resume`.

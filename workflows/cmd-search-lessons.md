@@ -27,7 +27,7 @@ Exit.
 Run the search-lessons command:
 
 ```bash
-RESULT=$(node /home/cam/.config/opencode/get-shit-done/bin/gsd-tools.cjs search-lessons "$QUERY" --raw 2>/dev/null)
+RESULT=$(node /home/cam/.config/opencode/get-shit-done/bin/gsd-tools.cjs search-lessons "$QUERY" 2>/dev/null)
 ```
 
 Parse the JSON output which includes:

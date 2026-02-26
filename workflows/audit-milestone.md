@@ -18,7 +18,7 @@ Extract from init JSON: `milestone_version`, `milestone_name`, `phase_count`, `c
 
 Resolve integration checker model:
 ```bash
-CHECKER_MODEL=$(node /home/cam/.config/opencode/get-shit-done/bin/gsd-tools.cjs resolve-model gsd-integration-checker --raw)
+CHECKER_MODEL=$(node /home/cam/.config/opencode/get-shit-done/bin/gsd-tools.cjs resolve-model gsd-integration-checker)
 ```
 
 ## 1. Determine Milestone Scope
@@ -39,7 +39,7 @@ For each phase directory, read the VERIFICATION.md:
 
 ```bash
 # For each phase, use find-phase to resolve the directory (handles archived phases)
-PHASE_INFO=$(node /home/cam/.config/opencode/get-shit-done/bin/gsd-tools.cjs find-phase 01 --raw)
+PHASE_INFO=$(node /home/cam/.config/opencode/get-shit-done/bin/gsd-tools.cjs find-phase 01)
 # Extract directory from JSON, then read VERIFICATION.md from that directory
 # Repeat for each phase number from ROADMAP.md
 ```

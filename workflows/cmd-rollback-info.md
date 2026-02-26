@@ -27,7 +27,7 @@ Exit.
 Run the rollback-info command:
 
 ```bash
-RESULT=$(node /home/cam/.config/opencode/get-shit-done/bin/gsd-tools.cjs rollback-info "$PLAN_ID" --raw 2>/dev/null)
+RESULT=$(node /home/cam/.config/opencode/get-shit-done/bin/gsd-tools.cjs rollback-info "$PLAN_ID" 2>/dev/null)
 ```
 
 Parse the JSON output which includes:

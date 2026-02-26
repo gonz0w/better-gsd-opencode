@@ -26,7 +26,7 @@ Exit.
 Run the context-budget command:
 
 ```bash
-RESULT=$(node /home/cam/.config/opencode/get-shit-done/bin/gsd-tools.cjs context-budget "$PLAN_PATH" --raw 2>/dev/null)
+RESULT=$(node /home/cam/.config/opencode/get-shit-done/bin/gsd-tools.cjs context-budget "$PLAN_PATH" 2>/dev/null)
 ```
 
 Parse the JSON output which includes:

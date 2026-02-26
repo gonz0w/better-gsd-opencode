@@ -5,7 +5,7 @@ Display the complete GSD command reference. Output ONLY the reference content. D
 <reference>
 # GSD Command Reference
 
-**GSD** (Get Shit Done) creates hierarchical project plans optimized for solo agentic development with OpenCode.
+**bGSD** (Get Stuff Done) creates hierarchical project plans optimized for solo agentic development with OpenCode.
 
 ## Quick Start
 
