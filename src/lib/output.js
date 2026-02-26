@@ -72,31 +72,107 @@ function filterFields(obj, fields) {
   return result;
 }
 
+// ─── Output Mode ─────────────────────────────────────────────────────────────
+
+/**
+ * Returns the current output mode: 'formatted', 'json', or 'pretty'.
+ * Set by router.js at startup via global._gsdOutputMode.
+ * Defaults to 'json' (safe for piped/scripted contexts).
+ */
+function outputMode() {
+  return global._gsdOutputMode || 'json';
+}
+
+// ─── JSON Output ─────────────────────────────────────────────────────────────
+
+/**
+ * Write result as JSON to stdout. Handles field filtering and large payload
+ * tmpfile fallback. Extracted from output() for dual-mode routing.
+ */
+function outputJSON(result, rawValue) {
+  if (rawValue !== undefined) {
+    process.stdout.write(String(rawValue));
+    return;
+  }
+  let filtered = result;
+  if (global._gsdRequestedFields && typeof result === 'object' && result !== null) {
+    filtered = filterFields(result, global._gsdRequestedFields);
+  }
+  const json = JSON.stringify(filtered, null, 2);
+  // Large payloads exceed OpenCode's Bash tool buffer (~50KB).
+  // Write to tmpfile and output the path prefixed with @file: so callers can detect it.
+  // GSD_NO_TMPFILE: skip file redirect (used by context-budget measure to capture full output)
+  if (json.length > 50000 && !process.env.GSD_NO_TMPFILE) {
+    const tmpPath = path.join(require('os').tmpdir(), `gsd-${Date.now()}.json`);
+    fs.writeFileSync(tmpPath, json, 'utf-8');
+    _tmpFiles.push(tmpPath);
+    process.stdout.write('@file:' + tmpPath);
+  } else {
+    process.stdout.write(json);
+  }
+}
+
 // ─── Output Functions ────────────────────────────────────────────────────────
 
-function output(result, raw, rawValue) {
-  if (raw && rawValue !== undefined) {
-    process.stdout.write(String(rawValue));
+/**
+ * Primary output function with dual-mode routing.
+ *
+ * Modes (set by global._gsdOutputMode):
+ *   'json'      — JSON to stdout (piped, default, backward-compat)
+ *   'formatted' — Human-readable via formatter function (TTY)
+ *   'pretty'    — Same as formatted, forced via --pretty flag
+ *
+ * @param {*} result - Data to output
+ * @param {object|boolean} options - { rawValue, formatter } or legacy boolean (raw flag)
+ *   rawValue:  If provided, write as plain string (bypasses JSON/formatting)
+ *   formatter: function(result) => string — renders human-readable output
+ *
+ * Backward compatibility: if options is boolean, treat as legacy raw mode
+ * (JSON output). This ensures all existing command handlers keep working
+ * during migration. Individual commands get migrated to output(result, { formatter })
+ * in Phases 32-34.
+ */
+function output(result, options) {
+  // Legacy backward compatibility: output(result, raw) or output(result, raw, rawValue)
+  if (typeof options === 'boolean') {
+    outputJSON(result, arguments[2]);
+    process.exit(0);
+    return;
+  }
+
+  const opts = options || {};
+  const mode = outputMode();
+
+  if (mode === 'json') {
+    // JSON mode — existing behavior (field filtering, tmpfile for large payloads)
+    outputJSON(result, opts.rawValue);
   } else {
-    let filtered = result;
-    if (global._gsdRequestedFields && typeof result === 'object' && result !== null) {
-      filtered = filterFields(result, global._gsdRequestedFields);
-    }
-    const json = JSON.stringify(filtered, null, 2);
-    // Large payloads exceed OpenCode's Bash tool buffer (~50KB).
-    // Write to tmpfile and output the path prefixed with @file: so callers can detect it.
-    // GSD_NO_TMPFILE: skip file redirect (used by context-budget measure to capture full output)
-    if (json.length > 50000 && !process.env.GSD_NO_TMPFILE) {
-      const tmpPath = path.join(require('os').tmpdir(), `gsd-${Date.now()}.json`);
-      fs.writeFileSync(tmpPath, json, 'utf-8');
-      _tmpFiles.push(tmpPath);
-      process.stdout.write('@file:' + tmpPath);
+    // Formatted/pretty mode — use formatter if provided, else graceful fallback to JSON
+    if (opts.formatter) {
+      const formatted = opts.formatter(result);
+      process.stdout.write(formatted + '\n');
     } else {
-      process.stdout.write(json);
+      // Graceful fallback: commands not yet migrated still produce JSON
+      outputJSON(result, opts.rawValue);
     }
   }
   process.exit(0);
 }
+
+// ─── Status Output (stderr) ─────────────────────────────────────────────────
+
+/**
+ * Write a status/progress message to stderr.
+ * Visible to the user even when stdout is piped to JSON.
+ * Use for progress indicators, timing info, diagnostic messages.
+ *
+ * @param {string} message - Status message to display
+ */
+function status(message) {
+  process.stderr.write(message + '\n');
+}
+
+// ─── Error & Debug ───────────────────────────────────────────────────────────
 
 function error(message) {
   process.stderr.write('Error: ' + message + '\n');
@@ -110,4 +186,4 @@ function debugLog(context, message, err) {
   process.stderr.write(line + '\n');
 }
 
-module.exports = { _tmpFiles, filterFields, output, error, debugLog };
+module.exports = { _tmpFiles, filterFields, output, outputMode, status, error, debugLog };

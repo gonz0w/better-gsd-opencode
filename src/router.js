@@ -26,9 +26,26 @@ function lazyCodebase() { return _modules.codebase || (_modules.codebase = requi
 
 async function main() {
   const args = process.argv.slice(2);
+
+  // ─── Output Mode: TTY auto-detection + --pretty override ──────────────
+  // --pretty: force formatted output even when piped (e.g., | less -R)
+  const prettyIdx = args.indexOf('--pretty');
+  if (prettyIdx !== -1) {
+    global._gsdOutputMode = 'pretty';
+    args.splice(prettyIdx, 1);
+  }
+  // Auto-detect: TTY → formatted, piped → json
+  if (global._gsdOutputMode === undefined) {
+    global._gsdOutputMode = process.stdout.isTTY ? 'formatted' : 'json';
+  }
+
+  // Backward compat: accept --raw silently (no-op, auto-detection handles it)
   const rawIndex = args.indexOf('--raw');
-  const raw = rawIndex !== -1;
   if (rawIndex !== -1) args.splice(rawIndex, 1);
+  // Legacy: all command handlers still receive `raw` parameter.
+  // In piped mode (json/no-TTY), this is true. Commands that haven't been
+  // migrated to output(result, { formatter }) will use this to produce JSON.
+  const raw = global._gsdOutputMode === 'json' || global._gsdOutputMode !== 'pretty' && !process.stdout.isTTY;
 
   // Parse --fields global flag for JSON output filtering
   const fieldsIdx = args.indexOf('--fields');
@@ -68,7 +85,7 @@ async function main() {
   const cwd = process.cwd();
 
   if (!command) {
-    error('Usage: gsd-tools <command> [args] [--raw] [--verbose]\nCommands: assertions, codebase, codebase-impact, commit, config-ensure-section, config-get, config-migrate, config-set, context-budget, current-timestamp, env, extract-sections, find-phase, frontmatter, generate-slug, history-digest, init, intent, list-todos, mcp, mcp-profile, memory, milestone, phase, phase-plan-index, phases, progress, quick-summary, requirements, resolve-model, roadmap, rollback-info, scaffold, search-decisions, search-lessons, session-diff, state, state-snapshot, summary-extract, template, test-coverage, test-run, todo, token-budget, trace-requirement, validate, validate-config, validate-dependencies, velocity, verify, verify-path-exists, verify-summary, websearch, worktree');
+    error('Usage: gsd-tools <command> [args] [--pretty] [--verbose]\nCommands: assertions, codebase, codebase-impact, commit, config-ensure-section, config-get, config-migrate, config-set, context-budget, current-timestamp, env, extract-sections, find-phase, frontmatter, generate-slug, history-digest, init, intent, list-todos, mcp, mcp-profile, memory, milestone, phase, phase-plan-index, phases, progress, quick-summary, requirements, resolve-model, roadmap, rollback-info, scaffold, search-decisions, search-lessons, session-diff, state, state-snapshot, summary-extract, template, test-coverage, test-run, todo, token-budget, trace-requirement, validate, validate-config, validate-dependencies, velocity, verify, verify-path-exists, verify-summary, websearch, worktree');
   }
 
   // --help / -h: print command help to stderr (never contaminates JSON stdout)
@@ -770,7 +787,5 @@ async function main() {
       error(`Unknown command: ${command}`);
   }
 }
-
-module.exports = { main };
 
 module.exports = { main };
