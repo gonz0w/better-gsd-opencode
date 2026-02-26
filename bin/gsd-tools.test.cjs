@@ -3991,6 +3991,59 @@ describe('codebase-impact batch grep', () => {
   });
 });
 
+describe('codebase-impact graph-first path (WKFL-03)', () => {
+  test('uses cached graph when intel has dependencies', () => {
+    // First ensure deps are built
+    runGsdTools('codebase deps --raw');
+    const result = runGsdTools('codebase-impact src/lib/helpers.js --raw');
+    assert.ok(result.success, 'codebase-impact should succeed');
+    const data = JSON.parse(result.output);
+    assert.strictEqual(data.source, 'cached_graph', 'should use cached graph when dependencies exist');
+    assert.strictEqual(data.files_analyzed, 1, 'should analyze 1 file');
+    assert.ok(data.total_dependents > 0, 'helpers.js should have dependents from graph');
+    assert.ok(typeof data.overall_risk === 'string', 'should have overall_risk');
+  });
+
+  test('graph path output format matches expected schema', () => {
+    const result = runGsdTools('codebase-impact src/lib/output.js --raw');
+    assert.ok(result.success, 'should succeed');
+    const data = JSON.parse(result.output);
+    // Verify top-level fields
+    assert.ok('files_analyzed' in data, 'should have files_analyzed');
+    assert.ok('total_dependents' in data, 'should have total_dependents');
+    assert.ok('overall_risk' in data, 'should have overall_risk');
+    assert.ok('files' in data, 'should have files array');
+    assert.ok('source' in data, 'should have source field');
+    // Verify per-file fields
+    const f = data.files[0];
+    assert.ok('path' in f, 'file should have path');
+    assert.ok('exists' in f, 'file should have exists');
+    assert.ok('dependent_count' in f, 'file should have dependent_count');
+    assert.ok('dependents' in f, 'file should have dependents');
+    assert.ok('risk' in f, 'file should have risk');
+  });
+
+  test('graph path handles non-existent file', () => {
+    const result = runGsdTools('codebase-impact nonexistent-graph-file.js --raw');
+    assert.ok(result.success, 'should succeed for missing file');
+    const data = JSON.parse(result.output);
+    assert.strictEqual(data.source, 'cached_graph', 'should still use cached graph');
+    assert.strictEqual(data.files[0].exists, false, 'file should not exist');
+    assert.strictEqual(data.files[0].dependent_count, 0, 'missing file should have 0 dependents');
+    assert.deepStrictEqual(data.files[0].dependents, [], 'missing file should have empty dependents');
+    assert.strictEqual(data.files[0].risk, 'low', 'missing file should have low risk');
+  });
+
+  test('graph path handles multiple files', () => {
+    const result = runGsdTools('codebase-impact src/lib/helpers.js src/lib/output.js --raw');
+    assert.ok(result.success, 'should succeed for multiple files');
+    const data = JSON.parse(result.output);
+    assert.strictEqual(data.source, 'cached_graph', 'should use cached graph');
+    assert.strictEqual(data.files_analyzed, 2, 'should analyze 2 files');
+    assert.ok(data.files.length === 2, 'should return 2 file results');
+  });
+});
+
 describe('configurable context window', () => {
   test('context-budget uses default context window (200K)', () => {
     // Use a plan file that exists in current milestone
