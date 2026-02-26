@@ -9,12 +9,12 @@ See: .planning/PROJECT.md (updated 2026-02-25)
 
 ## Current Position
 
-**Phase:** Phase 28 of 29: Workflow Context Injection
-**Current Plan:** Not started
-**Status:** Milestone complete
+**Phase:** Phase 28 of 29: Lifecycle Analysis
+**Current Plan:** Plan 1 of 2 complete
+**Status:** In Progress
 **Last Activity:** 2026-02-26
 
-Progress: 6/7 phases complete (27 done, 28 next).
+Progress: 6/7 phases complete (27 done, 28 in progress).
 
 ## Performance Metrics
 
@@ -42,6 +42,7 @@ Progress: 6/7 phases complete (27 done, 28 next).
 | Phase 26 P02 | 16 min | 2 tasks | 5 files |
 | Phase 27 P01 | 2 min | 2 tasks | 3 files |
 | Phase 27 P02 | 12 min | 2 tasks | 3 files |
+| Phase 28 P01 | 4 min | 2 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -81,6 +82,10 @@ All v1.0-v4.0 decisions recorded in PROJECT.md Key Decisions table with outcomes
 - [Phase 27-02]: Imports/dependents sorted by relevance score with fan-in/fan-out tiebreaker
 - [Phase 27-02]: Degradation applied to ALL files equally per CONTEXT.md atomic rule
 - [Phase 27-02]: Last resort drops lowest-scored files one by one until budget fits
+- [Phase 28-01]: Detector registry follows FRAMEWORK_DETECTORS pattern from conventions.js for consistency
+- [Phase 28-01]: Migration cap at 20 most recent per directory — keeps token budget manageable for large projects
+- [Phase 28-01]: Phoenix detector gates on intel.conventions.frameworks — skips if conventions not yet extracted
+- [Phase 28-01]: Symmetry enforcement as post-processing step rather than per-detector to avoid duplicate logic
 
 ### Pending Todos
 
@@ -99,5 +104,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-02-26
-Stopped at: Completed 27-02-PLAN.md
+Stopped at: Completed 28-01-PLAN.md
 Resume file: None

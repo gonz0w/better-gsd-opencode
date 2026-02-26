@@ -148,7 +148,7 @@ Goal: Detect execution order relationships — seeds after migrations, config at
 Requirements: LIFE-01, LIFE-02, LIFE-03
 Depends on: Phase 23 (storage infrastructure)
 Plans: 2 plans
-- [ ] 28-01-PLAN.md — Core lifecycle library with detector registry, DAG builder, and chain flattening
+- [x] 28-01-PLAN.md — Core lifecycle library with detector registry, DAG builder, and chain flattening
 - [ ] 28-02-PLAN.md — CLI command, caching integration, bundle rebuild, and test coverage
 Success criteria:
 1. `codebase lifecycle` shows execution order relationships for detected frameworks
@@ -195,5 +195,5 @@ Success criteria:
 | 25. Dependency Graph | v5.0 | Complete    | 2026-02-26 | 2026-02-26 |
 | 26. Init Integration & Context Summary | v5.0 | Complete    | 2026-02-26 | 2026-02-26 |
 | 27. Task-Scoped Context | 2/2 | Complete    | 2026-02-26 | — |
-| 28. Lifecycle Analysis | v5.0 | 0/2 | Planned | — |
+| 28. Lifecycle Analysis | v5.0 | 1/2 | In Progress | — |
 | 29. Workflow Integration | v5.0 | 0/0 | Planned | — |

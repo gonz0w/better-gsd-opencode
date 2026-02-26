@@ -32,9 +32,9 @@ Requirements for codebase intelligence milestone. Each maps to roadmap phases.
 
 ### Lifecycle Awareness
 
-- [ ] **LIFE-01**: User can run `codebase lifecycle` to see execution order relationships (seeds after migrations, config at boot)
-- [ ] **LIFE-02**: Lifecycle detection identifies framework-specific initialization patterns (starting with Elixir/Phoenix)
-- [ ] **LIFE-03**: Lifecycle analysis outputs a dependency chain showing which files/operations must run before others
+- [x] **LIFE-01**: User can run `codebase lifecycle` to see execution order relationships (seeds after migrations, config at boot)
+- [x] **LIFE-02**: Lifecycle detection identifies framework-specific initialization patterns (starting with Elixir/Phoenix)
+- [x] **LIFE-03**: Lifecycle analysis outputs a dependency chain showing which files/operations must run before others
 
 ### Context Injection
 
