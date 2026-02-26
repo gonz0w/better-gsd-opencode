@@ -152,7 +152,16 @@ Execute each wave in sequence. Within a wave: parallel if `PARALLELIZATION=true`
       Record each worktree path from output. If create fails (e.g., max_concurrent), fall back to sequential.
       If setup_status is `failed`: skip that plan, mark as setup-failed, continue with remaining.
 
-   b. **Spawn executor agents** in worktree directories:
+   b. **Inject codebase context** (same as Mode B):
+      ```bash
+      PLAN_FILES=$(node gsd-tools.cjs frontmatter "${PLAN_PATH}" --field files_modified --raw 2>/dev/null)
+      if [ -n "$PLAN_FILES" ]; then
+        CODEBASE_CTX=$(node gsd-tools.cjs codebase context --files ${PLAN_FILES} --plan ${PLAN_PATH} --raw 2>/dev/null)
+      fi
+      ```
+      If `CODEBASE_CTX` is non-empty, include the `<codebase_context>` block in the spawn prompt. If commands fail or return empty, omit the block entirely (graceful no-op).
+
+   c. **Spawn executor agents** in worktree directories:
       ```
       Task(
         subagent_type="gsd-executor",
@@ -164,12 +173,22 @@ Execute each wave in sequence. Within a wave: parallel if `PARALLELIZATION=true`
           Commit each task atomically. Create SUMMARY.md. Update STATE.md and ROADMAP.md.
           NOTE: You are running in a worktree at {worktree_path}. All file operations use this directory.
           </objective>
-          ...same execution_context, files_to_read, success_criteria as Mode B...
+          ...same execution_context, files_to_read as Mode B...
+
+          <codebase_context>
+          Architectural context for files this plan modifies.
+          Use this to understand import relationships, naming conventions, and risk levels.
+
+          {CODEBASE_CTX}
+          </codebase_context>
+          <!-- Include <codebase_context> block ONLY if CODEBASE_CTX is non-empty. Omit entirely if codebase intel unavailable. -->
+
+          ...same success_criteria as Mode B...
         "
       )
       ```
 
-   c. **Monitor progress** — after spawning all agents, periodically display:
+   d. **Monitor progress** — after spawning all agents, periodically display:
       ```
       ◆ Wave {N} progress:
         ┌─ {plan_id}: ◆ running ({elapsed}m)
@@ -178,11 +197,11 @@ Execute each wave in sequence. Within a wave: parallel if `PARALLELIZATION=true`
       ```
       Detection: check if `{worktree_path}/.planning/phases/{phase_dir}/{plan_id}-SUMMARY.md` exists.
 
-   d. **Wait for all agents** — collect results from all Task() returns.
+   e. **Wait for all agents** — collect results from all Task() returns.
       Let all agents finish even if one fails (per CONTEXT.md decision).
       Separate: successes (SUMMARY.md exists in worktree) and failures.
 
-   e. **Sequential merge** — for each completed plan (in plan-number order, smallest first):
+   f. **Sequential merge** — for each completed plan (in plan-number order, smallest first):
       ```bash
       node gsd-tools.cjs worktree merge {plan_id}
       ```
@@ -193,16 +212,25 @@ Execute each wave in sequence. Within a wave: parallel if `PARALLELIZATION=true`
         - "Abort wave" → stop merging, report what succeeded
       In yolo/auto mode: skip conflicting plan, log warning, continue.
 
-   f. **Cleanup** — after all merges (or failure handling):
+   g. **Cleanup** — after all merges (or failure handling):
       ```bash
       node gsd-tools.cjs worktree cleanup
       ```
 
-   g. **Continue** to next wave.
+   h. **Continue** to next wave.
 
    **Mode B: Standard execution** (worktree_enabled false OR single-plan wave OR parallelization false)
 
-   Spawn executor agents in main working directory (unchanged behavior):
+   **Before spawning each executor**, inject codebase context if available:
+   ```bash
+   PLAN_FILES=$(node gsd-tools.cjs frontmatter "${PLAN_PATH}" --field files_modified --raw 2>/dev/null)
+   if [ -n "$PLAN_FILES" ]; then
+     CODEBASE_CTX=$(node gsd-tools.cjs codebase context --files ${PLAN_FILES} --plan ${PLAN_PATH} --raw 2>/dev/null)
+   fi
+   ```
+   If `CODEBASE_CTX` is non-empty, include the `<codebase_context>` block below. If the commands fail or return empty, omit the block entirely (graceful no-op).
+
+   Spawn executor agents in main working directory:
 
    ```
    Task(
@@ -228,6 +256,14 @@ Execute each wave in sequence. Within a wave: parallel if `PARALLELIZATION=true`
        - .planning/config.json (Config, if exists)
        - ./AGENTS.md (Project instructions, if exists)
        </files_to_read>
+
+       <codebase_context>
+       Architectural context for files this plan modifies.
+       Use this to understand import relationships, naming conventions, and risk levels.
+
+       {CODEBASE_CTX}
+       </codebase_context>
+       <!-- Include <codebase_context> block ONLY if CODEBASE_CTX is non-empty. Omit entirely if codebase intel unavailable. -->
 
        <success_criteria>
        - [ ] All tasks executed
