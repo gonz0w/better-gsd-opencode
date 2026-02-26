@@ -18,9 +18,9 @@ Requirements for codebase intelligence milestone. Each maps to roadmap phases.
 
 - [x] **CONV-01**: User can run `codebase conventions` to extract naming patterns from project files
 - [x] **CONV-02**: Convention detector identifies file organization rules (directory structure, file placement patterns)
-- [ ] **CONV-03**: Framework-specific macro/pattern detection works for Elixir (Phoenix routes, Ecto schemas, plugs), with extensible pattern registry
+- [x] **CONV-03**: Framework-specific macro/pattern detection works for Elixir (Phoenix routes, Ecto schemas, plugs), with extensible pattern registry
 - [x] **CONV-04**: Each extracted convention has a confidence score (percentage of files following the pattern)
-- [ ] **CONV-05**: User can run `codebase rules` to generate a conventions rules document for agent consumption (capped at 15 rules)
+- [x] **CONV-05**: User can run `codebase rules` to generate a conventions rules document for agent consumption (capped at 15 rules)
 
 ### Dependency Analysis
 
@@ -85,9 +85,9 @@ Requirements for codebase intelligence milestone. Each maps to roadmap phases.
 | INFRA-04 | Phase 23 | Complete | node bin/gsd-tools.cjs init progress --raw |
 | CONV-01 | Phase 24 | Complete | node bin/gsd-tools.cjs codebase conventions --raw |
 | CONV-02 | Phase 24 | Complete | node bin/gsd-tools.cjs codebase conventions --raw |
-| CONV-03 | Phase 24 | Pending | node bin/gsd-tools.cjs codebase conventions --raw |
+| CONV-03 | Phase 24 | Complete | node bin/gsd-tools.cjs codebase conventions --raw |
 | CONV-04 | Phase 24 | Complete | node bin/gsd-tools.cjs codebase conventions --raw |
-| CONV-05 | Phase 24 | Pending | node bin/gsd-tools.cjs codebase rules --raw |
+| CONV-05 | Phase 24 | Complete | node bin/gsd-tools.cjs codebase rules --raw |
 | DEPS-01 | Phase 25 | Pending | node bin/gsd-tools.cjs codebase deps --raw |
 | DEPS-02 | Phase 25 | Pending | node bin/gsd-tools.cjs codebase deps --raw |
 | DEPS-03 | Phase 25 | Pending | node bin/gsd-tools.cjs codebase deps --raw |
