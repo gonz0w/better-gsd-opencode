@@ -79,6 +79,9 @@ Full details: `.planning/milestones/v4.0-ROADMAP.md`
 Goal: Build the foundation — codebase-intel.json storage, git-based staleness detection, incremental analysis, auto-trigger on init commands
 Requirements: INFRA-01, INFRA-02, INFRA-03, INFRA-04
 Depends on: None (foundation phase)
+Plans: 2 plans
+- [ ] 23-01-PLAN.md — Core intel engine + CLI commands (codebase analyze, codebase status)
+- [ ] 23-02-PLAN.md — Init auto-trigger integration + test coverage
 Success criteria:
 1. `codebase analyze` creates codebase-intel.json with git hash watermark; cached reads <10ms
 2. `codebase status` detects staleness via git diff in <50ms with reason reported
@@ -172,7 +175,7 @@ Success criteria:
 | 20. Structured Requirements | v4.0 | 3/3 | Complete | 2026-02-25 |
 | 21. Worktree Parallelism | v4.0 | 3/3 | Complete | 2026-02-25 |
 | 22. Workflow Polish | v4.0 | 1/1 | Complete | 2026-02-25 |
-| 23. Infrastructure & Storage | v5.0 | 0/0 | Planned | — |
+| 23. Infrastructure & Storage | v5.0 | 0/2 | Planned | — |
 | 24. Convention Extraction | v5.0 | 0/0 | Planned | — |
 | 25. Dependency Graph | v5.0 | 0/0 | Planned | — |
 | 26. Init Integration & Context Summary | v5.0 | 0/0 | Planned | — |
