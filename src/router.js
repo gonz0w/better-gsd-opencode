@@ -589,8 +589,10 @@ async function main() {
         lazyCodebase().cmdCodebaseImpact(cwd, args.slice(2), raw);
       } else if (sub === 'context') {
         lazyCodebase().cmdCodebaseContext(cwd, args.slice(2), raw);
+      } else if (sub === 'lifecycle') {
+        lazyCodebase().cmdCodebaseLifecycle(cwd, args.slice(2), raw);
       } else {
-        error('Usage: codebase <analyze|status|conventions|rules|deps|impact|context>');
+        error('Usage: codebase <analyze|status|conventions|rules|deps|impact|context|lifecycle>');
       }
       break;
     }

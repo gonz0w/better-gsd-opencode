@@ -66,6 +66,13 @@ function cmdCodebaseAnalyze(cwd, args, raw) {
     changedFiles,
   });
 
+  // Preserve conventions, dependencies, lifecycle from previous intel (populated by separate commands)
+  if (previousIntel) {
+    if (previousIntel.conventions && !intel.conventions) intel.conventions = previousIntel.conventions;
+    if (previousIntel.dependencies && !intel.dependencies) intel.dependencies = previousIntel.dependencies;
+    if (previousIntel.lifecycle && !intel.lifecycle) intel.lifecycle = previousIntel.lifecycle;
+  }
+
   writeIntel(cwd, intel);
 
   const durationMs = Date.now() - startMs;
@@ -281,12 +288,15 @@ function autoTriggerCodebaseIntel(cwd, options) {
         changedFiles: staleness.changed_files || null,
       });
 
-      // Preserve conventions and dependencies from previous intel (populated by separate commands)
+      // Preserve conventions, dependencies, lifecycle from previous intel (populated by separate commands)
       if (intel.conventions && !newIntel.conventions) {
         newIntel.conventions = intel.conventions;
       }
       if (intel.dependencies && !newIntel.dependencies) {
         newIntel.dependencies = intel.dependencies;
+      }
+      if (intel.lifecycle && !newIntel.lifecycle) {
+        newIntel.lifecycle = intel.lifecycle;
       }
 
       writeIntel(cwd, newIntel);
@@ -556,6 +566,93 @@ function cmdCodebaseImpact(cwd, args, raw) {
   output({
     success: true,
     files,
+  }, raw);
+}
+
+
+/**
+ * cmdCodebaseLifecycle — Build and display lifecycle analysis (execution order relationships).
+ *
+ * Detects migration ordering, framework-specific initialization patterns, and
+ * produces DAG chains showing what must run before what.
+ *
+ * @param {string} cwd - Project root
+ * @param {string[]} args - CLI arguments (after 'codebase lifecycle')
+ * @param {boolean} raw - Raw JSON output mode
+ */
+function cmdCodebaseLifecycle(cwd, args, raw) {
+  const intel = readIntel(cwd);
+
+  if (!intel) {
+    error('No codebase intel. Run: codebase analyze');
+    return;
+  }
+
+  const { buildLifecycleGraph } = require('../lib/lifecycle');
+
+  const lifecycle = buildLifecycleGraph(intel, cwd);
+
+  // Cache in intel
+  intel.lifecycle = lifecycle;
+  writeIntel(cwd, intel);
+
+  // Human-readable output (non-raw mode)
+  if (!raw) {
+    const lines = [];
+
+    if (lifecycle.nodes.length === 0) {
+      lines.push('No lifecycle patterns detected.');
+    } else {
+      lines.push(`Lifecycle Analysis (${lifecycle.nodes.length} nodes, ${lifecycle.chains.length} chains)`);
+      lines.push('');
+
+      for (let i = 0; i < lifecycle.chains.length; i++) {
+        const chain = lifecycle.chains[i];
+        const nodeMap = {};
+        for (let n = 0; n < lifecycle.nodes.length; n++) {
+          nodeMap[lifecycle.nodes[n].id] = lifecycle.nodes[n];
+        }
+
+        let chainStr;
+        if (chain.length <= 5) {
+          chainStr = chain.map(function(id) {
+            var node = nodeMap[id];
+            return node ? node.file_or_step : id;
+          }).join(' → ');
+        } else {
+          // Show first 3, ..., last
+          var first3 = chain.slice(0, 3).map(function(id) {
+            var node = nodeMap[id];
+            return node ? node.file_or_step : id;
+          });
+          var last = nodeMap[chain[chain.length - 1]];
+          chainStr = first3.join(' → ') + ' → ... +' + (chain.length - 4) + ' more → ' + (last ? last.file_or_step : chain[chain.length - 1]);
+        }
+
+        lines.push('  Chain ' + (i + 1) + ': ' + chainStr);
+      }
+
+      if (lifecycle.cycles.length > 0) {
+        lines.push('');
+        lines.push('WARNING: ' + lifecycle.cycles.length + ' cycle(s) detected');
+        for (let c = 0; c < lifecycle.cycles.length; c++) {
+          lines.push('  Cycle: ' + lifecycle.cycles[c].join(' → '));
+        }
+      }
+    }
+
+    process.stderr.write(lines.join('\n') + '\n');
+  }
+
+  output({
+    success: true,
+    nodes: lifecycle.nodes.length,
+    edges: lifecycle.stats.edge_count,
+    chains: lifecycle.chains,
+    cycles: lifecycle.cycles,
+    detectors_used: lifecycle.detectors_used,
+    stats: lifecycle.stats,
+    built_at: lifecycle.built_at,
   }, raw);
 }
 
@@ -1033,6 +1130,7 @@ module.exports = {
   cmdCodebaseRules,
   cmdCodebaseDeps,
   cmdCodebaseImpact,
+  cmdCodebaseLifecycle,
   cmdCodebaseContext,
   readCodebaseIntel,
   checkCodebaseIntelStaleness,
