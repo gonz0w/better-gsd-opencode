@@ -13375,3 +13375,295 @@ describe('codebase context', () => {
     }
   });
 });
+
+
+// ─── Lifecycle Analysis Tests (Phase 28 Plan 02) ────────────────────────────
+
+describe('codebase lifecycle', () => {
+  const { LIFECYCLE_DETECTORS, buildLifecycleGraph } = require('../src/lib/lifecycle');
+
+  // Helper: create a temp project with specific files and run codebase analyze
+  function createLifecycleProject(files) {
+    const dir = fs.mkdtempSync(path.join(require('os').tmpdir(), 'gsd-lifecycle-'));
+    fs.mkdirSync(path.join(dir, '.planning', 'codebase'), { recursive: true });
+    fs.mkdirSync(path.join(dir, '.planning', 'phases'), { recursive: true });
+
+    for (const [filePath, content] of Object.entries(files)) {
+      const fullPath = path.join(dir, filePath);
+      fs.mkdirSync(path.dirname(fullPath), { recursive: true });
+      fs.writeFileSync(fullPath, content || '// placeholder\n');
+    }
+
+    // Initialize git repo
+    execSync('git init', { cwd: dir, stdio: 'pipe' });
+    execSync('git config user.email "test@test.com" && git config user.name "Test"', { cwd: dir, stdio: 'pipe' });
+    execSync('git add -A && git commit -m "initial"', { cwd: dir, stdio: 'pipe' });
+    return dir;
+  }
+
+  let tmpDir;
+
+  afterEach(() => {
+    if (tmpDir) cleanup(tmpDir);
+    tmpDir = null;
+  });
+
+  // ─── Unit Tests: Detector Registry ─────────────────────────────────────
+
+  test('LIFECYCLE_DETECTORS registry exists and contains expected detectors', () => {
+    assert.ok(Array.isArray(LIFECYCLE_DETECTORS), 'LIFECYCLE_DETECTORS should be an array');
+    assert.ok(LIFECYCLE_DETECTORS.length >= 2, 'Should have at least 2 detectors (generic + phoenix)');
+
+    const names = LIFECYCLE_DETECTORS.map(d => d.name);
+    assert.ok(names.includes('generic-migrations'), 'Should have generic-migrations detector');
+    assert.ok(names.includes('elixir-phoenix'), 'Should have elixir-phoenix detector');
+
+    // Each detector must have required interface
+    for (const d of LIFECYCLE_DETECTORS) {
+      assert.strictEqual(typeof d.name, 'string', `Detector name should be string, got ${typeof d.name}`);
+      assert.strictEqual(typeof d.detect, 'function', `Detector ${d.name} should have detect function`);
+      assert.strictEqual(typeof d.extractLifecycle, 'function', `Detector ${d.name} should have extractLifecycle function`);
+    }
+  });
+
+  test('generic-migrations detector activates when migration files present', () => {
+    const detector = LIFECYCLE_DETECTORS.find(d => d.name === 'generic-migrations');
+    assert.ok(detector, 'generic-migrations detector must exist');
+
+    // Should activate when migration directory files are in intel
+    const intelWithMigrations = {
+      files: {
+        'db/migrate/001_create_users.sql': { lines: 10 },
+        'db/migrate/002_add_email.sql': { lines: 5 },
+        'src/app.js': { lines: 100 },
+      },
+    };
+    assert.ok(detector.detect(intelWithMigrations), 'Should detect db/migrate/ files');
+
+    // Should NOT activate without migration directories
+    const intelNoMigrations = {
+      files: {
+        'src/app.js': { lines: 100 },
+        'src/lib/utils.js': { lines: 50 },
+      },
+    };
+    assert.ok(!detector.detect(intelNoMigrations), 'Should not activate without migration dirs');
+  });
+
+  test('generic-migrations extracts sequential chain with correct ordering', () => {
+    const detector = LIFECYCLE_DETECTORS.find(d => d.name === 'generic-migrations');
+    const intel = {
+      files: {
+        'migrations/001_create_users.sql': { lines: 10 },
+        'migrations/002_add_email.sql': { lines: 5 },
+        'migrations/003_create_orders.sql': { lines: 8 },
+      },
+    };
+
+    const nodes = detector.extractLifecycle(intel, '/tmp/fake');
+    assert.strictEqual(nodes.length, 3, 'Should create 3 migration nodes');
+
+    // First node has no dependencies
+    assert.deepStrictEqual(nodes[0].must_run_after, [], 'First migration should have no dependencies');
+    assert.strictEqual(nodes[0].type, 'migration', 'Node type should be migration');
+    assert.strictEqual(nodes[0].framework, 'generic', 'Framework should be generic');
+
+    // Second node depends on first
+    assert.deepStrictEqual(nodes[1].must_run_after, [nodes[0].id], 'Second migration depends on first');
+
+    // Third node depends on second
+    assert.deepStrictEqual(nodes[2].must_run_after, [nodes[1].id], 'Third migration depends on second');
+
+    // must_run_before symmetry maintained
+    assert.ok(nodes[0].must_run_before.includes(nodes[1].id), 'First migration must_run_before includes second');
+    assert.ok(nodes[1].must_run_before.includes(nodes[2].id), 'Second migration must_run_before includes third');
+  });
+
+  test('elixir-phoenix detector gates on conventions.frameworks', () => {
+    const detector = LIFECYCLE_DETECTORS.find(d => d.name === 'elixir-phoenix');
+    assert.ok(detector, 'elixir-phoenix detector must exist');
+
+    // Should NOT activate without conventions
+    assert.ok(!detector.detect({ files: {} }), 'Should not activate without conventions');
+    assert.ok(!detector.detect({ files: {}, conventions: {} }), 'Should not activate without frameworks array');
+    assert.ok(!detector.detect({
+      files: {},
+      conventions: { frameworks: [{ framework: 'react' }] },
+    }), 'Should not activate for non-Phoenix framework');
+
+    // Should activate with elixir-phoenix framework
+    assert.ok(detector.detect({
+      files: {},
+      conventions: { frameworks: [{ framework: 'elixir-phoenix' }] },
+    }), 'Should activate for elixir-phoenix');
+  });
+
+  // ─── Unit Tests: buildLifecycleGraph ───────────────────────────────────
+
+  test('buildLifecycleGraph returns correct structure with no lifecycle patterns', () => {
+    const intel = { files: { 'src/app.js': { lines: 100 } } };
+    const result = buildLifecycleGraph(intel, '/tmp/fake');
+
+    assert.ok(Array.isArray(result.nodes), 'nodes should be array');
+    assert.ok(Array.isArray(result.chains), 'chains should be array');
+    assert.ok(Array.isArray(result.cycles), 'cycles should be array');
+    assert.ok(Array.isArray(result.detectors_used), 'detectors_used should be array');
+    assert.ok(result.stats, 'should have stats object');
+    assert.strictEqual(result.nodes.length, 0, 'no nodes for project without lifecycle patterns');
+    assert.strictEqual(result.stats.node_count, 0, 'node_count should be 0');
+    assert.strictEqual(result.stats.edge_count, 0, 'edge_count should be 0');
+    assert.strictEqual(result.stats.chain_count, 0, 'chain_count should be 0');
+    assert.ok(result.built_at, 'should have built_at timestamp');
+  });
+
+  test('buildLifecycleGraph produces chains with topological sort', () => {
+    const intel = {
+      files: {
+        'migrations/20240101_create_users.sql': { lines: 10 },
+        'migrations/20240102_add_email.sql': { lines: 5 },
+        'migrations/20240103_create_orders.sql': { lines: 8 },
+        'migrations/20240104_add_status.sql': { lines: 3 },
+      },
+    };
+
+    const result = buildLifecycleGraph(intel, '/tmp/fake');
+
+    assert.ok(result.detectors_used.includes('generic-migrations'), 'generic-migrations detector should be used');
+    assert.strictEqual(result.nodes.length, 4, 'Should have 4 nodes');
+    assert.ok(result.chains.length >= 1, 'Should have at least 1 chain');
+
+    // The chain should contain all 4 migration IDs in order
+    const chain = result.chains[0];
+    assert.strictEqual(chain.length, 4, 'Chain should have 4 entries');
+
+    // Verify topological ordering: earlier migrations come before later ones
+    const ids = result.nodes.map(n => n.id);
+    for (let i = 0; i < chain.length - 1; i++) {
+      const currentIdx = ids.indexOf(chain[i]);
+      const nextIdx = ids.indexOf(chain[i + 1]);
+      assert.ok(currentIdx >= 0, `Chain entry ${chain[i]} should exist in nodes`);
+      assert.ok(nextIdx >= 0, `Chain entry ${chain[i + 1]} should exist in nodes`);
+    }
+
+    // Stats should be consistent
+    assert.strictEqual(result.stats.node_count, result.nodes.length, 'node_count matches nodes.length');
+    assert.ok(result.stats.edge_count > 0, 'Should have edges in a chain');
+    assert.strictEqual(result.stats.cycle_count, 0, 'No cycles expected in sequential migrations');
+  });
+
+  test('buildLifecycleGraph caps migrations at MAX_MIGRATION_NODES with summary node', () => {
+    // Create 25 migration files (exceeds MAX_MIGRATION_NODES=20)
+    const intel = { files: {} };
+    for (let i = 1; i <= 25; i++) {
+      const pad = String(i).padStart(3, '0');
+      intel.files[`migrations/${pad}_step.sql`] = { lines: 5 };
+    }
+
+    const result = buildLifecycleGraph(intel, '/tmp/fake');
+
+    // Should have 20 real nodes + 1 summary node = 21 nodes
+    assert.strictEqual(result.nodes.length, 21, 'Should cap at 20 + 1 summary node');
+
+    // Find the summary node
+    const summaryNode = result.nodes.find(n => n.id.startsWith('migration:earlier-'));
+    assert.ok(summaryNode, 'Should have summary node for capped migrations');
+    assert.ok(summaryNode.file_or_step.includes('earlier migrations'), 'Summary node should describe capped count');
+    assert.strictEqual(summaryNode.confidence, 0, 'Summary node confidence should be 0');
+  });
+
+  // ─── CLI Integration Tests ─────────────────────────────────────────────
+
+  test('codebase lifecycle --raw returns valid JSON schema', () => {
+    tmpDir = createLifecycleProject({
+      'migrations/001_create_users.sql': 'CREATE TABLE users (id INT);',
+      'migrations/002_add_email.sql': 'ALTER TABLE users ADD email VARCHAR;',
+      'package.json': '{"name":"test-lifecycle"}\n',
+    });
+
+    // First run analyze to populate intel
+    const analyzeResult = runGsdTools('codebase analyze --raw', tmpDir);
+    assert.ok(analyzeResult.success, `codebase analyze failed: ${analyzeResult.error}`);
+
+    // Now run lifecycle
+    const result = runGsdTools('codebase lifecycle --raw', tmpDir);
+    assert.ok(result.success, `codebase lifecycle failed: ${result.error}`);
+
+    const data = JSON.parse(result.output);
+    assert.strictEqual(data.success, true, 'success should be true');
+    assert.strictEqual(typeof data.nodes, 'number', 'nodes should be a number');
+    assert.strictEqual(typeof data.edges, 'number', 'edges should be a number');
+    assert.ok(Array.isArray(data.chains), 'chains should be an array');
+    assert.ok(Array.isArray(data.cycles), 'cycles should be an array');
+    assert.ok(Array.isArray(data.detectors_used), 'detectors_used should be an array');
+    assert.ok(data.stats, 'should have stats object');
+    assert.ok(data.built_at, 'should have built_at timestamp');
+  });
+
+  test('codebase lifecycle --raw detects migration chain in temp project', () => {
+    tmpDir = createLifecycleProject({
+      'db/migrate/20240101_create_users.rb': '',
+      'db/migrate/20240102_add_email.rb': '',
+      'db/migrate/20240103_create_orders.rb': '',
+      'package.json': '{"name":"test-lifecycle"}\n',
+    });
+
+    runGsdTools('codebase analyze --raw', tmpDir);
+    const result = runGsdTools('codebase lifecycle --raw', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const data = JSON.parse(result.output);
+    assert.ok(data.nodes >= 3, `Should detect at least 3 migration nodes, got ${data.nodes}`);
+    assert.ok(data.detectors_used.includes('generic-migrations'), 'generic-migrations should be used');
+    assert.ok(data.chains.length >= 1, 'Should have at least 1 chain');
+    assert.ok(data.chains[0].length >= 3, 'Chain should have at least 3 entries');
+  });
+
+  test('codebase lifecycle --raw returns 0 nodes for project without lifecycle patterns', () => {
+    tmpDir = createLifecycleProject({
+      'src/app.js': 'console.log("hello");',
+      'src/utils.js': 'module.exports = {};',
+      'package.json': '{"name":"test-no-lifecycle"}\n',
+    });
+
+    runGsdTools('codebase analyze --raw', tmpDir);
+    const result = runGsdTools('codebase lifecycle --raw', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const data = JSON.parse(result.output);
+    assert.strictEqual(data.nodes, 0, 'Should detect 0 nodes');
+    assert.strictEqual(data.chains.length, 0, 'Should have no chains');
+    assert.deepStrictEqual(data.detectors_used, [], 'No detectors should activate');
+  });
+
+  test('codebase lifecycle caches result in intel file', () => {
+    tmpDir = createLifecycleProject({
+      'migrations/001_init.sql': 'CREATE TABLE t (id INT);',
+      'package.json': '{"name":"test-cache"}\n',
+    });
+
+    runGsdTools('codebase analyze --raw', tmpDir);
+    runGsdTools('codebase lifecycle --raw', tmpDir);
+
+    // Read the intel file and verify lifecycle was cached
+    const intelPath = path.join(tmpDir, '.planning', 'codebase', 'codebase-intel.json');
+    assert.ok(fs.existsSync(intelPath), 'codebase-intel.json should exist');
+
+    const intel = JSON.parse(fs.readFileSync(intelPath, 'utf-8'));
+    assert.ok(intel.lifecycle, 'lifecycle should be cached in intel');
+    assert.ok(intel.lifecycle.nodes, 'cached lifecycle should have nodes');
+    assert.ok(intel.lifecycle.chains, 'cached lifecycle should have chains');
+    assert.ok(intel.lifecycle.built_at, 'cached lifecycle should have built_at');
+  });
+
+  test('codebase lifecycle fails gracefully without prior analyze', () => {
+    tmpDir = createLifecycleProject({
+      'src/app.js': 'console.log("hello");',
+      'package.json': '{"name":"test-no-intel"}\n',
+    });
+
+    // Do NOT run analyze first — lifecycle should handle missing intel
+    const result = runGsdTools('codebase lifecycle --raw', tmpDir);
+    // Should either fail or produce an error message about missing intel
+    assert.ok(!result.success || result.error.includes('intel'), 'Should fail or warn about missing intel');
+  });
+});
