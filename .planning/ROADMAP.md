@@ -135,7 +135,7 @@ Goal: On-demand per-file architectural context for executor agents with heuristi
 Requirements: CTXI-02, CTXI-03, CTXI-04
 Depends on: Phase 24 (conventions), Phase 25 (dependency graph)
 Plans: 2 plans
-- [ ] 27-01-PLAN.md — Core codebase context command with per-file assembly (imports, dependents, conventions, risk level)
+- [x] 27-01-PLAN.md — Core codebase context command with per-file assembly (imports, dependents, conventions, risk level)
 - [ ] 27-02-PLAN.md — Heuristic relevance scoring + 5K token budget enforcement + test coverage
 Success criteria:
 1. `codebase context --files <paths>` returns per-file imports, dependents, conventions, risk level
@@ -191,6 +191,6 @@ Success criteria:
 | 24. Convention Extraction | 2/2 | Complete    | 2026-02-26 | — |
 | 25. Dependency Graph | v5.0 | Complete    | 2026-02-26 | 2026-02-26 |
 | 26. Init Integration & Context Summary | v5.0 | Complete    | 2026-02-26 | 2026-02-26 |
-| 27. Task-Scoped Context | v5.0 | 0/2 | Planned | — |
+| 27. Task-Scoped Context | v5.0 | 1/2 | In Progress | — |
 | 28. Lifecycle Analysis | v5.0 | 0/0 | Planned | — |
 | 29. Workflow Integration | v5.0 | 0/0 | Planned | — |

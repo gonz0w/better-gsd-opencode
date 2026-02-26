@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-02-25)
 
 **Core value:** Manage and deliver high-quality software with high-quality documentation, while continuously reducing token usage and improving performance
-**Current focus:** v5.0 Codebase Intelligence — phase 26 complete, phase 27 next
+**Current focus:** v5.0 Codebase Intelligence — phase 27 plan 01 complete, plan 02 next
 
 ## Current Position
 
 **Phase:** Phase 27 of 29: Task-Scoped Context
-**Current Plan:** Not started
-**Status:** Milestone complete
+**Current Plan:** Plan 02 of 2
+**Status:** In progress
 **Last Activity:** 2026-02-26
 
-Progress: 5/7 phases complete (26 done, 27 next).
+Progress: 5/7 phases complete (27 in progress, plan 01 done).
 
 ## Performance Metrics
 
@@ -40,6 +40,7 @@ Progress: 5/7 phases complete (26 done, 27 next).
 | Phase 25 P02 | 8 min | 2 tasks | 4 files |
 | Phase 26 P01 | 16 min | 2 tasks | 5 files |
 | Phase 26 P02 | 16 min | 2 tasks | 5 files |
+| Phase 27 P01 | 2 min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -72,6 +73,9 @@ All v1.0-v4.0 decisions recorded in PROJECT.md Key Decisions table with outcomes
 - [Phase 26-02]: Non-blocking autoTrigger returns stale data immediately, spawns detached child process for background re-analysis
 - [Phase 26-02]: Lock file (.planning/.cache/.analyzing) with 5-minute auto-expiry prevents concurrent background triggers
 - [Phase 26-02]: --refresh flag on init commands forces synchronous re-analysis (checks process.argv directly)
+- [Phase 27-01]: Convention matching: directory-level naming first, overall fallback — per CONTEXT.md
+- [Phase 27-01]: --plan flag parsed but unused (reserved for Plan 02 scoring)
+- [Phase 27-01]: Framework matching by evidence file extension/directory overlap
 
 ### Pending Todos
 
@@ -90,5 +94,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-02-26
-Stopped at: Completed 26-02-PLAN.md
+Stopped at: Completed 27-01-PLAN.md
 Resume file: None
