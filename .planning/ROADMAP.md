@@ -122,8 +122,8 @@ Goal: Wire codebase analysis into init commands with compact summary injection a
 Requirements: CTXI-01, INFRA-04
 Depends on: Phase 24 (conventions), Phase 25 (dependency graph)
 Plans: 2 plans
-- [ ] 26-01-PLAN.md — Expanded three-field context summary (stats, conventions, dependencies) with confidence scores + hybrid staleness
-- [ ] 26-02-PLAN.md — Non-blocking background analysis with lock file, --refresh flag, tests, bundle rebuild
+- [x] 26-01-PLAN.md — Expanded three-field context summary (stats, conventions, dependencies) with confidence scores + hybrid staleness
+- [x] 26-02-PLAN.md — Non-blocking background analysis with lock file, --refresh flag, tests, bundle rebuild
 Success criteria:
 1. Init commands include `codebase_summary` field when intel exists (<500 tokens)
 2. Auto-trigger runs quick analysis mode in <200ms when stale
@@ -187,7 +187,7 @@ Success criteria:
 | 23. Infrastructure & Storage | 2/2 | Complete    | 2026-02-26 | — |
 | 24. Convention Extraction | 2/2 | Complete    | 2026-02-26 | — |
 | 25. Dependency Graph | v5.0 | Complete    | 2026-02-26 | 2026-02-26 |
-| 26. Init Integration & Context Summary | 1/2 | In Progress|  | — |
+| 26. Init Integration & Context Summary | v5.0 | 2/2 | Complete | 2026-02-26 |
 | 27. Task-Scoped Context | v5.0 | 0/0 | Planned | — |
 | 28. Lifecycle Analysis | v5.0 | 0/0 | Planned | — |
 | 29. Workflow Integration | v5.0 | 0/0 | Planned | — |

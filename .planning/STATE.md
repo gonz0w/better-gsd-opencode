@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-02-25)
 
 **Core value:** Manage and deliver high-quality software with high-quality documentation, while continuously reducing token usage and improving performance
-**Current focus:** v5.0 Codebase Intelligence — phase 25 complete, phase 26 next
+**Current focus:** v5.0 Codebase Intelligence — phase 26 complete, phase 27 next
 
 ## Current Position
 
-**Phase:** Phase 26 of 29: Init Integration & Context Summary
+**Phase:** Phase 27 of 29: Task-Scoped Context
 **Current Plan:** Not started
-**Status:** Milestone complete
+**Status:** In progress
 **Last Activity:** 2026-02-26
 
-Progress: 4/7 phases complete (25 done, 26 next).
+Progress: 5/7 phases complete (26 done, 27 next).
 
 ## Performance Metrics
 
@@ -39,6 +39,7 @@ Progress: 4/7 phases complete (25 done, 26 next).
 | Phase 25 P01 | 3 min | 2 tasks | 4 files |
 | Phase 25 P02 | 8 min | 2 tasks | 4 files |
 | Phase 26 P01 | 16 min | 2 tasks | 5 files |
+| Phase 26 P02 | 16 min | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -68,6 +69,9 @@ All v1.0-v4.0 decisions recorded in PROJECT.md Key Decisions table with outcomes
 - [Phase 26]: Replaced single codebase_summary with three fields (stats/conventions/dependencies) for granular null handling
 - [Phase 26]: Confidence scores per field: 1.0 stats, variable conventions, 0.85 deps — agents know trust level
 - [Phase 26]: Hybrid staleness: git-commit check + 1-hour time fallback; freshness advisory only for very stale (>24h or >10 commits behind)
+- [Phase 26-02]: Non-blocking autoTrigger returns stale data immediately, spawns detached child process for background re-analysis
+- [Phase 26-02]: Lock file (.planning/.cache/.analyzing) with 5-minute auto-expiry prevents concurrent background triggers
+- [Phase 26-02]: --refresh flag on init commands forces synchronous re-analysis (checks process.argv directly)
 
 ### Pending Todos
 
@@ -86,5 +90,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-02-26
-Stopped at: Completed 25-02-PLAN.md
+Stopped at: Completed 26-02-PLAN.md
 Resume file: None
