@@ -38,6 +38,7 @@ Progress: 4/7 phases complete (25 done, 26 next).
 | Phase 24 P02 | 6 min | 2 tasks | 5 files |
 | Phase 25 P01 | 3 min | 2 tasks | 4 files |
 | Phase 25 P02 | 8 min | 2 tasks | 4 files |
+| Phase 26 P01 | 16 min | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -64,6 +65,9 @@ All v1.0-v4.0 decisions recorded in PROJECT.md Key Decisions table with outcomes
 - [Phase 25-02]: Tarjan's SCC for cycle detection — standard O(V+E) algorithm, no extra dependencies
 - [Phase 25-02]: BFS with maxDepth=10 for impact analysis — prevents infinite loops on cycles
 - [Phase 25-02]: Auto-build graph on impact command if not cached — seamless first-use experience
+- [Phase 26]: Replaced single codebase_summary with three fields (stats/conventions/dependencies) for granular null handling
+- [Phase 26]: Confidence scores per field: 1.0 stats, variable conventions, 0.85 deps — agents know trust level
+- [Phase 26]: Hybrid staleness: git-commit check + 1-hour time fallback; freshness advisory only for very stale (>24h or >10 commits behind)
 
 ### Pending Todos
 

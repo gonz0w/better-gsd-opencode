@@ -187,7 +187,7 @@ Success criteria:
 | 23. Infrastructure & Storage | 2/2 | Complete    | 2026-02-26 | — |
 | 24. Convention Extraction | 2/2 | Complete    | 2026-02-26 | — |
 | 25. Dependency Graph | v5.0 | Complete    | 2026-02-26 | 2026-02-26 |
-| 26. Init Integration & Context Summary | v5.0 | 0/0 | Planned | — |
+| 26. Init Integration & Context Summary | 1/2 | In Progress|  | — |
 | 27. Task-Scoped Context | v5.0 | 0/0 | Planned | — |
 | 28. Lifecycle Analysis | v5.0 | 0/0 | Planned | — |
 | 29. Workflow Integration | v5.0 | 0/0 | Planned | — |

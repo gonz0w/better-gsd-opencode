@@ -38,7 +38,7 @@ Requirements for codebase intelligence milestone. Each maps to roadmap phases.
 
 ### Context Injection
 
-- [ ] **CTXI-01**: Init commands include a compact codebase summary (<500 tokens) when codebase-intel.json exists
+- [x] **CTXI-01**: Init commands include a compact codebase summary (<500 tokens) when codebase-intel.json exists
 - [ ] **CTXI-02**: User can run `codebase context --files <paths>` to get task-scoped architectural context for specific files
 - [ ] **CTXI-03**: Task-scoped context uses heuristic scoring (graph distance + plan scope + git recency) for relevance ranking
 - [ ] **CTXI-04**: Total injected codebase context never exceeds 5K tokens per invocation
@@ -96,7 +96,7 @@ Requirements for codebase intelligence milestone. Each maps to roadmap phases.
 | LIFE-01 | Phase 28 | Pending | node bin/gsd-tools.cjs codebase lifecycle --raw |
 | LIFE-02 | Phase 28 | Pending | node bin/gsd-tools.cjs codebase lifecycle --raw |
 | LIFE-03 | Phase 28 | Pending | node bin/gsd-tools.cjs codebase lifecycle --raw |
-| CTXI-01 | Phase 26 | Pending | node bin/gsd-tools.cjs init progress --raw |
+| CTXI-01 | Phase 26 | Complete | node bin/gsd-tools.cjs init progress --raw |
 | CTXI-02 | Phase 27 | Pending | node bin/gsd-tools.cjs codebase context --files src/index.js --raw |
 | CTXI-03 | Phase 27 | Pending | node bin/gsd-tools.cjs codebase context --files src/index.js --raw |
 | CTXI-04 | Phase 27 | Pending | node bin/gsd-tools.cjs codebase context --files src/index.js --raw |
