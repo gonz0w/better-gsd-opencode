@@ -10,8 +10,8 @@ See: .planning/PROJECT.md (updated 2026-02-25)
 ## Current Position
 
 **Phase:** Phase 24 of 29: Convention Extraction
-**Current Plan:** Plan 2 of 2 complete
-**Status:** Phase complete
+**Current Plan:** Not started
+**Status:** Milestone complete
 **Last Activity:** 2026-02-26
 
 Progress: 3/7 phases complete.
