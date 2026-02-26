@@ -96,6 +96,9 @@ Full details: `.planning/milestones/v5.0-ROADMAP.md`
 **Depends on**: Nothing (foundation phase)
 **Requirements**: FMT-01, FMT-02, FMT-03, FMT-04, FMT-05, OUT-01, OUT-02, OUT-03, OUT-04
 **Plans**: 2 plans
+Plans:
+- [ ] 30-01-PLAN.md — Formatting primitives module (color, table, progress bar, banner, symbols)
+- [ ] 30-02-PLAN.md — Smart output mode, --raw removal, brand rename to bGSD
 **Success Criteria** (what must be TRUE):
   1. Running any GSD command in a terminal shows branded human-readable output; piping the same command produces JSON
   2. `--raw` forces JSON output in a TTY; `--pretty` forces human-readable output when piped
