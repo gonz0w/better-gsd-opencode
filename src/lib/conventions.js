@@ -1,5 +1,6 @@
 'use strict';
 
+const fs = require('fs');
 const path = require('path');
 const { LANGUAGE_MAP } = require('./codebase-intel');
 
@@ -288,23 +289,212 @@ function detectFileOrganization(intel) {
 }
 
 
+// ─── Framework Pattern Registry ──────────────────────────────────────────────
+//
+// Extensible framework detection. To add a new framework:
+//   1. Create a detector object with { name, detect, extractPatterns }
+//   2. Push it to FRAMEWORK_DETECTORS array
+//   3. detect(intel) → boolean: does this project use this framework?
+//   4. extractPatterns(intel, cwd) → ConventionPattern[]: extract framework-specific patterns
+//
+
+/**
+ * @typedef {Object} ConventionPattern
+ * @property {string} category - Always 'framework' for framework-detected patterns
+ * @property {string} framework - Framework identifier (e.g. 'elixir-phoenix')
+ * @property {string} pattern - Human-readable convention description
+ * @property {number} confidence - 0-100 confidence score
+ * @property {string[]} evidence - File paths or examples supporting this pattern
+ */
+
+/**
+ * Safely read file content, returning empty string on error.
+ * @param {string} filePath - Absolute file path
+ * @returns {string}
+ */
+function safeReadFile(filePath) {
+  try {
+    return fs.readFileSync(filePath, 'utf-8');
+  } catch (e) {
+    return '';
+  }
+}
+
+/**
+ * Framework detector registry.
+ * Each detector: { name: string, detect: (intel) => boolean, extractPatterns: (intel, cwd) => ConventionPattern[] }
+ * @type {Array<{name: string, detect: function, extractPatterns: function}>}
+ */
+const FRAMEWORK_DETECTORS = [
+  {
+    name: 'elixir-phoenix',
+
+    /**
+     * Detect if this project uses Elixir/Phoenix.
+     * Checks for Elixir language presence and Phoenix indicators (router.ex, mix.exs).
+     */
+    detect(intel) {
+      if (!intel || !intel.languages) return false;
+      if (!intel.languages.elixir) return false;
+
+      const filePaths = Object.keys(intel.files || {});
+      const hasRouter = filePaths.some(f => f.endsWith('router.ex'));
+      const hasMixExs = filePaths.some(f => f === 'mix.exs' || f.endsWith('/mix.exs'));
+      return hasRouter || hasMixExs;
+    },
+
+    /**
+     * Extract Elixir/Phoenix-specific convention patterns.
+     */
+    extractPatterns(intel, cwd) {
+      const patterns = [];
+      const filePaths = Object.keys(intel.files || {});
+
+      // 1. Phoenix routes — detect router.ex with pipe_through and HTTP macros
+      const routerFiles = filePaths.filter(f => f.endsWith('router.ex'));
+      if (routerFiles.length > 0) {
+        let routeEvidence = [];
+        let hasPipeThrough = false;
+        for (const rf of routerFiles) {
+          const content = safeReadFile(path.join(cwd, rf));
+          if (/pipe_through/.test(content)) hasPipeThrough = true;
+          if (/\b(get|post|put|delete|patch)\s/.test(content)) {
+            routeEvidence.push(rf);
+          }
+        }
+        if (routeEvidence.length > 0) {
+          patterns.push({
+            category: 'framework',
+            framework: 'elixir-phoenix',
+            pattern: hasPipeThrough
+              ? 'Routes defined in router.ex using pipe_through pipelines'
+              : 'Routes defined in router.ex',
+            confidence: Math.round((routeEvidence.length / Math.max(routerFiles.length, 1)) * 100),
+            evidence: routeEvidence.slice(0, 5),
+          });
+        }
+      }
+
+      // 2. Ecto schemas — files containing `use Ecto.Schema`
+      const schemaFiles = filePaths.filter(f => f.endsWith('.ex') || f.endsWith('.exs'));
+      const ectoSchemaFiles = [];
+      for (const sf of schemaFiles) {
+        const content = safeReadFile(path.join(cwd, sf));
+        if (/use Ecto\.Schema/.test(content)) {
+          ectoSchemaFiles.push(sf);
+        }
+      }
+      if (ectoSchemaFiles.length > 0) {
+        patterns.push({
+          category: 'framework',
+          framework: 'elixir-phoenix',
+          pattern: 'Ecto schemas use `schema` macro with `field` declarations',
+          confidence: Math.round((ectoSchemaFiles.length / Math.max(schemaFiles.length, 1)) * 100),
+          evidence: ectoSchemaFiles.slice(0, 5),
+        });
+      }
+
+      // 3. Plugs — files with `use Plug` or `import Plug.Conn`
+      const plugFiles = [];
+      for (const sf of schemaFiles) {
+        const content = safeReadFile(path.join(cwd, sf));
+        if (/use Plug\b/.test(content) || /import Plug\.Conn/.test(content)) {
+          plugFiles.push(sf);
+        }
+      }
+      if (plugFiles.length > 0) {
+        patterns.push({
+          category: 'framework',
+          framework: 'elixir-phoenix',
+          pattern: 'Plugs follow init/call pattern',
+          confidence: Math.round((plugFiles.length / Math.max(schemaFiles.length, 1)) * 100),
+          evidence: plugFiles.slice(0, 5),
+        });
+      }
+
+      // 4. Context modules — detect lib/*/  subdirectories acting as Phoenix contexts
+      const libDirs = new Set();
+      for (const fp of filePaths) {
+        const match = fp.match(/^lib\/([^/]+)\//);
+        if (match) libDirs.add(match[1]);
+      }
+      if (libDirs.size > 1) {
+        patterns.push({
+          category: 'framework',
+          framework: 'elixir-phoenix',
+          pattern: 'Business logic organized into context modules',
+          confidence: Math.min(Math.round((libDirs.size / 3) * 100), 100),
+          evidence: [...libDirs].slice(0, 5).map(d => `lib/${d}/`),
+        });
+      }
+
+      // 5. Migration naming — detect priv/repo/migrations/ timestamps
+      const migrationFiles = filePaths.filter(f =>
+        f.includes('priv/repo/migrations/') || f.match(/priv\/[^/]*\/migrations\//)
+      );
+      if (migrationFiles.length > 0) {
+        const timestampMigrations = migrationFiles.filter(f =>
+          /\d{14}_/.test(path.basename(f))
+        );
+        patterns.push({
+          category: 'framework',
+          framework: 'elixir-phoenix',
+          pattern: 'Migrations use timestamp prefixes',
+          confidence: Math.round((timestampMigrations.length / Math.max(migrationFiles.length, 1)) * 100),
+          evidence: migrationFiles.slice(0, 5),
+        });
+      }
+
+      return patterns;
+    },
+  },
+];
+
+
+/**
+ * Detect framework-specific conventions by iterating the detector registry.
+ *
+ * @param {object} intel - Codebase intel object
+ * @param {string} cwd - Project root directory
+ * @returns {ConventionPattern[]} Detected framework patterns
+ */
+function detectFrameworkConventions(intel, cwd) {
+  const allPatterns = [];
+
+  for (const detector of FRAMEWORK_DETECTORS) {
+    try {
+      if (detector.detect(intel)) {
+        const patterns = detector.extractPatterns(intel, cwd);
+        allPatterns.push(...patterns);
+      }
+    } catch (e) {
+      // Silently skip failed detectors — don't break convention extraction
+    }
+  }
+
+  return allPatterns;
+}
+
+
 // ─── Combined Extraction ─────────────────────────────────────────────────────
 
 /**
  * Extract all conventions from codebase intel.
- * Combines naming detection and file organization analysis.
+ * Combines naming detection, file organization analysis, and framework detection.
  *
  * @param {object} intel - Codebase intel object
  * @param {object} [options] - Extraction options
  * @param {number} [options.threshold=60] - Minimum confidence to include (0-100)
  * @param {boolean} [options.showAll=false] - Show all patterns regardless of threshold
+ * @param {string} [options.cwd] - Project root for framework file reading (defaults to process.cwd())
  * @returns {object} Complete conventions object
  */
 function extractConventions(intel, options = {}) {
-  const { threshold = 60, showAll = false } = options;
+  const { threshold = 60, showAll = false, cwd = process.cwd() } = options;
 
   const naming = detectNamingConventions(intel);
   const fileOrganization = detectFileOrganization(intel);
+  const frameworkPatterns = detectFrameworkConventions(intel, cwd);
 
   // Filter by threshold unless showAll
   const filteredNaming = { ...naming };
@@ -328,9 +518,14 @@ function extractConventions(intel, options = {}) {
     filteredFileOrg.patterns = fileOrganization.patterns.filter(p => p.confidence >= threshold);
   }
 
+  const filteredFrameworks = showAll
+    ? frameworkPatterns
+    : frameworkPatterns.filter(p => p.confidence >= threshold);
+
   return {
     naming: filteredNaming,
     file_organization: filteredFileOrg,
+    frameworks: filteredFrameworks,
     extracted_at: new Date().toISOString(),
   };
 }
@@ -341,5 +536,7 @@ function extractConventions(intel, options = {}) {
 module.exports = {
   detectNamingConventions,
   detectFileOrganization,
+  detectFrameworkConventions,
   extractConventions,
+  FRAMEWORK_DETECTORS,
 };

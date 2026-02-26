@@ -267,7 +267,7 @@ function cmdCodebaseConventions(cwd, args, raw) {
   const thresholdIdx = args.indexOf('--threshold');
   const threshold = thresholdIdx !== -1 ? parseInt(args[thresholdIdx + 1], 10) : 60;
 
-  const conventions = extractConventions(intel, { threshold, showAll });
+  const conventions = extractConventions(intel, { threshold, showAll, cwd });
 
   // Persist conventions in intel for reuse by other commands
   intel.conventions = conventions;
@@ -300,11 +300,14 @@ function cmdCodebaseConventions(cwd, args, raw) {
     });
   }
 
+  const frameworkPatterns = conventions.frameworks || [];
+
   output({
     success: true,
     naming_patterns: namingPatterns,
     file_organization: conventions.file_organization,
-    total_conventions: namingPatterns.length + (conventions.file_organization.patterns || []).length,
+    framework_patterns: frameworkPatterns,
+    total_conventions: namingPatterns.length + (conventions.file_organization.patterns || []).length + frameworkPatterns.length,
     threshold_used: threshold,
     show_all: showAll,
     extracted_at: conventions.extracted_at,

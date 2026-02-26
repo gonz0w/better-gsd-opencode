@@ -7952,6 +7952,7 @@ var require_codebase_intel = __commonJS({
 var require_conventions = __commonJS({
   "src/lib/conventions.js"(exports2, module2) {
     "use strict";
+    var fs = require("fs");
     var path = require("path");
     var { LANGUAGE_MAP } = require_codebase_intel();
     var NAMING_PATTERNS = {
@@ -8166,10 +8167,139 @@ var require_conventions = __commonJS({
         patterns
       };
     }
+    function safeReadFile(filePath) {
+      try {
+        return fs.readFileSync(filePath, "utf-8");
+      } catch (e) {
+        return "";
+      }
+    }
+    var FRAMEWORK_DETECTORS = [
+      {
+        name: "elixir-phoenix",
+        /**
+         * Detect if this project uses Elixir/Phoenix.
+         * Checks for Elixir language presence and Phoenix indicators (router.ex, mix.exs).
+         */
+        detect(intel) {
+          if (!intel || !intel.languages) return false;
+          if (!intel.languages.elixir) return false;
+          const filePaths = Object.keys(intel.files || {});
+          const hasRouter = filePaths.some((f) => f.endsWith("router.ex"));
+          const hasMixExs = filePaths.some((f) => f === "mix.exs" || f.endsWith("/mix.exs"));
+          return hasRouter || hasMixExs;
+        },
+        /**
+         * Extract Elixir/Phoenix-specific convention patterns.
+         */
+        extractPatterns(intel, cwd) {
+          const patterns = [];
+          const filePaths = Object.keys(intel.files || {});
+          const routerFiles = filePaths.filter((f) => f.endsWith("router.ex"));
+          if (routerFiles.length > 0) {
+            let routeEvidence = [];
+            let hasPipeThrough = false;
+            for (const rf of routerFiles) {
+              const content = safeReadFile(path.join(cwd, rf));
+              if (/pipe_through/.test(content)) hasPipeThrough = true;
+              if (/\b(get|post|put|delete|patch)\s/.test(content)) {
+                routeEvidence.push(rf);
+              }
+            }
+            if (routeEvidence.length > 0) {
+              patterns.push({
+                category: "framework",
+                framework: "elixir-phoenix",
+                pattern: hasPipeThrough ? "Routes defined in router.ex using pipe_through pipelines" : "Routes defined in router.ex",
+                confidence: Math.round(routeEvidence.length / Math.max(routerFiles.length, 1) * 100),
+                evidence: routeEvidence.slice(0, 5)
+              });
+            }
+          }
+          const schemaFiles = filePaths.filter((f) => f.endsWith(".ex") || f.endsWith(".exs"));
+          const ectoSchemaFiles = [];
+          for (const sf of schemaFiles) {
+            const content = safeReadFile(path.join(cwd, sf));
+            if (/use Ecto\.Schema/.test(content)) {
+              ectoSchemaFiles.push(sf);
+            }
+          }
+          if (ectoSchemaFiles.length > 0) {
+            patterns.push({
+              category: "framework",
+              framework: "elixir-phoenix",
+              pattern: "Ecto schemas use `schema` macro with `field` declarations",
+              confidence: Math.round(ectoSchemaFiles.length / Math.max(schemaFiles.length, 1) * 100),
+              evidence: ectoSchemaFiles.slice(0, 5)
+            });
+          }
+          const plugFiles = [];
+          for (const sf of schemaFiles) {
+            const content = safeReadFile(path.join(cwd, sf));
+            if (/use Plug\b/.test(content) || /import Plug\.Conn/.test(content)) {
+              plugFiles.push(sf);
+            }
+          }
+          if (plugFiles.length > 0) {
+            patterns.push({
+              category: "framework",
+              framework: "elixir-phoenix",
+              pattern: "Plugs follow init/call pattern",
+              confidence: Math.round(plugFiles.length / Math.max(schemaFiles.length, 1) * 100),
+              evidence: plugFiles.slice(0, 5)
+            });
+          }
+          const libDirs = /* @__PURE__ */ new Set();
+          for (const fp of filePaths) {
+            const match = fp.match(/^lib\/([^/]+)\//);
+            if (match) libDirs.add(match[1]);
+          }
+          if (libDirs.size > 1) {
+            patterns.push({
+              category: "framework",
+              framework: "elixir-phoenix",
+              pattern: "Business logic organized into context modules",
+              confidence: Math.min(Math.round(libDirs.size / 3 * 100), 100),
+              evidence: [...libDirs].slice(0, 5).map((d) => `lib/${d}/`)
+            });
+          }
+          const migrationFiles = filePaths.filter(
+            (f) => f.includes("priv/repo/migrations/") || f.match(/priv\/[^/]*\/migrations\//)
+          );
+          if (migrationFiles.length > 0) {
+            const timestampMigrations = migrationFiles.filter(
+              (f) => /\d{14}_/.test(path.basename(f))
+            );
+            patterns.push({
+              category: "framework",
+              framework: "elixir-phoenix",
+              pattern: "Migrations use timestamp prefixes",
+              confidence: Math.round(timestampMigrations.length / Math.max(migrationFiles.length, 1) * 100),
+              evidence: migrationFiles.slice(0, 5)
+            });
+          }
+          return patterns;
+        }
+      }
+    ];
+    function detectFrameworkConventions(intel, cwd) {
+      const allPatterns = [];
+      for (const detector of FRAMEWORK_DETECTORS) {
+        try {
+          if (detector.detect(intel)) {
+            const patterns = detector.extractPatterns(intel, cwd);
+            allPatterns.push(...patterns);
+          }
+        } catch (e) {
+        }
+      }
+      return allPatterns;
+    }
     function extractConventions(intel, options = {}) {
-      const { threshold = 60, showAll = false } = options;
+      const { threshold = 60, showAll = false, cwd = process.cwd() } = options;
       const naming = detectNamingConventions(intel);
       const fileOrganization = detectFileOrganization(intel);
+      const frameworkPatterns = detectFrameworkConventions(intel, cwd);
       const filteredNaming = { ...naming };
       if (!showAll) {
         filteredNaming.overall = {};
@@ -8189,16 +8319,20 @@ var require_conventions = __commonJS({
       if (!showAll) {
         filteredFileOrg.patterns = fileOrganization.patterns.filter((p) => p.confidence >= threshold);
       }
+      const filteredFrameworks = showAll ? frameworkPatterns : frameworkPatterns.filter((p) => p.confidence >= threshold);
       return {
         naming: filteredNaming,
         file_organization: filteredFileOrg,
+        frameworks: filteredFrameworks,
         extracted_at: (/* @__PURE__ */ new Date()).toISOString()
       };
     }
     module2.exports = {
       detectNamingConventions,
       detectFileOrganization,
-      extractConventions
+      detectFrameworkConventions,
+      extractConventions,
+      FRAMEWORK_DETECTORS
     };
   }
 });
@@ -8365,7 +8499,7 @@ var require_codebase = __commonJS({
       const showAll = args.includes("--all");
       const thresholdIdx = args.indexOf("--threshold");
       const threshold = thresholdIdx !== -1 ? parseInt(args[thresholdIdx + 1], 10) : 60;
-      const conventions = extractConventions(intel, { threshold, showAll });
+      const conventions = extractConventions(intel, { threshold, showAll, cwd });
       intel.conventions = conventions;
       writeIntel(cwd, intel);
       const namingPatterns = [];
@@ -8387,11 +8521,13 @@ var require_codebase = __commonJS({
           examples: value.patterns[value.dominant_pattern] ? value.patterns[value.dominant_pattern].examples : []
         });
       }
+      const frameworkPatterns = conventions.frameworks || [];
       output({
         success: true,
         naming_patterns: namingPatterns,
         file_organization: conventions.file_organization,
-        total_conventions: namingPatterns.length + (conventions.file_organization.patterns || []).length,
+        framework_patterns: frameworkPatterns,
+        total_conventions: namingPatterns.length + (conventions.file_organization.patterns || []).length + frameworkPatterns.length,
         threshold_used: threshold,
         show_all: showAll,
         extracted_at: conventions.extracted_at
