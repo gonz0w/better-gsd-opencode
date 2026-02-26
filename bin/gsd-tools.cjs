@@ -13485,6 +13485,8 @@ var require_features = __commonJS({
     var { extractFrontmatter } = require_frontmatter();
     var { execGit } = require_git();
     var { estimateTokens, estimateJsonTokens, checkBudget } = require_context();
+    var { readIntel } = require_codebase_intel();
+    var { getTransitiveDependents } = require_deps();
     function cmdSessionDiff(cwd, raw) {
       let since = null;
       try {
@@ -13954,6 +13956,43 @@ var require_features = __commonJS({
     function cmdCodebaseImpact(cwd, filePaths, raw) {
       if (!filePaths || filePaths.length === 0) {
         error("File paths required for impact estimation");
+      }
+      try {
+        const intel = readIntel(cwd);
+        if (intel && intel.dependencies) {
+          const graphResults = [];
+          for (const filePath of filePaths) {
+            const fullPath = path.join(cwd, filePath);
+            if (!fs.existsSync(fullPath)) {
+              graphResults.push({ path: filePath, exists: false, dependent_count: 0, dependents: [], risk: "low" });
+              continue;
+            }
+            const result = getTransitiveDependents(intel.dependencies, filePath);
+            const allDependents = [
+              ...result.direct_dependents || [],
+              ...(result.transitive_dependents || []).map((d) => d.file)
+            ];
+            const dependents = allDependents.slice(0, 20);
+            graphResults.push({
+              path: filePath,
+              exists: true,
+              dependent_count: result.fan_in || allDependents.length,
+              dependents,
+              risk: allDependents.length > 10 ? "high" : allDependents.length > 5 ? "medium" : "low"
+            });
+          }
+          const totalDependents2 = graphResults.reduce((sum, r) => sum + r.dependent_count, 0);
+          output({
+            files_analyzed: graphResults.length,
+            total_dependents: totalDependents2,
+            overall_risk: totalDependents2 > 20 ? "high" : totalDependents2 > 10 ? "medium" : "low",
+            files: graphResults,
+            source: "cached_graph"
+          }, raw);
+          return;
+        }
+      } catch (e) {
+        debugLog("feature.codebaseImpact", "graph fallback to grep", e);
       }
       const results = [];
       for (const filePath of filePaths) {
