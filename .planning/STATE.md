@@ -5,14 +5,18 @@
 See: .planning/PROJECT.md (updated 2026-02-26)
 
 **Core value:** Manage and deliver high-quality software with high-quality documentation, while continuously reducing token usage and improving performance
-**Current focus:** v6.0 UX & Developer Experience — defining requirements
+**Current focus:** v6.0 UX & Developer Experience — Phase 30: Formatting Foundation & Smart Output
 
 ## Current Position
 
-**Phase:** Not started (defining requirements)
+**Phase:** 30 — Formatting Foundation & Smart Output
 **Current Plan:** —
-**Status:** Defining requirements
-**Last Activity:** 2026-02-26 — Milestone v6.0 started
+**Status:** Not started
+**Last Activity:** 2026-02-26 — Roadmap created for v6.0
+
+```
+v6.0 Progress: [░░░░░░░░░░░░░░░░░░░░] 0/7 phases (0%)
+```
 
 ## Performance Metrics
 
@@ -31,6 +35,7 @@ See: .planning/PROJECT.md (updated 2026-02-26)
 | v3.0 | 4 | 10 | 1 day |
 | v4.0 | 5 | 13 | 1 day |
 | v5.0 | 7 | 14 | 2 days |
+| v6.0 | 7 | 14 | — |
 
 ## Accumulated Context
 
@@ -40,7 +45,7 @@ All v1.0-v5.0 decisions recorded in PROJECT.md Key Decisions table with outcomes
 
 ### Pending Todos
 
-- Fix 2 failing tests from v5.0
+- Fix 2 failing tests from v5.0 (assigned to Phase 31, QUAL-01)
 
 ### Blockers/Concerns
 
@@ -49,5 +54,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-02-26
-Stopped at: Milestone v6.0 initialization
+Stopped at: v6.0 roadmap created, ready for Phase 30 planning
 Resume file: None

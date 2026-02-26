@@ -80,37 +80,37 @@ Requirements for UX overhaul milestone. Each maps to roadmap phases.
 
 | Requirement | Phase | Status | Test Command |
 |-------------|-------|--------|--------------|
-| FMT-01 | — | Pending | — |
-| FMT-02 | — | Pending | — |
-| FMT-03 | — | Pending | — |
-| FMT-04 | — | Pending | — |
-| FMT-05 | — | Pending | — |
-| OUT-01 | — | Pending | — |
-| OUT-02 | — | Pending | — |
-| OUT-03 | — | Pending | — |
-| OUT-04 | — | Pending | — |
-| CMD-01 | — | Pending | — |
-| CMD-02 | — | Pending | — |
-| CMD-03 | — | Pending | — |
-| CMD-04 | — | Pending | — |
-| CMD-05 | — | Pending | — |
-| CMD-06 | — | Pending | — |
-| WKFL-04 | — | Pending | — |
-| WKFL-05 | — | Pending | — |
-| WKFL-06 | — | Pending | — |
-| WKFL-07 | — | Pending | — |
-| INTG-01 | — | Pending | — |
-| INTG-02 | — | Pending | — |
-| INTG-03 | — | Pending | — |
-| QUAL-01 | — | Pending | — |
-| QUAL-02 | — | Pending | — |
-| QUAL-03 | — | Pending | — |
+| FMT-01 | Phase 30 | Pending | — |
+| FMT-02 | Phase 30 | Pending | — |
+| FMT-03 | Phase 30 | Pending | — |
+| FMT-04 | Phase 30 | Pending | — |
+| FMT-05 | Phase 30 | Pending | — |
+| OUT-01 | Phase 30 | Pending | — |
+| OUT-02 | Phase 30 | Pending | — |
+| OUT-03 | Phase 30 | Pending | — |
+| OUT-04 | Phase 30 | Pending | — |
+| CMD-01 | Phase 32 | Pending | — |
+| CMD-02 | Phase 32 | Pending | — |
+| CMD-03 | Phase 33 | Pending | — |
+| CMD-04 | Phase 33 | Pending | — |
+| CMD-05 | Phase 34 | Pending | — |
+| CMD-06 | Phase 34 | Pending | — |
+| WKFL-04 | Phase 35 | Pending | — |
+| WKFL-05 | Phase 35 | Pending | — |
+| WKFL-06 | Phase 35 | Pending | — |
+| WKFL-07 | Phase 35 | Pending | — |
+| INTG-01 | Phase 36 | Pending | — |
+| INTG-02 | Phase 36 | Pending | — |
+| INTG-03 | Phase 36 | Pending | — |
+| QUAL-01 | Phase 31 | Pending | — |
+| QUAL-02 | Phase 31 | Pending | — |
+| QUAL-03 | Phase 36 | Pending | — |
 
 **Coverage:**
 - v6.0 requirements: 25 total
-- Mapped to phases: 0
-- Unmapped: 25 (pending roadmap creation)
+- Mapped to phases: 25
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-02-26*
-*Last updated: 2026-02-26 after initial definition*
+*Last updated: 2026-02-26 after roadmap creation*
