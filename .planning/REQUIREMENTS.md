@@ -9,9 +9,9 @@ Requirements for codebase intelligence milestone. Each maps to roadmap phases.
 
 ### Infrastructure
 
-- [ ] **INFRA-01**: CLI produces a codebase-intel.json cache file with git hash watermarks for freshness validation
-- [ ] **INFRA-02**: Staleness check completes in <50ms by comparing cached git hash to current HEAD
-- [ ] **INFRA-03**: Incremental updates re-analyze only files changed since last cached commit
+- [x] **INFRA-01**: CLI produces a codebase-intel.json cache file with git hash watermarks for freshness validation
+- [x] **INFRA-02**: Staleness check completes in <50ms by comparing cached git hash to current HEAD
+- [x] **INFRA-03**: Incremental updates re-analyze only files changed since last cached commit
 - [ ] **INFRA-04**: Cache auto-triggers on init commands when stale (follows env.js autoTrigger pattern)
 
 ### Convention Extraction
@@ -79,9 +79,9 @@ Requirements for codebase intelligence milestone. Each maps to roadmap phases.
 
 | Requirement | Phase | Status | Test Command |
 |-------------|-------|--------|--------------|
-| INFRA-01 | Phase 23 | Pending | node bin/gsd-tools.cjs codebase analyze --raw |
-| INFRA-02 | Phase 23 | Pending | node bin/gsd-tools.cjs codebase status --raw |
-| INFRA-03 | Phase 23 | Pending | node bin/gsd-tools.cjs codebase analyze --raw |
+| INFRA-01 | Phase 23 | Complete | node bin/gsd-tools.cjs codebase analyze --raw |
+| INFRA-02 | Phase 23 | Complete | node bin/gsd-tools.cjs codebase status --raw |
+| INFRA-03 | Phase 23 | Complete | node bin/gsd-tools.cjs codebase analyze --raw |
 | INFRA-04 | Phase 23 | Pending | node bin/gsd-tools.cjs init progress --raw |
 | CONV-01 | Phase 24 | Pending | node bin/gsd-tools.cjs codebase conventions --raw |
 | CONV-02 | Phase 24 | Pending | node bin/gsd-tools.cjs codebase conventions --raw |
