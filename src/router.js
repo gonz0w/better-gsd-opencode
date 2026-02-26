@@ -3,85 +3,25 @@
 const { COMMAND_HELP } = require('./lib/constants');
 const { error } = require('./lib/output');
 
-// Command modules
-const {
-  cmdStateLoad, cmdStateGet, cmdStatePatch, cmdStateUpdate,
-  cmdStateAdvancePlan, cmdStateRecordMetric, cmdStateUpdateProgress,
-  cmdStateAddDecision, cmdStateAddBlocker, cmdStateResolveBlocker,
-  cmdStateRecordSession, cmdStateValidate,
-} = require('./commands/state');
+// ─── Lazy-loaded command modules ─────────────────────────────────────────────
+// Each module is loaded on first use, not at startup. This avoids parsing and
+// initializing all 12 command modules when only one command runs per invocation.
 
-const {
-  cmdRoadmapGetPhase, cmdRoadmapAnalyze, cmdRoadmapUpdatePlanProgress,
-} = require('./commands/roadmap');
+const _modules = {};
 
-const {
-  cmdPhasesList, cmdPhaseNextDecimal, cmdPhaseAdd, cmdPhaseInsert,
-  cmdPhaseRemove, cmdRequirementsMarkComplete, cmdPhaseComplete,
-  cmdMilestoneComplete,
-} = require('./commands/phase');
-
-const {
-  cmdVerifyPlanStructure, cmdVerifyPhaseCompleteness, cmdVerifyReferences,
-  cmdVerifyCommits, cmdVerifyArtifacts, cmdVerifyKeyLinks,
-  cmdValidateConsistency, cmdValidateHealth, cmdAnalyzePlan,
-  cmdVerifyDeliverables, cmdVerifyRequirements, cmdVerifyRegression,
-  cmdVerifyPlanWave, cmdVerifyPlanDeps, cmdVerifyQuality,
-  cmdAssertionsList, cmdAssertionsValidate,
-} = require('./commands/verify');
-
-const {
-  cmdInitExecutePhase, cmdInitPlanPhase, cmdInitNewProject,
-  cmdInitNewMilestone, cmdInitQuick, cmdInitResume, cmdInitVerifyWork,
-  cmdInitPhaseOp, cmdInitTodos, cmdInitMilestoneOp, cmdInitMapCodebase,
-  cmdInitProgress, cmdInitMemory,
-} = require('./commands/init');
-
-const {
-  cmdSessionDiff, cmdContextBudget, cmdContextBudgetBaseline,
-  cmdContextBudgetCompare, cmdContextBudgetMeasure, cmdTestRun, cmdSearchDecisions,
-  cmdValidateDependencies, cmdSearchLessons, cmdCodebaseImpact,
-  cmdRollbackInfo, cmdVelocity, cmdTraceRequirement, cmdValidateConfig,
-  cmdQuickTaskSummary, cmdExtractSections, cmdTestCoverage, cmdTokenBudget,
-  cmdSessionSummary,
-} = require('./commands/features');
-
-const {
-  cmdGenerateSlug, cmdCurrentTimestamp, cmdListTodos, cmdVerifyPathExists,
-  cmdConfigEnsureSection, cmdConfigSet, cmdConfigGet, cmdConfigMigrate,
-  cmdHistoryDigest, cmdResolveModel, cmdFindPhase, cmdCommit,
-  cmdVerifySummary, cmdTemplateSelect, cmdTemplateFill, cmdPhasePlanIndex,
-  cmdStateSnapshot, cmdSummaryExtract, cmdWebsearch, cmdFrontmatterGet,
-  cmdFrontmatterSet, cmdFrontmatterMerge, cmdFrontmatterValidate,
-  cmdProgressRender, cmdTodoComplete, cmdScaffold,
-} = require('./commands/misc');
-
-const {
-  cmdMemoryWrite, cmdMemoryRead, cmdMemoryList, cmdMemoryEnsureDir, cmdMemoryCompact,
-} = require('./commands/memory');
-
-const {
-  cmdIntentCreate,
-  cmdIntentShow,
-  cmdIntentUpdate,
-  cmdIntentValidate,
-  cmdIntentTrace,
-  cmdIntentDrift,
-  getIntentDriftData,
-} = require('./commands/intent');
-
-const {
-  cmdEnvScan, cmdEnvStatus,
-} = require('./commands/env');
-
-const {
-  cmdMcpProfile,
-} = require('./commands/mcp');
-
-const {
-  cmdWorktreeCreate, cmdWorktreeList, cmdWorktreeRemove, cmdWorktreeCleanup,
-  cmdWorktreeMerge, cmdWorktreeCheckOverlap,
-} = require('./commands/worktree');
+function lazyState() { return _modules.state || (_modules.state = require('./commands/state')); }
+function lazyRoadmap() { return _modules.roadmap || (_modules.roadmap = require('./commands/roadmap')); }
+function lazyPhase() { return _modules.phase || (_modules.phase = require('./commands/phase')); }
+function lazyVerify() { return _modules.verify || (_modules.verify = require('./commands/verify')); }
+function lazyInit() { return _modules.init || (_modules.init = require('./commands/init')); }
+function lazyFeatures() { return _modules.features || (_modules.features = require('./commands/features')); }
+function lazyMisc() { return _modules.misc || (_modules.misc = require('./commands/misc')); }
+function lazyMemory() { return _modules.memory || (_modules.memory = require('./commands/memory')); }
+function lazyIntent() { return _modules.intent || (_modules.intent = require('./commands/intent')); }
+function lazyEnv() { return _modules.env || (_modules.env = require('./commands/env')); }
+function lazyMcp() { return _modules.mcp || (_modules.mcp = require('./commands/mcp')); }
+function lazyWorktree() { return _modules.worktree || (_modules.worktree = require('./commands/worktree')); }
+function lazyCodebase() { return _modules.codebase || (_modules.codebase = require('./commands/codebase')); }
 
 
 async function main() {
@@ -128,7 +68,7 @@ async function main() {
   const cwd = process.cwd();
 
   if (!command) {
-    error('Usage: gsd-tools <command> [args] [--raw] [--verbose]\nCommands: assertions, codebase-impact, commit, config-ensure-section, config-get, config-migrate, config-set, context-budget, current-timestamp, env, extract-sections, find-phase, frontmatter, generate-slug, history-digest, init, intent, list-todos, mcp, mcp-profile, memory, milestone, phase, phase-plan-index, phases, progress, quick-summary, requirements, resolve-model, roadmap, rollback-info, scaffold, search-decisions, search-lessons, session-diff, state, state-snapshot, summary-extract, template, test-coverage, test-run, todo, token-budget, trace-requirement, validate, validate-config, validate-dependencies, velocity, verify, verify-path-exists, verify-summary, websearch, worktree');
+    error('Usage: gsd-tools <command> [args] [--raw] [--verbose]\nCommands: assertions, codebase, codebase-impact, commit, config-ensure-section, config-get, config-migrate, config-set, context-budget, current-timestamp, env, extract-sections, find-phase, frontmatter, generate-slug, history-digest, init, intent, list-todos, mcp, mcp-profile, memory, milestone, phase, phase-plan-index, phases, progress, quick-summary, requirements, resolve-model, roadmap, rollback-info, scaffold, search-decisions, search-lessons, session-diff, state, state-snapshot, summary-extract, template, test-coverage, test-run, todo, token-budget, trace-requirement, validate, validate-config, validate-dependencies, velocity, verify, verify-path-exists, verify-summary, websearch, worktree');
   }
 
   // --help / -h: print command help to stderr (never contaminates JSON stdout)
@@ -151,9 +91,9 @@ async function main() {
     case 'state': {
       const subcommand = args[1];
       if (subcommand === 'update') {
-        cmdStateUpdate(cwd, args[2], args[3]);
+        lazyState().cmdStateUpdate(cwd, args[2], args[3]);
       } else if (subcommand === 'get') {
-        cmdStateGet(cwd, args[2], raw);
+        lazyState().cmdStateGet(cwd, args[2], raw);
       } else if (subcommand === 'patch') {
         const patches = {};
         for (let i = 2; i < args.length; i += 2) {
@@ -163,16 +103,16 @@ async function main() {
             patches[key] = value;
           }
         }
-        cmdStatePatch(cwd, patches, raw);
+        lazyState().cmdStatePatch(cwd, patches, raw);
       } else if (subcommand === 'advance-plan') {
-        cmdStateAdvancePlan(cwd, raw);
+        lazyState().cmdStateAdvancePlan(cwd, raw);
       } else if (subcommand === 'record-metric') {
         const phaseIdx = args.indexOf('--phase');
         const planIdx = args.indexOf('--plan');
         const durationIdx = args.indexOf('--duration');
         const tasksIdx = args.indexOf('--tasks');
         const filesIdx = args.indexOf('--files');
-        cmdStateRecordMetric(cwd, {
+        lazyState().cmdStateRecordMetric(cwd, {
           phase: phaseIdx !== -1 ? args[phaseIdx + 1] : null,
           plan: planIdx !== -1 ? args[planIdx + 1] : null,
           duration: durationIdx !== -1 ? args[durationIdx + 1] : null,
@@ -180,45 +120,45 @@ async function main() {
           files: filesIdx !== -1 ? args[filesIdx + 1] : null,
         }, raw);
       } else if (subcommand === 'update-progress') {
-        cmdStateUpdateProgress(cwd, raw);
+        lazyState().cmdStateUpdateProgress(cwd, raw);
       } else if (subcommand === 'add-decision') {
         const phaseIdx = args.indexOf('--phase');
         const summaryIdx = args.indexOf('--summary');
         const rationaleIdx = args.indexOf('--rationale');
-        cmdStateAddDecision(cwd, {
+        lazyState().cmdStateAddDecision(cwd, {
           phase: phaseIdx !== -1 ? args[phaseIdx + 1] : null,
           summary: summaryIdx !== -1 ? args[summaryIdx + 1] : null,
           rationale: rationaleIdx !== -1 ? args[rationaleIdx + 1] : '',
         }, raw);
       } else if (subcommand === 'add-blocker') {
         const textIdx = args.indexOf('--text');
-        cmdStateAddBlocker(cwd, textIdx !== -1 ? args[textIdx + 1] : null, raw);
+        lazyState().cmdStateAddBlocker(cwd, textIdx !== -1 ? args[textIdx + 1] : null, raw);
       } else if (subcommand === 'resolve-blocker') {
         const textIdx = args.indexOf('--text');
-        cmdStateResolveBlocker(cwd, textIdx !== -1 ? args[textIdx + 1] : null, raw);
+        lazyState().cmdStateResolveBlocker(cwd, textIdx !== -1 ? args[textIdx + 1] : null, raw);
       } else if (subcommand === 'record-session') {
         const stoppedIdx = args.indexOf('--stopped-at');
         const resumeIdx = args.indexOf('--resume-file');
-        cmdStateRecordSession(cwd, {
+        lazyState().cmdStateRecordSession(cwd, {
           stopped_at: stoppedIdx !== -1 ? args[stoppedIdx + 1] : null,
           resume_file: resumeIdx !== -1 ? args[resumeIdx + 1] : 'None',
         }, raw);
       } else if (subcommand === 'validate') {
         const fix = args.includes('--fix');
-        cmdStateValidate(cwd, { fix }, raw);
+        lazyState().cmdStateValidate(cwd, { fix }, raw);
       } else {
-        cmdStateLoad(cwd, raw);
+        lazyState().cmdStateLoad(cwd, raw);
       }
       break;
     }
 
     case 'resolve-model': {
-      cmdResolveModel(cwd, args[1], raw);
+      lazyMisc().cmdResolveModel(cwd, args[1], raw);
       break;
     }
 
     case 'find-phase': {
-      cmdFindPhase(cwd, args[1], raw);
+      lazyMisc().cmdFindPhase(cwd, args[1], raw);
       break;
     }
 
@@ -228,7 +168,7 @@ async function main() {
       // Parse --files flag (collect args after --files, stopping at other flags)
       const filesIndex = args.indexOf('--files');
       const files = filesIndex !== -1 ? args.slice(filesIndex + 1).filter(a => !a.startsWith('--')) : [];
-      cmdCommit(cwd, message, files, raw, amend);
+      lazyMisc().cmdCommit(cwd, message, files, raw, amend);
       break;
     }
 
@@ -236,14 +176,14 @@ async function main() {
       const summaryPath = args[1];
       const countIndex = args.indexOf('--check-count');
       const checkCount = countIndex !== -1 ? parseInt(args[countIndex + 1], 10) : 2;
-      cmdVerifySummary(cwd, summaryPath, checkCount, raw);
+      lazyMisc().cmdVerifySummary(cwd, summaryPath, checkCount, raw);
       break;
     }
 
     case 'template': {
       const subcommand = args[1];
       if (subcommand === 'select') {
-        cmdTemplateSelect(cwd, args[2], raw);
+        lazyMisc().cmdTemplateSelect(cwd, args[2], raw);
       } else if (subcommand === 'fill') {
         const templateType = args[2];
         const phaseIdx = args.indexOf('--phase');
@@ -252,7 +192,7 @@ async function main() {
         const typeIdx = args.indexOf('--type');
         const waveIdx = args.indexOf('--wave');
         const fieldsIdx = args.indexOf('--fields');
-        cmdTemplateFill(cwd, templateType, {
+        lazyMisc().cmdTemplateFill(cwd, templateType, {
           phase: phaseIdx !== -1 ? args[phaseIdx + 1] : null,
           plan: planIdx !== -1 ? args[planIdx + 1] : null,
           name: nameIdx !== -1 ? args[nameIdx + 1] : null,
@@ -271,17 +211,17 @@ async function main() {
       const file = args[2];
       if (subcommand === 'get') {
         const fieldIdx = args.indexOf('--field');
-        cmdFrontmatterGet(cwd, file, fieldIdx !== -1 ? args[fieldIdx + 1] : null, raw);
+        lazyMisc().cmdFrontmatterGet(cwd, file, fieldIdx !== -1 ? args[fieldIdx + 1] : null, raw);
       } else if (subcommand === 'set') {
         const fieldIdx = args.indexOf('--field');
         const valueIdx = args.indexOf('--value');
-        cmdFrontmatterSet(cwd, file, fieldIdx !== -1 ? args[fieldIdx + 1] : null, valueIdx !== -1 ? args[valueIdx + 1] : undefined, raw);
+        lazyMisc().cmdFrontmatterSet(cwd, file, fieldIdx !== -1 ? args[fieldIdx + 1] : null, valueIdx !== -1 ? args[valueIdx + 1] : undefined, raw);
       } else if (subcommand === 'merge') {
         const dataIdx = args.indexOf('--data');
-        cmdFrontmatterMerge(cwd, file, dataIdx !== -1 ? args[dataIdx + 1] : null, raw);
+        lazyMisc().cmdFrontmatterMerge(cwd, file, dataIdx !== -1 ? args[dataIdx + 1] : null, raw);
       } else if (subcommand === 'validate') {
         const schemaIdx = args.indexOf('--schema');
-        cmdFrontmatterValidate(cwd, file, schemaIdx !== -1 ? args[schemaIdx + 1] : null, raw);
+        lazyMisc().cmdFrontmatterValidate(cwd, file, schemaIdx !== -1 ? args[schemaIdx + 1] : null, raw);
       } else {
         error('Unknown frontmatter subcommand. Available: get, set, merge, validate');
       }
@@ -291,41 +231,41 @@ async function main() {
     case 'verify': {
       const subcommand = args[1];
       if (subcommand === 'plan-structure') {
-        cmdVerifyPlanStructure(cwd, args[2], raw);
+        lazyVerify().cmdVerifyPlanStructure(cwd, args[2], raw);
       } else if (subcommand === 'phase-completeness') {
-        cmdVerifyPhaseCompleteness(cwd, args[2], raw);
+        lazyVerify().cmdVerifyPhaseCompleteness(cwd, args[2], raw);
       } else if (subcommand === 'references') {
-        cmdVerifyReferences(cwd, args[2], raw);
+        lazyVerify().cmdVerifyReferences(cwd, args[2], raw);
       } else if (subcommand === 'commits') {
-        cmdVerifyCommits(cwd, args.slice(2), raw);
+        lazyVerify().cmdVerifyCommits(cwd, args.slice(2), raw);
       } else if (subcommand === 'artifacts') {
-        cmdVerifyArtifacts(cwd, args[2], raw);
+        lazyVerify().cmdVerifyArtifacts(cwd, args[2], raw);
       } else if (subcommand === 'key-links') {
-        cmdVerifyKeyLinks(cwd, args[2], raw);
+        lazyVerify().cmdVerifyKeyLinks(cwd, args[2], raw);
       } else if (subcommand === 'analyze-plan') {
-        cmdAnalyzePlan(cwd, args[2], raw);
+        lazyVerify().cmdAnalyzePlan(cwd, args[2], raw);
       } else if (subcommand === 'deliverables') {
         const planIdx = args.indexOf('--plan');
-        cmdVerifyDeliverables(cwd, {
+        lazyVerify().cmdVerifyDeliverables(cwd, {
           plan: planIdx !== -1 ? args[planIdx + 1] : null,
         }, raw);
       } else if (subcommand === 'requirements') {
-        cmdVerifyRequirements(cwd, {}, raw);
+        lazyVerify().cmdVerifyRequirements(cwd, {}, raw);
       } else if (subcommand === 'regression') {
         const beforeIdx = args.indexOf('--before');
         const afterIdx = args.indexOf('--after');
-        cmdVerifyRegression(cwd, {
+        lazyVerify().cmdVerifyRegression(cwd, {
           before: beforeIdx !== -1 ? args[beforeIdx + 1] : null,
           after: afterIdx !== -1 ? args[afterIdx + 1] : null,
         }, raw);
       } else if (subcommand === 'plan-wave') {
-        cmdVerifyPlanWave(cwd, args[2], raw);
+        lazyVerify().cmdVerifyPlanWave(cwd, args[2], raw);
       } else if (subcommand === 'plan-deps') {
-        cmdVerifyPlanDeps(cwd, args[2], raw);
+        lazyVerify().cmdVerifyPlanDeps(cwd, args[2], raw);
       } else if (subcommand === 'quality') {
         const planIdx = args.indexOf('--plan');
         const phaseIdx = args.indexOf('--phase');
-        cmdVerifyQuality(cwd, {
+        lazyVerify().cmdVerifyQuality(cwd, {
           plan: planIdx !== -1 ? args[planIdx + 1] : null,
           phase: phaseIdx !== -1 ? args[phaseIdx + 1] : null,
         }, raw);
@@ -336,42 +276,42 @@ async function main() {
     }
 
     case 'generate-slug': {
-      cmdGenerateSlug(args[1], raw);
+      lazyMisc().cmdGenerateSlug(args[1], raw);
       break;
     }
 
     case 'current-timestamp': {
-      cmdCurrentTimestamp(args[1] || 'full', raw);
+      lazyMisc().cmdCurrentTimestamp(args[1] || 'full', raw);
       break;
     }
 
     case 'list-todos': {
-      cmdListTodos(cwd, args[1], raw);
+      lazyMisc().cmdListTodos(cwd, args[1], raw);
       break;
     }
 
     case 'verify-path-exists': {
-      cmdVerifyPathExists(cwd, args[1], raw);
+      lazyMisc().cmdVerifyPathExists(cwd, args[1], raw);
       break;
     }
 
     case 'config-ensure-section': {
-      cmdConfigEnsureSection(cwd, raw);
+      lazyMisc().cmdConfigEnsureSection(cwd, raw);
       break;
     }
 
     case 'config-set': {
-      cmdConfigSet(cwd, args[1], args[2], raw);
+      lazyMisc().cmdConfigSet(cwd, args[1], args[2], raw);
       break;
     }
 
     case 'config-get': {
-      cmdConfigGet(cwd, args[1], raw);
+      lazyMisc().cmdConfigGet(cwd, args[1], raw);
       break;
     }
 
     case 'config-migrate': {
-      cmdConfigMigrate(cwd, raw);
+      lazyMisc().cmdConfigMigrate(cwd, raw);
       break;
     }
 
@@ -384,7 +324,7 @@ async function main() {
         phases: hdPhasesIdx !== -1 ? args[hdPhasesIdx + 1].split(',').map(s => s.trim()) : null,
         compact: hdSlim,
       };
-      cmdHistoryDigest(cwd, hdOptions, raw);
+      lazyMisc().cmdHistoryDigest(cwd, hdOptions, raw);
       break;
     }
 
@@ -398,7 +338,7 @@ async function main() {
           phase: phaseIndex !== -1 ? args[phaseIndex + 1] : null,
           includeArchived: args.includes('--include-archived'),
         };
-        cmdPhasesList(cwd, options, raw);
+        lazyPhase().cmdPhasesList(cwd, options, raw);
       } else {
         error('Unknown phases subcommand. Available: list');
       }
@@ -408,11 +348,11 @@ async function main() {
     case 'roadmap': {
       const subcommand = args[1];
       if (subcommand === 'get-phase') {
-        cmdRoadmapGetPhase(cwd, args[2], raw);
+        lazyRoadmap().cmdRoadmapGetPhase(cwd, args[2], raw);
       } else if (subcommand === 'analyze') {
-        cmdRoadmapAnalyze(cwd, raw);
+        lazyRoadmap().cmdRoadmapAnalyze(cwd, raw);
       } else if (subcommand === 'update-plan-progress') {
-        cmdRoadmapUpdatePlanProgress(cwd, args[2], raw);
+        lazyRoadmap().cmdRoadmapUpdatePlanProgress(cwd, args[2], raw);
       } else {
         error('Unknown roadmap subcommand. Available: get-phase, analyze, update-plan-progress');
       }
@@ -422,7 +362,7 @@ async function main() {
     case 'requirements': {
       const subcommand = args[1];
       if (subcommand === 'mark-complete') {
-        cmdRequirementsMarkComplete(cwd, args.slice(2), raw);
+        lazyPhase().cmdRequirementsMarkComplete(cwd, args.slice(2), raw);
       } else {
         error('Unknown requirements subcommand. Available: mark-complete');
       }
@@ -432,16 +372,16 @@ async function main() {
     case 'phase': {
       const subcommand = args[1];
       if (subcommand === 'next-decimal') {
-        cmdPhaseNextDecimal(cwd, args[2], raw);
+        lazyPhase().cmdPhaseNextDecimal(cwd, args[2], raw);
       } else if (subcommand === 'add') {
-        cmdPhaseAdd(cwd, args.slice(2).join(' '), raw);
+        lazyPhase().cmdPhaseAdd(cwd, args.slice(2).join(' '), raw);
       } else if (subcommand === 'insert') {
-        cmdPhaseInsert(cwd, args[2], args.slice(3).join(' '), raw);
+        lazyPhase().cmdPhaseInsert(cwd, args[2], args.slice(3).join(' '), raw);
       } else if (subcommand === 'remove') {
         const forceFlag = args.includes('--force');
-        cmdPhaseRemove(cwd, args[2], { force: forceFlag }, raw);
+        lazyPhase().cmdPhaseRemove(cwd, args[2], { force: forceFlag }, raw);
       } else if (subcommand === 'complete') {
-        cmdPhaseComplete(cwd, args[2], raw);
+        lazyPhase().cmdPhaseComplete(cwd, args[2], raw);
       } else {
         error('Unknown phase subcommand. Available: next-decimal, add, insert, remove, complete');
       }
@@ -463,7 +403,7 @@ async function main() {
           }
           milestoneName = nameArgs.join(' ') || null;
         }
-        cmdMilestoneComplete(cwd, args[2], { name: milestoneName, archivePhases }, raw);
+        lazyPhase().cmdMilestoneComplete(cwd, args[2], { name: milestoneName, archivePhases }, raw);
       } else {
         error('Unknown milestone subcommand. Available: complete');
       }
@@ -473,10 +413,10 @@ async function main() {
     case 'validate': {
       const subcommand = args[1];
       if (subcommand === 'consistency') {
-        cmdValidateConsistency(cwd, raw);
+        lazyVerify().cmdValidateConsistency(cwd, raw);
       } else if (subcommand === 'health') {
         const repairFlag = args.includes('--repair');
-        cmdValidateHealth(cwd, { repair: repairFlag }, raw);
+        lazyVerify().cmdValidateHealth(cwd, { repair: repairFlag }, raw);
       } else {
         error('Unknown validate subcommand. Available: consistency, health');
       }
@@ -485,14 +425,14 @@ async function main() {
 
     case 'progress': {
       const subcommand = args[1] || 'json';
-      cmdProgressRender(cwd, subcommand, raw);
+      lazyMisc().cmdProgressRender(cwd, subcommand, raw);
       break;
     }
 
     case 'todo': {
       const subcommand = args[1];
       if (subcommand === 'complete') {
-        cmdTodoComplete(cwd, args[2], raw);
+        lazyMisc().cmdTodoComplete(cwd, args[2], raw);
       } else {
         error('Unknown todo subcommand. Available: complete');
       }
@@ -507,7 +447,7 @@ async function main() {
         phase: phaseIndex !== -1 ? args[phaseIndex + 1] : null,
         name: nameIndex !== -1 ? args.slice(nameIndex + 1).join(' ') : null,
       };
-      cmdScaffold(cwd, scaffoldType, scaffoldOptions, raw);
+      lazyMisc().cmdScaffold(cwd, scaffoldType, scaffoldOptions, raw);
       break;
     }
 
@@ -515,43 +455,43 @@ async function main() {
       const workflow = args[1];
       switch (workflow) {
         case 'execute-phase':
-          cmdInitExecutePhase(cwd, args[2], raw);
+          lazyInit().cmdInitExecutePhase(cwd, args[2], raw);
           break;
         case 'plan-phase':
-          cmdInitPlanPhase(cwd, args[2], raw);
+          lazyInit().cmdInitPlanPhase(cwd, args[2], raw);
           break;
         case 'new-project':
-          cmdInitNewProject(cwd, raw);
+          lazyInit().cmdInitNewProject(cwd, raw);
           break;
         case 'new-milestone':
-          cmdInitNewMilestone(cwd, raw);
+          lazyInit().cmdInitNewMilestone(cwd, raw);
           break;
         case 'quick':
-          cmdInitQuick(cwd, args.slice(2).join(' '), raw);
+          lazyInit().cmdInitQuick(cwd, args.slice(2).join(' '), raw);
           break;
         case 'resume':
-          cmdInitResume(cwd, raw);
+          lazyInit().cmdInitResume(cwd, raw);
           break;
         case 'verify-work':
-          cmdInitVerifyWork(cwd, args[2], raw);
+          lazyInit().cmdInitVerifyWork(cwd, args[2], raw);
           break;
         case 'phase-op':
-          cmdInitPhaseOp(cwd, args[2], raw);
+          lazyInit().cmdInitPhaseOp(cwd, args[2], raw);
           break;
         case 'todos':
-          cmdInitTodos(cwd, args[2], raw);
+          lazyInit().cmdInitTodos(cwd, args[2], raw);
           break;
         case 'milestone-op':
-          cmdInitMilestoneOp(cwd, raw);
+          lazyInit().cmdInitMilestoneOp(cwd, raw);
           break;
         case 'map-codebase':
-          cmdInitMapCodebase(cwd, raw);
+          lazyInit().cmdInitMapCodebase(cwd, raw);
           break;
         case 'progress':
-          cmdInitProgress(cwd, raw);
+          lazyInit().cmdInitProgress(cwd, raw);
           break;
         case 'memory':
-          cmdInitMemory(cwd, args.slice(2), raw);
+          lazyInit().cmdInitMemory(cwd, args.slice(2), raw);
           break;
         default:
           error(`Unknown init workflow: ${workflow}\nAvailable: execute-phase, plan-phase, new-project, new-milestone, quick, resume, verify-work, phase-op, todos, milestone-op, map-codebase, progress, memory`);
@@ -560,12 +500,12 @@ async function main() {
     }
 
     case 'phase-plan-index': {
-      cmdPhasePlanIndex(cwd, args[1], raw);
+      lazyMisc().cmdPhasePlanIndex(cwd, args[1], raw);
       break;
     }
 
     case 'state-snapshot': {
-      cmdStateSnapshot(cwd, raw);
+      lazyMisc().cmdStateSnapshot(cwd, raw);
       break;
     }
 
@@ -573,7 +513,7 @@ async function main() {
       const summaryPath = args[1];
       const fieldsIndex = args.indexOf('--fields');
       const fields = fieldsIndex !== -1 ? args[fieldsIndex + 1].split(',') : null;
-      cmdSummaryExtract(cwd, summaryPath, fields, raw);
+      lazyMisc().cmdSummaryExtract(cwd, summaryPath, fields, raw);
       break;
     }
 
@@ -581,7 +521,7 @@ async function main() {
       const query = args[1];
       const limitIdx = args.indexOf('--limit');
       const freshnessIdx = args.indexOf('--freshness');
-      await cmdWebsearch(query, {
+      await lazyMisc().cmdWebsearch(query, {
         limit: limitIdx !== -1 ? parseInt(args[limitIdx + 1], 10) : 10,
         freshness: freshnessIdx !== -1 ? args[freshnessIdx + 1] : null,
       }, raw);
@@ -589,92 +529,104 @@ async function main() {
     }
 
     case 'session-diff': {
-      cmdSessionDiff(cwd, raw);
+      lazyFeatures().cmdSessionDiff(cwd, raw);
       break;
     }
 
     case 'session-summary': {
-      cmdSessionSummary(cwd, raw);
+      lazyFeatures().cmdSessionSummary(cwd, raw);
       break;
     }
 
     case 'context-budget': {
       const subcommand = args[1];
       if (subcommand === 'baseline') {
-        cmdContextBudgetBaseline(cwd, raw);
+        lazyFeatures().cmdContextBudgetBaseline(cwd, raw);
       } else if (subcommand === 'compare') {
-        cmdContextBudgetCompare(cwd, args[2], raw);
+        lazyFeatures().cmdContextBudgetCompare(cwd, args[2], raw);
       } else if (subcommand === 'measure') {
-        cmdContextBudgetMeasure(cwd, raw);
+        lazyFeatures().cmdContextBudgetMeasure(cwd, raw);
       } else {
         // Existing behavior: treat args[1] as plan/file path
-        cmdContextBudget(cwd, subcommand, raw);
+        lazyFeatures().cmdContextBudget(cwd, subcommand, raw);
       }
       break;
     }
 
     case 'test-run': {
-      cmdTestRun(cwd, raw);
+      lazyFeatures().cmdTestRun(cwd, raw);
       break;
     }
 
     case 'search-decisions': {
-      cmdSearchDecisions(cwd, args.slice(1).join(' '), raw);
+      lazyFeatures().cmdSearchDecisions(cwd, args.slice(1).join(' '), raw);
       break;
     }
 
     case 'validate-dependencies': {
-      cmdValidateDependencies(cwd, args[1], raw);
+      lazyFeatures().cmdValidateDependencies(cwd, args[1], raw);
       break;
     }
 
     case 'search-lessons': {
-      cmdSearchLessons(cwd, args.slice(1).join(' '), raw);
+      lazyFeatures().cmdSearchLessons(cwd, args.slice(1).join(' '), raw);
+      break;
+    }
+
+    case 'codebase': {
+      const sub = args[1];
+      if (sub === 'analyze') {
+        lazyCodebase().cmdCodebaseAnalyze(cwd, args.slice(2), raw);
+      } else if (sub === 'status') {
+        lazyCodebase().cmdCodebaseStatus(cwd, args.slice(2), raw);
+      } else {
+        error('Usage: codebase <analyze|status>');
+      }
       break;
     }
 
     case 'codebase-impact': {
-      cmdCodebaseImpact(cwd, args.slice(1), raw);
+      lazyFeatures().cmdCodebaseImpact(cwd, args.slice(1), raw);
       break;
     }
 
     case 'rollback-info': {
-      cmdRollbackInfo(cwd, args[1], raw);
+      lazyFeatures().cmdRollbackInfo(cwd, args[1], raw);
       break;
     }
 
     case 'velocity': {
-      cmdVelocity(cwd, raw);
+      lazyFeatures().cmdVelocity(cwd, raw);
       break;
     }
 
     case 'trace-requirement': {
-      cmdTraceRequirement(cwd, args[1], raw);
+      lazyFeatures().cmdTraceRequirement(cwd, args[1], raw);
       break;
     }
 
     case 'validate-config': {
-      cmdValidateConfig(cwd, raw);
+      lazyFeatures().cmdValidateConfig(cwd, raw);
       break;
     }
 
     case 'quick-summary': {
-      cmdQuickTaskSummary(cwd, raw);
+      lazyFeatures().cmdQuickTaskSummary(cwd, raw);
       break;
     }
 
     case 'extract-sections': {
-      cmdExtractSections(cwd, args.slice(1), raw);
+      lazyFeatures().cmdExtractSections(cwd, args.slice(1), raw);
       break;
     }
 
     case 'test-coverage': {
-      cmdTestCoverage(cwd, raw);
+      lazyFeatures().cmdTestCoverage(cwd, raw);
       break;
     }
 
     case 'token-budget': {
-      cmdTokenBudget(cwd, raw);
+      lazyFeatures().cmdTokenBudget(cwd, raw);
       break;
     }
 
@@ -683,7 +635,7 @@ async function main() {
       if (subcommand === 'write') {
         const storeIdx = args.indexOf('--store');
         const entryIdx = args.indexOf('--entry');
-        cmdMemoryWrite(cwd, {
+        lazyMemory().cmdMemoryWrite(cwd, {
           store: storeIdx !== -1 ? args[storeIdx + 1] : null,
           entry: entryIdx !== -1 ? args[entryIdx + 1] : null,
         }, raw);
@@ -692,21 +644,21 @@ async function main() {
         const limitIdx = args.indexOf('--limit');
         const queryIdx = args.indexOf('--query');
         const phaseIdx = args.indexOf('--phase');
-        cmdMemoryRead(cwd, {
+        lazyMemory().cmdMemoryRead(cwd, {
           store: storeIdx !== -1 ? args[storeIdx + 1] : null,
           limit: limitIdx !== -1 ? args[limitIdx + 1] : null,
           query: queryIdx !== -1 ? args[queryIdx + 1] : null,
           phase: phaseIdx !== -1 ? args[phaseIdx + 1] : null,
         }, raw);
       } else if (subcommand === 'list') {
-        cmdMemoryList(cwd, {}, raw);
+        lazyMemory().cmdMemoryList(cwd, {}, raw);
       } else if (subcommand === 'ensure-dir') {
-        cmdMemoryEnsureDir(cwd);
+        lazyMemory().cmdMemoryEnsureDir(cwd);
       } else if (subcommand === 'compact') {
         const storeIdx = args.indexOf('--store');
         const thresholdIdx = args.indexOf('--threshold');
         const dryRun = args.includes('--dry-run');
-        cmdMemoryCompact(cwd, {
+        lazyMemory().cmdMemoryCompact(cwd, {
           store: storeIdx !== -1 ? args[storeIdx + 1] : null,
           threshold: thresholdIdx !== -1 ? args[thresholdIdx + 1] : null,
           dryRun,
@@ -720,20 +672,20 @@ async function main() {
     case 'intent': {
       const subcommand = args[1];
       if (subcommand === 'create') {
-        cmdIntentCreate(cwd, args.slice(2), raw);
+        lazyIntent().cmdIntentCreate(cwd, args.slice(2), raw);
       } else if (subcommand === 'show') {
-        cmdIntentShow(cwd, args.slice(2), raw);
+        lazyIntent().cmdIntentShow(cwd, args.slice(2), raw);
       } else if (subcommand === 'read') {
         // 'read' is syntactic sugar for 'show --raw' per user decision
-        cmdIntentShow(cwd, args.slice(2), true);
+        lazyIntent().cmdIntentShow(cwd, args.slice(2), true);
       } else if (subcommand === 'update') {
-        cmdIntentUpdate(cwd, args.slice(2), raw);
+        lazyIntent().cmdIntentUpdate(cwd, args.slice(2), raw);
       } else if (subcommand === 'validate') {
-        cmdIntentValidate(cwd, args.slice(2), raw);
+        lazyIntent().cmdIntentValidate(cwd, args.slice(2), raw);
       } else if (subcommand === 'trace') {
-        cmdIntentTrace(cwd, args.slice(2), raw);
+        lazyIntent().cmdIntentTrace(cwd, args.slice(2), raw);
       } else if (subcommand === 'drift') {
-        cmdIntentDrift(cwd, args.slice(2), raw);
+        lazyIntent().cmdIntentDrift(cwd, args.slice(2), raw);
       } else {
         error('Unknown intent subcommand. Available: create, show, read, update, validate, trace, drift');
       }
@@ -743,9 +695,9 @@ async function main() {
     case 'env': {
       const subcommand = args[1];
       if (subcommand === 'scan') {
-        cmdEnvScan(cwd, args.slice(2), raw);
+        lazyEnv().cmdEnvScan(cwd, args.slice(2), raw);
       } else if (subcommand === 'status') {
-        cmdEnvStatus(cwd, args.slice(2), raw);
+        lazyEnv().cmdEnvStatus(cwd, args.slice(2), raw);
       } else {
         error('Unknown env subcommand. Available: scan, status');
       }
@@ -753,14 +705,14 @@ async function main() {
     }
 
     case 'mcp-profile': {
-      cmdMcpProfile(cwd, args.slice(1), raw);
+      lazyMcp().cmdMcpProfile(cwd, args.slice(1), raw);
       break;
     }
 
     case 'mcp': {
       const subcommand = args[1];
       if (subcommand === 'profile') {
-        cmdMcpProfile(cwd, args.slice(2), raw);
+        lazyMcp().cmdMcpProfile(cwd, args.slice(2), raw);
       } else {
         error('Unknown mcp subcommand. Available: profile');
       }
@@ -771,11 +723,11 @@ async function main() {
       const subcommand = args[1];
       if (subcommand === 'list') {
         const reqIdx = args.indexOf('--req');
-        cmdAssertionsList(cwd, {
+        lazyVerify().cmdAssertionsList(cwd, {
           reqId: reqIdx !== -1 ? args[reqIdx + 1] : null,
         }, raw);
       } else if (subcommand === 'validate') {
-        cmdAssertionsValidate(cwd, raw);
+        lazyVerify().cmdAssertionsValidate(cwd, raw);
       } else {
         error('Unknown assertions subcommand. Available: list, validate');
       }
@@ -785,17 +737,17 @@ async function main() {
     case 'worktree': {
       const subcommand = args[1];
       if (subcommand === 'create') {
-        cmdWorktreeCreate(cwd, args[2], raw);
+        lazyWorktree().cmdWorktreeCreate(cwd, args[2], raw);
       } else if (subcommand === 'list') {
-        cmdWorktreeList(cwd, raw);
+        lazyWorktree().cmdWorktreeList(cwd, raw);
       } else if (subcommand === 'remove') {
-        cmdWorktreeRemove(cwd, args[2], raw);
+        lazyWorktree().cmdWorktreeRemove(cwd, args[2], raw);
       } else if (subcommand === 'cleanup') {
-        cmdWorktreeCleanup(cwd, raw);
+        lazyWorktree().cmdWorktreeCleanup(cwd, raw);
       } else if (subcommand === 'merge') {
-        cmdWorktreeMerge(cwd, args[2], raw);
+        lazyWorktree().cmdWorktreeMerge(cwd, args[2], raw);
       } else if (subcommand === 'check-overlap') {
-        cmdWorktreeCheckOverlap(cwd, args[2], raw);
+        lazyWorktree().cmdWorktreeCheckOverlap(cwd, args[2], raw);
       } else {
         error('Unknown worktree subcommand. Available: create, list, remove, cleanup, merge, check-overlap');
       }
@@ -806,5 +758,7 @@ async function main() {
       error(`Unknown command: ${command}`);
   }
 }
+
+module.exports = { main };
 
 module.exports = { main };

@@ -1,0 +1,839 @@
+{
+  "version": 1,
+  "generated_at": "2026-02-26T13:35:41.652Z",
+  "git_commit_hash": "e72931e4f9b856bf5470e696ed43899f9020d9a6",
+  "git_branch": "main",
+  "analysis_duration_ms": 51,
+  "source_dirs": [
+    ".",
+    "bin",
+    "references",
+    "src",
+    "templates",
+    "workflows"
+  ],
+  "languages": {
+    "markdown": {
+      "count": 98,
+      "extensions": [
+        ".md"
+      ],
+      "lines": 19779
+    },
+    "javascript": {
+      "count": 27,
+      "extensions": [
+        ".cjs",
+        ".js"
+      ],
+      "lines": 43727
+    },
+    "shell": {
+      "count": 1,
+      "extensions": [
+        ".sh"
+      ],
+      "lines": 50
+    },
+    "json": {
+      "count": 3,
+      "extensions": [
+        ".json"
+      ],
+      "lines": 579
+    }
+  },
+  "files": {
+    ".gitignore": {
+      "language": null,
+      "size_bytes": 32,
+      "lines": 2,
+      "last_modified": "2026-02-22T16:01:59.430Z"
+    },
+    "AGENTS.md": {
+      "language": "markdown",
+      "size_bytes": 5206,
+      "lines": 90,
+      "last_modified": "2026-02-25T11:19:26.773Z"
+    },
+    "README.md": {
+      "language": "markdown",
+      "size_bytes": 11997,
+      "lines": 218,
+      "last_modified": "2026-02-25T11:19:15.738Z"
+    },
+    "VERSION": {
+      "language": null,
+      "size_bytes": 6,
+      "lines": 1,
+      "last_modified": "2026-02-22T06:39:11.216Z"
+    },
+    "bin/gsd-tools.cjs": {
+      "language": "javascript",
+      "size_bytes": 587971,
+      "lines": 14281,
+      "last_modified": "2026-02-26T13:30:01.367Z"
+    },
+    "bin/gsd-tools.test.cjs": {
+      "language": "javascript",
+      "size_bytes": 511425,
+      "lines": 12341,
+      "last_modified": "2026-02-25T22:45:12.301Z"
+    },
+    "build.js": {
+      "language": "javascript",
+      "size_bytes": 2786,
+      "lines": 94,
+      "last_modified": "2026-02-25T22:45:12.301Z"
+    },
+    "deploy.sh": {
+      "language": "shell",
+      "size_bytes": 1326,
+      "lines": 50,
+      "last_modified": "2026-02-22T16:07:44.623Z"
+    },
+    "package-lock.json": {
+      "language": "json",
+      "size_bytes": 14917,
+      "lines": 514,
+      "last_modified": "2026-02-25T21:54:06.990Z"
+    },
+    "package.json": {
+      "language": "json",
+      "size_bytes": 421,
+      "lines": 22,
+      "last_modified": "2026-02-25T21:54:06.971Z"
+    },
+    "references/checkpoints.md": {
+      "language": "markdown",
+      "size_bytes": 29837,
+      "lines": 782,
+      "last_modified": "2026-02-25T20:45:06.783Z"
+    },
+    "references/continuation-format.md": {
+      "language": "markdown",
+      "size_bytes": 4421,
+      "lines": 254,
+      "last_modified": "2026-02-22T19:18:22.499Z"
+    },
+    "references/decimal-phase-calculation.md": {
+      "language": "markdown",
+      "size_bytes": 1420,
+      "lines": 65,
+      "last_modified": "2026-02-22T06:39:11.213Z"
+    },
+    "references/git-integration.md": {
+      "language": "markdown",
+      "size_bytes": 6836,
+      "lines": 248,
+      "last_modified": "2026-02-25T20:45:06.783Z"
+    },
+    "references/git-planning-commit.md": {
+      "language": "markdown",
+      "size_bytes": 1446,
+      "lines": 38,
+      "last_modified": "2026-02-22T06:39:11.213Z"
+    },
+    "references/model-profile-resolution.md": {
+      "language": "markdown",
+      "size_bytes": 1118,
+      "lines": 34,
+      "last_modified": "2026-02-22T06:39:11.213Z"
+    },
+    "references/model-profiles.md": {
+      "language": "markdown",
+      "size_bytes": 3249,
+      "lines": 92,
+      "last_modified": "2026-02-25T20:45:06.784Z"
+    },
+    "references/phase-argument-parsing.md": {
+      "language": "markdown",
+      "size_bytes": 1627,
+      "lines": 61,
+      "last_modified": "2026-02-22T06:39:11.214Z"
+    },
+    "references/planning-config.md": {
+      "language": "markdown",
+      "size_bytes": 7267,
+      "lines": 196,
+      "last_modified": "2026-02-22T06:39:11.214Z"
+    },
+    "references/questioning.md": {
+      "language": "markdown",
+      "size_bytes": 5376,
+      "lines": 145,
+      "last_modified": "2026-02-25T20:45:06.784Z"
+    },
+    "references/tdd.md": {
+      "language": "markdown",
+      "size_bytes": 7682,
+      "lines": 263,
+      "last_modified": "2026-02-22T06:39:11.214Z"
+    },
+    "references/ui-brand.md": {
+      "language": "markdown",
+      "size_bytes": 4421,
+      "lines": 160,
+      "last_modified": "2026-02-22T06:39:11.214Z"
+    },
+    "references/verification-patterns.md": {
+      "language": "markdown",
+      "size_bytes": 16769,
+      "lines": 620,
+      "last_modified": "2026-02-25T20:45:06.784Z"
+    },
+    "src/commands/codebase.js": {
+      "language": "javascript",
+      "size_bytes": 7330,
+      "lines": 250,
+      "last_modified": "2026-02-26T13:29:32.835Z"
+    },
+    "src/commands/env.js": {
+      "language": "javascript",
+      "size_bytes": 37915,
+      "lines": 1177,
+      "last_modified": "2026-02-25T22:45:12.301Z"
+    },
+    "src/commands/features.js": {
+      "language": "javascript",
+      "size_bytes": 70613,
+      "lines": 1904,
+      "last_modified": "2026-02-25T22:45:12.301Z"
+    },
+    "src/commands/init.js": {
+      "language": "javascript",
+      "size_bytes": 51642,
+      "lines": 1426,
+      "last_modified": "2026-02-25T22:45:12.302Z"
+    },
+    "src/commands/intent.js": {
+      "language": "javascript",
+      "size_bytes": 55962,
+      "lines": 1592,
+      "last_modified": "2026-02-25T11:04:46.901Z"
+    },
+    "src/commands/mcp.js": {
+      "language": "javascript",
+      "size_bytes": 17836,
+      "lines": 405,
+      "last_modified": "2026-02-25T15:52:10.966Z"
+    },
+    "src/commands/memory.js": {
+      "language": "javascript",
+      "size_bytes": 9110,
+      "lines": 307,
+      "last_modified": "2026-02-24T23:20:40.253Z"
+    },
+    "src/commands/misc.js": {
+      "language": "javascript",
+      "size_bytes": 47821,
+      "lines": 1431,
+      "last_modified": "2026-02-25T22:45:12.302Z"
+    },
+    "src/commands/phase.js": {
+      "language": "javascript",
+      "size_bytes": 30512,
+      "lines": 901,
+      "last_modified": "2026-02-22T15:44:54.239Z"
+    },
+    "src/commands/roadmap.js": {
+      "language": "javascript",
+      "size_bytes": 10772,
+      "lines": 295,
+      "last_modified": "2026-02-25T21:17:35.070Z"
+    },
+    "src/commands/state.js": {
+      "language": "javascript",
+      "size_bytes": 26100,
+      "lines": 652,
+      "last_modified": "2026-02-25T22:45:12.302Z"
+    },
+    "src/commands/verify.js": {
+      "language": "javascript",
+      "size_bytes": 69711,
+      "lines": 1984,
+      "last_modified": "2026-02-25T22:45:12.302Z"
+    },
+    "src/commands/worktree.js": {
+      "language": "javascript",
+      "size_bytes": 25587,
+      "lines": 791,
+      "last_modified": "2026-02-25T22:45:12.303Z"
+    },
+    "src/index.js": {
+      "language": "javascript",
+      "size_bytes": 81,
+      "lines": 5,
+      "last_modified": "2026-02-22T16:00:46.331Z"
+    },
+    "src/lib/codebase-intel.js": {
+      "language": "javascript",
+      "size_bytes": 16339,
+      "lines": 529,
+      "last_modified": "2026-02-26T13:28:38.563Z"
+    },
+    "src/lib/config.js": {
+      "language": "javascript",
+      "size_bytes": 2512,
+      "lines": 76,
+      "last_modified": "2026-02-25T22:45:12.303Z"
+    },
+    "src/lib/constants.js": {
+      "language": "javascript",
+      "size_bytes": 41453,
+      "lines": 1088,
+      "last_modified": "2026-02-25T19:01:34.697Z"
+    },
+    "src/lib/context.js": {
+      "language": "javascript",
+      "size_bytes": 3349,
+      "lines": 97,
+      "last_modified": "2026-02-22T17:12:19.614Z"
+    },
+    "src/lib/frontmatter.js": {
+      "language": "javascript",
+      "size_bytes": 6166,
+      "lines": 166,
+      "last_modified": "2026-02-25T22:45:12.303Z"
+    },
+    "src/lib/git.js": {
+      "language": "javascript",
+      "size_bytes": 970,
+      "lines": 29,
+      "last_modified": "2026-02-25T21:19:24.472Z"
+    },
+    "src/lib/helpers.js": {
+      "language": "javascript",
+      "size_bytes": 33206,
+      "lines": 946,
+      "last_modified": "2026-02-25T22:45:12.303Z"
+    },
+    "src/lib/output.js": {
+      "language": "javascript",
+      "size_bytes": 4061,
+      "lines": 113,
+      "last_modified": "2026-02-25T20:49:46.196Z"
+    },
+    "src/lib/regex-cache.js": {
+      "language": "javascript",
+      "size_bytes": 2919,
+      "lines": 83,
+      "last_modified": "2026-02-25T21:50:01.527Z"
+    },
+    "src/router.js": {
+      "language": "javascript",
+      "size_bytes": 28512,
+      "lines": 764,
+      "last_modified": "2026-02-26T13:29:57.469Z"
+    },
+    "templates/DEBUG.md": {
+      "language": "markdown",
+      "size_bytes": 4384,
+      "lines": 159,
+      "last_modified": "2026-02-25T20:45:06.785Z"
+    },
+    "templates/UAT.md": {
+      "language": "markdown",
+      "size_bytes": 6186,
+      "lines": 247,
+      "last_modified": "2026-02-22T06:39:11.214Z"
+    },
+    "templates/assertions.md": {
+      "language": "markdown",
+      "size_bytes": 3275,
+      "lines": 94,
+      "last_modified": "2026-02-25T17:11:52.806Z"
+    },
+    "templates/codebase/architecture.md": {
+      "language": "markdown",
+      "size_bytes": 7271,
+      "lines": 255,
+      "last_modified": "2026-02-25T20:45:06.785Z"
+    },
+    "templates/codebase/concerns.md": {
+      "language": "markdown",
+      "size_bytes": 11268,
+      "lines": 310,
+      "last_modified": "2026-02-25T20:45:06.785Z"
+    },
+    "templates/codebase/conventions.md": {
+      "language": "markdown",
+      "size_bytes": 8835,
+      "lines": 307,
+      "last_modified": "2026-02-25T20:45:06.785Z"
+    },
+    "templates/codebase/integrations.md": {
+      "language": "markdown",
+      "size_bytes": 8664,
+      "lines": 280,
+      "last_modified": "2026-02-22T06:39:11.215Z"
+    },
+    "templates/codebase/stack.md": {
+      "language": "markdown",
+      "size_bytes": 4466,
+      "lines": 186,
+      "last_modified": "2026-02-22T06:39:11.215Z"
+    },
+    "templates/codebase/structure.md": {
+      "language": "markdown",
+      "size_bytes": 8169,
+      "lines": 285,
+      "last_modified": "2026-02-25T20:45:06.785Z"
+    },
+    "templates/codebase/testing.md": {
+      "language": "markdown",
+      "size_bytes": 10993,
+      "lines": 480,
+      "last_modified": "2026-02-22T06:39:11.215Z"
+    },
+    "templates/config.json": {
+      "language": "json",
+      "size_bytes": 985,
+      "lines": 43,
+      "last_modified": "2026-02-25T18:04:15.379Z"
+    },
+    "templates/context.md": {
+      "language": "markdown",
+      "size_bytes": 7177,
+      "lines": 283,
+      "last_modified": "2026-02-25T20:45:06.785Z"
+    },
+    "templates/continue-here.md": {
+      "language": "markdown",
+      "size_bytes": 1820,
+      "lines": 78,
+      "last_modified": "2026-02-25T20:45:06.785Z"
+    },
+    "templates/debug-subagent-prompt.md": {
+      "language": "markdown",
+      "size_bytes": 1802,
+      "lines": 91,
+      "last_modified": "2026-02-22T06:39:11.215Z"
+    },
+    "templates/dependency-eval.md": {
+      "language": "markdown",
+      "size_bytes": 730,
+      "lines": 18,
+      "last_modified": "2026-02-24T23:20:40.409Z"
+    },
+    "templates/discovery.md": {
+      "language": "markdown",
+      "size_bytes": 4077,
+      "lines": 146,
+      "last_modified": "2026-02-22T06:39:11.215Z"
+    },
+    "templates/intent.md": {
+      "language": "markdown",
+      "size_bytes": 8493,
+      "lines": 220,
+      "last_modified": "2026-02-25T11:07:06.678Z"
+    },
+    "templates/milestone-archive.md": {
+      "language": "markdown",
+      "size_bytes": 2803,
+      "lines": 123,
+      "last_modified": "2026-02-22T06:39:11.215Z"
+    },
+    "templates/milestone.md": {
+      "language": "markdown",
+      "size_bytes": 3057,
+      "lines": 115,
+      "last_modified": "2026-02-22T06:39:11.215Z"
+    },
+    "templates/phase-prompt.md": {
+      "language": "markdown",
+      "size_bytes": 17031,
+      "lines": 569,
+      "last_modified": "2026-02-25T20:45:06.785Z"
+    },
+    "templates/planner-subagent-prompt.md": {
+      "language": "markdown",
+      "size_bytes": 2682,
+      "lines": 117,
+      "last_modified": "2026-02-22T06:39:11.215Z"
+    },
+    "templates/plans/discovery.md": {
+      "language": "markdown",
+      "size_bytes": 4185,
+      "lines": 136,
+      "last_modified": "2026-02-22T19:57:34.008Z"
+    },
+    "templates/plans/execute.md": {
+      "language": "markdown",
+      "size_bytes": 2495,
+      "lines": 98,
+      "last_modified": "2026-02-22T19:56:55.472Z"
+    },
+    "templates/plans/tdd.md": {
+      "language": "markdown",
+      "size_bytes": 2804,
+      "lines": 91,
+      "last_modified": "2026-02-22T19:57:12.932Z"
+    },
+    "templates/project.md": {
+      "language": "markdown",
+      "size_bytes": 4951,
+      "lines": 184,
+      "last_modified": "2026-02-25T20:45:06.785Z"
+    },
+    "templates/requirements.md": {
+      "language": "markdown",
+      "size_bytes": 7183,
+      "lines": 238,
+      "last_modified": "2026-02-25T17:11:44.814Z"
+    },
+    "templates/research-project/ARCHITECTURE.md": {
+      "language": "markdown",
+      "size_bytes": 7803,
+      "lines": 238,
+      "last_modified": "2026-02-22T19:26:25.398Z"
+    },
+    "templates/research-project/FEATURES.md": {
+      "language": "markdown",
+      "size_bytes": 5061,
+      "lines": 175,
+      "last_modified": "2026-02-22T19:26:47.974Z"
+    },
+    "templates/research-project/PITFALLS.md": {
+      "language": "markdown",
+      "size_bytes": 6418,
+      "lines": 234,
+      "last_modified": "2026-02-22T19:27:26.270Z"
+    },
+    "templates/research-project/STACK.md": {
+      "language": "markdown",
+      "size_bytes": 3791,
+      "lines": 147,
+      "last_modified": "2026-02-22T19:27:45.365Z"
+    },
+    "templates/research-project/SUMMARY.md": {
+      "language": "markdown",
+      "size_bytes": 5436,
+      "lines": 202,
+      "last_modified": "2026-02-22T19:25:56.593Z"
+    },
+    "templates/research.md": {
+      "language": "markdown",
+      "size_bytes": 17745,
+      "lines": 602,
+      "last_modified": "2026-02-25T20:45:06.786Z"
+    },
+    "templates/roadmap.md": {
+      "language": "markdown",
+      "size_bytes": 5668,
+      "lines": 202,
+      "last_modified": "2026-02-22T06:39:11.216Z"
+    },
+    "templates/state.md": {
+      "language": "markdown",
+      "size_bytes": 4551,
+      "lines": 176,
+      "last_modified": "2026-02-25T20:45:06.786Z"
+    },
+    "templates/summary-complex.md": {
+      "language": "markdown",
+      "size_bytes": 1308,
+      "lines": 59,
+      "last_modified": "2026-02-22T06:39:11.216Z"
+    },
+    "templates/summary-minimal.md": {
+      "language": "markdown",
+      "size_bytes": 861,
+      "lines": 41,
+      "last_modified": "2026-02-22T06:39:11.216Z"
+    },
+    "templates/summary-standard.md": {
+      "language": "markdown",
+      "size_bytes": 1054,
+      "lines": 48,
+      "last_modified": "2026-02-22T06:39:11.216Z"
+    },
+    "templates/summary.md": {
+      "language": "markdown",
+      "size_bytes": 7826,
+      "lines": 248,
+      "last_modified": "2026-02-22T06:39:11.216Z"
+    },
+    "templates/user-setup.md": {
+      "language": "markdown",
+      "size_bytes": 9074,
+      "lines": 311,
+      "last_modified": "2026-02-25T20:45:06.786Z"
+    },
+    "templates/verification-report.md": {
+      "language": "markdown",
+      "size_bytes": 9633,
+      "lines": 322,
+      "last_modified": "2026-02-25T20:45:06.786Z"
+    },
+    "workflows/add-phase.md": {
+      "language": "markdown",
+      "size_bytes": 2731,
+      "lines": 111,
+      "last_modified": "2026-02-22T06:39:11.217Z"
+    },
+    "workflows/add-todo.md": {
+      "language": "markdown",
+      "size_bytes": 4114,
+      "lines": 157,
+      "last_modified": "2026-02-25T20:45:06.786Z"
+    },
+    "workflows/audit-milestone.md": {
+      "language": "markdown",
+      "size_bytes": 10500,
+      "lines": 297,
+      "last_modified": "2026-02-22T06:39:11.217Z"
+    },
+    "workflows/check-todos.md": {
+      "language": "markdown",
+      "size_bytes": 4531,
+      "lines": 176,
+      "last_modified": "2026-02-22T06:39:11.218Z"
+    },
+    "workflows/cleanup.md": {
+      "language": "markdown",
+      "size_bytes": 3411,
+      "lines": 152,
+      "last_modified": "2026-02-22T06:39:11.218Z"
+    },
+    "workflows/cmd-codebase-impact.md": {
+      "language": "markdown",
+      "size_bytes": 1300,
+      "lines": 57,
+      "last_modified": "2026-02-22T14:53:46.151Z"
+    },
+    "workflows/cmd-context-budget.md": {
+      "language": "markdown",
+      "size_bytes": 1457,
+      "lines": 61,
+      "last_modified": "2026-02-22T14:53:19.416Z"
+    },
+    "workflows/cmd-rollback-info.md": {
+      "language": "markdown",
+      "size_bytes": 1154,
+      "lines": 60,
+      "last_modified": "2026-02-22T14:53:51.398Z"
+    },
+    "workflows/cmd-search-decisions.md": {
+      "language": "markdown",
+      "size_bytes": 1114,
+      "lines": 56,
+      "last_modified": "2026-02-22T14:53:30.472Z"
+    },
+    "workflows/cmd-search-lessons.md": {
+      "language": "markdown",
+      "size_bytes": 1121,
+      "lines": 55,
+      "last_modified": "2026-02-22T14:53:40.167Z"
+    },
+    "workflows/cmd-session-diff.md": {
+      "language": "markdown",
+      "size_bytes": 745,
+      "lines": 35,
+      "last_modified": "2026-02-22T14:53:11.494Z"
+    },
+    "workflows/cmd-test-run.md": {
+      "language": "markdown",
+      "size_bytes": 1134,
+      "lines": 50,
+      "last_modified": "2026-02-22T14:53:25.085Z"
+    },
+    "workflows/cmd-trace-requirement.md": {
+      "language": "markdown",
+      "size_bytes": 1547,
+      "lines": 70,
+      "last_modified": "2026-02-22T14:54:03.767Z"
+    },
+    "workflows/cmd-validate-config.md": {
+      "language": "markdown",
+      "size_bytes": 1253,
+      "lines": 58,
+      "last_modified": "2026-02-22T14:54:09.632Z"
+    },
+    "workflows/cmd-validate-deps.md": {
+      "language": "markdown",
+      "size_bytes": 1336,
+      "lines": 68,
+      "last_modified": "2026-02-22T14:53:36.035Z"
+    },
+    "workflows/cmd-velocity.md": {
+      "language": "markdown",
+      "size_bytes": 1194,
+      "lines": 46,
+      "last_modified": "2026-02-22T14:53:57.142Z"
+    },
+    "workflows/complete-and-clear.md": {
+      "language": "markdown",
+      "size_bytes": 3064,
+      "lines": 97,
+      "last_modified": "2026-02-25T19:04:04.716Z"
+    },
+    "workflows/complete-milestone.md": {
+      "language": "markdown",
+      "size_bytes": 4637,
+      "lines": 133,
+      "last_modified": "2026-02-22T19:31:16.581Z"
+    },
+    "workflows/diagnose-issues.md": {
+      "language": "markdown",
+      "size_bytes": 6668,
+      "lines": 219,
+      "last_modified": "2026-02-22T06:39:11.218Z"
+    },
+    "workflows/discovery-phase.md": {
+      "language": "markdown",
+      "size_bytes": 8311,
+      "lines": 289,
+      "last_modified": "2026-02-25T20:45:06.786Z"
+    },
+    "workflows/discuss-phase.md": {
+      "language": "markdown",
+      "size_bytes": 15954,
+      "lines": 490,
+      "last_modified": "2026-02-25T20:45:06.786Z"
+    },
+    "workflows/execute-phase.md": {
+      "language": "markdown",
+      "size_bytes": 13186,
+      "lines": 346,
+      "last_modified": "2026-02-25T18:32:49.092Z"
+    },
+    "workflows/execute-plan.md": {
+      "language": "markdown",
+      "size_bytes": 9137,
+      "lines": 237,
+      "last_modified": "2026-02-24T23:20:40.267Z"
+    },
+    "workflows/health.md": {
+      "language": "markdown",
+      "size_bytes": 4222,
+      "lines": 156,
+      "last_modified": "2026-02-22T06:39:11.219Z"
+    },
+    "workflows/help.md": {
+      "language": "markdown",
+      "size_bytes": 14681,
+      "lines": 486,
+      "last_modified": "2026-02-25T20:45:06.786Z"
+    },
+    "workflows/insert-phase.md": {
+      "language": "markdown",
+      "size_bytes": 3570,
+      "lines": 129,
+      "last_modified": "2026-02-22T06:39:11.220Z"
+    },
+    "workflows/list-phase-assumptions.md": {
+      "language": "markdown",
+      "size_bytes": 4316,
+      "lines": 178,
+      "last_modified": "2026-02-25T20:45:06.786Z"
+    },
+    "workflows/map-codebase.md": {
+      "language": "markdown",
+      "size_bytes": 8795,
+      "lines": 315,
+      "last_modified": "2026-02-25T20:45:06.786Z"
+    },
+    "workflows/new-milestone.md": {
+      "language": "markdown",
+      "size_bytes": 16298,
+      "lines": 439,
+      "last_modified": "2026-02-25T11:02:13.475Z"
+    },
+    "workflows/new-project.md": {
+      "language": "markdown",
+      "size_bytes": 11066,
+      "lines": 274,
+      "last_modified": "2026-02-25T11:01:10.884Z"
+    },
+    "workflows/pause-work.md": {
+      "language": "markdown",
+      "size_bytes": 3326,
+      "lines": 127,
+      "last_modified": "2026-02-24T23:20:40.267Z"
+    },
+    "workflows/plan-milestone-gaps.md": {
+      "language": "markdown",
+      "size_bytes": 6821,
+      "lines": 274,
+      "last_modified": "2026-02-22T06:39:11.221Z"
+    },
+    "workflows/plan-phase.md": {
+      "language": "markdown",
+      "size_bytes": 7105,
+      "lines": 175,
+      "last_modified": "2026-02-25T17:10:52.803Z"
+    },
+    "workflows/progress.md": {
+      "language": "markdown",
+      "size_bytes": 9246,
+      "lines": 381,
+      "last_modified": "2026-02-25T20:45:06.787Z"
+    },
+    "workflows/quick.md": {
+      "language": "markdown",
+      "size_bytes": 8561,
+      "lines": 287,
+      "last_modified": "2026-02-25T20:45:06.787Z"
+    },
+    "workflows/remove-phase.md": {
+      "language": "markdown",
+      "size_bytes": 4089,
+      "lines": 154,
+      "last_modified": "2026-02-22T06:39:11.222Z"
+    },
+    "workflows/research-phase.md": {
+      "language": "markdown",
+      "size_bytes": 2132,
+      "lines": 75,
+      "last_modified": "2026-02-25T10:41:09.965Z"
+    },
+    "workflows/resume-project.md": {
+      "language": "markdown",
+      "size_bytes": 9048,
+      "lines": 306,
+      "last_modified": "2026-02-22T06:39:11.222Z"
+    },
+    "workflows/set-profile.md": {
+      "language": "markdown",
+      "size_bytes": 1878,
+      "lines": 80,
+      "last_modified": "2026-02-25T20:45:06.787Z"
+    },
+    "workflows/settings.md": {
+      "language": "markdown",
+      "size_bytes": 6220,
+      "lines": 200,
+      "last_modified": "2026-02-22T06:39:11.223Z"
+    },
+    "workflows/transition.md": {
+      "language": "markdown",
+      "size_bytes": 12350,
+      "lines": 544,
+      "last_modified": "2026-02-22T06:39:11.223Z"
+    },
+    "workflows/update.md": {
+      "language": "markdown",
+      "size_bytes": 5645,
+      "lines": 214,
+      "last_modified": "2026-02-25T20:45:06.787Z"
+    },
+    "workflows/verify-phase.md": {
+      "language": "markdown",
+      "size_bytes": 5347,
+      "lines": 138,
+      "last_modified": "2026-02-25T10:42:21.661Z"
+    },
+    "workflows/verify-work.md": {
+      "language": "markdown",
+      "size_bytes": 5542,
+      "lines": 146,
+      "last_modified": "2026-02-25T20:45:06.787Z"
+    }
+  },
+  "stats": {
+    "total_files": 131,
+    "total_lines": 64138,
+    "languages_detected": 4
+  }
+}
