@@ -99,7 +99,7 @@ async function main() {
   }
 
   if (!command) {
-    error('Usage: gsd-tools <command> [args] [--pretty] [--verbose]\nCommands: assertions, classify, codebase, codebase-impact, commit, config-ensure-section, config-get, config-migrate, config-set, context-budget, current-timestamp, env, extract-sections, find-phase, frontmatter, generate-slug, git, history-digest, init, intent, list-todos, mcp, mcp-profile, memory, milestone, phase, phase-plan-index, phases, progress, quick-summary, requirements, resolve-model, review, roadmap, rollback-info, scaffold, search-decisions, search-lessons, session-diff, state, state-snapshot, summary-extract, template, test-coverage, test-run, todo, token-budget, trace-requirement, validate, validate-config, validate-dependencies, velocity, verify, verify-path-exists, verify-summary, websearch, worktree');
+    error('Usage: gsd-tools <command> [args] [--pretty] [--verbose]\nCommands: assertions, classify, codebase, codebase-impact, commit, config-ensure-section, config-get, config-migrate, config-set, context-budget, current-timestamp, env, extract-sections, find-phase, frontmatter, generate-slug, git, history-digest, init, intent, list-todos, mcp, mcp-profile, memory, milestone, phase, phase-plan-index, phases, progress, quick-summary, requirements, resolve-model, review, roadmap, rollback-info, scaffold, search-decisions, search-lessons, session-diff, state, state-snapshot, summary-extract, tdd, template, test-coverage, test-run, todo, token-budget, trace-requirement, validate, validate-config, validate-dependencies, velocity, verify, verify-path-exists, verify-summary, websearch, worktree');
   }
 
   // --help / -h: print command help to stderr (never contaminates JSON stdout)
@@ -198,11 +198,13 @@ async function main() {
       const forceFlag = args.includes('--force');
       const agentIdx = args.indexOf('--agent');
       const agentType = agentIdx !== -1 ? args[agentIdx + 1] : null;
+      const tddPhaseIdx = args.indexOf('--tdd-phase');
+      const tddPhase = tddPhaseIdx !== -1 ? args[tddPhaseIdx + 1] : null;
       const message = args[1];
       // Parse --files flag (collect args after --files, stopping at other flags)
       const filesIndex = args.indexOf('--files');
       const files = filesIndex !== -1 ? args.slice(filesIndex + 1).filter(a => !a.startsWith('--')) : [];
-      lazyMisc().cmdCommit(cwd, message, files, raw, amend, forceFlag, agentType);
+      lazyMisc().cmdCommit(cwd, message, files, raw, amend, forceFlag, agentType, tddPhase);
       break;
     }
 
@@ -856,6 +858,22 @@ async function main() {
 
     case 'review': {
       lazyMisc().cmdReview(cwd, args.slice(1), raw);
+      break;
+    }
+
+    case 'tdd': {
+      const tddSub = args[1];
+      const tddTestCmdIdx = args.indexOf('--test-cmd');
+      const tddTestFileIdx = args.indexOf('--test-file');
+      const tddPhaseIdx = args.indexOf('--phase');
+      const tddFilesIdx = args.indexOf('--files');
+      const tddArgs = {
+        'test-cmd': tddTestCmdIdx !== -1 ? args[tddTestCmdIdx + 1] : null,
+        'test-file': tddTestFileIdx !== -1 ? args[tddTestFileIdx + 1] : null,
+        phase: tddPhaseIdx !== -1 ? args[tddPhaseIdx + 1] : null,
+        files: tddFilesIdx !== -1 ? args[tddFilesIdx + 1] : null,
+      };
+      lazyMisc().cmdTdd(cwd, tddSub, tddArgs, raw);
       break;
     }
 

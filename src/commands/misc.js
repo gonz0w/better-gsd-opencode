@@ -586,7 +586,7 @@ function preCommitChecks(cwd, force) {
   return { passed: failures.length === 0, failures };
 }
 
-function cmdCommit(cwd, message, files, raw, amend, force, agentType) {
+function cmdCommit(cwd, message, files, raw, amend, force, agentType, tddPhase) {
   if (!message && !amend) {
     error('commit message required');
   }
@@ -627,6 +627,9 @@ function cmdCommit(cwd, message, files, raw, amend, force, agentType) {
   if (agentType) {
     commitArgs.push('--trailer', `Agent-Type: ${agentType}`);
   }
+  if (tddPhase && ['red', 'green', 'refactor'].includes(tddPhase)) {
+    commitArgs.push('--trailer', `GSD-Phase: ${tddPhase}`);
+  }
   const commitResult = execGit(cwd, commitArgs);
   if (commitResult.exitCode !== 0) {
     if (commitResult.stdout.includes('nothing to commit') || commitResult.stderr.includes('nothing to commit')) {
@@ -642,7 +645,7 @@ function cmdCommit(cwd, message, files, raw, amend, force, agentType) {
   // Get short hash
   const hashResult = execGit(cwd, ['rev-parse', '--short', 'HEAD']);
   const hash = hashResult.exitCode === 0 ? hashResult.stdout : null;
-  const result = { committed: true, hash, reason: 'committed', agent_type: agentType || null };
+  const result = { committed: true, hash, reason: 'committed', agent_type: agentType || null, tdd_phase: tddPhase || null };
   output(result, raw, hash || 'committed');
 }
 
@@ -1486,6 +1489,60 @@ function cmdScaffold(cwd, type, options, raw) {
   output({ created: true, path: relPath }, raw, relPath);
 }
 
+function cmdTdd(cwd, subcommand, parsedArgs, raw) {
+  const testCmd = parsedArgs['test-cmd'];
+  const snip = (s) => (s || '').slice(0, 500);
+
+  if (subcommand === 'validate-red' || subcommand === 'validate-green' || subcommand === 'validate-refactor') {
+    if (!testCmd) { error('--test-cmd required'); }
+    const phase = subcommand.replace('validate-', '');
+    const expectFail = phase === 'red';
+    let exitCode = 0, out = '';
+    try {
+      out = execSync(testCmd, { encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'], timeout: 120000, cwd });
+    } catch (e) {
+      exitCode = e.status || 1;
+      out = (e.stdout || '') + (e.stderr || '');
+    }
+    const valid = expectFail ? exitCode !== 0 : exitCode === 0;
+    if (!valid) process.exitCode = 1;
+    output({ phase, valid, test_exit_code: exitCode, output_snippet: snip(out) }, raw);
+  } else if (subcommand === 'auto-test') {
+    if (!testCmd) { error('--test-cmd required'); }
+    let exitCode = 0, out = '';
+    try {
+      out = execSync(testCmd, { encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'], timeout: 120000, cwd });
+    } catch (e) {
+      exitCode = e.status || 1;
+      out = (e.stdout || '') + (e.stderr || '');
+    }
+    output({ passed: exitCode === 0, exit_code: exitCode, output_snippet: snip(out) }, raw);
+  } else if (subcommand === 'detect-antipattern') {
+    const phase = parsedArgs.phase;
+    const files = (parsedArgs.files || '').split(',').map(f => f.trim()).filter(Boolean);
+    if (!phase) { error('--phase required'); }
+    const warnings = [];
+    const isTest = (f) => /\.(test|spec)\.[^.]+$/.test(f) || f.includes('__tests__') || f.includes('test/');
+    if (phase === 'red') {
+      for (const f of files) { if (!isTest(f)) warnings.push({ type: 'pre_test_code', file: f, message: 'Non-test file modified in RED phase' }); }
+    } else if (phase === 'green') {
+      for (const f of files) { if (isTest(f)) warnings.push({ type: 'test_modified_in_green', file: f, message: 'Test file modified in GREEN phase' }); }
+    }
+    for (const f of files) {
+      if (isTest(f)) {
+        try {
+          const content = fs.readFileSync(path.isAbsolute(f) ? f : path.join(cwd, f), 'utf-8');
+          const mocks = (content.match(/jest\.mock\(|vi\.mock\(|sinon\.stub\(|\.mock\(/g) || []).length;
+          if (mocks > 5) warnings.push({ type: 'over_mocking', file: f, message: `${mocks} mock patterns found (threshold: 5)` });
+        } catch (e) { debugLog('tdd.antipattern', 'read failed', e); }
+      }
+    }
+    output({ phase, warnings }, raw);
+  } else {
+    error('Unknown tdd subcommand: ' + subcommand + '. Available: validate-red, validate-green, validate-refactor, auto-test, detect-antipattern');
+  }
+}
+
 function cmdReview(cwd, args, raw) {
   if (!args[0] || !args[1]) { error('Usage: review <phase> <plan-number>'); }
   const phaseInfo = findPhaseInternal(cwd, args[0]);
@@ -1556,5 +1613,6 @@ module.exports = {
   cmdProgressRender,
   cmdTodoComplete,
   cmdScaffold,
+  cmdTdd,
   cmdReview,
 };

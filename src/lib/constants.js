@@ -45,48 +45,18 @@ const COMMAND_HELP = {
 Manage project state in STATE.md.
 
 Subcommands:
-  load                      Load all state from STATE.md (default)
-  get <field>               Get a specific field value
-  update <field> <value>    Update a specific field
-  patch --key value ...     Update multiple fields atomically
-  advance-plan              Increment plan counter
-  record-metric             Record execution metrics
-    --phase P --plan N --duration D [--tasks T] [--files F]
-  update-progress           Recalculate progress bar from disk
-  add-decision              Add decision to state
-    --phase P --summary S [--rationale R]
-  add-blocker --text "..."  Add a blocker
-  resolve-blocker --text "..." Remove a blocker
-  record-session            Update session continuity
-    --stopped-at "..." [--resume-file path]
-  validate [--fix]          Validate state vs disk reality (auto-runs as pre-flight in execute-phase)
-
-Examples:
-  gsd-tools state load
-  gsd-tools state advance-plan
-  gsd-tools state add-decision --phase 03 --summary "Chose esbuild"`,
+  load | get <field> | update <field> <value> | patch --key value ...
+  advance-plan | update-progress
+  record-metric --phase P --plan N --duration D [--tasks T] [--files F]
+  add-decision --phase P --summary S [--rationale R]
+  add-blocker --text "..." | resolve-blocker --text "..."
+  record-session --stopped-at "..." [--resume-file path]
+  validate [--fix]`,
 
   'state validate': `Usage: gsd-tools state validate [--fix]
 
-Validate state consistency between declared state and disk reality.
-
-Checks:
-  Plan count drift     ROADMAP.md claims vs actual files
-  Position validity    STATE.md position vs existing phases
-  Activity staleness   Last activity timestamp vs git history
-  Blocker/todo age     Items open through 2+ completed plans
-
-Options:
-  --fix      Auto-correct plan count mismatches in ROADMAP.md
-  --pretty   Force human-readable output when piped
-
-Pre-flight: Execute-phase automatically runs state validate --fix before
-execution. Errors block, warnings display. Use --skip-validate to bypass.
-Disable permanently via config: gates.pre_flight_validation: false
-
-Examples:
-  gsd-tools state validate
-  gsd-tools state validate --fix`,
+Validate state vs disk reality: plan counts, position, activity staleness.
+--fix auto-corrects plan count mismatches. Pre-flight in execute-phase.`,
 
   'frontmatter': `Usage: gsd-tools frontmatter <subcommand> <file> [options]
 
@@ -172,29 +142,8 @@ Examples:
 
   'verify quality': `Usage: gsd-tools verify quality [--plan <file>] [--phase <N>]
 
-Composite quality score across 4 dimensions with trend tracking.
-
-Dimensions (weighted):
-  tests (30%)          Run test suite, 100 if pass, 0 if fail
-  must_haves (30%)     Check plan artifacts + key_links (requires --plan)
-  requirements (20%)   REQUIREMENTS.md coverage (filterable by --phase)
-  regression (20%)     Check test-baseline.json for regressions
-
-Skipped dimensions (null score) are excluded from the weighted average.
-Grade: A (90+), B (80+), C (70+), D (60+), F (<60)
-
-Scores are stored in .planning/memory/quality-scores.json for trend tracking.
-Trend: "improving" (last 3 ascending), "declining" (descending), "stable" (mixed).
-
-Options:
-  --plan <file>   Plan file for must_haves checking
-  --phase <N>     Filter requirements to specific phase
-
-Output: { score, grade, dimensions, trend, plan, phase }
-
-Examples:
-  gsd-tools verify quality
-  gsd-tools verify quality --plan .planning/phases/12-quality/12-02-PLAN.md --phase 12`,
+Composite quality score (tests 30%, must_haves 30%, requirements 20%, regression 20%).
+Grade: A(90+) B(80+) C(70+) D(60+) F(<60). Trend tracking via quality-scores.json.`,
 
   'roadmap': `Usage: gsd-tools roadmap <subcommand> [args]
 
@@ -265,45 +214,24 @@ Examples:
   gsd-tools init progress --compact
   gsd-tools init progress --compact --manifest`,
 
-  'init memory': `Usage: gsd-tools init memory [options]
+  'init memory': `Usage: gsd-tools init memory [--workflow <name>] [--phase <N>] [--compact]
+Session memory digest: position, bookmarks, decisions, lessons, codebase knowledge.
+Workflows: execute-phase, plan-phase, execute-plan, quick, resume, verify-work, progress.`,
 
-Session memory digest with workflow-aware codebase knowledge surfacing.
-Reads position from STATE.md, bookmarks/decisions/lessons from memory stores,
-and loads relevant codebase docs based on the active workflow.
-
-Options:
-  --workflow <name>   Workflow context: execute-phase, plan-phase, execute-plan,
-                      quick, resume, verify-work, progress
-  --phase <N>         Filter decisions/lessons by phase number
-  --compact           Reduced output (5 decisions, 4000 char limit)
-
-Output includes: position, bookmark (with drift warning), decisions, blockers,
-todos, lessons, codebase knowledge sections, and trimming metadata.
-
-Priority trimming (when output exceeds size limit):
-  1. codebase content removed
-  2. lessons reduced to 2
-  3. decisions reduced to 3
-  4. todos reduced to 2
-  Position is never trimmed.
-
-Examples:
-  gsd-tools init memory --workflow execute-phase --phase 11
-  gsd-tools init memory --workflow plan-phase --compact
-  gsd-tools init memory`,
-
-  'commit': `Usage: gsd-tools commit <message> [--files f1 f2 ...] [--amend] [--agent <type>]
+  'commit': `Usage: gsd-tools commit <message> [--files f1 f2 ...] [--amend] [--agent <type>] [--tdd-phase red|green|refactor]
 
 Commit planning documents to git.
 
 Arguments:
-  message         Commit message (required)
-  --files f1 f2   Specific files to stage (default: all .planning/ changes)
-  --amend         Amend the previous commit instead of creating new
-  --agent <type>  Add Agent-Type git trailer for attribution
+  message              Commit message (required)
+  --files f1 f2        Specific files to stage (default: all .planning/ changes)
+  --amend              Amend the previous commit instead of creating new
+  --agent <type>       Add Agent-Type git trailer for attribution
+  --tdd-phase <phase>  Add GSD-Phase trailer (red, green, or refactor)
 
 Examples:
-  gsd-tools commit "docs(03-01): add help system" --files .planning/STATE.md`,
+  gsd-tools commit "docs(03-01): add help system" --files .planning/STATE.md
+  gsd-tools commit "test(43-01): failing test" --tdd-phase red --files src/`,
 
   'template': `Usage: gsd-tools template <subcommand> [options]
 
@@ -692,73 +620,16 @@ Examples:
   gsd-tools memory list`,
 
   'memory write': `Usage: gsd-tools memory write --store <name> --entry '{json}'
+Write entry to store. Stores: decisions, bookmarks, lessons, todos.
+decisions/lessons append-only. bookmarks prepend + trim to 20.`,
 
-Write an entry to a memory store.
+  'memory read': `Usage: gsd-tools memory read --store <name> [--limit N] [--query "text"] [--phase N]
+Read entries with optional filtering.`,
 
-Arguments:
-  --store <name>    Store name: decisions, bookmarks, lessons, todos
-  --entry '{json}'  JSON object to store
-
-Behavior:
-  decisions/lessons  Append only, NEVER pruned (sacred data)
-  bookmarks          Prepend (newest first), trim to max 20
-  todos              Simple append
-
-Auto-adds "timestamp" field (ISO date) if not present.
-
-Examples:
-  gsd-tools memory write --store decisions --entry '{"summary":"Use esbuild","phase":"03"}'
-  gsd-tools memory write --store bookmarks --entry '{"file":"src/router.js","line":42}'`,
-
-  'memory read': `Usage: gsd-tools memory read --store <name> [options]
-
-Read entries from a memory store with optional filtering.
-
-Arguments:
-  --store <name>    Store name: decisions, bookmarks, lessons, todos
-
-Options:
-  --limit N         Max entries to return
-  --query "text"    Case-insensitive text search across all string values
-  --phase N         Filter by entry.phase field
-
-Output: { entries, count, store, total }
-
-Examples:
-  gsd-tools memory read --store decisions
-  gsd-tools memory read --store lessons --query "frontmatter" --limit 5
-  gsd-tools memory read --store decisions --phase 03`,
-
-  'memory list': `Usage: gsd-tools memory list
-
-List all memory stores with entry counts and file sizes.
-
-Output: { stores: [{name, entry_count, size_bytes, last_modified}], memory_dir }
-
-Examples:
-  gsd-tools memory list`,
+  'memory list': `Usage: gsd-tools memory list — List stores with entry counts and sizes.`,
 
   'memory compact': `Usage: gsd-tools memory compact [--store <name>] [--threshold N] [--dry-run]
-
-Compact memory stores by summarizing old entries.
-
-Options:
-  --store <name>     Specific store to compact (default: all non-sacred)
-  --threshold N      Entry count threshold to trigger compaction (default: 50)
-  --dry-run          Preview compaction without modifying files
-
-Sacred data (decisions, lessons) is NEVER compacted.
-
-Compaction rules:
-  bookmarks    Keep 10 most recent, summarize older entries
-  todos        Keep active todos, summarize completed ones
-
-Output: { compacted, stores_processed, entries_before, entries_after, summaries_created, sacred_skipped }
-
-Examples:
-  gsd-tools memory compact
-  gsd-tools memory compact --store bookmarks --dry-run
-  gsd-tools memory compact --threshold 30`,
+Compact non-sacred stores by summarizing old entries.`,
 
   'test-coverage': `Usage: gsd-tools test-coverage
 
@@ -800,26 +671,8 @@ Examples:
   gsd-tools intent trace --gaps
   gsd-tools intent drift`,
 
-  'intent create': `Usage: gsd-tools intent create [options]
-
-Create a new INTENT.md in .planning/ with 6 structured sections.
-
-Options:
-  --force                 Overwrite existing INTENT.md
-  --objective "text"      Set objective statement
-  --users "u1" "u2"      Set target users
-  --outcomes "DO-01 [P1]: desc"  Add desired outcomes
-  --criteria "SC-01: gate"       Add success criteria
-
-Sections: objective, users, outcomes, criteria, constraints, health
-Auto-commits if commit_docs is enabled.
-
-Output: { created, path, revision, sections, commit }
-
-Examples:
-  gsd-tools intent create
-  gsd-tools intent create --force
-  gsd-tools intent create --objective "A CLI for project planning"`,
+  'intent create': `Usage: gsd-tools intent create [--force] [--objective "text"] [--users "u1" "u2"] [--outcomes "DO-01: desc"] [--criteria "SC-01: gate"]
+Create INTENT.md with 6 sections. --force overwrites existing.`,
 
   'intent show': `Usage: gsd-tools intent show [section] [--full]
 
@@ -1013,22 +866,8 @@ Examples:
   gsd-tools env status`,
 
   'env scan': `Usage: gsd-tools env scan [--force] [--verbose]
-
-Scan project for languages, tools, runtimes, and write env-manifest.json.
-
-Without --force, skips scan if manifest is fresh (no watched files changed).
-With --force, always performs a full scan.
-
-Detects: 26 language manifest patterns, package managers (with lockfile
-precedence), version managers, CI platforms, test frameworks, linters/formatters,
-well-known scripts, Docker services, MCP servers, monorepo configurations.
-
-Output includes: languages (with binary version/path), package_manager,
-version_managers, tools, scripts, infrastructure, monorepo, watched_files.
-
-Examples:
-  gsd-tools env scan
-  gsd-tools env scan --force --verbose`,
+Detect languages, tools, runtimes. Write env-manifest.json + project-profile.json.
+--force bypasses freshness check. Detects 26+ language patterns.`,
 
   'env status': `Usage: gsd-tools env status
 
@@ -1215,6 +1054,23 @@ Output: { phase, plans_classified, plans: [...], execution_mode: { mode, reason,
 Examples:
   gsd-tools classify phase 39
   gsd-tools classify phase 38`,
+
+  'tdd': `Usage: gsd-tools tdd <subcommand> [options]
+
+TDD validation gates for RED/GREEN/REFACTOR cycle enforcement.
+
+Subcommands:
+  validate-red --test-cmd "cmd"       Verify test fails (exit 0 if test fails)
+  validate-green --test-cmd "cmd"     Verify test passes (exit 0 if test passes)
+  validate-refactor --test-cmd "cmd"  Same as validate-green
+  auto-test --test-cmd "cmd"          Run test, report result (no exit code override)
+  detect-antipattern --phase P --files "f1,f2"  Check for TDD violations
+
+Also: commit --tdd-phase red|green|refactor adds GSD-Phase trailer
+
+Examples:
+  gsd-tools tdd validate-red --test-cmd "npm test"
+  gsd-tools tdd detect-antipattern --phase red --files "src/foo.js"`,
 
   'review': `Usage: gsd-tools review <phase> <plan> — Review context for reviewer agent`,
 
