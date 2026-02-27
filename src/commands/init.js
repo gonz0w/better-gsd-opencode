@@ -3,6 +3,7 @@
 const fs = require('fs');
 const path = require('path');
 const { output, error, debugLog } = require('../lib/output');
+const { banner, sectionHeader, progressBar, formatTable, summaryLine, actionHint, color, SYMBOLS, colorByPercent } = require('../lib/format');
 const { loadConfig } = require('../lib/config');
 const { safeReadFile, cachedReadFile, findPhaseInternal, resolveModelInternal, getRoadmapPhaseInternal, getMilestoneInfo, getArchivedPhaseDirs, normalizePhaseName, isValidDateString, sanitizeShellArg, pathExistsInternal, generateSlugInternal, getPhaseTree } = require('../lib/helpers');
 const { extractFrontmatter } = require('../lib/frontmatter');
@@ -1225,6 +1226,80 @@ function cmdInitMapCodebase(cwd, raw) {
   output(result, raw);
 }
 
+/**
+ * Formatter for init progress — renders branded banner, progress bar, phase table, and action hints.
+ * @param {object} result - The init progress result object
+ * @returns {string}
+ */
+function formatInitProgress(result) {
+  const lines = [];
+
+  // 1. Branded banner
+  lines.push(banner('Progress'));
+  lines.push('');
+
+  // 2. Milestone line
+  if (result.milestone_version || result.milestone_name) {
+    const version = result.milestone_version || '?';
+    const name = result.milestone_name || '';
+    lines.push(color.bold(`${version}`) + (name ? ` ${color.dim('\u2014')} ${name}` : ''));
+    lines.push('');
+  }
+
+  // 3. Progress bar
+  const completedCount = result.completed_count || 0;
+  const phaseCount = result.phase_count || 0;
+  const completedPercent = phaseCount > 0 ? Math.round((completedCount / phaseCount) * 100) : 0;
+  lines.push(progressBar(completedPercent) + `  ${completedCount}/${phaseCount} phases`);
+  lines.push('');
+
+  // 4. Phase table
+  if (result.phases && result.phases.length > 0) {
+    lines.push(sectionHeader('Phases'));
+    const rows = result.phases.map(p => {
+      let statusIcon;
+      if (p.status === 'complete') statusIcon = color.green(SYMBOLS.check);
+      else if (p.status === 'in_progress') statusIcon = color.cyan(SYMBOLS.progress);
+      else statusIcon = color.dim(SYMBOLS.pending);
+      const plans = p.plan_count > 0 ? `${p.summary_count}/${p.plan_count}` : color.dim('TBD');
+      return [p.number, statusIcon + ' ' + (p.status || 'pending'), p.name || '', plans];
+    });
+    lines.push(formatTable(['#', 'Status', 'Phase', 'Plans'], rows, { maxRows: 20, showAll: true }));
+    lines.push('');
+  }
+
+  // 5. Current phase
+  if (result.current_phase) {
+    lines.push(sectionHeader('Current'));
+    lines.push(` Phase ${result.current_phase.number}: ${result.current_phase.name || 'unnamed'}`);
+    lines.push('');
+  }
+
+  // 6. Action hint for next phase
+  if (result.next_phase) {
+    lines.push(actionHint(`Next: /gsd-discuss-phase ${result.next_phase.number}`));
+  }
+
+  // 7. Session diff
+  if (result.session_diff && result.session_diff.commit_count > 0) {
+    lines.push('');
+    lines.push(sectionHeader('Session'));
+    lines.push(` ${result.session_diff.commit_count} commits since last session`);
+    if (result.session_diff.recent && result.session_diff.recent.length > 0) {
+      for (const commit of result.session_diff.recent.slice(0, 3)) {
+        lines.push(color.dim(`   ${commit}`));
+      }
+    }
+  }
+
+  // 8. Summary line
+  lines.push('');
+  const milestoneSuffix = result.milestone_name ? ` \u2014 ${result.milestone_name}` : '';
+  lines.push(summaryLine(`${completedCount}/${phaseCount} phases complete${milestoneSuffix}`));
+
+  return lines.join('\n');
+}
+
 function cmdInitProgress(cwd, raw) {
   const config = loadConfig(cwd);
   const milestone = getMilestoneInfo(cwd);
@@ -1392,7 +1467,7 @@ function cmdInitProgress(cwd, raw) {
     if (global._gsdManifestMode) {
       compactResult._manifest = { files: manifestFiles };
     }
-    return output(compactResult, raw);
+    return output(compactResult, { formatter: formatInitProgress });
   }
 
   // Trim null/empty fields from verbose output to reduce token waste
@@ -1405,7 +1480,7 @@ function cmdInitProgress(cwd, raw) {
   if (result.paused_at === null) delete result.paused_at;
   if (result.session_diff === null) delete result.session_diff;
 
-  output(result, raw);
+  output(result, { formatter: formatInitProgress });
 }
 
 function cmdInitMemory(cwd, args, raw) {
