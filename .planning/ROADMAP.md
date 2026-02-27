@@ -138,6 +138,11 @@ Plans:
 4. Non-JS files fall back to regex-based extraction via detector registry without errors
 5. Repository map generates ~1k token compact codebase summary from AST signatures
 
+**Plans:** 2 plans
+Plans:
+- [ ] 38-01-PLAN.md — AST parser with acorn + regex fallback, codebase ast/exports CLI commands
+- [ ] 38-02-PLAN.md — Complexity scoring + repo-map generator
+
 ### Phase 39: Orchestration Intelligence
 
 **Goal:** System auto-classifies task complexity and routes to right agent/model without manual selection.
