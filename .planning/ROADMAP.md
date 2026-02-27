@@ -140,8 +140,8 @@ Plans:
 
 **Plans:** 2/2 plans complete
 Plans:
-- [ ] 38-01-PLAN.md — AST parser with acorn + regex fallback, codebase ast/exports CLI commands
-- [ ] 38-02-PLAN.md — Complexity scoring + repo-map generator
+- [x] 38-01-PLAN.md — AST parser with acorn + regex fallback, codebase ast/exports CLI commands
+- [x] 38-02-PLAN.md — Complexity scoring + repo-map generator
 
 ### Phase 39: Orchestration Intelligence
 
@@ -205,4 +205,4 @@ Plans:
 | 18-22 | v4.0 | 13/13 | Complete | 2026-02-25 |
 | 23-29 | v5.0 | 14/14 | Complete | 2026-02-26 |
 | 30-36 | v6.0 | 11/11 | Complete | 2026-02-27 |
-| 37-42 | v7.0 | 2/? | In progress | — |
+| 37-42 | v7.0 | 4/? | In progress | — |
