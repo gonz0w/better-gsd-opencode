@@ -43,6 +43,25 @@ Requirements for milestone v7.0 Agent Orchestration & Efficiency. Each maps to r
 - [x] **GIT-01**: User can query structured git log, diff summary, blame, and branch info via enhanced git.js commands
 - [x] **GIT-02**: Pre-commit checks detect uncommitted changes, active rebase, detached HEAD, and shallow clones
 
+### TDD Execution
+
+- [ ] **TDD-01**: Executor follows RED→GREEN→REFACTOR state machine for `type: tdd` plans, with verification gates between each phase
+- [ ] **TDD-02**: RED phase commits a failing test before any implementation code exists; orchestrator verifies test actually fails
+- [ ] **TDD-03**: GREEN phase writes minimal implementation; orchestrator verifies previously-failing test now passes
+- [ ] **TDD-04**: REFACTOR phase commits are verified to not break any passing tests
+- [ ] **TDD-05**: TDD commit discipline uses git trailers (`GSD-Phase: red|green|refactor`) for audit trail
+
+### Execution Discipline
+
+- [ ] **EXEC-01**: Auto test-after-edit: executor runs test suite after each file modification to catch errors early
+- [ ] **EXEC-02**: Anti-pattern detection blocks common AI mistakes (pre-test code in TDD, YAGNI violations, over-mocking) with explanations
+
+### Review Gate Hardening
+
+- [ ] **QUAL-04**: Reviewer performs two-stage review: spec compliance (plan must_haves) THEN code quality (conventions, patterns)
+- [ ] **QUAL-05**: Review findings are severity-classified (blocker/warning/info) with blockers preventing task completion
+- [ ] **QUAL-06**: Stuck/loop detection identifies when executor is repeating failed patterns and triggers recovery
+
 ## Future Requirements
 
 Deferred to future release. Tracked but not in current roadmap.
@@ -107,12 +126,22 @@ Which phases cover which requirements. Updated during roadmap creation.
 | QUAL-01 | Phase 41 | Complete | npm test -- --grep reviewer |
 | QUAL-02 | Phase 41 | Complete | npm test -- --grep attribution |
 | QUAL-03 | Phase 41 | Complete | npm test -- --grep verification |
+| TDD-01 | Phase 43 | Pending | npm test -- --grep tdd |
+| TDD-02 | Phase 43 | Pending | npm test -- --grep tdd-red |
+| TDD-03 | Phase 43 | Pending | npm test -- --grep tdd-green |
+| TDD-04 | Phase 43 | Pending | npm test -- --grep tdd-refactor |
+| TDD-05 | Phase 43 | Pending | npm test -- --grep tdd-trailer |
+| EXEC-01 | Phase 43 | Pending | npm test -- --grep auto-test |
+| EXEC-02 | Phase 43 | Pending | npm test -- --grep anti-pattern |
+| QUAL-04 | Phase 44 | Pending | npm test -- --grep two-stage |
+| QUAL-05 | Phase 44 | Pending | npm test -- --grep severity |
+| QUAL-06 | Phase 44 | Pending | npm test -- --grep stuck |
 
 **Coverage:**
-- v7.0 requirements: 18 total
-- Mapped to phases: 18
+- v7.0 requirements: 29 total
+- Mapped to phases: 29
 - Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-02-26*
-*Last updated: 2026-02-27 after 40-02 completion*
+*Last updated: 2026-02-27 after Phase 43-44 requirements added*

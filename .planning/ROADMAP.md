@@ -9,7 +9,7 @@
 - ✅ **v4.0 Environment & Execution Intelligence** — Phases 18-22 (shipped 2026-02-25)
 - ✅ **v5.0 Codebase Intelligence** — Phases 23-29 (shipped 2026-02-26)
 - ✅ **v6.0 UX & Developer Experience** — Phases 30-36 (shipped 2026-02-27)
-- **v7.0 Agent Orchestration & Efficiency** — Phases 37-42
+- **v7.0 Agent Orchestration & Efficiency** — Phases 37-44
 
 ## Phases
 
@@ -106,7 +106,7 @@ Full details: `.planning/milestones/v6.0-ROADMAP.md`
 </details>
 
 <details>
-<summary>v7.0 Agent Orchestration & Efficiency (Phases 37-42)</summary>
+<summary>v7.0 Agent Orchestration & Efficiency (Phases 37-44)</summary>
 
 ### Phase 37: Foundation & Safety Net
 
@@ -206,6 +206,40 @@ Plans:
 4. No output format regressions detected by contract tests
 5. Bundle remains within 1000KB budget
 
+### Phase 43: TDD Execution Engine
+
+**Goal:** Executor follows a strict RED→GREEN→REFACTOR state machine for TDD plans with verification gates, auto test-after-edit, and anti-pattern detection.
+
+**Requirements:** TDD-01, TDD-02, TDD-03, TDD-04, TDD-05, EXEC-01, EXEC-02
+
+**Dependencies:** Phase 41 (reviewer agent, commit attribution)
+
+**Success Criteria:**
+1. `type: tdd` plans execute through RED→GREEN→REFACTOR cycle with orchestrator-enforced gates between phases
+2. RED phase: test file committed, `npm test` run confirms failure, commit includes `GSD-Phase: red` trailer
+3. GREEN phase: minimal implementation committed, previously-failing test now passes, commit includes `GSD-Phase: green` trailer
+4. REFACTOR phase: cleanup committed only if all tests still pass, commit includes `GSD-Phase: refactor` trailer
+5. Auto test-after-edit catches errors early during execution (not just at task end)
+6. Anti-pattern detection warns on pre-test code, YAGNI violations, and over-mocking during TDD execution
+
+**Plans:** 0 plans (not yet planned)
+
+### Phase 44: Review Gate Hardening
+
+**Goal:** Graduate reviewer from informational to enforcing — two-stage review (spec + quality), severity-classified findings with blocking, and stuck/loop detection.
+
+**Requirements:** QUAL-04, QUAL-05, QUAL-06
+
+**Dependencies:** Phase 41 (reviewer agent), Phase 43 (TDD execution)
+
+**Success Criteria:**
+1. Reviewer performs two-stage review: first checks spec compliance (plan must_haves), then code quality (conventions, patterns)
+2. Blocker-severity findings prevent task completion; warning/info findings are advisory
+3. Stuck/loop detection identifies repeated failure patterns (>2 retries on same error) and triggers recovery (rollback + different approach)
+4. Quality scoring formula includes TDD adherence and review-pass rate
+
+**Plans:** 0 plans (not yet planned)
+
 </details>
 
 ## Progress
@@ -219,4 +253,4 @@ Plans:
 | 18-22 | v4.0 | 13/13 | Complete | 2026-02-25 |
 | 23-29 | v5.0 | 14/14 | Complete | 2026-02-26 |
 | 30-36 | v6.0 | 11/11 | Complete | 2026-02-27 |
-| 37-42 | v7.0 | 8/? | In progress | — |
+| 37-44 | v7.0 | 8/? | In progress | — |
