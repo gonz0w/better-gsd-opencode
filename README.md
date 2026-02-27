@@ -32,7 +32,7 @@ Every step produces structured documents in `.planning/` that agents read for co
 ## Quick Start
 
 ```bash
-npx get-shit-done-cc
+clone this repo, run deploy.sh (we are in dev mode, no npx plugin yet)
 ```
 
 Then in OpenCode:
