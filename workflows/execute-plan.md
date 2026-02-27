@@ -159,12 +159,55 @@ DURATION="${DURATION_MIN} min"
 If plan has `user_setup:` frontmatter: create `{phase}-USER-SETUP.md` using template. Otherwise skip.
 </step>
 
+<step name="post_execution_review">
+After plan execution completes (all tasks committed, before SUMMARY creation):
+
+1. Check if plan has `autonomous: true` and is not a gap_closure plan. Skip review for gap closures and checkpoint plans.
+
+2. Assemble review context:
+```bash
+REVIEW_CTX=$(node {config_path}/bin/gsd-tools.cjs review ${PHASE_NUM} ${PLAN_NUM} --raw 2>/dev/null)
+```
+
+3. If review context available (non-empty, valid JSON), perform review:
+   - Load `references/reviewer-agent.md` for review protocol
+   - Review the changed files against conventions using the protocol
+   - Produce review findings JSON
+
+4. Store review findings for SUMMARY inclusion:
+   - If `status: approved` — note in summary, no action needed
+   - If `status: changes_requested` with blockers — list blockers, but do NOT auto-fix (reviewer suggests, executor decides in next iteration)
+   - If `status: info_only` — note findings in summary for awareness
+
+5. Review is NON-BLOCKING for plan completion. Findings are informational for this iteration.
+   Future iterations may make blockers blocking once the review pipeline is proven reliable.
+
+Skip conditions (do NOT review):
+- Plan has `gap_closure: true` in frontmatter
+- Plan has checkpoints (Pattern B/C) — review happens per-segment if at all
+- Review context assembly fails (no commits found, etc.)
+- Bundle is over budget (focus on fixing that first)
+</step>
+
 <step name="create_summary">
 Create `{phase}-{plan}-SUMMARY.md` using templates/summary.md.
 
 Frontmatter: phase, plan, subsystem, tags, requires/provides/affects, tech-stack, key-files, key-decisions, requirements-completed (copy from PLAN frontmatter), duration, completed date.
 
 One-liner MUST be substantive. Include duration, start/end, task count, file count.
+
+**Review Findings section:**
+If post_execution_review produced findings, include in SUMMARY:
+
+## Review Findings
+
+**Status:** {approved|changes_requested|info_only}
+
+| Severity | File | Dimension | Finding | Suggestion |
+|----------|------|-----------|---------|------------|
+| {severity} | {file} | {dimension} | {finding} | {suggestion} |
+
+If no review was performed (gap closure, skipped, etc.): omit this section entirely.
 </step>
 
 <step name="update_current_position">

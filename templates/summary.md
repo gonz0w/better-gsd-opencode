@@ -104,6 +104,22 @@ _Note: TDD tasks may have multiple commits (test → feat → refactor)_
 **Total deviations:** [N] auto-fixed ([breakdown by rule])
 **Impact on plan:** [Brief assessment - e.g., "All auto-fixes necessary for correctness/security. No scope creep."]
 
+## Review Findings
+
+[If post-execution review was performed:]
+
+**Status:** {approved|changes_requested|info_only}
+
+| Severity | File | Dimension | Finding | Suggestion |
+|----------|------|-----------|---------|------------|
+| warning | src/lib/foo.js | convention | Missing error handling in parseX | Add try/catch with descriptive error |
+| info | src/router.js | architecture | Consider lazy-loading new module | Use lazyFoo() pattern |
+
+**Review summary:** [One-line summary from reviewer]
+
+[If no review performed:]
+Review skipped — {reason: gap closure plan / checkpoint plan / review context unavailable}
+
 ## Issues Encountered
 [Problems and how they were resolved, or "None"]
 

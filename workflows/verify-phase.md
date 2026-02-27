@@ -93,6 +93,22 @@ Status: ✓ SATISFIED | ✗ BLOCKED | ? NEEDS HUMAN
 Scan files from SUMMARYs for: TODO/FIXME/HACK (⚠️), placeholder content (🛑), empty returns (⚠️), log-only functions (⚠️).
 </step>
 
+<step name="verify_review_coverage">
+**Review coverage check:**
+For each SUMMARY.md in the phase:
+- Check if "Review Findings" section exists
+- If missing and plan was autonomous (not gap_closure): flag as ⚠️ "No post-execution review"
+- If present with status "changes_requested" and blockers: flag as ⚠️ "Unresolved review blockers"
+- If present with status "approved" or "info_only": ✓ Review completed
+
+Include review coverage in verification report:
+
+| Plan | Review Status | Blockers |
+|------|---------------|----------|
+| 41-01 | approved | 0 |
+| 41-02 | changes_requested | 2 |
+</step>
+
 <step name="identify_human_verification">
 Always needs human: visual appearance, user flows, real-time behavior, external integrations, performance feel, error clarity.
 
@@ -130,6 +146,7 @@ If human_needed: list items requiring human testing.
 - [ ] Key links verified
 - [ ] Requirements coverage assessed
 - [ ] Anti-patterns scanned
+- [ ] Review coverage assessed
 - [ ] Human verification items identified
 - [ ] Overall status determined
 - [ ] Fix plans generated (if gaps_found)
