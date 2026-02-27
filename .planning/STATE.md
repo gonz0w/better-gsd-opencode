@@ -9,15 +9,15 @@ See: .planning/PROJECT.md (updated 2026-02-26)
 
 ## Current Position
 
-Phase: 38 — AST Intelligence & Repo Map
-Plan: 2 of 2 complete
+Phase: 39 — Orchestration Intelligence
+Plan: 1 of 1 complete
 Status: Phase complete
-Last activity: 2026-02-27 — Completed 38-02 (complexity scoring + repo-map)
+Last activity: 2026-02-27 — Completed 39-01 (orchestration intelligence engine)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 89 (85 across v1.0-v6.0 + 4 in v7.0)
+- Total plans completed: 90 (85 across v1.0-v6.0 + 5 in v7.0)
 - Average duration: ~15 min/plan
 - Total execution time: ~21 hours
 
@@ -45,6 +45,8 @@ All v1.0-v6.0 decisions recorded in PROJECT.md Key Decisions table with outcomes
 - Phase 37-02: Profiler uses process exit hook to capture timing after output() calls process.exit()
 - Phase 38-01: Use acorn with module→script fallback, TypeScript stripping via regex not full parser
 - Phase 38-02: Base complexity 1 per function + branching nodes, skip bin/dist in repo-map, cap signatures per file
+- Phase 39-01: Model mapping scores 1-3 → sonnet, 4-5 → opus; dep graph non-blocking for classification
+- Phase 39-01: task_routing added to compact mode whitelist so agents always get routing guidance
 
 ### Pending Todos
 
@@ -57,5 +59,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-02-27
-Stopped at: Completed 38-02-PLAN.md (complexity scoring + repo-map) — Phase 38 complete
+Stopped at: Completed 39-01-PLAN.md (orchestration intelligence engine) — Phase 39 complete
 Resume file: None

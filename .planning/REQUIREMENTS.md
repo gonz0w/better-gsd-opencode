@@ -28,9 +28,9 @@ Requirements for milestone v7.0 Agent Orchestration & Efficiency. Each maps to r
 
 ### Orchestration Intelligence
 
-- [ ] **ORCH-01**: User can classify task complexity (1-5 score) based on file count, cross-module reach, and test requirements
-- [ ] **ORCH-02**: System auto-selects agent type and model tier based on task classification
-- [ ] **ORCH-03**: System auto-selects between single/parallel/team execution mode based on plan structure
+- [x] **ORCH-01**: User can classify task complexity (1-5 score) based on file count, cross-module reach, and test requirements
+- [x] **ORCH-02**: System auto-selects agent type and model tier based on task classification
+- [x] **ORCH-03**: System auto-selects between single/parallel/team execution mode based on plan structure
 
 ### Agent Quality
 
@@ -98,9 +98,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 | AST-03 | Phase 38 | Complete | npm test -- --grep complexity |
 | AST-04 | Phase 38 | Pending | npm test -- --grep registry |
 | CTX-01 | Phase 38 | Complete | npm test -- --grep repomap |
-| ORCH-01 | Phase 39 | Pending | npm test -- --grep classify |
-| ORCH-02 | Phase 39 | Pending | npm test -- --grep routing |
-| ORCH-03 | Phase 39 | Pending | npm test -- --grep mode |
+| ORCH-01 | Phase 39 | Complete | npm test -- --grep classify |
+| ORCH-02 | Phase 39 | Complete | npm test -- --grep routing |
+| ORCH-03 | Phase 39 | Complete | npm test -- --grep mode |
 | CTX-02 | Phase 40 | Pending | npm test -- --grep manifest |
 | CTX-03 | Phase 40 | Pending | npm test -- --grep compact |
 | CTX-04 | Phase 40 | Pending | npm test -- --grep injection |
