@@ -1,12 +1,13 @@
 {
   "version": 1,
-  "generated_at": "2026-02-26T13:35:41.652Z",
-  "git_commit_hash": "e72931e4f9b856bf5470e696ed43899f9020d9a6",
+  "generated_at": "2026-02-27T04:35:20.444Z",
+  "git_commit_hash": "491e9681163ecf24395f03c35526dafb0f665125",
   "git_branch": "main",
-  "analysis_duration_ms": 51,
+  "analysis_duration_ms": 33,
   "source_dirs": [
     ".",
     "bin",
+    "docs",
     "references",
     "src",
     "templates",
@@ -14,19 +15,19 @@
   ],
   "languages": {
     "markdown": {
-      "count": 98,
+      "count": 176,
       "extensions": [
         ".md"
       ],
-      "lines": 19779
+      "lines": 32579
     },
     "javascript": {
-      "count": 27,
+      "count": 32,
       "extensions": [
         ".cjs",
         ".js"
       ],
-      "lines": 43727
+      "lines": 52298
     },
     "shell": {
       "count": 1,
@@ -36,11 +37,11 @@
       "lines": 50
     },
     "json": {
-      "count": 3,
+      "count": 5,
       "extensions": [
         ".json"
       ],
-      "lines": 579
+      "lines": 1580
     }
   },
   "files": {
@@ -52,15 +53,15 @@
     },
     "AGENTS.md": {
       "language": "markdown",
-      "size_bytes": 5206,
+      "size_bytes": 5208,
       "lines": 90,
-      "last_modified": "2026-02-25T11:19:26.773Z"
+      "last_modified": "2026-02-26T22:25:17.780Z"
     },
     "README.md": {
       "language": "markdown",
-      "size_bytes": 11997,
-      "lines": 218,
-      "last_modified": "2026-02-25T11:19:15.738Z"
+      "size_bytes": 11481,
+      "lines": 316,
+      "last_modified": "2026-02-26T22:25:14.706Z"
     },
     "VERSION": {
       "language": null,
@@ -70,15 +71,15 @@
     },
     "bin/gsd-tools.cjs": {
       "language": "javascript",
-      "size_bytes": 587971,
-      "lines": 14281,
-      "last_modified": "2026-02-26T13:30:01.367Z"
+      "size_bytes": 697698,
+      "lines": 17032,
+      "last_modified": "2026-02-27T04:33:27.308Z"
     },
     "bin/gsd-tools.test.cjs": {
       "language": "javascript",
-      "size_bytes": 511425,
-      "lines": 12341,
-      "last_modified": "2026-02-25T22:45:12.301Z"
+      "size_bytes": 573754,
+      "lines": 13736,
+      "last_modified": "2026-02-27T03:55:07.486Z"
     },
     "build.js": {
       "language": "javascript",
@@ -106,9 +107,9 @@
     },
     "references/checkpoints.md": {
       "language": "markdown",
-      "size_bytes": 29837,
-      "lines": 782,
-      "last_modified": "2026-02-25T20:45:06.783Z"
+      "size_bytes": 28141,
+      "lines": 746,
+      "last_modified": "2026-02-27T04:31:06.181Z"
     },
     "references/continuation-format.md": {
       "language": "markdown",
@@ -119,14 +120,14 @@
     "references/decimal-phase-calculation.md": {
       "language": "markdown",
       "size_bytes": 1420,
-      "lines": 65,
-      "last_modified": "2026-02-22T06:39:11.213Z"
+      "lines": 64,
+      "last_modified": "2026-02-27T04:26:45.146Z"
     },
     "references/git-integration.md": {
       "language": "markdown",
-      "size_bytes": 6836,
+      "size_bytes": 6838,
       "lines": 248,
-      "last_modified": "2026-02-25T20:45:06.783Z"
+      "last_modified": "2026-02-27T04:26:20.746Z"
     },
     "references/git-planning-commit.md": {
       "language": "markdown",
@@ -142,21 +143,21 @@
     },
     "references/model-profiles.md": {
       "language": "markdown",
-      "size_bytes": 3249,
+      "size_bytes": 3208,
       "lines": 92,
-      "last_modified": "2026-02-25T20:45:06.784Z"
+      "last_modified": "2026-02-27T04:26:37.529Z"
     },
     "references/phase-argument-parsing.md": {
       "language": "markdown",
-      "size_bytes": 1627,
+      "size_bytes": 1642,
       "lines": 61,
-      "last_modified": "2026-02-22T06:39:11.214Z"
+      "last_modified": "2026-02-27T04:26:41.914Z"
     },
     "references/planning-config.md": {
       "language": "markdown",
-      "size_bytes": 7267,
+      "size_bytes": 7269,
       "lines": 196,
-      "last_modified": "2026-02-22T06:39:11.214Z"
+      "last_modified": "2026-02-27T04:26:23.361Z"
     },
     "references/questioning.md": {
       "language": "markdown",
@@ -172,21 +173,21 @@
     },
     "references/ui-brand.md": {
       "language": "markdown",
-      "size_bytes": 4421,
-      "lines": 160,
-      "last_modified": "2026-02-22T06:39:11.214Z"
+      "size_bytes": 8059,
+      "lines": 238,
+      "last_modified": "2026-02-27T04:26:29.612Z"
     },
     "references/verification-patterns.md": {
       "language": "markdown",
-      "size_bytes": 16769,
-      "lines": 620,
-      "last_modified": "2026-02-25T20:45:06.784Z"
+      "size_bytes": 16354,
+      "lines": 612,
+      "last_modified": "2026-02-27T04:31:14.801Z"
     },
     "src/commands/codebase.js": {
       "language": "javascript",
-      "size_bytes": 7330,
-      "lines": 250,
-      "last_modified": "2026-02-26T13:29:32.835Z"
+      "size_bytes": 40141,
+      "lines": 1220,
+      "last_modified": "2026-02-27T04:33:21.821Z"
     },
     "src/commands/env.js": {
       "language": "javascript",
@@ -196,15 +197,15 @@
     },
     "src/commands/features.js": {
       "language": "javascript",
-      "size_bytes": 70613,
-      "lines": 1904,
-      "last_modified": "2026-02-25T22:45:12.301Z"
+      "size_bytes": 74753,
+      "lines": 2016,
+      "last_modified": "2026-02-27T04:26:37.597Z"
     },
     "src/commands/init.js": {
       "language": "javascript",
-      "size_bytes": 51642,
-      "lines": 1426,
-      "last_modified": "2026-02-25T22:45:12.302Z"
+      "size_bytes": 65996,
+      "lines": 1743,
+      "last_modified": "2026-02-27T04:26:19.842Z"
     },
     "src/commands/intent.js": {
       "language": "javascript",
@@ -244,15 +245,15 @@
     },
     "src/commands/state.js": {
       "language": "javascript",
-      "size_bytes": 26100,
-      "lines": 652,
-      "last_modified": "2026-02-25T22:45:12.302Z"
+      "size_bytes": 28345,
+      "lines": 716,
+      "last_modified": "2026-02-27T04:27:22.074Z"
     },
     "src/commands/verify.js": {
       "language": "javascript",
-      "size_bytes": 69711,
-      "lines": 1984,
-      "last_modified": "2026-02-25T22:45:12.302Z"
+      "size_bytes": 73591,
+      "lines": 2089,
+      "last_modified": "2026-02-27T04:26:38.278Z"
     },
     "src/commands/worktree.js": {
       "language": "javascript",
@@ -268,9 +269,9 @@
     },
     "src/lib/codebase-intel.js": {
       "language": "javascript",
-      "size_bytes": 16339,
-      "lines": 529,
-      "last_modified": "2026-02-26T13:28:38.563Z"
+      "size_bytes": 17897,
+      "lines": 570,
+      "last_modified": "2026-02-26T15:59:25.015Z"
     },
     "src/lib/config.js": {
       "language": "javascript",
@@ -280,9 +281,9 @@
     },
     "src/lib/constants.js": {
       "language": "javascript",
-      "size_bytes": 41453,
+      "size_bytes": 40504,
       "lines": 1088,
-      "last_modified": "2026-02-25T19:01:34.697Z"
+      "last_modified": "2026-02-26T22:25:02.093Z"
     },
     "src/lib/context.js": {
       "language": "javascript",
@@ -310,9 +311,9 @@
     },
     "src/lib/output.js": {
       "language": "javascript",
-      "size_bytes": 4061,
-      "lines": 113,
-      "last_modified": "2026-02-25T20:49:46.196Z"
+      "size_bytes": 7785,
+      "lines": 196,
+      "last_modified": "2026-02-27T04:33:25.394Z"
     },
     "src/lib/regex-cache.js": {
       "language": "javascript",
@@ -322,9 +323,9 @@
     },
     "src/router.js": {
       "language": "javascript",
-      "size_bytes": 28512,
-      "lines": 764,
-      "last_modified": "2026-02-26T13:29:57.469Z"
+      "size_bytes": 30051,
+      "lines": 791,
+      "last_modified": "2026-02-26T22:23:27.278Z"
     },
     "templates/DEBUG.md": {
       "language": "markdown",
@@ -574,15 +575,15 @@
     },
     "workflows/add-todo.md": {
       "language": "markdown",
-      "size_bytes": 4114,
+      "size_bytes": 4044,
       "lines": 157,
-      "last_modified": "2026-02-25T20:45:06.786Z"
+      "last_modified": "2026-02-27T04:30:24.902Z"
     },
     "workflows/audit-milestone.md": {
       "language": "markdown",
-      "size_bytes": 10500,
+      "size_bytes": 10452,
       "lines": 297,
-      "last_modified": "2026-02-22T06:39:11.217Z"
+      "last_modified": "2026-02-27T04:30:20.930Z"
     },
     "workflows/check-todos.md": {
       "language": "markdown",
@@ -598,75 +599,75 @@
     },
     "workflows/cmd-codebase-impact.md": {
       "language": "markdown",
-      "size_bytes": 1300,
+      "size_bytes": 1294,
       "lines": 57,
-      "last_modified": "2026-02-22T14:53:46.151Z"
+      "last_modified": "2026-02-26T22:24:15.884Z"
     },
     "workflows/cmd-context-budget.md": {
       "language": "markdown",
-      "size_bytes": 1457,
+      "size_bytes": 1451,
       "lines": 61,
-      "last_modified": "2026-02-22T14:53:19.416Z"
+      "last_modified": "2026-02-26T22:24:15.840Z"
     },
     "workflows/cmd-rollback-info.md": {
       "language": "markdown",
-      "size_bytes": 1154,
+      "size_bytes": 1148,
       "lines": 60,
-      "last_modified": "2026-02-22T14:53:51.398Z"
+      "last_modified": "2026-02-26T22:24:15.859Z"
     },
     "workflows/cmd-search-decisions.md": {
       "language": "markdown",
-      "size_bytes": 1114,
+      "size_bytes": 1108,
       "lines": 56,
-      "last_modified": "2026-02-22T14:53:30.472Z"
+      "last_modified": "2026-02-26T22:24:15.882Z"
     },
     "workflows/cmd-search-lessons.md": {
       "language": "markdown",
-      "size_bytes": 1121,
+      "size_bytes": 1115,
       "lines": 55,
-      "last_modified": "2026-02-22T14:53:40.167Z"
+      "last_modified": "2026-02-26T22:24:15.873Z"
     },
     "workflows/cmd-session-diff.md": {
       "language": "markdown",
-      "size_bytes": 745,
+      "size_bytes": 739,
       "lines": 35,
-      "last_modified": "2026-02-22T14:53:11.494Z"
+      "last_modified": "2026-02-26T22:24:15.896Z"
     },
     "workflows/cmd-test-run.md": {
       "language": "markdown",
-      "size_bytes": 1134,
+      "size_bytes": 1128,
       "lines": 50,
-      "last_modified": "2026-02-22T14:53:25.085Z"
+      "last_modified": "2026-02-26T22:24:15.844Z"
     },
     "workflows/cmd-trace-requirement.md": {
       "language": "markdown",
-      "size_bytes": 1547,
+      "size_bytes": 1541,
       "lines": 70,
-      "last_modified": "2026-02-22T14:54:03.767Z"
+      "last_modified": "2026-02-26T22:24:15.850Z"
     },
     "workflows/cmd-validate-config.md": {
       "language": "markdown",
-      "size_bytes": 1253,
+      "size_bytes": 1247,
       "lines": 58,
-      "last_modified": "2026-02-22T14:54:09.632Z"
+      "last_modified": "2026-02-26T22:24:15.856Z"
     },
     "workflows/cmd-validate-deps.md": {
       "language": "markdown",
-      "size_bytes": 1336,
+      "size_bytes": 1330,
       "lines": 68,
-      "last_modified": "2026-02-22T14:53:36.035Z"
+      "last_modified": "2026-02-26T22:24:15.863Z"
     },
     "workflows/cmd-velocity.md": {
       "language": "markdown",
-      "size_bytes": 1194,
+      "size_bytes": 1188,
       "lines": 46,
-      "last_modified": "2026-02-22T14:53:57.142Z"
+      "last_modified": "2026-02-26T22:24:15.865Z"
     },
     "workflows/complete-and-clear.md": {
       "language": "markdown",
-      "size_bytes": 3064,
+      "size_bytes": 3059,
       "lines": 97,
-      "last_modified": "2026-02-25T19:04:04.716Z"
+      "last_modified": "2026-02-27T04:28:10.443Z"
     },
     "workflows/complete-milestone.md": {
       "language": "markdown",
@@ -676,45 +677,45 @@
     },
     "workflows/diagnose-issues.md": {
       "language": "markdown",
-      "size_bytes": 6668,
-      "lines": 219,
-      "last_modified": "2026-02-22T06:39:11.218Z"
+      "size_bytes": 6278,
+      "lines": 203,
+      "last_modified": "2026-02-27T04:31:45.254Z"
     },
     "workflows/discovery-phase.md": {
       "language": "markdown",
-      "size_bytes": 8311,
-      "lines": 289,
-      "last_modified": "2026-02-25T20:45:06.786Z"
+      "size_bytes": 8115,
+      "lines": 281,
+      "last_modified": "2026-02-27T04:31:31.934Z"
     },
     "workflows/discuss-phase.md": {
       "language": "markdown",
-      "size_bytes": 15954,
-      "lines": 490,
-      "last_modified": "2026-02-25T20:45:06.786Z"
+      "size_bytes": 15282,
+      "lines": 464,
+      "last_modified": "2026-02-27T04:29:30.103Z"
     },
     "workflows/execute-phase.md": {
       "language": "markdown",
-      "size_bytes": 13186,
-      "lines": 346,
-      "last_modified": "2026-02-25T18:32:49.092Z"
+      "size_bytes": 15507,
+      "lines": 391,
+      "last_modified": "2026-02-27T04:29:09.464Z"
     },
     "workflows/execute-plan.md": {
       "language": "markdown",
-      "size_bytes": 9137,
+      "size_bytes": 9131,
       "lines": 237,
-      "last_modified": "2026-02-24T23:20:40.267Z"
+      "last_modified": "2026-02-26T22:24:15.887Z"
     },
     "workflows/health.md": {
       "language": "markdown",
-      "size_bytes": 4222,
+      "size_bytes": 4187,
       "lines": 156,
-      "last_modified": "2026-02-22T06:39:11.219Z"
+      "last_modified": "2026-02-27T04:30:23.879Z"
     },
     "workflows/help.md": {
       "language": "markdown",
-      "size_bytes": 14681,
-      "lines": 486,
-      "last_modified": "2026-02-25T20:45:06.786Z"
+      "size_bytes": 8817,
+      "lines": 270,
+      "last_modified": "2026-02-27T04:34:02.760Z"
     },
     "workflows/insert-phase.md": {
       "language": "markdown",
@@ -730,51 +731,51 @@
     },
     "workflows/map-codebase.md": {
       "language": "markdown",
-      "size_bytes": 8795,
-      "lines": 315,
-      "last_modified": "2026-02-25T20:45:06.786Z"
+      "size_bytes": 8354,
+      "lines": 305,
+      "last_modified": "2026-02-27T04:31:24.170Z"
     },
     "workflows/new-milestone.md": {
       "language": "markdown",
-      "size_bytes": 16298,
-      "lines": 439,
-      "last_modified": "2026-02-25T11:02:13.475Z"
+      "size_bytes": 16109,
+      "lines": 435,
+      "last_modified": "2026-02-27T04:30:12.785Z"
     },
     "workflows/new-project.md": {
       "language": "markdown",
-      "size_bytes": 11066,
+      "size_bytes": 11041,
       "lines": 274,
-      "last_modified": "2026-02-25T11:01:10.884Z"
+      "last_modified": "2026-02-27T04:30:17.597Z"
     },
     "workflows/pause-work.md": {
       "language": "markdown",
-      "size_bytes": 3326,
+      "size_bytes": 3320,
       "lines": 127,
-      "last_modified": "2026-02-24T23:20:40.267Z"
+      "last_modified": "2026-02-26T22:24:15.868Z"
     },
     "workflows/plan-milestone-gaps.md": {
       "language": "markdown",
-      "size_bytes": 6821,
+      "size_bytes": 6785,
       "lines": 274,
-      "last_modified": "2026-02-22T06:39:11.221Z"
+      "last_modified": "2026-02-27T04:30:19.954Z"
     },
     "workflows/plan-phase.md": {
       "language": "markdown",
-      "size_bytes": 7105,
+      "size_bytes": 7093,
       "lines": 175,
-      "last_modified": "2026-02-25T17:10:52.803Z"
+      "last_modified": "2026-02-26T22:24:15.877Z"
     },
     "workflows/progress.md": {
       "language": "markdown",
-      "size_bytes": 9246,
-      "lines": 381,
-      "last_modified": "2026-02-25T20:45:06.787Z"
+      "size_bytes": 8025,
+      "lines": 345,
+      "last_modified": "2026-02-27T04:28:48.028Z"
     },
     "workflows/quick.md": {
       "language": "markdown",
-      "size_bytes": 8561,
+      "size_bytes": 8531,
       "lines": 287,
-      "last_modified": "2026-02-25T20:45:06.787Z"
+      "last_modified": "2026-02-27T04:30:18.662Z"
     },
     "workflows/remove-phase.md": {
       "language": "markdown",
@@ -790,50 +791,959 @@
     },
     "workflows/resume-project.md": {
       "language": "markdown",
-      "size_bytes": 9048,
-      "lines": 306,
-      "last_modified": "2026-02-22T06:39:11.222Z"
+      "size_bytes": 8399,
+      "lines": 284,
+      "last_modified": "2026-02-27T04:30:07.246Z"
     },
     "workflows/set-profile.md": {
       "language": "markdown",
-      "size_bytes": 1878,
+      "size_bytes": 1843,
       "lines": 80,
-      "last_modified": "2026-02-25T20:45:06.787Z"
+      "last_modified": "2026-02-27T04:30:25.807Z"
     },
     "workflows/settings.md": {
       "language": "markdown",
-      "size_bytes": 6220,
+      "size_bytes": 6106,
       "lines": 200,
-      "last_modified": "2026-02-22T06:39:11.223Z"
+      "last_modified": "2026-02-27T04:30:21.845Z"
     },
     "workflows/transition.md": {
       "language": "markdown",
-      "size_bytes": 12350,
-      "lines": 544,
-      "last_modified": "2026-02-22T06:39:11.223Z"
+      "size_bytes": 11728,
+      "lines": 513,
+      "last_modified": "2026-02-27T04:29:50.810Z"
     },
     "workflows/update.md": {
       "language": "markdown",
-      "size_bytes": 5645,
-      "lines": 214,
-      "last_modified": "2026-02-25T20:45:06.787Z"
+      "size_bytes": 5412,
+      "lines": 204,
+      "last_modified": "2026-02-27T04:30:22.891Z"
     },
     "workflows/verify-phase.md": {
       "language": "markdown",
-      "size_bytes": 5347,
+      "size_bytes": 5341,
       "lines": 138,
-      "last_modified": "2026-02-25T10:42:21.661Z"
+      "last_modified": "2026-02-26T22:24:15.898Z"
     },
     "workflows/verify-work.md": {
       "language": "markdown",
       "size_bytes": 5542,
       "lines": 146,
       "last_modified": "2026-02-25T20:45:06.787Z"
+    },
+    ".planning/codebase/codebase-intel.json": {
+      "language": "json",
+      "size_bytes": 22840,
+      "lines": 839,
+      "last_modified": "2026-02-26T13:35:41.654Z"
+    },
+    ".planning/REQUIREMENTS.md": {
+      "language": "markdown",
+      "size_bytes": 5647,
+      "lines": 116,
+      "last_modified": "2026-02-27T04:28:20.471Z"
+    },
+    ".planning/ROADMAP.md": {
+      "language": "markdown",
+      "size_bytes": 12759,
+      "lines": 225,
+      "last_modified": "2026-02-27T04:28:08.004Z"
+    },
+    ".planning/STATE.md": {
+      "language": "markdown",
+      "size_bytes": 2477,
+      "lines": 70,
+      "last_modified": "2026-02-27T04:28:04.395Z"
+    },
+    ".planning/phases/23-infrastructure-storage/23-01-SUMMARY.md": {
+      "language": "markdown",
+      "size_bytes": 4862,
+      "lines": 106,
+      "last_modified": "2026-02-26T13:36:52.649Z"
+    },
+    ".planning/phases/23-infrastructure-storage/23-02-SUMMARY.md": {
+      "language": "markdown",
+      "size_bytes": 4577,
+      "lines": 100,
+      "last_modified": "2026-02-26T14:02:19.121Z"
+    },
+    ".planning/phases/23-infrastructure-storage/23-VERIFICATION.md": {
+      "language": "markdown",
+      "size_bytes": 8891,
+      "lines": 89,
+      "last_modified": "2026-02-26T14:11:26.708Z"
+    },
+    ".planning/phases/24-convention-extraction/24-01-PLAN.md": {
+      "language": "markdown",
+      "size_bytes": 8495,
+      "lines": 181,
+      "last_modified": "2026-02-26T14:14:29.949Z"
+    },
+    ".planning/phases/24-convention-extraction/24-02-PLAN.md": {
+      "language": "markdown",
+      "size_bytes": 9706,
+      "lines": 195,
+      "last_modified": "2026-02-26T14:15:24.367Z"
+    },
+    ".planning/phases/24-convention-extraction/24-01-SUMMARY.md": {
+      "language": "markdown",
+      "size_bytes": 5310,
+      "lines": 116,
+      "last_modified": "2026-02-26T14:22:46.574Z"
+    },
+    "src/lib/conventions.js": {
+      "language": "javascript",
+      "size_bytes": 23139,
+      "lines": 644,
+      "last_modified": "2026-02-26T14:27:27.556Z"
+    },
+    ".planning/phases/24-convention-extraction/24-02-SUMMARY.md": {
+      "language": "markdown",
+      "size_bytes": 4616,
+      "lines": 107,
+      "last_modified": "2026-02-26T14:32:23.657Z"
+    },
+    ".planning/phases/24-convention-extraction/24-VERIFICATION.md": {
+      "language": "markdown",
+      "size_bytes": 6831,
+      "lines": 81,
+      "last_modified": "2026-02-26T14:38:08.268Z"
+    },
+    ".planning/phases/25-dependency-graph/25-01-PLAN.md": {
+      "language": "markdown",
+      "size_bytes": 8853,
+      "lines": 208,
+      "last_modified": "2026-02-26T14:42:20.691Z"
+    },
+    ".planning/phases/25-dependency-graph/25-01-SUMMARY.md": {
+      "language": "markdown",
+      "size_bytes": 4212,
+      "lines": 100,
+      "last_modified": "2026-02-26T14:51:03.458Z"
+    },
+    ".planning/phases/25-dependency-graph/25-02-PLAN.md": {
+      "language": "markdown",
+      "size_bytes": 10238,
+      "lines": 223,
+      "last_modified": "2026-02-26T14:43:10.751Z"
+    },
+    "src/lib/deps.js": {
+      "language": "javascript",
+      "size_bytes": 20802,
+      "lines": 697,
+      "last_modified": "2026-02-26T14:53:42.093Z"
+    },
+    ".planning/phases/25-dependency-graph/25-02-SUMMARY.md": {
+      "language": "markdown",
+      "size_bytes": 4338,
+      "lines": 102,
+      "last_modified": "2026-02-26T15:02:27.686Z"
+    },
+    ".planning/codebase/ARCHITECTURE.md": {
+      "language": "markdown",
+      "size_bytes": 13843,
+      "lines": 233,
+      "last_modified": "2026-02-26T19:35:14.014Z"
+    },
+    ".planning/codebase/CONCERNS.md": {
+      "language": "markdown",
+      "size_bytes": 20934,
+      "lines": 231,
+      "last_modified": "2026-02-26T19:36:37.347Z"
+    },
+    ".planning/codebase/CONVENTIONS.md": {
+      "language": "markdown",
+      "size_bytes": 11575,
+      "lines": 272,
+      "last_modified": "2026-02-26T19:35:07.555Z"
+    },
+    ".planning/codebase/INTEGRATIONS.md": {
+      "language": "markdown",
+      "size_bytes": 10968,
+      "lines": 231,
+      "last_modified": "2026-02-26T19:35:45.131Z"
+    },
+    ".planning/codebase/STACK.md": {
+      "language": "markdown",
+      "size_bytes": 7413,
+      "lines": 181,
+      "last_modified": "2026-02-26T19:34:39.937Z"
+    },
+    ".planning/codebase/STRUCTURE.md": {
+      "language": "markdown",
+      "size_bytes": 13491,
+      "lines": 248,
+      "last_modified": "2026-02-26T19:36:23.829Z"
+    },
+    ".planning/codebase/TESTING.md": {
+      "language": "markdown",
+      "size_bytes": 13850,
+      "lines": 361,
+      "last_modified": "2026-02-26T19:36:24.973Z"
+    },
+    ".planning/phases/25-dependency-graph/25-VERIFICATION.md": {
+      "language": "markdown",
+      "size_bytes": 7241,
+      "lines": 98,
+      "last_modified": "2026-02-26T15:08:51.468Z"
+    },
+    ".planning/phases/26-init-integration-context-summary/26-CONTEXT.md": {
+      "language": "markdown",
+      "size_bytes": 3345,
+      "lines": 71,
+      "last_modified": "2026-02-26T15:28:55.740Z"
+    },
+    ".planning/phases/26-init-integration-context-summary/26-01-PLAN.md": {
+      "language": "markdown",
+      "size_bytes": 9896,
+      "lines": 194,
+      "last_modified": "2026-02-26T15:32:28.502Z"
+    },
+    ".planning/phases/26-init-integration-context-summary/26-02-PLAN.md": {
+      "language": "markdown",
+      "size_bytes": 12846,
+      "lines": 268,
+      "last_modified": "2026-02-26T15:43:46.453Z"
+    },
+    ".planning/phases/26-init-integration-context-summary/26-01-SUMMARY.md": {
+      "language": "markdown",
+      "size_bytes": 5616,
+      "lines": 122,
+      "last_modified": "2026-02-26T16:10:09.985Z"
+    },
+    ".planning/.gitignore": {
+      "language": null,
+      "size_bytes": 26,
+      "lines": 2,
+      "last_modified": "2026-02-26T16:14:19.920Z"
+    },
+    ".planning/phases/26-init-integration-context-summary/26-02-SUMMARY.md": {
+      "language": "markdown",
+      "size_bytes": 4715,
+      "lines": 108,
+      "last_modified": "2026-02-26T16:29:52.779Z"
+    },
+    ".planning/phases/26-init-integration-context-summary/26-VERIFICATION.md": {
+      "language": "markdown",
+      "size_bytes": 6722,
+      "lines": 81,
+      "last_modified": "2026-02-26T16:45:32.238Z"
+    },
+    ".planning/phases/27-task-scoped-context/27-CONTEXT.md": {
+      "language": "markdown",
+      "size_bytes": 3689,
+      "lines": 72,
+      "last_modified": "2026-02-26T16:48:10.751Z"
+    },
+    ".planning/phases/27-task-scoped-context/27-RESEARCH.md": {
+      "language": "markdown",
+      "size_bytes": 21148,
+      "lines": 397,
+      "last_modified": "2026-02-26T16:53:58.933Z"
+    },
+    ".planning/phases/27-task-scoped-context/27-01-PLAN.md": {
+      "language": "markdown",
+      "size_bytes": 9057,
+      "lines": 201,
+      "last_modified": "2026-02-26T16:56:50.383Z"
+    },
+    ".planning/phases/27-task-scoped-context/27-02-PLAN.md": {
+      "language": "markdown",
+      "size_bytes": 11482,
+      "lines": 214,
+      "last_modified": "2026-02-26T16:57:55.635Z"
+    },
+    ".planning/phases/27-task-scoped-context/27-01-SUMMARY.md": {
+      "language": "markdown",
+      "size_bytes": 3879,
+      "lines": 103,
+      "last_modified": "2026-02-26T17:06:08.437Z"
+    },
+    ".planning/phases/27-task-scoped-context/27-02-SUMMARY.md": {
+      "language": "markdown",
+      "size_bytes": 4372,
+      "lines": 108,
+      "last_modified": "2026-02-26T17:21:52.102Z"
+    },
+    ".planning/phases/27-task-scoped-context/27-VERIFICATION.md": {
+      "language": "markdown",
+      "size_bytes": 7309,
+      "lines": 99,
+      "last_modified": "2026-02-26T17:30:35.382Z"
+    },
+    ".planning/phases/28-lifecycle-analysis/28-CONTEXT.md": {
+      "language": "markdown",
+      "size_bytes": 3710,
+      "lines": 71,
+      "last_modified": "2026-02-26T17:33:16.258Z"
+    },
+    ".planning/phases/28-lifecycle-analysis/28-RESEARCH.md": {
+      "language": "markdown",
+      "size_bytes": 30105,
+      "lines": 545,
+      "last_modified": "2026-02-26T17:37:55.016Z"
+    },
+    ".planning/phases/28-lifecycle-analysis/28-01-PLAN.md": {
+      "language": "markdown",
+      "size_bytes": 11795,
+      "lines": 195,
+      "last_modified": "2026-02-26T17:41:08.991Z"
+    },
+    ".planning/phases/28-lifecycle-analysis/28-02-PLAN.md": {
+      "language": "markdown",
+      "size_bytes": 13180,
+      "lines": 292,
+      "last_modified": "2026-02-26T17:42:14.140Z"
+    },
+    ".planning/phases/28-lifecycle-analysis/28-01-SUMMARY.md": {
+      "language": "markdown",
+      "size_bytes": 4270,
+      "lines": 99,
+      "last_modified": "2026-02-26T17:56:27.237Z"
+    },
+    "src/lib/lifecycle.js": {
+      "language": "javascript",
+      "size_bytes": 19089,
+      "lines": 569,
+      "last_modified": "2026-02-26T17:52:15.089Z"
+    },
+    ".planning/phases/28-lifecycle-analysis/28-02-SUMMARY.md": {
+      "language": "markdown",
+      "size_bytes": 5184,
+      "lines": 113,
+      "last_modified": "2026-02-26T18:06:00.471Z"
+    },
+    ".planning/phases/28-lifecycle-analysis/28-VERIFICATION.md": {
+      "language": "markdown",
+      "size_bytes": 9524,
+      "lines": 96,
+      "last_modified": "2026-02-26T18:12:03.156Z"
+    },
+    ".planning/phases/29-workflow-integration/29-CONTEXT.md": {
+      "language": "markdown",
+      "size_bytes": 2643,
+      "lines": 61,
+      "last_modified": "2026-02-26T19:01:18.338Z"
+    },
+    ".planning/phases/29-workflow-integration/29-RESEARCH.md": {
+      "language": "markdown",
+      "size_bytes": 20107,
+      "lines": 368,
+      "last_modified": "2026-02-26T19:04:00.018Z"
+    },
+    ".planning/INTENT.md": {
+      "language": "markdown",
+      "size_bytes": 5426,
+      "lines": 73,
+      "last_modified": "2026-02-26T20:13:56.081Z"
+    },
+    ".planning/MILESTONES.md": {
+      "language": "markdown",
+      "size_bytes": 7639,
+      "lines": 128,
+      "last_modified": "2026-02-26T20:09:34.229Z"
+    },
+    ".planning/PROJECT.md": {
+      "language": "markdown",
+      "size_bytes": 16020,
+      "lines": 203,
+      "last_modified": "2026-02-26T20:10:30.177Z"
+    },
+    ".planning/memory/bookmarks.json": {
+      "language": "json",
+      "size_bytes": 3082,
+      "lines": 162,
+      "last_modified": "2026-02-27T04:09:58.523Z"
+    },
+    ".planning/phases/29-workflow-integration/29-01-PLAN.md": {
+      "language": "markdown",
+      "size_bytes": 7541,
+      "lines": 156,
+      "last_modified": "2026-02-26T19:06:24.141Z"
+    },
+    ".planning/phases/29-workflow-integration/29-01-SUMMARY.md": {
+      "language": "markdown",
+      "size_bytes": 3436,
+      "lines": 95,
+      "last_modified": "2026-02-26T19:16:32.509Z"
+    },
+    ".planning/phases/29-workflow-integration/29-02-PLAN.md": {
+      "language": "markdown",
+      "size_bytes": 8877,
+      "lines": 184,
+      "last_modified": "2026-02-26T19:07:05.029Z"
+    },
+    ".planning/phases/29-workflow-integration/29-02-SUMMARY.md": {
+      "language": "markdown",
+      "size_bytes": 4330,
+      "lines": 108,
+      "last_modified": "2026-02-26T19:24:23.671Z"
+    },
+    ".planning/phases/29-workflow-integration/29-VERIFICATION.md": {
+      "language": "markdown",
+      "size_bytes": 7717,
+      "lines": 77,
+      "last_modified": "2026-02-26T19:28:12.525Z"
+    },
+    ".planning/phases/30-formatting-foundation-smart-output/30-01-PLAN.md": {
+      "language": "markdown",
+      "size_bytes": 10078,
+      "lines": 205,
+      "last_modified": "2026-02-26T22:09:44.964Z"
+    },
+    ".planning/phases/30-formatting-foundation-smart-output/30-01-SUMMARY.md": {
+      "language": "markdown",
+      "size_bytes": 4380,
+      "lines": 103,
+      "last_modified": "2026-02-26T22:19:25.627Z"
+    },
+    ".planning/phases/30-formatting-foundation-smart-output/30-02-PLAN.md": {
+      "language": "markdown",
+      "size_bytes": 12242,
+      "lines": 246,
+      "last_modified": "2026-02-26T22:10:46.627Z"
+    },
+    ".planning/phases/30-formatting-foundation-smart-output/30-02-SUMMARY.md": {
+      "language": "markdown",
+      "size_bytes": 5165,
+      "lines": 119,
+      "last_modified": "2026-02-26T22:27:01.789Z"
+    },
+    ".planning/phases/30-formatting-foundation-smart-output/30-CONTEXT.md": {
+      "language": "markdown",
+      "size_bytes": 6136,
+      "lines": 100,
+      "last_modified": "2026-02-26T22:01:19.799Z"
+    },
+    ".planning/phases/30-formatting-foundation-smart-output/30-VERIFICATION.md": {
+      "language": "markdown",
+      "size_bytes": 9775,
+      "lines": 107,
+      "last_modified": "2026-02-26T22:31:27.807Z"
+    },
+    ".planning/phases/31-quality-gates-format-testing/31-01-PLAN.md": {
+      "language": "markdown",
+      "size_bytes": 6742,
+      "lines": 145,
+      "last_modified": "2026-02-27T03:10:52.814Z"
+    },
+    ".planning/phases/31-quality-gates-format-testing/31-01-SUMMARY.md": {
+      "language": "markdown",
+      "size_bytes": 6586,
+      "lines": 132,
+      "last_modified": "2026-02-27T04:03:14.255Z"
+    },
+    ".planning/phases/31-quality-gates-format-testing/31-02-PLAN.md": {
+      "language": "markdown",
+      "size_bytes": 6149,
+      "lines": 152,
+      "last_modified": "2026-02-27T03:11:25.359Z"
+    },
+    ".planning/phases/31-quality-gates-format-testing/31-02-SUMMARY.md": {
+      "language": "markdown",
+      "size_bytes": 3651,
+      "lines": 101,
+      "last_modified": "2026-02-27T04:10:44.572Z"
+    },
+    ".planning/phases/31-quality-gates-format-testing/31-CONTEXT.md": {
+      "language": "markdown",
+      "size_bytes": 2479,
+      "lines": 59,
+      "last_modified": "2026-02-27T03:05:24.853Z"
+    },
+    ".planning/phases/32-init-state-command-renderers/32-01-PLAN.md": {
+      "language": "markdown",
+      "size_bytes": 6491,
+      "lines": 148,
+      "last_modified": "2026-02-27T04:20:08.889Z"
+    },
+    ".planning/phases/32-init-state-command-renderers/32-CONTEXT.md": {
+      "language": "markdown",
+      "size_bytes": 1042,
+      "lines": 20,
+      "last_modified": "2026-02-27T04:18:18.670Z"
+    },
+    ".planning/phases/33-verify-codebase-command-renderers/33-01-PLAN.md": {
+      "language": "markdown",
+      "size_bytes": 7295,
+      "lines": 160,
+      "last_modified": "2026-02-27T04:20:39.306Z"
+    },
+    ".planning/phases/33-verify-codebase-command-renderers/33-CONTEXT.md": {
+      "language": "markdown",
+      "size_bytes": 1046,
+      "lines": 21,
+      "last_modified": "2026-02-27T04:18:23.055Z"
+    },
+    ".planning/phases/34-feature-intent-command-renderers/34-01-PLAN.md": {
+      "language": "markdown",
+      "size_bytes": 8075,
+      "lines": 179,
+      "last_modified": "2026-02-27T04:21:12.945Z"
+    },
+    ".planning/phases/34-feature-intent-command-renderers/34-CONTEXT.md": {
+      "language": "markdown",
+      "size_bytes": 1065,
+      "lines": 22,
+      "last_modified": "2026-02-27T04:18:28.448Z"
+    },
+    ".planning/phases/35-workflow-output-tightening/35-01-PLAN.md": {
+      "language": "markdown",
+      "size_bytes": 3923,
+      "lines": 102,
+      "last_modified": "2026-02-27T04:21:35.060Z"
+    },
+    ".planning/phases/35-workflow-output-tightening/35-01-SUMMARY.md": {
+      "language": "markdown",
+      "size_bytes": 3178,
+      "lines": 87,
+      "last_modified": "2026-02-27T04:27:25.590Z"
+    },
+    ".planning/phases/35-workflow-output-tightening/35-02-PLAN.md": {
+      "language": "markdown",
+      "size_bytes": 5763,
+      "lines": 114,
+      "last_modified": "2026-02-27T04:22:02.485Z"
+    },
+    ".planning/phases/35-workflow-output-tightening/35-CONTEXT.md": {
+      "language": "markdown",
+      "size_bytes": 734,
+      "lines": 17,
+      "last_modified": "2026-02-27T04:18:33.392Z"
+    },
+    "bin/format.test.cjs": {
+      "language": "javascript",
+      "size_bytes": 14570,
+      "lines": 365,
+      "last_modified": "2026-02-27T04:06:43.047Z"
+    },
+    "docs/architecture.md": {
+      "language": "markdown",
+      "size_bytes": 13153,
+      "lines": 391,
+      "last_modified": "2026-02-26T19:50:20.500Z"
+    },
+    "docs/commands.md": {
+      "language": "markdown",
+      "size_bytes": 16125,
+      "lines": 636,
+      "last_modified": "2026-02-26T19:49:04.124Z"
+    },
+    "docs/expert-guide.md": {
+      "language": "markdown",
+      "size_bytes": 17668,
+      "lines": 615,
+      "last_modified": "2026-02-26T19:47:43.398Z"
+    },
+    "docs/getting-started.md": {
+      "language": "markdown",
+      "size_bytes": 6501,
+      "lines": 246,
+      "last_modified": "2026-02-26T19:46:04.017Z"
+    },
+    "src/lib/format.js": {
+      "language": "javascript",
+      "size_bytes": 14750,
+      "lines": 431,
+      "last_modified": "2026-02-26T22:18:35.697Z"
     }
   },
   "stats": {
-    "total_files": 131,
-    "total_lines": 64138,
+    "total_files": 217,
+    "total_lines": 86512,
     "languages_detected": 4
+  },
+  "conventions": {
+    "naming": {
+      "overall": {
+        "kebab-case": {
+          "pattern": "kebab-case",
+          "confidence": 75,
+          "file_count": 3,
+          "examples": [
+            "gsd-tools",
+            "codebase-intel",
+            "regex-cache"
+          ]
+        }
+      },
+      "by_directory": {
+        "src/lib": {
+          "dominant_pattern": "kebab-case",
+          "confidence": 100,
+          "file_count": 2,
+          "patterns": {
+            "kebab-case": {
+              "count": 2,
+              "examples": [
+                "codebase-intel",
+                "regex-cache"
+              ]
+            }
+          }
+        }
+      }
+    },
+    "file_organization": {
+      "structure_type": "nested",
+      "max_depth": 4,
+      "avg_depth": 2.6,
+      "test_placement": "co-located",
+      "patterns": [
+        {
+          "pattern": "nested structure",
+          "detail": "max depth 4, avg depth 2.6",
+          "confidence": 100
+        },
+        {
+          "pattern": "co-located tests",
+          "detail": "1 co-located, 0 in test dirs",
+          "confidence": 100
+        }
+      ]
+    },
+    "frameworks": [],
+    "extracted_at": "2026-02-26T20:07:26.457Z"
+  },
+  "dependencies": {
+    "forward": {
+      "bin/gsd-tools.test.cjs": [
+        "src/lib/output.js",
+        "src/lib/context.js",
+        "src/lib/helpers.js",
+        "src/lib/deps.js",
+        "src/lib/lifecycle.js"
+      ],
+      "src/commands/codebase.js": [
+        "src/lib/output.js",
+        "src/lib/codebase-intel.js",
+        "src/lib/format.js",
+        "src/lib/git.js",
+        "src/lib/conventions.js",
+        "src/lib/deps.js",
+        "src/lib/lifecycle.js",
+        "src/lib/frontmatter.js",
+        "src/lib/context.js"
+      ],
+      "src/commands/env.js": [
+        "src/lib/output.js"
+      ],
+      "src/commands/features.js": [
+        "src/lib/output.js",
+        "src/lib/config.js",
+        "src/lib/constants.js",
+        "src/commands/verify.js",
+        "src/lib/helpers.js",
+        "src/lib/regex-cache.js",
+        "src/lib/frontmatter.js",
+        "src/lib/git.js",
+        "src/lib/context.js",
+        "src/lib/codebase-intel.js",
+        "src/lib/deps.js",
+        "src/lib/format.js",
+        "src/commands/misc.js",
+        "src/commands/init.js"
+      ],
+      "src/commands/init.js": [
+        "src/lib/output.js",
+        "src/lib/format.js",
+        "src/lib/config.js",
+        "src/lib/helpers.js",
+        "src/lib/frontmatter.js",
+        "src/lib/git.js",
+        "src/commands/intent.js",
+        "src/commands/env.js",
+        "src/commands/codebase.js",
+        "src/commands/worktree.js",
+        "src/lib/codebase-intel.js"
+      ],
+      "src/commands/intent.js": [
+        "src/lib/output.js",
+        "src/lib/config.js",
+        "src/lib/git.js",
+        "src/lib/helpers.js",
+        "src/lib/frontmatter.js",
+        "src/lib/format.js"
+      ],
+      "src/commands/mcp.js": [
+        "src/lib/output.js"
+      ],
+      "src/commands/memory.js": [
+        "src/lib/output.js"
+      ],
+      "src/commands/misc.js": [
+        "src/lib/output.js",
+        "src/lib/config.js",
+        "src/lib/constants.js",
+        "src/lib/helpers.js",
+        "src/lib/frontmatter.js",
+        "src/lib/git.js"
+      ],
+      "src/commands/phase.js": [
+        "src/lib/output.js",
+        "src/lib/helpers.js",
+        "src/lib/frontmatter.js",
+        "src/lib/git.js"
+      ],
+      "src/commands/roadmap.js": [
+        "src/lib/output.js",
+        "src/lib/helpers.js",
+        "src/lib/frontmatter.js"
+      ],
+      "src/commands/state.js": [
+        "src/lib/output.js",
+        "src/lib/config.js",
+        "src/lib/helpers.js",
+        "src/lib/git.js",
+        "src/lib/format.js"
+      ],
+      "src/commands/verify.js": [
+        "src/lib/output.js",
+        "src/lib/helpers.js",
+        "src/lib/frontmatter.js",
+        "src/lib/git.js",
+        "src/lib/format.js",
+        "src/lib/config.js"
+      ],
+      "src/commands/worktree.js": [
+        "src/lib/output.js",
+        "src/lib/git.js",
+        "src/lib/config.js",
+        "src/lib/frontmatter.js"
+      ],
+      "src/index.js": [
+        "src/router.js"
+      ],
+      "src/lib/codebase-intel.js": [
+        "src/lib/output.js",
+        "src/lib/git.js",
+        "src/lib/helpers.js"
+      ],
+      "src/lib/config.js": [
+        "src/lib/constants.js",
+        "src/lib/output.js"
+      ],
+      "src/lib/context.js": [
+        "src/lib/output.js"
+      ],
+      "src/lib/git.js": [
+        "src/lib/output.js"
+      ],
+      "src/lib/helpers.js": [
+        "src/lib/output.js",
+        "src/lib/config.js",
+        "src/lib/constants.js",
+        "src/lib/regex-cache.js",
+        "src/lib/frontmatter.js"
+      ],
+      "src/router.js": [
+        "src/lib/constants.js",
+        "src/lib/output.js",
+        "src/commands/state.js",
+        "src/commands/roadmap.js",
+        "src/commands/phase.js",
+        "src/commands/verify.js",
+        "src/commands/init.js",
+        "src/commands/features.js",
+        "src/commands/misc.js",
+        "src/commands/memory.js",
+        "src/commands/intent.js",
+        "src/commands/env.js",
+        "src/commands/mcp.js",
+        "src/commands/worktree.js",
+        "src/commands/codebase.js",
+        "src/lib/git.js"
+      ],
+      "src/lib/conventions.js": [
+        "src/lib/codebase-intel.js"
+      ],
+      "src/lib/deps.js": [
+        "src/lib/output.js",
+        "src/lib/codebase-intel.js"
+      ],
+      "src/lib/lifecycle.js": [
+        "src/lib/output.js",
+        "src/lib/deps.js"
+      ],
+      "bin/format.test.cjs": [
+        "src/lib/format.js"
+      ]
+    },
+    "reverse": {
+      "src/lib/output.js": [
+        "bin/gsd-tools.test.cjs",
+        "src/commands/codebase.js",
+        "src/commands/env.js",
+        "src/commands/features.js",
+        "src/commands/init.js",
+        "src/commands/intent.js",
+        "src/commands/mcp.js",
+        "src/commands/memory.js",
+        "src/commands/misc.js",
+        "src/commands/phase.js",
+        "src/commands/roadmap.js",
+        "src/commands/state.js",
+        "src/commands/verify.js",
+        "src/commands/worktree.js",
+        "src/lib/codebase-intel.js",
+        "src/lib/config.js",
+        "src/lib/context.js",
+        "src/lib/git.js",
+        "src/lib/helpers.js",
+        "src/router.js",
+        "src/lib/deps.js",
+        "src/lib/lifecycle.js"
+      ],
+      "src/lib/context.js": [
+        "bin/gsd-tools.test.cjs",
+        "src/commands/codebase.js",
+        "src/commands/features.js"
+      ],
+      "src/lib/helpers.js": [
+        "bin/gsd-tools.test.cjs",
+        "src/commands/features.js",
+        "src/commands/init.js",
+        "src/commands/intent.js",
+        "src/commands/misc.js",
+        "src/commands/phase.js",
+        "src/commands/roadmap.js",
+        "src/commands/state.js",
+        "src/commands/verify.js",
+        "src/lib/codebase-intel.js"
+      ],
+      "src/lib/deps.js": [
+        "bin/gsd-tools.test.cjs",
+        "src/commands/codebase.js",
+        "src/commands/features.js",
+        "src/lib/lifecycle.js"
+      ],
+      "src/lib/lifecycle.js": [
+        "bin/gsd-tools.test.cjs",
+        "src/commands/codebase.js"
+      ],
+      "src/lib/codebase-intel.js": [
+        "src/commands/codebase.js",
+        "src/commands/features.js",
+        "src/commands/init.js",
+        "src/lib/conventions.js",
+        "src/lib/deps.js"
+      ],
+      "src/lib/format.js": [
+        "src/commands/codebase.js",
+        "src/commands/features.js",
+        "src/commands/init.js",
+        "src/commands/intent.js",
+        "src/commands/state.js",
+        "src/commands/verify.js",
+        "bin/format.test.cjs"
+      ],
+      "src/lib/git.js": [
+        "src/commands/codebase.js",
+        "src/commands/features.js",
+        "src/commands/init.js",
+        "src/commands/intent.js",
+        "src/commands/misc.js",
+        "src/commands/phase.js",
+        "src/commands/state.js",
+        "src/commands/verify.js",
+        "src/commands/worktree.js",
+        "src/lib/codebase-intel.js",
+        "src/router.js"
+      ],
+      "src/lib/conventions.js": [
+        "src/commands/codebase.js"
+      ],
+      "src/lib/frontmatter.js": [
+        "src/commands/codebase.js",
+        "src/commands/features.js",
+        "src/commands/init.js",
+        "src/commands/intent.js",
+        "src/commands/misc.js",
+        "src/commands/phase.js",
+        "src/commands/roadmap.js",
+        "src/commands/verify.js",
+        "src/commands/worktree.js",
+        "src/lib/helpers.js"
+      ],
+      "src/lib/config.js": [
+        "src/commands/features.js",
+        "src/commands/init.js",
+        "src/commands/intent.js",
+        "src/commands/misc.js",
+        "src/commands/state.js",
+        "src/commands/verify.js",
+        "src/commands/worktree.js",
+        "src/lib/helpers.js"
+      ],
+      "src/lib/constants.js": [
+        "src/commands/features.js",
+        "src/commands/misc.js",
+        "src/lib/config.js",
+        "src/lib/helpers.js",
+        "src/router.js"
+      ],
+      "src/commands/verify.js": [
+        "src/commands/features.js",
+        "src/router.js"
+      ],
+      "src/lib/regex-cache.js": [
+        "src/commands/features.js",
+        "src/lib/helpers.js"
+      ],
+      "src/commands/misc.js": [
+        "src/commands/features.js",
+        "src/router.js"
+      ],
+      "src/commands/init.js": [
+        "src/commands/features.js",
+        "src/router.js"
+      ],
+      "src/commands/intent.js": [
+        "src/commands/init.js",
+        "src/router.js"
+      ],
+      "src/commands/env.js": [
+        "src/commands/init.js",
+        "src/router.js"
+      ],
+      "src/commands/codebase.js": [
+        "src/commands/init.js",
+        "src/router.js"
+      ],
+      "src/commands/worktree.js": [
+        "src/commands/init.js",
+        "src/router.js"
+      ],
+      "src/router.js": [
+        "src/index.js"
+      ],
+      "src/commands/state.js": [
+        "src/router.js"
+      ],
+      "src/commands/roadmap.js": [
+        "src/router.js"
+      ],
+      "src/commands/phase.js": [
+        "src/router.js"
+      ],
+      "src/commands/features.js": [
+        "src/router.js"
+      ],
+      "src/commands/memory.js": [
+        "src/router.js"
+      ],
+      "src/commands/mcp.js": [
+        "src/router.js"
+      ]
+    },
+    "stats": {
+      "total_files_parsed": 32,
+      "total_edges": 111,
+      "languages_parsed": [
+        "javascript"
+      ],
+      "parse_errors": 0
+    },
+    "built_at": "2026-02-27T14:18:28.301Z"
   }
 }

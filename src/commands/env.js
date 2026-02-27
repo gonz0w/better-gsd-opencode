@@ -2,7 +2,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { execSync } = require('child_process');
+const { execFileSync } = require('child_process');
 const { output, error, debugLog } = require('../lib/output');
 
 // --- Language Manifest Patterns -----------------------------------------------
@@ -209,7 +209,8 @@ function checkBinary(binaryName, versionFlag) {
   const timeout = 3000;
 
   try {
-    const whichResult = execSync(`which ${binaryName}`, {
+    // Use execFileSync — avoids shell spawning overhead (~2ms per call)
+    const whichResult = execFileSync('which', [binaryName], {
       encoding: 'utf-8', timeout, stdio: 'pipe',
     }).trim();
 
@@ -218,7 +219,9 @@ function checkBinary(binaryName, versionFlag) {
       result.path = whichResult;
 
       try {
-        const versionOut = execSync(`${binaryName} ${versionFlag}`, {
+        // Parse versionFlag which may contain spaces (e.g., 'go version')
+        const flagArgs = versionFlag.split(/\s+/);
+        const versionOut = execFileSync(binaryName, flagArgs, {
           encoding: 'utf-8', timeout, stdio: 'pipe',
         }).trim();
 
@@ -510,7 +513,7 @@ function detectScripts(rootDir) {
   try {
     const mixPath = path.join(rootDir, 'mix.exs');
     if (fs.existsSync(mixPath)) {
-      const result = execSync('mix help --names', {
+      const result = execFileSync('mix', ['help', '--names'], {
         cwd: rootDir, encoding: 'utf-8', timeout: 3000, stdio: 'pipe',
       }).trim();
       if (result) {
@@ -829,13 +832,14 @@ function checkEnvManifestStaleness(cwd) {
   // Instead of doing a full scanManifests(cwd, 0) recursive walk,
   // just check if any known manifest/lockfile/version-manager files exist
   // that weren't in the original watched list (cheap existsSync checks).
-  const knownFiles = [
+  // Deduplicated set avoids redundant existsSync calls for shared filenames.
+  const knownFilesSet = new Set([
     ...LANG_MANIFESTS.map(m => m.file),
     ...PM_LOCKFILES.map(l => l.file),
     ...VERSION_MANAGERS.map(v => v.file),
-  ];
+  ]);
   const trackedSet = new Set(manifest.watched_files || []);
-  for (const file of knownFiles) {
+  for (const file of knownFilesSet) {
     if (!trackedSet.has(file) && fs.existsSync(path.join(cwd, file))) {
       // New file appeared that wasn't tracked
       changedFiles.push(file);

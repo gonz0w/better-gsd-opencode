@@ -1,61 +1,69 @@
 // ─── Frontmatter Parsing ─────────────────────────────────────────────────────
+// Custom YAML frontmatter parser optimized for GSD planning files.
+// Handles the subset of YAML used in PLAN.md, STATE.md, SUMMARY.md files.
+// Pre-compiled regex patterns for hot-path performance.
+
+// Pre-compiled patterns (compiled once at module load, reused across calls)
+const FM_DELIMITERS = /^---\n([\s\S]+?)\n---/;
+const FM_INDENT = /^(\s*)/;
+const FM_KEY_VALUE = /^(\s*)([a-zA-Z0-9_-]+):\s*(.*)/;
+
+/** Module-level frontmatter parse cache — keyed by content hash, avoids re-parsing */
+const _fmCache = new Map();
+const FM_CACHE_MAX = 100;
 
 function extractFrontmatter(content) {
+  if (!content || typeof content !== 'string') return {};
+  if (!content.startsWith('---\n')) return {};
+
+  // Check cache (use first 200 chars + length as cheap hash)
+  const cacheKey = content.length + ':' + content.slice(0, 200);
+  if (_fmCache.has(cacheKey)) {
+    return _fmCache.get(cacheKey);
+  }
+
   const frontmatter = {};
-  const match = content.match(/^---\n([\s\S]+?)\n---/);
+  const match = content.match(FM_DELIMITERS);
   if (!match) return frontmatter;
 
   const yaml = match[1];
   const lines = yaml.split('\n');
 
   // Stack to track nested objects: [{obj, key, indent}]
-  // obj = object to write to, key = current key collecting array items, indent = indentation level
   let stack = [{ obj: frontmatter, key: null, indent: -1 }];
 
   for (const line of lines) {
-    // Skip empty lines
     if (line.trim() === '') continue;
 
-    // Calculate indentation (number of leading spaces)
-    const indentMatch = line.match(/^(\s*)/);
+    const indentMatch = line.match(FM_INDENT);
     const indent = indentMatch ? indentMatch[1].length : 0;
 
-    // Pop stack back to appropriate level
     while (stack.length > 1 && indent <= stack[stack.length - 1].indent) {
       stack.pop();
     }
 
     const current = stack[stack.length - 1];
 
-    // Check for key: value pattern
-    const keyMatch = line.match(/^(\s*)([a-zA-Z0-9_-]+):\s*(.*)/);
+    const keyMatch = line.match(FM_KEY_VALUE);
     if (keyMatch) {
       const key = keyMatch[2];
       const value = keyMatch[3].trim();
 
       if (value === '' || value === '[') {
-        // Key with no value or opening bracket — could be nested object or array
-        // We'll determine based on next lines, for now create placeholder
         current.obj[key] = value === '[' ? [] : {};
         current.key = null;
-        // Push new context for potential nested content
         stack.push({ obj: current.obj[key], key: null, indent });
       } else if (value.startsWith('[') && value.endsWith(']')) {
-        // Inline array: key: [a, b, c]
         current.obj[key] = value.slice(1, -1).split(',').map(s => s.trim().replace(/^["']|["']$/g, '')).filter(Boolean);
         current.key = null;
       } else {
-        // Simple key: value
         current.obj[key] = value.replace(/^["']|["']$/g, '');
         current.key = null;
       }
     } else if (line.trim().startsWith('- ')) {
-      // Array item
       const itemValue = line.trim().slice(2).replace(/^["']|["']$/g, '');
 
-      // If current context is an empty object, convert to array
       if (typeof current.obj === 'object' && !Array.isArray(current.obj) && Object.keys(current.obj).length === 0) {
-        // Find the key in parent that points to this object and convert it
         const parent = stack.length > 1 ? stack[stack.length - 2] : null;
         if (parent) {
           for (const k of Object.keys(parent.obj)) {
@@ -71,6 +79,13 @@ function extractFrontmatter(content) {
       }
     }
   }
+
+  // Cache result (LRU eviction)
+  if (_fmCache.size >= FM_CACHE_MAX) {
+    const oldest = _fmCache.keys().next().value;
+    _fmCache.delete(oldest);
+  }
+  _fmCache.set(cacheKey, frontmatter);
 
   return frontmatter;
 }

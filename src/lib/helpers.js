@@ -3,6 +3,7 @@ const path = require('path');
 const { debugLog } = require('./output');
 const { loadConfig } = require('./config');
 const { MODEL_PROFILES } = require('./constants');
+const { cachedRegex, PHASE_DIR_NUMBER } = require('./regex-cache');
 
 // ─── File Helpers ────────────────────────────────────────────────────────────
 
@@ -102,7 +103,7 @@ function getPhaseTree(cwd) {
     const dirs = entries.filter(e => e.isDirectory()).map(e => e.name).sort();
 
     for (const dir of dirs) {
-      const dirMatch = dir.match(/^(\d+(?:\.\d+)?)-?(.*)/);
+      const dirMatch = dir.match(PHASE_DIR_NUMBER);
       const phaseNumber = dirMatch ? dirMatch[1] : dir;
       const normalized = normalizePhaseName(phaseNumber);
       const phaseName = dirMatch && dirMatch[2] ? dirMatch[2] : null;
@@ -169,7 +170,7 @@ function parseMustHavesBlock(content, blockName) {
 
   const yaml = fmMatch[1];
   // Find the block (e.g., "truths:", "artifacts:", "key_links:")
-  const blockPattern = new RegExp(`^\\s{4}${blockName}:\\s*$`, 'm');
+  const blockPattern = cachedRegex(`^\\s{4}${blockName}:\\s*$`, 'm');
   const blockStart = yaml.search(blockPattern);
   if (blockStart === -1) return [];
 
@@ -305,7 +306,7 @@ function searchPhaseInDir(baseDir, relBase, normalized) {
     const match = dirs.find(d => d.startsWith(normalized));
     if (!match) return null;
 
-    const dirMatch = match.match(/^(\d+(?:\.\d+)?)-?(.*)/);
+    const dirMatch = match.match(PHASE_DIR_NUMBER);
     const phaseNumber = dirMatch ? dirMatch[1] : normalized;
     const phaseName = dirMatch && dirMatch[2] ? dirMatch[2] : null;
     const phaseDir = path.join(baseDir, match);
@@ -403,7 +404,7 @@ function getRoadmapPhaseInternal(cwd, phaseNum) {
     const content = cachedReadFile(roadmapPath);
     if (!content) return null;
     const escapedPhase = phaseNum.toString().replace(/\./g, '\\.');
-    const phasePattern = new RegExp(`#{2,4}\\s*Phase\\s+${escapedPhase}:\\s*([^\\n]+)`, 'i');
+    const phasePattern = cachedRegex(`#{2,4}\\s*Phase\\s+${escapedPhase}:\\s*([^\\n]+)`, 'i');
     const headerMatch = content.match(phasePattern);
     if (!headerMatch) return null;
 
@@ -446,7 +447,23 @@ function generateSlugInternal(text) {
   return text.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
 }
 
+/** Module-level milestone info cache — computed once per invocation */
+let _milestoneCache = null;
+let _milestoneCwd = null;
+
 function getMilestoneInfo(cwd) {
+  // Return cached result if same cwd (single CLI invocation)
+  if (_milestoneCache && _milestoneCwd === cwd) {
+    return _milestoneCache;
+  }
+
+  const result = _getMilestoneInfoUncached(cwd);
+  _milestoneCache = result;
+  _milestoneCwd = cwd;
+  return result;
+}
+
+function _getMilestoneInfoUncached(cwd) {
   try {
     const roadmap = cachedReadFile(path.join(cwd, '.planning', 'ROADMAP.md'));
     if (!roadmap) return { version: 'v1.0', name: 'milestone', phaseRange: null };
@@ -486,7 +503,7 @@ function getMilestoneInfo(cwd) {
         version = 'v' + currentWorkMatch[1];
         name = currentWorkMatch[2].trim();
         // Try to find phase range from milestone list for this version
-        const listMatch = roadmap.match(new RegExp('v' + currentWorkMatch[1].replace('.', '\\.') + '[^\\n]*Phases?\\s+(\\d+)\\s*[-–]\\s*(\\d+)', 'i'));
+        const listMatch = roadmap.match(cachedRegex('v' + currentWorkMatch[1].replace('.', '\\.') + '[^\\n]*Phases?\\s+(\\d+)\\s*[-–]\\s*(\\d+)', 'i'));
         if (listMatch) phaseRange = { start: parseInt(listMatch[1]), end: parseInt(listMatch[2]) };
       }
     }
@@ -515,6 +532,12 @@ function getMilestoneInfo(cwd) {
     debugLog('milestone.info', 'read roadmap for milestone failed', e);
     return { version: 'v1.0', name: 'milestone', phaseRange: null };
   }
+}
+
+/** Invalidate milestone cache (call after writing ROADMAP.md) */
+function invalidateMilestoneCache() {
+  _milestoneCache = null;
+  _milestoneCwd = null;
 }
 
 // ─── Workflow Reference Parsing ──────────────────────────────────────────────
@@ -915,6 +938,7 @@ module.exports = {
   pathExistsInternal,
   generateSlugInternal,
   getMilestoneInfo,
+  invalidateMilestoneCache,
   extractAtReferences,
   parseIntentMd,
   generateIntentMd,

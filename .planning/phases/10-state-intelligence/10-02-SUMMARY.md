@@ -1,9 +1,10 @@
 ---
-phase: "10"
-plan: "02"
-name: "Pre-flight State Validation"
-one_liner: "Pre-flight state validation in execute-phase workflow with auto-fix, config gate, and 5 integration tests"
-dependency-graph:
+phase: 10-state-intelligence
+plan: 02
+subsystem: infra
+tags: [pre-flight-validation, execute-phase, config-gates, state-validation]
+
+# Dependency graph
   requires:
     - "cmdStateValidate from 10-01"
   provides:
@@ -27,12 +28,15 @@ key-files:
     - "src/commands/init.js"
     - "src/lib/constants.js"
     - "bin/gsd-tools.cjs"
-decisions:
-  - decision: "Read raw config.json for gates.* keys since loadConfig only returns CONFIG_SCHEMA keys"
-    rationale: "gates is a new namespace for execution control flags, not yet in CONFIG_SCHEMA; raw read is simpler than schema expansion"
-  - decision: "Pre-flight step placed between dependency check and plan discovery"
-    rationale: "Matches plan spec; validates state after deps confirmed but before any execution begins"
-metrics:
+key-decisions:
+  - "Read raw config.json for gates.* keys — new namespace, not yet in CONFIG_SCHEMA"
+  - "Pre-flight step placed between dependency check and plan discovery"
+
+patterns-established:
+  - "Two-pass validation pattern: fix first, then check remaining issues"
+  - "Config gate pattern: gates.* namespace for execution control flags"
+
+# Metrics
   duration: "4m 22s"
   tasks_completed: 2
   tasks_total: 2

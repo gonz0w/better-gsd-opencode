@@ -3,7 +3,7 @@
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
-const { execSync } = require('child_process');
+const { execSync, execFileSync } = require('child_process');
 const { output, error, debugLog } = require('../lib/output');
 const { execGit } = require('../lib/git');
 const { loadConfig } = require('../lib/config');
@@ -129,9 +129,10 @@ function parseWorktreeListPorcelain(porcelainOutput) {
  */
 function getDiskUsage(dirPath) {
   try {
-    const result = execSync(`du -sh "${dirPath}" 2>/dev/null`, {
+    const result = execFileSync('du', ['-sh', dirPath], {
       encoding: 'utf-8',
       timeout: 5000,
+      stdio: 'pipe',
     }).trim();
     // Output is like "123M\t/path" — extract size
     const match = result.match(/^([\d.]+[BKMGT]?)\s/);
@@ -146,12 +147,16 @@ function getDiskUsage(dirPath) {
  */
 function getAvailableDiskMB(dirPath) {
   try {
-    // Use df to get available space in 1K blocks
-    const result = execSync(`df -k "${dirPath}" 2>/dev/null | tail -1`, {
+    // Use df to get available space in 1K blocks (execFileSync avoids shell)
+    const result = execFileSync('df', ['-k', dirPath], {
       encoding: 'utf-8',
       timeout: 5000,
+      stdio: 'pipe',
     }).trim();
-    const parts = result.split(/\s+/);
+    // Get the last line (skip header)
+    const lines = result.split('\n');
+    const lastLine = lines[lines.length - 1];
+    const parts = lastLine.split(/\s+/);
     // df columns: Filesystem, 1K-blocks, Used, Available, Use%, Mounted
     const availKB = parseInt(parts[3], 10);
     return isNaN(availKB) ? null : Math.round(availKB / 1024);
@@ -165,9 +170,10 @@ function getAvailableDiskMB(dirPath) {
  */
 function getProjectSizeMB(cwd) {
   try {
-    const result = execSync(`du -sm "${cwd}" 2>/dev/null`, {
+    const result = execFileSync('du', ['-sm', cwd], {
       encoding: 'utf-8',
       timeout: 10000,
+      stdio: 'pipe',
     }).trim();
     const match = result.match(/^(\d+)/);
     return match ? parseInt(match[1], 10) : null;

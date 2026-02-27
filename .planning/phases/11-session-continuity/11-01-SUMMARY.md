@@ -1,9 +1,10 @@
 ---
-phase: "11"
-plan: "01"
-name: "Memory Store Infrastructure"
-one_liner: "Memory store CRUD commands for decisions, bookmarks, lessons, todos with sacred data protection"
-dependency-graph:
+phase: 11-session-continuity
+plan: 01
+subsystem: infra
+tags: [memory-store, crud, decisions, bookmarks, lessons, sacred-data]
+
+# Dependency graph
   requires: []
   provides:
     - "cmdMemoryWrite function"
@@ -27,14 +28,20 @@ key-files:
     - "src/lib/constants.js"
     - "bin/gsd-tools.cjs"
     - "bin/gsd-tools.test.cjs"
-decisions:
-  - decision: "Four separate JSON files (decisions.json, bookmarks.json, lessons.json, todos.json) instead of single store"
-    rationale: "Per CONTEXT.md — isolates concerns, enables smaller reads per query"
-  - decision: "Bookmarks trimmed to 20 entries max, newest first"
-    rationale: "Only recent bookmarks are useful for resume; older ones are noise"
-  - decision: "Decisions and lessons are sacred — never pruned by any operation"
-    rationale: "Per CONTEXT.md — decisions and lessons are kept in full detail permanently"
-metrics:
+key-decisions:
+  - "Four separate JSON files instead of single store — isolates concerns, enables smaller reads"
+  - "Bookmarks trimmed to 20 entries max, newest first"
+  - "Decisions and lessons are sacred — never pruned by any operation"
+
+patterns-established:
+  - "JSON file-based memory stores with store-specific retention rules"
+  - "Sacred data pattern: decisions and lessons never pruned"
+
+requirements-completed:
+  - MEMO-01
+  - MEMO-05
+
+# Metrics
   duration: "5m"
   completed: "2026-02-24"
   tasks_completed: 2

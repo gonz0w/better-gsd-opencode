@@ -1,9 +1,10 @@
 ---
-phase: "11"
-plan: "02"
-name: "Init Memory Command"
-one_liner: "Workflow-aware memory digest with codebase knowledge surfacing and priority trimming"
-dependency-graph:
+phase: 11-session-continuity
+plan: 02
+subsystem: infra
+tags: [init-memory, workflow-aware, priority-trimming, context-injection]
+
+# Dependency graph
   requires:
     - "cmdMemoryRead from 11-01"
   provides:
@@ -25,14 +26,16 @@ key-files:
     - "src/lib/constants.js"
     - "bin/gsd-tools.cjs"
     - "bin/gsd-tools.test.cjs"
-decisions:
-  - decision: "Codebase doc selection varies by workflow type"
-    rationale: "Different workflows need different context — execution needs conventions, planning needs architecture"
-  - decision: "Priority trimming hierarchy: conventions → lessons → decisions → todos → position"
-    rationale: "Per CONTEXT.md — position is always present, conventions are expendable since re-readable"
-  - decision: "First 50 lines of codebase docs loaded (not full files)"
-    rationale: "Enough for key patterns while staying within token budget"
-metrics:
+key-decisions:
+  - "Codebase doc selection varies by workflow type — different workflows need different context"
+  - "Priority trimming hierarchy: conventions → lessons → decisions → todos → position"
+  - "First 50 lines of codebase docs loaded (not full files) — within token budget"
+
+patterns-established:
+  - "Workflow-aware content selection based on --workflow flag"
+  - "Priority-based content trimming (position always preserved)"
+
+# Metrics
   duration: "5m"
   completed: "2026-02-24"
   tasks_completed: 2

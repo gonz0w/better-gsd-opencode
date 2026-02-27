@@ -1,9 +1,10 @@
 ---
-phase: "11"
-plan: "03"
-name: "Bookmark Auto-save and Memory Compaction"
-one_liner: "Bookmark auto-save in workflows plus deterministic memory compaction with sacred data protection"
-dependency-graph:
+phase: 11-session-continuity
+plan: 03
+subsystem: infra
+tags: [bookmark-autosave, memory-compaction, sacred-data, workflow-integration]
+
+# Dependency graph
   requires:
     - "cmdMemoryWrite from 11-01"
   provides:
@@ -31,14 +32,16 @@ key-files:
     - "workflows/pause-work.md"
     - "bin/gsd-tools.cjs"
     - "bin/gsd-tools.test.cjs"
-decisions:
-  - decision: "Compaction replaces old entries with summary lines, not deletion"
-    rationale: "Preserves historical record while reducing size"
-  - decision: "Threshold warning on write, not auto-compact"
-    rationale: "Keep writes fast and predictable; let workflows decide when to compact"
-  - decision: "Bookmark saves are single CLI calls after task commits"
-    rationale: "Per CONTEXT.md — lightweight append, not full file rewrite"
-metrics:
+key-decisions:
+  - "Compaction replaces old entries with summary lines, not deletion — preserves history"
+  - "Threshold warning on write, not auto-compact — keep writes fast and predictable"
+  - "Bookmark saves are single CLI calls after task commits — lightweight append"
+
+patterns-established:
+  - "Summary-line compaction: one summary per old entry"
+  - "Threshold-based warning on writes (workflow decides when to compact)"
+
+# Metrics
   duration: "5m"
   completed: "2026-02-24"
   tasks_completed: 2

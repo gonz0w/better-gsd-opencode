@@ -1,9 +1,10 @@
 ---
-phase: "10"
-plan: "01"
-name: "State Validate Command"
-one_liner: "state validate command with 5 drift-detection checks and auto-fix for plan count mismatches"
-dependency-graph:
+phase: 10-state-intelligence
+plan: 01
+subsystem: infra
+tags: [state-validation, drift-detection, auto-fix, state-management]
+
+# Dependency graph
   requires: []
   provides:
     - "cmdStateValidate function"
@@ -25,14 +26,23 @@ key-files:
     - "src/router.js"
     - "src/lib/constants.js"
     - "bin/gsd-tools.cjs"
-decisions:
-  - decision: "Issue structure uses { type, location, expected, actual, severity } per CONTEXT.md"
-    rationale: "Consistent, machine-readable output for all 7 issue types"
-  - decision: "Auto-fix only corrects plan count drift, not timestamps or position"
-    rationale: "Per CONTEXT.md guidance — timestamps and position need human judgment"
-  - decision: "Blocker staleness uses total completed plan count, not per-blocker git history"
-    rationale: "Simpler implementation, avoids git log parsing per blocker line"
-metrics:
+key-decisions:
+  - "Issue structure uses { type, location, expected, actual, severity } — consistent, machine-readable"
+  - "Auto-fix only corrects plan count drift, not timestamps or position — those need human judgment"
+  - "Blocker staleness uses total completed plan count, not per-blocker git history"
+
+patterns-established:
+  - "Multi-check validation engine with structured issue output"
+  - "Advisory validation pattern: warn and suggest fixes, never block workflows"
+
+requirements-completed:
+  - SVAL-01
+  - SVAL-02
+  - SVAL-03
+  - SVAL-04
+  - SVAL-05
+
+# Metrics
   duration: "5m 45s"
   completed: "2026-02-22"
   tasks_completed: 2
