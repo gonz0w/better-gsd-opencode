@@ -11,7 +11,42 @@ const {
   getGitInfo,
   getChangedFilesSinceCommit,
 } = require('../lib/codebase-intel');
+const { banner, sectionHeader, formatTable, summaryLine, color, SYMBOLS, box, relativeTime } = require('../lib/format');
 
+
+// ─── Codebase Analyze Formatter ─────────────────────────────────────────────
+
+function formatCodebaseAnalyze(result) {
+  const lines = [];
+  lines.push(banner('Codebase Analyze'));
+  lines.push('');
+
+  if (!result.success) {
+    lines.push(box('Analysis failed', 'error'));
+    return lines.join('\n');
+  }
+
+  const mode = result.mode || 'full';
+  lines.push('  ' + color.green(SYMBOLS.check + ' Analysis complete') + '  ' + color.dim('(' + mode + ')'));
+  lines.push('');
+
+  const filesAnalyzed = result.files_analyzed || 0;
+  const totalFiles = result.total_files || 0;
+  lines.push('  ' + filesAnalyzed + ' files analyzed, ' + totalFiles + ' total');
+
+  if (result.languages && result.languages.length > 0) {
+    lines.push('  ' + result.languages.join(', '));
+  }
+
+  if (result.duration_ms !== undefined) {
+    lines.push('  ' + color.dim(result.duration_ms + 'ms'));
+  }
+  lines.push('');
+
+  lines.push(summaryLine('Analysis complete (' + mode + ')'));
+
+  return lines.join('\n');
+}
 
 /**
  * cmdCodebaseAnalyze — Run codebase analysis (full or incremental).
@@ -51,7 +86,7 @@ function cmdCodebaseAnalyze(cwd, args, raw) {
           languages: Object.keys(previousIntel.languages),
           duration_ms: durationMs,
           path: '.planning/codebase/codebase-intel.json',
-        }, raw);
+        }, { formatter: formatCodebaseAnalyze });
         return;
       }
       // If stale but no changed_files (commit_missing, etc.), do full analysis
@@ -91,9 +126,54 @@ function cmdCodebaseAnalyze(cwd, args, raw) {
     languages: Object.keys(intel.languages),
     duration_ms: durationMs,
     path: '.planning/codebase/codebase-intel.json',
-  }, raw);
+  }, { formatter: formatCodebaseAnalyze });
 }
 
+
+// ─── Codebase Status Formatter ──────────────────────────────────────────────
+
+function formatCodebaseStatus(result) {
+  const lines = [];
+  lines.push(banner('Codebase'));
+  lines.push('');
+
+  if (!result.exists) {
+    lines.push(box('No codebase intel. Run: codebase analyze', 'warning'));
+    return lines.join('\n');
+  }
+
+  if (result.stale) {
+    lines.push(box('Intel is stale: ' + (result.reason || 'unknown'), 'warning'));
+    lines.push('');
+    if (result.changed_files && result.changed_files.length > 0) {
+      lines.push('  ' + color.yellow(result.changed_files.length + ' files changed'));
+    }
+    if (result.changed_groups) {
+      const g = result.changed_groups;
+      const parts = [];
+      if (g.added && g.added.length > 0) parts.push(color.green(g.added.length + ' added'));
+      if (g.modified && g.modified.length > 0) parts.push(color.yellow(g.modified.length + ' modified'));
+      if (g.deleted && g.deleted.length > 0) parts.push(color.red(g.deleted.length + ' deleted'));
+      if (parts.length > 0) {
+        lines.push('  ' + parts.join(', '));
+      }
+    }
+    lines.push('');
+    lines.push(summaryLine('Stale \u2014 run codebase analyze'));
+  } else {
+    lines.push('  ' + color.green(SYMBOLS.check + ' Intel is fresh'));
+    if (result.generated_at) {
+      lines.push('  Generated ' + relativeTime(result.generated_at));
+    }
+    const fileCount = result.total_files || 0;
+    const langCount = result.languages ? result.languages.length : 0;
+    lines.push('  ' + fileCount + ' files, ' + langCount + ' languages');
+    lines.push('');
+    lines.push(summaryLine('Fresh'));
+  }
+
+  return lines.join('\n');
+}
 
 /**
  * cmdCodebaseStatus — Report codebase intel status (exists, fresh/stale, details).
@@ -109,7 +189,7 @@ function cmdCodebaseStatus(cwd, args, raw) {
     output({
       exists: false,
       message: 'No codebase intel. Run: codebase analyze',
-    }, raw);
+    }, { formatter: formatCodebaseStatus });
     return;
   }
 
@@ -132,7 +212,7 @@ function cmdCodebaseStatus(cwd, args, raw) {
       intel_commit: intel.git_commit_hash,
       current_commit: gitInfo.commit_hash,
       generated_at: intel.generated_at,
-    }, raw);
+    }, { formatter: formatCodebaseStatus });
   } else {
     output({
       exists: true,
@@ -143,7 +223,7 @@ function cmdCodebaseStatus(cwd, args, raw) {
       total_lines: intel.stats.total_lines,
       languages: Object.keys(intel.languages),
       languages_detected: intel.stats.languages_detected,
-    }, raw);
+    }, { formatter: formatCodebaseStatus });
   }
 }
 
