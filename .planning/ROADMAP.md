@@ -9,6 +9,7 @@
 - ✅ **v4.0 Environment & Execution Intelligence** — Phases 18-22 (shipped 2026-02-25)
 - ✅ **v5.0 Codebase Intelligence** — Phases 23-29 (shipped 2026-02-26)
 - ✅ **v6.0 UX & Developer Experience** — Phases 30-36 (shipped 2026-02-27)
+- **v7.0 Agent Orchestration & Efficiency** — Phases 37-42
 
 ## Phases
 
@@ -104,6 +105,85 @@ Full details: `.planning/milestones/v6.0-ROADMAP.md`
 
 </details>
 
+<details>
+<summary>v7.0 Agent Orchestration & Efficiency (Phases 37-42)</summary>
+
+### Phase 37: Foundation & Safety Net
+
+**Goal:** Establish safety net (contract tests, enhanced git, pre-commit checks) that catches regressions before feature work touches output.
+
+**Requirements:** SAFE-01, SAFE-02, GIT-01, GIT-02
+
+**Success Criteria:**
+1. Snapshot contract tests exist for every `init` and `state` JSON output field — renaming a field fails the test suite
+2. Enhanced `git.js` exposes structured log, diff summary, blame, and branch info via CLI commands
+3. Pre-commit checks detect dirty tree, active rebase, detached HEAD, and shallow clones before git-write operations
+4. All existing 574 tests continue passing with zero regressions
+
+### Phase 38: AST Intelligence & Repo Map
+
+**Goal:** CLI produces compact code intelligence (signatures, repo map, complexity) that agents consume instead of full file contents.
+
+**Requirements:** AST-01, AST-02, AST-03, AST-04, CTX-01
+
+**Success Criteria:**
+1. `codebase ast` extracts function signatures from JS/TS files via acorn parser
+2. `codebase exports` produces export surface analysis for any JS/TS module
+3. Per-function/module complexity metrics available for task classification
+4. Non-JS files fall back to regex-based extraction via detector registry without errors
+5. Repository map generates ~1k token compact codebase summary from AST signatures
+
+### Phase 39: Orchestration Intelligence
+
+**Goal:** System auto-classifies task complexity and routes to right agent/model without manual selection.
+
+**Requirements:** ORCH-01, ORCH-02, ORCH-03
+
+**Success Criteria:**
+1. Every plan task gets a 1-5 complexity score based on file count, cross-module reach, and test requirements
+2. `init execute-phase` includes recommended agent type and model tier based on task classification
+3. Orchestrator auto-selects single vs parallel vs team mode from plan structure
+4. Routing decisions are visible in CLI output for transparency
+
+### Phase 40: Context Efficiency
+
+**Goal:** Agent context consumption drops 40-60% via compact serialization, context scoping, and task-scoped injection.
+
+**Requirements:** CTX-02, CTX-03, CTX-04
+
+**Success Criteria:**
+1. Each agent type declares required context via manifest; system provides only declared context at spawn
+2. Compact serialization format reduces plan state tokens by 70-80% and dependency graphs by 50-60%
+3. Task-scoped file injection loads only task-relevant files using dependency graph and relevance scoring
+4. Context reduction validated against quality baselines — no loss of agent decision quality
+
+### Phase 41: Agent Quality Gates
+
+**Goal:** Every execution has a post-review quality gate — separate reviewer checks against conventions.
+
+**Requirements:** QUAL-01, QUAL-02, QUAL-03
+
+**Success Criteria:**
+1. `gsd-reviewer` agent reviews code changes against project CONVENTIONS.md with fresh context
+2. Commits are tagged with agent type in metadata for attribution and observability
+3. Verification pipeline includes post-execution review step via gsd-reviewer
+4. Review findings are surfaced in plan SUMMARY.md
+
+### Phase 42: Integration & Validation
+
+**Goal:** All v7.0 features work end-to-end with measured performance and no canary regressions.
+
+**Requirements:** (validates all prior phases)
+
+**Success Criteria:**
+1. Full planning→execution→verification cycle on canary project succeeds
+2. Measurable token savings (>=30%) vs v6.0 baselines
+3. All tests pass (existing + new contract + new feature tests)
+4. No output format regressions detected by contract tests
+5. Bundle remains within 1000KB budget
+
+</details>
+
 ## Progress
 
 | Phase | Milestone | Plans | Status | Completed |
@@ -115,3 +195,4 @@ Full details: `.planning/milestones/v6.0-ROADMAP.md`
 | 18-22 | v4.0 | 13/13 | Complete | 2026-02-25 |
 | 23-29 | v5.0 | 14/14 | Complete | 2026-02-26 |
 | 30-36 | v6.0 | 11/11 | Complete | 2026-02-27 |
+| 37-42 | v7.0 | 0/? | Not started | — |

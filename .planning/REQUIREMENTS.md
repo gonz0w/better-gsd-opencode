@@ -89,30 +89,30 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status | Test Command |
 |-------------|-------|--------|--------------|
-| SAFE-01 | Pending | Pending | npm test -- --grep contract |
-| SAFE-02 | Pending | Pending | npm test -- --grep safety |
-| AST-01 | Pending | Pending | npm test -- --grep ast |
-| AST-02 | Pending | Pending | npm test -- --grep export |
-| AST-03 | Pending | Pending | npm test -- --grep complexity |
-| AST-04 | Pending | Pending | npm test -- --grep registry |
-| CTX-01 | Pending | Pending | npm test -- --grep repomap |
-| CTX-02 | Pending | Pending | npm test -- --grep manifest |
-| CTX-03 | Pending | Pending | npm test -- --grep compact |
-| CTX-04 | Pending | Pending | npm test -- --grep injection |
-| ORCH-01 | Pending | Pending | npm test -- --grep classify |
-| ORCH-02 | Pending | Pending | npm test -- --grep routing |
-| ORCH-03 | Pending | Pending | npm test -- --grep mode |
-| QUAL-01 | Pending | Pending | npm test -- --grep reviewer |
-| QUAL-02 | Pending | Pending | npm test -- --grep attribution |
-| QUAL-03 | Pending | Pending | npm test -- --grep verification |
-| GIT-01 | Pending | Pending | npm test -- --grep git |
-| GIT-02 | Pending | Pending | npm test -- --grep precommit |
+| SAFE-01 | Phase 37 | Pending | npm test -- --grep contract |
+| SAFE-02 | Phase 37 | Pending | npm test -- --grep safety |
+| GIT-01 | Phase 37 | Pending | npm test -- --grep git |
+| GIT-02 | Phase 37 | Pending | npm test -- --grep precommit |
+| AST-01 | Phase 38 | Pending | npm test -- --grep ast |
+| AST-02 | Phase 38 | Pending | npm test -- --grep export |
+| AST-03 | Phase 38 | Pending | npm test -- --grep complexity |
+| AST-04 | Phase 38 | Pending | npm test -- --grep registry |
+| CTX-01 | Phase 38 | Pending | npm test -- --grep repomap |
+| ORCH-01 | Phase 39 | Pending | npm test -- --grep classify |
+| ORCH-02 | Phase 39 | Pending | npm test -- --grep routing |
+| ORCH-03 | Phase 39 | Pending | npm test -- --grep mode |
+| CTX-02 | Phase 40 | Pending | npm test -- --grep manifest |
+| CTX-03 | Phase 40 | Pending | npm test -- --grep compact |
+| CTX-04 | Phase 40 | Pending | npm test -- --grep injection |
+| QUAL-01 | Phase 41 | Pending | npm test -- --grep reviewer |
+| QUAL-02 | Phase 41 | Pending | npm test -- --grep attribution |
+| QUAL-03 | Phase 41 | Pending | npm test -- --grep verification |
 
 **Coverage:**
 - v7.0 requirements: 18 total
-- Mapped to phases: 0 (pending roadmap)
-- Unmapped: 18
+- Mapped to phases: 18
+- Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-02-26*
-*Last updated: 2026-02-26 after initial definition*
+*Last updated: 2026-02-26 after roadmap creation*
