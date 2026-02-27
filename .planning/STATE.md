@@ -10,14 +10,14 @@ See: .planning/PROJECT.md (updated 2026-02-26)
 ## Current Position
 
 Phase: 37 — Foundation & Safety Net
-Plan: 1 of 2 complete
-Status: Executing
-Last activity: 2026-02-27 — Completed 37-01 (git intelligence + pre-commit checks)
+Plan: 2 of 2 complete
+Status: Phase complete
+Last activity: 2026-02-27 — Completed 37-02 (contract tests + profiler)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 85 (across v1.0-v6.0)
+- Total plans completed: 87 (85 across v1.0-v6.0 + 2 in v7.0)
 - Average duration: ~15 min/plan
 - Total execution time: ~21 hours
 
@@ -41,6 +41,8 @@ All v1.0-v6.0 decisions recorded in PROJECT.md Key Decisions table with outcomes
 
 - Phase 37-01: Pre-commit checks run all checks before reporting (agents see all failures in one pass)
 - Phase 37-01: Exit code 2 for pre-commit blocks vs 1 for general errors
+- Phase 37-02: Hybrid snapshot strategy — full snapshots for init-phase-op/state-read, field-level contracts for others
+- Phase 37-02: Profiler uses process exit hook to capture timing after output() calls process.exit()
 
 ### Pending Todos
 
@@ -53,5 +55,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-02-27
-Stopped at: Completed 37-01-PLAN.md (git intelligence + pre-commit checks)
+Stopped at: Completed 37-02-PLAN.md (contract tests + profiler) — Phase 37 complete
 Resume file: None

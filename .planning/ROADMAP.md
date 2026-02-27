@@ -120,10 +120,10 @@ Full details: `.planning/milestones/v6.0-ROADMAP.md`
 3. Pre-commit checks detect dirty tree, active rebase, detached HEAD, and shallow clones before git-write operations
 4. All existing 574 tests continue passing with zero regressions
 
-**Plans:** 1/2 plans executed
+**Plans:** 2/2 plans executed
 Plans:
-- [ ] 37-01-PLAN.md — Git intelligence (enhanced git.js, CLI commands, pre-commit checks)
-- [ ] 37-02-PLAN.md — Safety net (contract tests, performance profiler)
+- [x] 37-01-PLAN.md — Git intelligence (enhanced git.js, CLI commands, pre-commit checks)
+- [x] 37-02-PLAN.md — Safety net (contract tests, performance profiler)
 
 ### Phase 38: AST Intelligence & Repo Map
 
@@ -200,4 +200,4 @@ Plans:
 | 18-22 | v4.0 | 13/13 | Complete | 2026-02-25 |
 | 23-29 | v5.0 | 14/14 | Complete | 2026-02-26 |
 | 30-36 | v6.0 | 11/11 | Complete | 2026-02-27 |
-| 37-42 | v7.0 | 0/? | Not started | — |
+| 37-42 | v7.0 | 2/? | In progress | — |

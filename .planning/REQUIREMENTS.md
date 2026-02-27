@@ -9,8 +9,8 @@ Requirements for milestone v7.0 Agent Orchestration & Efficiency. Each maps to r
 
 ### Foundation & Safety
 
-- [ ] **SAFE-01**: CLI JSON output has consumer contract tests (snapshot-based) covering all init and state commands
-- [ ] **SAFE-02**: Pre-commit safety checks detect dirty tree, rebase in progress, detached HEAD before git-write operations
+- [x] **SAFE-01**: CLI JSON output has consumer contract tests (snapshot-based) covering all init and state commands
+- [x] **SAFE-02**: Pre-commit safety checks detect dirty tree, rebase in progress, detached HEAD before git-write operations
 
 ### AST Intelligence
 
@@ -89,8 +89,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status | Test Command |
 |-------------|-------|--------|--------------|
-| SAFE-01 | Phase 37 | Pending | npm test -- --grep contract |
-| SAFE-02 | Phase 37 | Pending | npm test -- --grep safety |
+| SAFE-01 | Phase 37 | Complete | npm test -- --grep contract |
+| SAFE-02 | Phase 37 | Complete | npm test -- --grep safety |
 | GIT-01 | Phase 37 | Complete | npm test -- --grep git |
 | GIT-02 | Phase 37 | Complete | npm test -- --grep precommit |
 | AST-01 | Phase 38 | Pending | npm test -- --grep ast |
