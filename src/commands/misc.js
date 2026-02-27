@@ -6,7 +6,7 @@ const { execSync } = require('child_process');
 const { output, error, debugLog } = require('../lib/output');
 const { loadConfig, isGitIgnored } = require('../lib/config');
 const { MODEL_PROFILES, CONFIG_SCHEMA } = require('../lib/constants');
-const { safeReadFile, normalizePhaseName, findPhaseInternal, generateSlugInternal, getArchivedPhaseDirs, getMilestoneInfo, getPhaseTree, cachedReaddirSync } = require('../lib/helpers');
+const { safeReadFile, cachedReadFile, normalizePhaseName, findPhaseInternal, generateSlugInternal, getArchivedPhaseDirs, getMilestoneInfo, getPhaseTree, cachedReaddirSync } = require('../lib/helpers');
 const { extractFrontmatter, reconstructFrontmatter, spliceFrontmatter } = require('../lib/frontmatter');
 const { execGit } = require('../lib/git');
 
@@ -363,7 +363,8 @@ function cmdHistoryDigest(cwd, options, raw) {
 
       for (const summary of summaries) {
         try {
-          const content = fs.readFileSync(path.join(dirPath, summary), 'utf-8');
+          const content = cachedReadFile(path.join(dirPath, summary));
+          if (!content) continue;
           const fm = extractFrontmatter(content);
           
           const phaseNum = fm.phase || dir.split('-')[0];
@@ -511,7 +512,81 @@ function cmdFindPhase(cwd, phase, raw) {
   }
 }
 
-function cmdCommit(cwd, message, files, raw, amend) {
+// ─── Pre-commit Checks ──────────────────────────────────────────────────────
+
+/**
+ * Validates repo state before committing. Runs ALL checks before reporting.
+ * @param {string} cwd - Working directory
+ * @param {boolean} force - If true, skip checks
+ * @returns {{ passed: boolean, failures: Array<{ check: string, message: string, fix: string }> }}
+ */
+function preCommitChecks(cwd, force) {
+  if (force) return { passed: true, failures: [] };
+
+  const failures = [];
+
+  // 1. Shallow clone check
+  const shallowResult = execGit(cwd, ['rev-parse', '--is-shallow-repository']);
+  if (shallowResult.exitCode === 0 && shallowResult.stdout === 'true') {
+    failures.push({
+      check: 'shallow_clone',
+      message: 'Shallow clone detected.',
+      fix: 'git fetch --unshallow',
+    });
+  }
+
+  // 2. Detached HEAD check
+  const symbolicResult = execGit(cwd, ['symbolic-ref', '-q', 'HEAD']);
+  if (symbolicResult.exitCode !== 0) {
+    failures.push({
+      check: 'detached_head',
+      message: 'Detached HEAD.',
+      fix: 'git checkout <branch>',
+    });
+  }
+
+  // 3. Active rebase check
+  let gitDir = cwd;
+  try {
+    const gitDirResult = execGit(cwd, ['rev-parse', '--git-dir']);
+    if (gitDirResult.exitCode === 0) {
+      gitDir = path.resolve(cwd, gitDirResult.stdout);
+    }
+  } catch (e) {
+    debugLog('preCommitChecks', 'git-dir resolution failed', e);
+  }
+  if (fs.existsSync(path.join(gitDir, 'rebase-merge')) || fs.existsSync(path.join(gitDir, 'rebase-apply'))) {
+    failures.push({
+      check: 'active_rebase',
+      message: 'Rebase in progress.',
+      fix: 'git rebase --continue or git rebase --abort',
+    });
+  }
+
+  // 4. Dirty working tree (files outside .planning/)
+  const statusResult = execGit(cwd, ['status', '--porcelain']);
+  if (statusResult.exitCode === 0 && statusResult.stdout) {
+    const dirtyNonPlanning = statusResult.stdout.split('\n').filter(line => {
+      if (!line.trim()) return false;
+      // The porcelain format has 2 status chars + space + path
+      const filePath = line.slice(3).trim();
+      // Handle renamed files: "R  old -> new"
+      const actualPath = filePath.includes(' -> ') ? filePath.split(' -> ')[1] : filePath;
+      return !actualPath.startsWith('.planning/') && !actualPath.startsWith('.planning\\');
+    });
+    if (dirtyNonPlanning.length > 0) {
+      failures.push({
+        check: 'dirty_tree',
+        message: `Dirty working tree (${dirtyNonPlanning.length} files).`,
+        fix: 'git stash or commit changes first',
+      });
+    }
+  }
+
+  return { passed: failures.length === 0, failures };
+}
+
+function cmdCommit(cwd, message, files, raw, amend, force) {
   if (!message && !amend) {
     error('commit message required');
   }
@@ -529,6 +604,15 @@ function cmdCommit(cwd, message, files, raw, amend) {
   if (isGitIgnored(cwd, '.planning')) {
     const result = { committed: false, hash: null, reason: 'skipped_gitignored' };
     output(result, raw, 'skipped');
+    return;
+  }
+
+  // Pre-commit repo-state validation
+  const checks = preCommitChecks(cwd, force);
+  if (!checks.passed) {
+    process.exitCode = 2;
+    const result = { committed: false, hash: null, reason: 'pre_commit_blocked', failures: checks.failures };
+    output(result, raw, 'blocked');
     return;
   }
 
@@ -1411,6 +1495,7 @@ module.exports = {
   cmdHistoryDigest,
   cmdResolveModel,
   cmdFindPhase,
+  preCommitChecks,
   cmdCommit,
   cmdVerifySummary,
   cmdTemplateSelect,

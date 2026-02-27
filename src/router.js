@@ -22,6 +22,7 @@ function lazyEnv() { return _modules.env || (_modules.env = require('./commands/
 function lazyMcp() { return _modules.mcp || (_modules.mcp = require('./commands/mcp')); }
 function lazyWorktree() { return _modules.worktree || (_modules.worktree = require('./commands/worktree')); }
 function lazyCodebase() { return _modules.codebase || (_modules.codebase = require('./commands/codebase')); }
+function lazyGit() { return _modules.git || (_modules.git = require('./lib/git')); }
 
 
 async function main() {
@@ -85,7 +86,7 @@ async function main() {
   const cwd = process.cwd();
 
   if (!command) {
-    error('Usage: gsd-tools <command> [args] [--pretty] [--verbose]\nCommands: assertions, codebase, codebase-impact, commit, config-ensure-section, config-get, config-migrate, config-set, context-budget, current-timestamp, env, extract-sections, find-phase, frontmatter, generate-slug, history-digest, init, intent, list-todos, mcp, mcp-profile, memory, milestone, phase, phase-plan-index, phases, progress, quick-summary, requirements, resolve-model, roadmap, rollback-info, scaffold, search-decisions, search-lessons, session-diff, state, state-snapshot, summary-extract, template, test-coverage, test-run, todo, token-budget, trace-requirement, validate, validate-config, validate-dependencies, velocity, verify, verify-path-exists, verify-summary, websearch, worktree');
+    error('Usage: gsd-tools <command> [args] [--pretty] [--verbose]\nCommands: assertions, codebase, codebase-impact, commit, config-ensure-section, config-get, config-migrate, config-set, context-budget, current-timestamp, env, extract-sections, find-phase, frontmatter, generate-slug, git, history-digest, init, intent, list-todos, mcp, mcp-profile, memory, milestone, phase, phase-plan-index, phases, progress, quick-summary, requirements, resolve-model, roadmap, rollback-info, scaffold, search-decisions, search-lessons, session-diff, state, state-snapshot, summary-extract, template, test-coverage, test-run, todo, token-budget, trace-requirement, validate, validate-config, validate-dependencies, velocity, verify, verify-path-exists, verify-summary, websearch, worktree');
   }
 
   // --help / -h: print command help to stderr (never contaminates JSON stdout)
@@ -181,11 +182,12 @@ async function main() {
 
     case 'commit': {
       const amend = args.includes('--amend');
+      const forceFlag = args.includes('--force');
       const message = args[1];
       // Parse --files flag (collect args after --files, stopping at other flags)
       const filesIndex = args.indexOf('--files');
       const files = filesIndex !== -1 ? args.slice(filesIndex + 1).filter(a => !a.startsWith('--')) : [];
-      lazyMisc().cmdCommit(cwd, message, files, raw, amend);
+      lazyMisc().cmdCommit(cwd, message, files, raw, amend, forceFlag);
       break;
     }
 
@@ -779,6 +781,52 @@ async function main() {
         lazyWorktree().cmdWorktreeCheckOverlap(cwd, args[2], raw);
       } else {
         error('Unknown worktree subcommand. Available: create, list, remove, cleanup, merge, check-overlap');
+      }
+      break;
+    }
+
+    case 'git': {
+      const gitSub = args[1];
+      const gitMod = lazyGit();
+      const { output: gitOutput } = require('./lib/output');
+      switch (gitSub) {
+        case 'log': {
+          const countIdx = args.indexOf('--count');
+          const sinceIdx = args.indexOf('--since');
+          const untilIdx = args.indexOf('--until');
+          const authorIdx = args.indexOf('--author');
+          const pathIdx = args.indexOf('--path');
+          const gitOpts = {
+            count: countIdx !== -1 ? parseInt(args[countIdx + 1], 10) : 20,
+            since: sinceIdx !== -1 ? args[sinceIdx + 1] : undefined,
+            until: untilIdx !== -1 ? args[untilIdx + 1] : undefined,
+            author: authorIdx !== -1 ? args[authorIdx + 1] : undefined,
+            path: pathIdx !== -1 ? args[pathIdx + 1] : undefined,
+          };
+          gitOutput(gitMod.structuredLog(cwd, gitOpts), raw);
+          break;
+        }
+        case 'diff-summary': {
+          const fromIdx = args.indexOf('--from');
+          const toIdx = args.indexOf('--to');
+          const dsPathIdx = args.indexOf('--path');
+          gitOutput(gitMod.diffSummary(cwd, {
+            from: fromIdx !== -1 ? args[fromIdx + 1] : undefined,
+            to: toIdx !== -1 ? args[toIdx + 1] : undefined,
+            path: dsPathIdx !== -1 ? args[dsPathIdx + 1] : undefined,
+          }), raw);
+          break;
+        }
+        case 'blame': {
+          gitOutput(gitMod.blame(cwd, args[2]), raw);
+          break;
+        }
+        case 'branch-info': {
+          gitOutput(gitMod.branchInfo(cwd), raw);
+          break;
+        }
+        default:
+          error('Unknown git subcommand: ' + gitSub + '. Available: log, diff-summary, blame, branch-info');
       }
       break;
     }

@@ -1083,6 +1083,26 @@ Output: { removed, plan_id, path }`,
 Remove all worktrees for the current project and prune stale references.
 
 Output: { cleaned, worktrees: [{ plan_id, path }] }`,
+
+  'git': `Usage: gsd-tools git <log|diff-summary|blame|branch-info> [options]
+
+Structured git intelligence — JSON output for agents and workflows.
+
+Subcommands:
+  log [--count N] [--since D] [--until D] [--author A] [--path P]
+    Structured commit log with file stats and conventional commit parsing.
+  diff-summary [--from ref] [--to ref] [--path P]
+    Diff stats between two refs (default: HEAD~1..HEAD).
+  blame <file>
+    Line-to-commit/author mapping for a file.
+  branch-info
+    Current branch state: detached, shallow, dirty, rebasing, upstream.
+
+Examples:
+  gsd-tools git log --count 5
+  gsd-tools git diff-summary --from main --to HEAD
+  gsd-tools git blame src/router.js
+  gsd-tools git branch-info`,
 };
 
 module.exports = { MODEL_PROFILES, CONFIG_SCHEMA, COMMAND_HELP };

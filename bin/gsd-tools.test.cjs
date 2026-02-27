@@ -13734,3 +13734,232 @@ describe('codebase lifecycle', () => {
     assert.ok(!result.success || result.error.includes('intel'), 'Should fail or warn about missing intel');
   });
 });
+
+// ─── git commands ────────────────────────────────────────────────────────────
+
+describe('git log', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+    fs.writeFileSync(path.join(tmpDir, '.gitkeep'), '');
+    execSync('git init && git config user.email "test@test.com" && git config user.name "Test" && git add . && git commit -m "init: first commit"', { cwd: tmpDir, stdio: 'pipe' });
+    // Create second commit
+    fs.writeFileSync(path.join(tmpDir, 'file1.txt'), 'hello\n');
+    execSync('git add file1.txt && git commit -m "feat(scope): add file1"', { cwd: tmpDir, stdio: 'pipe' });
+    // Create third commit
+    fs.writeFileSync(path.join(tmpDir, 'file2.txt'), 'world\n');
+    execSync('git add file2.txt && git commit -m "fix: add file2"', { cwd: tmpDir, stdio: 'pipe' });
+  });
+
+  afterEach(() => { cleanup(tmpDir); });
+
+  test('git log returns structured output with hash/author/date/message/files', () => {
+    const result = runGsdTools('git log --count 3', tmpDir);
+    assert.ok(result.success, 'Command should succeed');
+    const data = JSON.parse(result.output);
+    assert.ok(Array.isArray(data), 'Should return array');
+    assert.strictEqual(data.length, 3, 'Should return 3 commits');
+
+    const latest = data[0];
+    assert.ok(latest.hash, 'Commit should have hash');
+    assert.ok(latest.author, 'Commit should have author');
+    assert.ok(latest.date, 'Commit should have date');
+    assert.ok(latest.message, 'Commit should have message');
+    assert.ok(Array.isArray(latest.files), 'Commit should have files array');
+    assert.strictEqual(typeof latest.file_count, 'number', 'Should have file_count');
+    assert.strictEqual(typeof latest.total_insertions, 'number', 'Should have total_insertions');
+    assert.strictEqual(typeof latest.total_deletions, 'number', 'Should have total_deletions');
+  });
+
+  test('git log --count 1 returns only 1 commit', () => {
+    const result = runGsdTools('git log --count 1', tmpDir);
+    assert.ok(result.success, 'Command should succeed');
+    const data = JSON.parse(result.output);
+    assert.strictEqual(data.length, 1, 'Should return 1 commit');
+  });
+
+  test('git log parses conventional commits', () => {
+    const result = runGsdTools('git log --count 2', tmpDir);
+    assert.ok(result.success, 'Command should succeed');
+    const data = JSON.parse(result.output);
+    // Latest commit: "fix: add file2"
+    assert.ok(data[0].conventional, 'Should parse conventional commit');
+    assert.strictEqual(data[0].conventional.type, 'fix');
+    // Second commit: "feat(scope): add file1"
+    assert.ok(data[1].conventional, 'Should parse conventional commit with scope');
+    assert.strictEqual(data[1].conventional.type, 'feat');
+    assert.strictEqual(data[1].conventional.scope, 'scope');
+  });
+
+  test('git log includes file stats per commit', () => {
+    const result = runGsdTools('git log --count 1', tmpDir);
+    const data = JSON.parse(result.output);
+    assert.ok(data[0].files.length > 0, 'Latest commit should have file stats');
+    assert.ok(data[0].files[0].path, 'File stat should have path');
+    assert.strictEqual(typeof data[0].files[0].insertions, 'number', 'Should have insertions');
+    assert.strictEqual(typeof data[0].files[0].deletions, 'number', 'Should have deletions');
+  });
+});
+
+describe('git diff-summary', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+    fs.writeFileSync(path.join(tmpDir, '.gitkeep'), '');
+    execSync('git init && git config user.email "test@test.com" && git config user.name "Test" && git add . && git commit -m "init"', { cwd: tmpDir, stdio: 'pipe' });
+    fs.writeFileSync(path.join(tmpDir, 'changed.txt'), 'line1\nline2\nline3\n');
+    execSync('git add changed.txt && git commit -m "add changed.txt"', { cwd: tmpDir, stdio: 'pipe' });
+  });
+
+  afterEach(() => { cleanup(tmpDir); });
+
+  test('git diff-summary returns files/insertions/deletions', () => {
+    const result = runGsdTools('git diff-summary', tmpDir);
+    assert.ok(result.success, 'Command should succeed');
+    const data = JSON.parse(result.output);
+    assert.ok(data.from, 'Should have from ref');
+    assert.ok(data.to, 'Should have to ref');
+    assert.ok(Array.isArray(data.files), 'Should have files array');
+    assert.strictEqual(typeof data.file_count, 'number', 'Should have file_count');
+    assert.strictEqual(typeof data.total_insertions, 'number', 'Should have total_insertions');
+    assert.strictEqual(typeof data.total_deletions, 'number', 'Should have total_deletions');
+    // The latest commit added changed.txt
+    assert.ok(data.files.some(f => f.path === 'changed.txt'), 'Should include changed.txt');
+  });
+});
+
+describe('git blame', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+    fs.writeFileSync(path.join(tmpDir, 'target.txt'), 'line1\nline2\n');
+    execSync('git init && git config user.email "test@test.com" && git config user.name "Test" && git add . && git commit -m "init"', { cwd: tmpDir, stdio: 'pipe' });
+  });
+
+  afterEach(() => { cleanup(tmpDir); });
+
+  test('git blame returns line-to-commit mapping', () => {
+    const result = runGsdTools('git blame target.txt', tmpDir);
+    assert.ok(result.success, 'Command should succeed');
+    const data = JSON.parse(result.output);
+    assert.strictEqual(data.file, 'target.txt', 'Should report correct file');
+    assert.ok(Array.isArray(data.lines), 'Should have lines array');
+    assert.ok(data.lines.length >= 2, 'Should have at least 2 lines');
+    assert.ok(data.lines[0].hash, 'Line should have hash');
+    assert.ok(data.lines[0].author, 'Line should have author');
+    assert.ok(data.lines[0].date, 'Line should have date');
+    assert.ok(data.lines[0].content !== undefined, 'Line should have content');
+    assert.ok(data.unique_authors.length >= 1, 'Should have at least 1 unique author');
+    assert.ok(data.unique_commits.length >= 1, 'Should have at least 1 unique commit');
+  });
+});
+
+describe('git branch-info', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+    fs.writeFileSync(path.join(tmpDir, '.gitkeep'), '');
+    execSync('git init && git config user.email "test@test.com" && git config user.name "Test" && git add . && git commit -m "init"', { cwd: tmpDir, stdio: 'pipe' });
+  });
+
+  afterEach(() => { cleanup(tmpDir); });
+
+  test('git branch-info returns branch name and state', () => {
+    const result = runGsdTools('git branch-info', tmpDir);
+    assert.ok(result.success, 'Command should succeed');
+    const data = JSON.parse(result.output);
+    assert.ok(data.branch, 'Should have branch name');
+    assert.ok(data.head_sha, 'Should have head_sha');
+    assert.strictEqual(data.is_detached, false, 'Should not be detached');
+    assert.strictEqual(data.is_shallow, false, 'Should not be shallow');
+    assert.strictEqual(typeof data.has_dirty_files, 'boolean', 'Should have has_dirty_files');
+    assert.strictEqual(typeof data.dirty_file_count, 'number', 'Should have dirty_file_count');
+    assert.strictEqual(data.is_rebasing, false, 'Should not be rebasing');
+  });
+
+  test('git branch-info detects detached HEAD', () => {
+    // Get current commit hash
+    const hash = execSync('git rev-parse HEAD', { cwd: tmpDir, encoding: 'utf-8' }).trim();
+    // Detach HEAD
+    execSync(`git checkout ${hash}`, { cwd: tmpDir, stdio: 'pipe' });
+
+    const result = runGsdTools('git branch-info', tmpDir);
+    assert.ok(result.success, 'Command should succeed');
+    const data = JSON.parse(result.output);
+    assert.strictEqual(data.is_detached, true, 'Should detect detached HEAD');
+  });
+});
+
+// ─── pre-commit checks ──────────────────────────────────────────────────────
+
+describe('pre-commit checks', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+    // Write config.json so commit_docs is true
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'config.json'), JSON.stringify({ commit_docs: true }), 'utf-8');
+    fs.writeFileSync(path.join(tmpDir, '.gitkeep'), '');
+    execSync('git init && git config user.email "test@test.com" && git config user.name "Test" && git add . && git commit -m "init"', { cwd: tmpDir, stdio: 'pipe' });
+  });
+
+  afterEach(() => { cleanup(tmpDir); });
+
+  test('commit with dirty non-.planning files is blocked', () => {
+    // Create a dirty file outside .planning
+    fs.writeFileSync(path.join(tmpDir, 'dirty.txt'), 'dirty\n');
+    const result = runGsdTools('commit "test commit"', tmpDir);
+    const data = JSON.parse(result.output);
+    assert.strictEqual(data.committed, false, 'Should not commit');
+    assert.strictEqual(data.reason, 'pre_commit_blocked', 'Should be blocked by pre-commit');
+    assert.ok(data.failures.length > 0, 'Should have failures');
+    assert.ok(data.failures.some(f => f.check === 'dirty_tree'), 'Should have dirty_tree failure');
+  });
+
+  test('commit --force bypasses dirty file check', () => {
+    // Create a dirty file outside .planning
+    fs.writeFileSync(path.join(tmpDir, 'dirty.txt'), 'dirty\n');
+    // Create something in .planning to actually commit
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'test.md'), 'test\n');
+    const result = runGsdTools('commit "test commit" --force', tmpDir);
+    const data = JSON.parse(result.output);
+    // Should either commit successfully or report nothing_to_commit (not blocked)
+    assert.notStrictEqual(data.reason, 'pre_commit_blocked', 'Should not be blocked by pre-commit');
+  });
+
+  test('commit in detached HEAD is blocked', () => {
+    // Get current commit hash and detach
+    const hash = execSync('git rev-parse HEAD', { cwd: tmpDir, encoding: 'utf-8' }).trim();
+    execSync(`git checkout ${hash}`, { cwd: tmpDir, stdio: 'pipe' });
+    const result = runGsdTools('commit "test commit"', tmpDir);
+    const data = JSON.parse(result.output);
+    assert.strictEqual(data.committed, false, 'Should not commit');
+    assert.strictEqual(data.reason, 'pre_commit_blocked', 'Should be blocked by pre-commit');
+    assert.ok(data.failures.some(f => f.check === 'detached_head'), 'Should have detached_head failure');
+  });
+
+  test('commit in clean state proceeds normally', () => {
+    // Add something to .planning to commit
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'new.md'), 'content\n');
+    const result = runGsdTools('commit "test clean commit"', tmpDir);
+    const data = JSON.parse(result.output);
+    assert.ok(data.committed === true || data.reason === 'nothing_to_commit', 'Should commit or have nothing to commit');
+    assert.notStrictEqual(data.reason, 'pre_commit_blocked', 'Should not be blocked');
+  });
+
+  test('multiple pre-commit failures reported together', () => {
+    // Detach HEAD and create dirty file
+    const hash = execSync('git rev-parse HEAD', { cwd: tmpDir, encoding: 'utf-8' }).trim();
+    execSync(`git checkout ${hash}`, { cwd: tmpDir, stdio: 'pipe' });
+    fs.writeFileSync(path.join(tmpDir, 'dirty.txt'), 'dirty\n');
+    const result = runGsdTools('commit "test commit"', tmpDir);
+    const data = JSON.parse(result.output);
+    assert.strictEqual(data.reason, 'pre_commit_blocked', 'Should be blocked');
+    // Should have at least 2 failures (detached_head + dirty_tree)
+    assert.ok(data.failures.length >= 2, `Should report multiple failures, got ${data.failures.length}`);
+  });
+});
