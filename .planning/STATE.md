@@ -5,18 +5,18 @@
 See: .planning/PROJECT.md (updated 2026-02-26)
 
 **Core value:** Manage and deliver high-quality software with high-quality documentation, while continuously reducing token usage and improving performance
-**Current focus:** v6.0 UX & Developer Experience — Phase 34 Plan 01 complete, Phase 36 remains
+**Current focus:** v6.0 UX & Developer Experience — Phase 36 Plan 01 complete, Plan 02 remains
 
 ## Current Position
 
-**Phase:** 34 — Feature & Intent Command Renderers
-**Current Plan:** 1 of 1 complete
-**Status:** Phase Complete
+**Phase:** 36 — Integration & Polish
+**Current Plan:** 1 of 2
+**Status:** In Progress
 **Last Activity:** 2026-02-27
 
 ```
-v6.0 Progress: [██████████████░░░░░░] 5/7 phases (71%)
-Phase 34: [████████████████████] 1/1 plans ✓
+v6.0 Progress: [████████████████░░░░] 6/7 phases (86%)
+Phase 36: [██████████░░░░░░░░░░] 1/2 plans
 ```
 
 ## Performance Metrics
@@ -46,6 +46,7 @@ Phase 34: [████████████████████] 1/1 pla
 | Phase 33 P01 | 11 min | 2 tasks | 2 files |
 | Phase 32 P01 | 5 min | 2 tasks | 2 files |
 | Phase 34 P01 | 19 min | 2 tasks | 3 files |
+| Phase 36 P01 | 3 min | 2 tasks | 12 files |
 
 ## Accumulated Context
 
@@ -62,6 +63,7 @@ All v1.0-v5.0 decisions recorded in PROJECT.md Key Decisions table with outcomes
 - **Phase 33-01:** Formatter functions co-located with command handlers; only 4 user-facing commands migrated, agent-consumed commands left untouched
 - **Phase 32-01:** Phase table showAll:true for small milestones; state config as key:value pairs; session diff capped at 3 commits in formatted mode
 - **Phase 34-01:** intent show preserves forced-JSON for 'intent read'; output.js uses process.exitCode for non-zero exits; colorPriority simplified to shared color utilities
+- **Phase 36-01:** Command wrappers use same format as existing 30 installed commands; cmd-*.md files stay in workflows/ as workflow content; deploy.sh copies individual files via loop not cp -r
 
 ### Pending Todos
 
@@ -74,5 +76,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-02-27
-Stopped at: Completed 34-01-PLAN.md (feature & intent command formatters — Phase 34 complete)
+Stopped at: Completed 36-01-PLAN.md (11 command wrappers + deploy.sh sync)
 Resume file: None

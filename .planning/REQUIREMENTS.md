@@ -40,15 +40,15 @@ Requirements for UX overhaul milestone. Each maps to roadmap phases.
 
 ### Slash Commands & Integration
 
-- [ ] **INTG-01**: 11 missing command wrapper files created in OpenCode command directory
-- [ ] **INTG-02**: `deploy.sh` updated to sync command wrappers during deployment
+- [x] **INTG-01**: 11 missing command wrapper files created in OpenCode command directory
+- [x] **INTG-02**: `deploy.sh` updated to sync command wrappers during deployment
 - [ ] **INTG-03**: AGENTS.md updated to reflect current project state — stale items removed, v5.0/v6.0 status current
 
 ### Quality
 
 - [x] **QUAL-01**: 2 failing tests from v5.0 fixed
 - [x] **QUAL-02**: New tests cover formatting utilities (table, color, progress bar, banner, box)
-- [ ] **QUAL-03**: Bundle size stays reasonable after adding formatting module
+- [x] **QUAL-03**: Bundle size stays reasonable after adding formatting module
 
 ## Future Requirements
 
@@ -99,12 +99,12 @@ Requirements for UX overhaul milestone. Each maps to roadmap phases.
 | WKFL-05 | Phase 35 | Complete | 2026-02-27 |
 | WKFL-06 | Phase 35 | Complete | 2026-02-27 |
 | WKFL-07 | Phase 35 | Complete | 2026-02-27 |
-| INTG-01 | Phase 36 | Pending | — |
-| INTG-02 | Phase 36 | Pending | — |
+| INTG-01 | Phase 36 | Complete | 2026-02-27 |
+| INTG-02 | Phase 36 | Complete | 2026-02-27 |
 | INTG-03 | Phase 36 | Pending | — |
 | QUAL-01 | Phase 31 | Complete | — |
 | QUAL-02 | Phase 31 | Complete | — |
-| QUAL-03 | Phase 36 | Pending | — |
+| QUAL-03 | Phase 36 | Complete | 2026-02-27 |
 
 **Coverage:**
 - v6.0 requirements: 25 total
