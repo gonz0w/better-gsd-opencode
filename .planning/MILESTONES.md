@@ -1,5 +1,27 @@
 # Milestones
 
+## ✅ v6.0 UX & Developer Experience (Shipped: 2026-02-27)
+
+**Phases completed:** 7 phases (30-36), 11 plans
+**Commits:** 29 | **Files changed:** 102 | **Lines:** +6,275 / -1,982
+**Timeline:** 1 day (2026-02-26 → 2026-02-27)
+**Tests:** 574 passing (0 failing)
+**Bundle:** 681KB
+
+**Key accomplishments:**
+- Built shared formatting engine (`src/lib/format.js`) with formatTable, progressBar, banner, box, and ~2KB picocolors-pattern color utility with TTY-aware auto-disable
+- Added smart output detection — human-readable branded output in TTY mode, JSON when piped — with `--raw` and `--pretty` overrides, backward-compatible --raw acceptance
+- Migrated all user-facing commands (init, state, verify, codebase, velocity, intent) to shared formatting with co-located formatter functions, agent-consumed commands untouched
+- Tightened workflow output across 27 files (455-line reduction, help.md cut 44%), updated ui-brand.md with bGSD patterns and format.js function references
+- Created 11 slash command wrappers in `commands/` directory with updated deploy.sh safe sync, and rewrote AGENTS.md as lean 59-line project index
+- Fixed 2 failing v5.0 tests (outputJSON rawValue bug), added format utility test coverage, all 574 tests green
+
+**Archives:**
+- `.planning/milestones/v6.0-ROADMAP.md`
+- `.planning/milestones/v6.0-REQUIREMENTS.md`
+
+---
+
 ## ✅ v5.0 Codebase Intelligence (Shipped: 2026-02-26)
 
 **Phases completed:** 7 phases (23-29), 14 plans
