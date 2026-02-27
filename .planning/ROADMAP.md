@@ -110,7 +110,7 @@ Plans:
 **Goal**: Test suite is green and new formatting utilities have coverage — no regressions before building on Phase 30
 **Depends on**: Phase 30 (formatting foundation)
 **Requirements**: QUAL-01, QUAL-02
-**Plans**: 2 plans
+**Plans**: 1/2 plans executed
 Plans:
 - [ ] 31-01-PLAN.md — Fix outputJSON rawValue bug + clean --raw from tests (243 failures → 0)
 - [ ] 31-02-PLAN.md — Format utility test suite (formatTable, color, progressBar, banner, box)
@@ -208,7 +208,7 @@ Plans:
 | 28. Lifecycle Analysis | v5.0 | 2/2 | Complete | 2026-02-26 |
 | 29. Workflow Integration | v5.0 | 2/2 | Complete | 2026-02-26 |
 | 30. Formatting Foundation & Smart Output | 2/2 | Complete    | 2026-02-26 | — |
-| 31. Quality Gates & Format Testing | v6.0 | 0/2 | Not started | — |
+| 31. Quality Gates & Format Testing | 1/2 | In Progress|  | — |
 | 32. Init & State Command Renderers | v6.0 | 0/2 | Not started | — |
 | 33. Verify & Codebase Command Renderers | v6.0 | 0/2 | Not started | — |
 | 34. Feature & Intent Command Renderers | v6.0 | 0/2 | Not started | — |

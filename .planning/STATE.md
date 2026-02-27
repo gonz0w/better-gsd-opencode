@@ -5,18 +5,18 @@
 See: .planning/PROJECT.md (updated 2026-02-26)
 
 **Core value:** Manage and deliver high-quality software with high-quality documentation, while continuously reducing token usage and improving performance
-**Current focus:** v6.0 UX & Developer Experience — Phase 30: Formatting Foundation & Smart Output
+**Current focus:** v6.0 UX & Developer Experience — Phase 31: Quality Gates & Format Testing
 
 ## Current Position
 
-**Phase:** 30 — Formatting Foundation & Smart Output (complete)
-**Current Plan:** Not started
-**Status:** Milestone complete
-**Last Activity:** 2026-02-26
+**Phase:** 31 — Quality Gates & Format Testing
+**Current Plan:** 1 of 2 complete
+**Status:** Executing
+**Last Activity:** 2026-02-27
 
 ```
 v6.0 Progress: [███░░░░░░░░░░░░░░░░░] 1/7 phases (14%)
-Phase 30: [████████████████████] 2/2 plans
+Phase 31: [██████████░░░░░░░░░░] 1/2 plans
 ```
 
 ## Performance Metrics
@@ -39,6 +39,7 @@ Phase 30: [████████████████████] 2/2 pla
 | v6.0 | 7 | 14 | — |
 | Phase 30 P01 | 2 min | 2 tasks | 1 files |
 | Phase 30 P02 | 4 min | 2 tasks | 28 files |
+| Phase 31 P01 | 44 min | 1 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -48,10 +49,12 @@ All v1.0-v5.0 decisions recorded in PROJECT.md Key Decisions table with outcomes
 
 - **Phase 30-01:** Single-module format.js design — all primitives in one file, picocolors inline pattern, PSql-style tables, bGSD subtle branding
 - **Phase 30-02:** Backward-compat output migration — boolean options still work, --raw silently accepted, graceful JSON fallback for un-migrated commands
+- **Phase 31-01:** Mode-aware rawValue — outputJSON ignores rawValue in json mode, commands with if(raw) direct-stdout bypasses routed through output()
+- [Phase 31]: Mode-aware rawValue: outputJSON ignores rawValue in json mode, commands route through output() instead of direct stdout
 
 ### Pending Todos
 
-- Fix 2 failing tests from v5.0 (assigned to Phase 31, QUAL-01)
+- None (QUAL-01 resolved by Phase 31-01)
 
 ### Blockers/Concerns
 
@@ -59,6 +62,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-02-26
-Stopped at: Completed 30-02-PLAN.md (smart output mode, brand rename)
+Last session: 2026-02-27
+Stopped at: Completed 31-01-PLAN.md (fix outputJSON rawValue bug, clean tests)
 Resume file: None
