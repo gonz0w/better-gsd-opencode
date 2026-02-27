@@ -4,6 +4,7 @@ const { output, error, debugLog } = require('../lib/output');
 const { loadConfig } = require('../lib/config');
 const { safeReadFile, cachedReadFile, invalidateFileCache, normalizePhaseName, findPhaseInternal, getPhaseTree } = require('../lib/helpers');
 const { execGit } = require('../lib/git');
+const { banner, sectionHeader, formatTable, summaryLine, actionHint, color, SYMBOLS, progressBar, box } = require('../lib/format');
 
 // ─── Pre-compiled Regex Cache ────────────────────────────────────────────────
 // Avoids repeated `new RegExp()` construction in hot paths like stateExtractField/stateReplaceField
@@ -24,6 +25,73 @@ function getFieldReplaceRegex(fieldName) {
   const pattern = new RegExp(`(\\*\\*${escaped}:\\*\\*\\s*)(.*)`, 'i');
   _fieldRegexCache.set(key, pattern);
   return pattern;
+}
+
+// ─── State Formatters ────────────────────────────────────────────────────────
+
+/**
+ * Formatter for state show — renders branded state card with config and file status.
+ * @param {object} result - The state load result object
+ * @returns {string}
+ */
+function formatStateShow(result) {
+  const lines = [];
+  const c = result.config || {};
+
+  // 1. Branded banner
+  lines.push(banner('State'));
+  lines.push('');
+
+  // 2. Configuration section
+  lines.push(sectionHeader('Configuration'));
+  const configItems = [
+    ['model_profile', c.model_profile || 'default'],
+    ['commit_docs', String(c.commit_docs ?? 'true')],
+    ['branching_strategy', c.branching_strategy || 'none'],
+    ['parallelization', String(c.parallelization ?? 'false')],
+  ];
+  for (const [key, val] of configItems) {
+    lines.push(` ${color.dim(key + ':')} ${val}`);
+  }
+  lines.push('');
+
+  // 3. Files section
+  lines.push(sectionHeader('Files'));
+  const fileChecks = [
+    ['STATE.md', result.state_exists],
+    ['ROADMAP.md', result.roadmap_exists],
+    ['config.json', result.config_exists],
+  ];
+  for (const [name, exists] of fileChecks) {
+    const icon = exists ? color.green(SYMBOLS.check) : color.red(SYMBOLS.cross);
+    lines.push(` ${icon} ${name}`);
+  }
+  lines.push('');
+
+  // 4. Summary
+  lines.push(summaryLine('State loaded'));
+
+  return lines.join('\n');
+}
+
+/**
+ * Formatter for state update-progress — renders success box or warning.
+ * @param {object} result - The update-progress result object
+ * @returns {string}
+ */
+function formatStateUpdateProgress(result) {
+  const lines = [];
+
+  if (result.updated) {
+    lines.push(box(`Progress updated: ${result.percent}%`, 'success'));
+    lines.push('');
+    lines.push(progressBar(result.percent));
+    lines.push(` ${result.completed}/${result.total} plans`);
+  } else {
+    lines.push(box(result.reason || 'Update failed', 'warning'));
+  }
+
+  return lines.join('\n');
 }
 
 // ─── State Commands ──────────────────────────────────────────────────────────
@@ -67,7 +135,7 @@ function cmdStateLoad(cwd, raw) {
     `state_exists=${stateExists}`,
   ].join('\n');
 
-  output(result, raw, rawLines);
+  output(result, { formatter: formatStateShow, rawValue: rawLines });
 }
 
 function cmdStateGet(cwd, section, raw) {
@@ -259,9 +327,9 @@ function cmdStateUpdateProgress(cwd, raw) {
     content = content.replace(progressPattern, `$1${progressStr}`);
     fs.writeFileSync(statePath, content, 'utf-8');
     invalidateFileCache(statePath);
-    output({ updated: true, percent, completed: totalSummaries, total: totalPlans, bar: progressStr }, raw, progressStr);
+    output({ updated: true, percent, completed: totalSummaries, total: totalPlans, bar: progressStr }, { formatter: formatStateUpdateProgress, rawValue: progressStr });
   } else {
-    output({ updated: false, reason: 'Progress field not found in STATE.md' }, raw, 'false');
+    output({ updated: false, reason: 'Progress field not found in STATE.md' }, { formatter: formatStateUpdateProgress, rawValue: 'false' });
   }
 }
 
