@@ -47,7 +47,7 @@ Requirements for UX overhaul milestone. Each maps to roadmap phases.
 ### Quality
 
 - [x] **QUAL-01**: 2 failing tests from v5.0 fixed
-- [ ] **QUAL-02**: New tests cover formatting utilities (table, color, progress bar, banner, box)
+- [x] **QUAL-02**: New tests cover formatting utilities (table, color, progress bar, banner, box)
 - [ ] **QUAL-03**: Bundle size stays reasonable after adding formatting module
 
 ## Future Requirements
@@ -103,7 +103,7 @@ Requirements for UX overhaul milestone. Each maps to roadmap phases.
 | INTG-02 | Phase 36 | Pending | — |
 | INTG-03 | Phase 36 | Pending | — |
 | QUAL-01 | Phase 31 | Complete | — |
-| QUAL-02 | Phase 31 | Pending | — |
+| QUAL-02 | Phase 31 | Complete | — |
 | QUAL-03 | Phase 36 | Pending | — |
 
 **Coverage:**

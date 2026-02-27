@@ -9,14 +9,14 @@ See: .planning/PROJECT.md (updated 2026-02-26)
 
 ## Current Position
 
-**Phase:** 31 — Quality Gates & Format Testing
-**Current Plan:** 1 of 2 complete
-**Status:** Executing
+**Phase:** 31 — Quality Gates & Format Testing (COMPLETE)
+**Current Plan:** 2 of 2 complete
+**Status:** Phase Complete
 **Last Activity:** 2026-02-27
 
 ```
-v6.0 Progress: [███░░░░░░░░░░░░░░░░░] 1/7 phases (14%)
-Phase 31: [██████████░░░░░░░░░░] 1/2 plans
+v6.0 Progress: [██████░░░░░░░░░░░░░░] 2/7 phases (29%)
+Phase 31: [████████████████████] 2/2 plans
 ```
 
 ## Performance Metrics
@@ -40,6 +40,7 @@ Phase 31: [██████████░░░░░░░░░░] 1/2 pla
 | Phase 30 P01 | 2 min | 2 tasks | 1 files |
 | Phase 30 P02 | 4 min | 2 tasks | 28 files |
 | Phase 31 P01 | 44 min | 1 tasks | 5 files |
+| Phase 31 P02 | 4 min | 1 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -50,7 +51,7 @@ All v1.0-v5.0 decisions recorded in PROJECT.md Key Decisions table with outcomes
 - **Phase 30-01:** Single-module format.js design — all primitives in one file, picocolors inline pattern, PSql-style tables, bGSD subtle branding
 - **Phase 30-02:** Backward-compat output migration — boolean options still work, --raw silently accepted, graceful JSON fallback for un-migrated commands
 - **Phase 31-01:** Mode-aware rawValue — outputJSON ignores rawValue in json mode, commands with if(raw) direct-stdout bypasses routed through output()
-- [Phase 31]: Mode-aware rawValue: outputJSON ignores rawValue in json mode, commands route through output() instead of direct stdout
+- **Phase 31-02:** Subprocess NO_COLOR test — used execSync with NO_COLOR=1 env to verify color auto-disable independently of piped-mode
 
 ### Pending Todos
 
@@ -63,5 +64,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-02-27
-Stopped at: Completed 31-01-PLAN.md (fix outputJSON rawValue bug, clean tests)
+Stopped at: Completed 31-02-PLAN.md (format utility test suite — Phase 31 complete)
 Resume file: None
