@@ -111,6 +111,9 @@ Plans:
 **Depends on**: Phase 30 (formatting foundation)
 **Requirements**: QUAL-01, QUAL-02
 **Plans**: 2 plans
+Plans:
+- [ ] 31-01-PLAN.md — Fix outputJSON rawValue bug + clean --raw from tests (243 failures → 0)
+- [ ] 31-02-PLAN.md — Format utility test suite (formatTable, color, progressBar, banner, box)
 **Success Criteria** (what must be TRUE):
   1. All tests pass with zero failures (the 2 broken v5.0 tests are fixed)
   2. New tests cover formatTable, color utility, progressBar, banner, and box — at least one test per utility
