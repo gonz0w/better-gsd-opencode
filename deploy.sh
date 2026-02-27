@@ -23,6 +23,14 @@ if [ -d "$DEST" ]; then
 	echo "  Backed up current to: $BACKUP"
 fi
 
+# Step 2b: Backup command directory
+CMD_DIR="$HOME/.config/opencode/command"
+CMD_BACKUP="$CMD_DIR.bak-$(date +%Y%m%d-%H%M%S)"
+if [ -d "$CMD_DIR" ]; then
+	cp -r "$CMD_DIR" "$CMD_BACKUP" 2>/dev/null || true
+	echo "  Backed up commands to: $CMD_BACKUP"
+fi
+
 # Step 3: Copy files (preserve dest directory, overwrite contents)
 cp -r "$SRC/bin" "$DEST/"
 cp -r "$SRC/workflows" "$DEST/"
@@ -30,6 +38,12 @@ cp -r "$SRC/templates" "$DEST/"
 cp -r "$SRC/references" "$DEST/"
 cp -r "$SRC/src" "$DEST/"
 cp "$SRC/VERSION" "$DEST/"
+
+# Step 3b: Deploy command wrappers (only our commands, don't touch others)
+mkdir -p "$CMD_DIR"
+for cmd in "$SRC/commands"/gsd-*.md; do
+	[ -f "$cmd" ] && cp "$cmd" "$CMD_DIR/"
+done
 
 # Step 4: Smoke test deployed artifact
 echo ""
@@ -44,6 +58,9 @@ if [ -z "$SMOKE" ]; then
 	exit 1
 fi
 echo "  ✅ Smoke test passed: $SMOKE"
+
+CMD_COUNT=$(ls "$CMD_DIR"/gsd-*.md 2>/dev/null | wc -l)
+echo "  Commands deployed: $CMD_COUNT"
 
 echo ""
 echo "Deployed successfully."
