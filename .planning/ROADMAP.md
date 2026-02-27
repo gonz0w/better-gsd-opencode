@@ -155,6 +155,10 @@ Plans:
 3. Orchestrator auto-selects single vs parallel vs team mode from plan structure
 4. Routing decisions are visible in CLI output for transparency
 
+**Plans:** 1 plan
+Plans:
+- [ ] 39-01-PLAN.md — Task complexity classifier, agent router, execution mode selector, init execute-phase integration
+
 ### Phase 40: Context Efficiency
 
 **Goal:** Agent context consumption drops 40-60% via compact serialization, context scoping, and task-scoped injection.
