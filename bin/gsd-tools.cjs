@@ -1026,7 +1026,26 @@ Output: { removed, plan_id, path }`,
 
 Remove all worktrees for the current project and prune stale references.
 
-Output: { cleaned, worktrees: [{ plan_id, path }] }`
+Output: { cleaned, worktrees: [{ plan_id, path }] }`,
+      "git": `Usage: gsd-tools git <log|diff-summary|blame|branch-info> [options]
+
+Structured git intelligence \u2014 JSON output for agents and workflows.
+
+Subcommands:
+  log [--count N] [--since D] [--until D] [--author A] [--path P]
+    Structured commit log with file stats and conventional commit parsing.
+  diff-summary [--from ref] [--to ref] [--path P]
+    Diff stats between two refs (default: HEAD~1..HEAD).
+  blame <file>
+    Line-to-commit/author mapping for a file.
+  branch-info
+    Current branch state: detached, shallow, dirty, rebasing, upstream.
+
+Examples:
+  gsd-tools git log --count 5
+  gsd-tools git diff-summary --from main --to HEAD
+  gsd-tools git blame src/router.js
+  gsd-tools git branch-info`
     };
     module2.exports = { MODEL_PROFILES, CONFIG_SCHEMA, COMMAND_HELP };
   }
@@ -1109,7 +1128,7 @@ var require_output = __commonJS({
     function output(result, options) {
       if (typeof options === "boolean") {
         outputJSON(result, arguments[2]);
-        process.exit(0);
+        process.exit(process.exitCode || 0);
         return;
       }
       const opts = options || {};
@@ -1124,7 +1143,7 @@ var require_output = __commonJS({
           outputJSON(result, opts.rawValue);
         }
       }
-      process.exit(0);
+      process.exit(process.exitCode || 0);
     }
     function status(message) {
       process.stderr.write(message + "\n");
@@ -2155,6 +2174,8 @@ var require_helpers = __commonJS({
 // src/lib/git.js
 var require_git = __commonJS({
   "src/lib/git.js"(exports2, module2) {
+    var fs = require("fs");
+    var path = require("path");
     var { execFileSync } = require("child_process");
     var { debugLog } = require_output();
     function execGit(cwd, args) {
@@ -2174,7 +2195,458 @@ var require_git = __commonJS({
         };
       }
     }
-    module2.exports = { execGit };
+    function structuredLog(cwd, opts = {}) {
+      const count = opts.count || 20;
+      const logArgs = ["log", `--format=%H|%an|%ae|%ai|%s`, `-${count}`];
+      if (opts.since) logArgs.push(`--since=${opts.since}`);
+      if (opts.until) logArgs.push(`--until=${opts.until}`);
+      if (opts.author) logArgs.push(`--author=${opts.author}`);
+      if (opts.path) logArgs.push("--", opts.path);
+      const logResult = execGit(cwd, logArgs);
+      if (logResult.exitCode !== 0 || !logResult.stdout) {
+        return { error: logResult.stderr || "No commits found" };
+      }
+      const lines = logResult.stdout.split("\n").filter(Boolean);
+      const commits = [];
+      for (const line of lines) {
+        const parts = line.split("|");
+        if (parts.length < 5) continue;
+        const hash = parts[0];
+        const author = parts[1];
+        const email = parts[2];
+        const date = parts[3];
+        const message = parts.slice(4).join("|");
+        const statResult = execGit(cwd, ["diff-tree", "--no-commit-id", "--numstat", "-r", hash]);
+        const files = [];
+        let totalInsertions = 0;
+        let totalDeletions = 0;
+        if (statResult.exitCode === 0 && statResult.stdout) {
+          for (const statLine of statResult.stdout.split("\n").filter(Boolean)) {
+            const [ins, del, filePath] = statLine.split("	");
+            const insertions = ins === "-" ? 0 : parseInt(ins, 10) || 0;
+            const deletions = del === "-" ? 0 : parseInt(del, 10) || 0;
+            files.push({ path: filePath, insertions, deletions, binary: ins === "-" });
+            totalInsertions += insertions;
+            totalDeletions += deletions;
+          }
+        }
+        let conventional = null;
+        const ccMatch = message.match(/^(\w+)(?:\(([^)]*)\))?:\s*(.+)$/);
+        if (ccMatch) {
+          conventional = { type: ccMatch[1], scope: ccMatch[2] || null, description: ccMatch[3] };
+        }
+        commits.push({
+          hash,
+          author,
+          email,
+          date,
+          message,
+          conventional,
+          files,
+          file_count: files.length,
+          total_insertions: totalInsertions,
+          total_deletions: totalDeletions
+        });
+      }
+      return commits;
+    }
+    function diffSummary(cwd, opts = {}) {
+      const from = opts.from || "HEAD~1";
+      const to = opts.to || "HEAD";
+      const diffArgs = ["diff", "--numstat", from, to];
+      if (opts.path) diffArgs.push("--", opts.path);
+      const result = execGit(cwd, diffArgs);
+      if (result.exitCode !== 0) {
+        return { error: result.stderr || "diff failed" };
+      }
+      const files = [];
+      let totalInsertions = 0;
+      let totalDeletions = 0;
+      if (result.stdout) {
+        for (const line of result.stdout.split("\n").filter(Boolean)) {
+          const [ins, del, filePath] = line.split("	");
+          const insertions = ins === "-" ? 0 : parseInt(ins, 10) || 0;
+          const deletions = del === "-" ? 0 : parseInt(del, 10) || 0;
+          files.push({ path: filePath, insertions, deletions, binary: ins === "-" });
+          totalInsertions += insertions;
+          totalDeletions += deletions;
+        }
+      }
+      return {
+        from,
+        to,
+        files,
+        file_count: files.length,
+        total_insertions: totalInsertions,
+        total_deletions: totalDeletions
+      };
+    }
+    function blame(cwd, filePath) {
+      if (!filePath) {
+        return { error: "file path required" };
+      }
+      const result = execGit(cwd, ["blame", "--porcelain", filePath]);
+      if (result.exitCode !== 0) {
+        return { error: result.stderr || "blame failed" };
+      }
+      const lines = [];
+      const uniqueAuthors = /* @__PURE__ */ new Set();
+      const uniqueCommits = /* @__PURE__ */ new Set();
+      const rawLines = result.stdout.split("\n");
+      let currentHash = null;
+      let currentAuthor = null;
+      let currentDate = null;
+      let lineNumber = 0;
+      for (const raw of rawLines) {
+        const commitMatch = raw.match(/^([0-9a-f]{40})\s+(\d+)\s+(\d+)/);
+        if (commitMatch) {
+          currentHash = commitMatch[1];
+          lineNumber = parseInt(commitMatch[3], 10);
+          uniqueCommits.add(currentHash);
+          continue;
+        }
+        if (raw.startsWith("author ")) {
+          currentAuthor = raw.slice(7);
+          uniqueAuthors.add(currentAuthor);
+          continue;
+        }
+        if (raw.startsWith("author-time ")) {
+          const epoch = parseInt(raw.slice(12), 10);
+          currentDate = new Date(epoch * 1e3).toISOString();
+          continue;
+        }
+        if (raw.startsWith("	")) {
+          lines.push({
+            line_number: lineNumber,
+            hash: currentHash,
+            author: currentAuthor,
+            date: currentDate,
+            content: raw.slice(1)
+          });
+        }
+      }
+      return {
+        file: filePath,
+        lines,
+        unique_authors: [...uniqueAuthors],
+        unique_commits: [...uniqueCommits]
+      };
+    }
+    function branchInfo(cwd) {
+      const branchResult = execGit(cwd, ["rev-parse", "--abbrev-ref", "HEAD"]);
+      const branch = branchResult.exitCode === 0 ? branchResult.stdout : null;
+      const headResult = execGit(cwd, ["rev-parse", "HEAD"]);
+      const headSha = headResult.exitCode === 0 ? headResult.stdout : null;
+      const isDetached = branch === "HEAD";
+      const shallowResult = execGit(cwd, ["rev-parse", "--is-shallow-repository"]);
+      const isShallow = shallowResult.exitCode === 0 && shallowResult.stdout === "true";
+      const statusResult = execGit(cwd, ["status", "--porcelain"]);
+      const dirtyLines = statusResult.exitCode === 0 && statusResult.stdout ? statusResult.stdout.split("\n").filter(Boolean) : [];
+      const hasDirtyFiles = dirtyLines.length > 0;
+      const dirtyFileCount = dirtyLines.length;
+      let gitDir = cwd;
+      try {
+        const gitDirResult = execGit(cwd, ["rev-parse", "--git-dir"]);
+        if (gitDirResult.exitCode === 0) {
+          gitDir = path.resolve(cwd, gitDirResult.stdout);
+        }
+      } catch (e) {
+        debugLog("git.branchInfo", "git-dir resolution failed", e);
+      }
+      const isRebasing = fs.existsSync(path.join(gitDir, "rebase-merge")) || fs.existsSync(path.join(gitDir, "rebase-apply"));
+      let upstream = null;
+      if (!isDetached) {
+        const upstreamResult = execGit(cwd, ["rev-list", "--left-right", "--count", "HEAD...@{upstream}"]);
+        if (upstreamResult.exitCode === 0 && upstreamResult.stdout) {
+          const [ahead, behind] = upstreamResult.stdout.split("	").map(Number);
+          const upstreamNameResult = execGit(cwd, ["rev-parse", "--abbrev-ref", "@{upstream}"]);
+          if (upstreamNameResult.exitCode === 0) {
+            const parts = upstreamNameResult.stdout.split("/");
+            upstream = {
+              remote: parts[0],
+              branch: parts.slice(1).join("/"),
+              ahead: ahead || 0,
+              behind: behind || 0
+            };
+          }
+        }
+      }
+      return {
+        branch,
+        head_sha: headSha,
+        is_detached: isDetached,
+        is_shallow: isShallow,
+        has_dirty_files: hasDirtyFiles,
+        dirty_file_count: dirtyFileCount,
+        is_rebasing: isRebasing,
+        upstream
+      };
+    }
+    module2.exports = { execGit, structuredLog, diffSummary, blame, branchInfo };
+  }
+});
+
+// src/lib/format.js
+var require_format = __commonJS({
+  "src/lib/format.js"(exports2, module2) {
+    "use strict";
+    function getTerminalWidth() {
+      return process.stdout.columns || 80;
+    }
+    function isTTY() {
+      return !!process.stdout.isTTY;
+    }
+    var _colorEnabled = (() => {
+      if ("NO_COLOR" in process.env) return false;
+      if (!process.stdout.isTTY) return false;
+      if (process.env.FORCE_COLOR) return true;
+      return true;
+    })();
+    function _wrap(open, close) {
+      if (!_colorEnabled) return (s) => String(s);
+      return (s) => `\x1B[${open}m${s}\x1B[${close}m`;
+    }
+    var color = {
+      enabled: _colorEnabled,
+      // Modifiers
+      bold: _wrap("1", "22"),
+      dim: _wrap("2", "22"),
+      underline: _wrap("4", "24"),
+      // Colors
+      red: _wrap("31", "39"),
+      green: _wrap("32", "39"),
+      yellow: _wrap("33", "39"),
+      blue: _wrap("34", "39"),
+      magenta: _wrap("35", "39"),
+      cyan: _wrap("36", "39"),
+      white: _wrap("37", "39"),
+      gray: _wrap("90", "39")
+    };
+    function colorByPercent(percent) {
+      if (percent <= 33) return color.red;
+      if (percent <= 66) return color.yellow;
+      return color.green;
+    }
+    var SYMBOLS = {
+      check: "\u2713",
+      // ✓
+      cross: "\u2717",
+      // ✗
+      progress: "\u25B6",
+      // ▶
+      pending: "\u25CB",
+      // ○
+      warning: "\u26A0",
+      // ⚠
+      arrow: "\u2192",
+      // →
+      bullet: "\u2022",
+      // •
+      dash: "\u2500",
+      // ─
+      heavyDash: "\u2501"
+      // ━
+    };
+    var _ansiRegex = /\x1b\[[0-9;]*m/g;
+    function stripAnsi(text) {
+      return String(text).replace(_ansiRegex, "");
+    }
+    function truncate(text, maxWidth) {
+      const str = String(text);
+      const visible = stripAnsi(str);
+      if (visible.length <= maxWidth) return str;
+      if (maxWidth <= 1) return "\u2026";
+      return visible.slice(0, maxWidth - 1) + "\u2026";
+    }
+    function relativeTime(dateStr) {
+      const then = new Date(dateStr);
+      if (isNaN(then.getTime())) return String(dateStr);
+      const now = /* @__PURE__ */ new Date();
+      const diffMs = now - then;
+      const diffSec = Math.floor(diffMs / 1e3);
+      const diffMin = Math.floor(diffSec / 60);
+      const diffHr = Math.floor(diffMin / 60);
+      const diffDay = Math.floor(diffHr / 24);
+      if (diffSec < 0) return "in the future";
+      if (diffSec < 60) return "just now";
+      if (diffMin < 60) return `${diffMin}m ago`;
+      if (diffHr < 24) return `${diffHr}h ago`;
+      if (diffDay === 1) return "yesterday";
+      if (diffDay < 30) return `${diffDay} days ago`;
+      if (diffDay < 365) {
+        const months = Math.floor(diffDay / 30);
+        return `${months} month${months > 1 ? "s" : ""} ago`;
+      }
+      const years = Math.floor(diffDay / 365);
+      return `${years} year${years > 1 ? "s" : ""} ago`;
+    }
+    function pad(text, width, align = "left") {
+      const str = String(text);
+      const visible = stripAnsi(str);
+      const diff = width - visible.length;
+      if (diff <= 0) return str;
+      if (align === "right") return " ".repeat(diff) + str;
+      if (align === "center") {
+        const left = Math.floor(diff / 2);
+        const right = diff - left;
+        return " ".repeat(left) + str + " ".repeat(right);
+      }
+      return str + " ".repeat(diff);
+    }
+    function formatTable(headers, rows, options = {}) {
+      const {
+        maxWidth = getTerminalWidth(),
+        truncate: doTruncate = true,
+        borders = false,
+        indent = 1,
+        colorFn = null,
+        maxRows = 10,
+        showAll = false
+      } = options;
+      if (!headers || headers.length === 0) return "";
+      const indentStr = " ".repeat(indent);
+      const colGap = 2;
+      const colCount = headers.length;
+      const colWidths = headers.map((h) => stripAnsi(String(h)).length);
+      for (const row of rows) {
+        for (let i = 0; i < colCount; i++) {
+          const cellLen = stripAnsi(String(row[i] || "")).length;
+          if (cellLen > colWidths[i]) colWidths[i] = cellLen;
+        }
+      }
+      const totalGap = (colCount - 1) * colGap + indent;
+      const availableWidth = maxWidth - totalGap;
+      const totalColWidth = colWidths.reduce((a, b) => a + b, 0);
+      if (totalColWidth > availableWidth && availableWidth > 0) {
+        const ratio = availableWidth / totalColWidth;
+        for (let i = 0; i < colCount; i++) {
+          colWidths[i] = Math.max(4, Math.floor(colWidths[i] * ratio));
+        }
+      }
+      const headerCells = headers.map(
+        (h, i) => color.bold(pad(truncateCell(String(h), colWidths[i], doTruncate), colWidths[i]))
+      );
+      const headerLine = indentStr + headerCells.join(" ".repeat(colGap));
+      const sepWidth = colWidths.reduce((a, b) => a + b, 0) + (colCount - 1) * colGap;
+      const separator = indentStr + SYMBOLS.dash.repeat(sepWidth);
+      const displayRows = !showAll && rows.length > maxRows ? rows.slice(0, maxRows) : rows;
+      const rowLines = displayRows.map((row, rowIdx) => {
+        const cells = [];
+        for (let i = 0; i < colCount; i++) {
+          let cellText = String(row[i] != null ? row[i] : "");
+          cellText = truncateCell(cellText, colWidths[i], doTruncate);
+          if (colorFn) {
+            cellText = colorFn(row[i], i, rowIdx);
+            cellText = truncateCell(String(cellText), colWidths[i], doTruncate);
+          }
+          cells.push(pad(cellText, colWidths[i]));
+        }
+        return indentStr + cells.join(" ".repeat(colGap));
+      });
+      const lines = [headerLine, separator, ...rowLines];
+      if (!showAll && rows.length > maxRows) {
+        const remaining = rows.length - maxRows;
+        lines.push(indentStr + color.dim(`... and ${remaining} more (use --all to see full list)`));
+      }
+      return lines.join("\n");
+    }
+    function truncateCell(text, maxWidth, doTruncate) {
+      if (!doTruncate) return text;
+      return truncate(text, maxWidth);
+    }
+    function progressBar(percent, width = 20) {
+      const pct = Math.max(0, Math.min(100, Math.round(percent)));
+      const filled = Math.round(pct / 100 * width);
+      const empty = width - filled;
+      const bar = "\u2588".repeat(filled) + "\u2591".repeat(empty);
+      const colorFn = colorByPercent(pct);
+      const pctStr = String(pct).padStart(3) + "%";
+      return `${colorFn(pctStr)} [${colorFn(bar)}]`;
+    }
+    function sectionHeader(label) {
+      const termWidth = getTerminalWidth();
+      const prefix = SYMBOLS.heavyDash.repeat(2) + " ";
+      const labelStr = color.bold(color.cyan(label));
+      const labelLen = stripAnsi(label).length;
+      const suffixLen = Math.max(4, termWidth - 2 - 1 - labelLen - 1);
+      const suffix = " " + SYMBOLS.heavyDash.repeat(suffixLen);
+      return prefix + labelStr + suffix;
+    }
+    function banner(title, options = {}) {
+      const { completion = false } = options;
+      const termWidth = getTerminalWidth();
+      if (completion) {
+        const rule2 = SYMBOLS.heavyDash.repeat(Math.min(termWidth, 60));
+        const line = `${SYMBOLS.check} ${title}`;
+        return [
+          color.green(rule2),
+          color.bold(color.green(line)),
+          color.green(rule2)
+        ].join("\n");
+      }
+      const prefix = color.dim("bGSD") + " " + color.cyan(SYMBOLS.progress) + " ";
+      const titleStr = color.bold(title);
+      const ruleLen = Math.min(termWidth, 60);
+      const rule = color.dim(SYMBOLS.dash.repeat(ruleLen));
+      return prefix + titleStr + "\n" + rule;
+    }
+    var _boxPrefixes = {
+      info: { fn: color.cyan, label: "INFO" },
+      warning: { fn: color.yellow, label: "WARNING" },
+      error: { fn: color.red, label: "ERROR" },
+      success: { fn: color.green, label: "SUCCESS" }
+    };
+    function box(content, type = "info") {
+      const termWidth = getTerminalWidth();
+      const ruleLen = Math.min(termWidth, 60);
+      const cfg = _boxPrefixes[type] || _boxPrefixes.info;
+      const topRule = cfg.fn(SYMBOLS.dash.repeat(ruleLen));
+      const prefix = cfg.fn(color.bold(cfg.label + ":"));
+      const bottomRule = cfg.fn(SYMBOLS.dash.repeat(ruleLen));
+      return [topRule, prefix + " " + content, bottomRule].join("\n");
+    }
+    function summaryLine(text) {
+      const ruleLen = Math.min(getTerminalWidth(), 60);
+      const rule = color.dim(SYMBOLS.dash.repeat(ruleLen));
+      return rule + "\n" + color.bold(text);
+    }
+    function actionHint(text) {
+      return color.dim(SYMBOLS.arrow + " " + text);
+    }
+    function listWithTruncation(items, maxItems = 10, showAll = false) {
+      if (!items || items.length === 0) return "";
+      const display = !showAll && items.length > maxItems ? items.slice(0, maxItems) : items;
+      const lines = display.map((item, i) => ` ${i + 1}. ${item}`);
+      if (!showAll && items.length > maxItems) {
+        const remaining = items.length - maxItems;
+        lines.push(color.dim(` ... and ${remaining} more (use --all to see full list)`));
+      }
+      return lines.join("\n");
+    }
+    module2.exports = {
+      // Terminal
+      getTerminalWidth,
+      isTTY,
+      // Color
+      color,
+      colorByPercent,
+      // Symbols
+      SYMBOLS,
+      // Helpers
+      stripAnsi,
+      truncate,
+      relativeTime,
+      pad,
+      // Renderers
+      formatTable,
+      progressBar,
+      sectionHeader,
+      banner,
+      box,
+      summaryLine,
+      actionHint,
+      listWithTruncation
+    };
   }
 });
 
@@ -2187,6 +2659,7 @@ var require_state = __commonJS({
     var { loadConfig } = require_config();
     var { safeReadFile, cachedReadFile, invalidateFileCache, normalizePhaseName, findPhaseInternal, getPhaseTree } = require_helpers();
     var { execGit } = require_git();
+    var { banner, sectionHeader, formatTable, summaryLine, actionHint, color, SYMBOLS, progressBar, box } = require_format();
     var _fieldRegexCache = /* @__PURE__ */ new Map();
     function getFieldExtractRegex(fieldName) {
       const key = `extract:${fieldName}`;
@@ -2202,6 +2675,48 @@ var require_state = __commonJS({
       const pattern = new RegExp(`(\\*\\*${escaped}:\\*\\*\\s*)(.*)`, "i");
       _fieldRegexCache.set(key, pattern);
       return pattern;
+    }
+    function formatStateShow(result) {
+      const lines = [];
+      const c = result.config || {};
+      lines.push(banner("State"));
+      lines.push("");
+      lines.push(sectionHeader("Configuration"));
+      const configItems = [
+        ["model_profile", c.model_profile || "default"],
+        ["commit_docs", String(c.commit_docs ?? "true")],
+        ["branching_strategy", c.branching_strategy || "none"],
+        ["parallelization", String(c.parallelization ?? "false")]
+      ];
+      for (const [key, val] of configItems) {
+        lines.push(` ${color.dim(key + ":")} ${val}`);
+      }
+      lines.push("");
+      lines.push(sectionHeader("Files"));
+      const fileChecks = [
+        ["STATE.md", result.state_exists],
+        ["ROADMAP.md", result.roadmap_exists],
+        ["config.json", result.config_exists]
+      ];
+      for (const [name, exists] of fileChecks) {
+        const icon = exists ? color.green(SYMBOLS.check) : color.red(SYMBOLS.cross);
+        lines.push(` ${icon} ${name}`);
+      }
+      lines.push("");
+      lines.push(summaryLine("State loaded"));
+      return lines.join("\n");
+    }
+    function formatStateUpdateProgress(result) {
+      const lines = [];
+      if (result.updated) {
+        lines.push(box(`Progress updated: ${result.percent}%`, "success"));
+        lines.push("");
+        lines.push(progressBar(result.percent));
+        lines.push(` ${result.completed}/${result.total} plans`);
+      } else {
+        lines.push(box(result.reason || "Update failed", "warning"));
+      }
+      return lines.join("\n");
     }
     function cmdStateLoad(cwd, raw) {
       const config = loadConfig(cwd);
@@ -2243,7 +2758,7 @@ var require_state = __commonJS({
         `roadmap_exists=${roadmapExists}`,
         `state_exists=${stateExists}`
       ].join("\n");
-      output(result, raw, rawLines);
+      output(result, { formatter: formatStateShow, rawValue: rawLines });
     }
     function cmdStateGet(cwd, section, raw) {
       const statePath = path.join(cwd, ".planning", "STATE.md");
@@ -2411,9 +2926,9 @@ var require_state = __commonJS({
         content = content.replace(progressPattern, `$1${progressStr}`);
         fs.writeFileSync(statePath, content, "utf-8");
         invalidateFileCache(statePath);
-        output({ updated: true, percent, completed: totalSummaries, total: totalPlans, bar: progressStr }, raw, progressStr);
+        output({ updated: true, percent, completed: totalSummaries, total: totalPlans, bar: progressStr }, { formatter: formatStateUpdateProgress, rawValue: progressStr });
       } else {
-        output({ updated: false, reason: "Progress field not found in STATE.md" }, raw, "false");
+        output({ updated: false, reason: "Progress field not found in STATE.md" }, { formatter: formatStateUpdateProgress, rawValue: "false" });
       }
     }
     function cmdStateAddDecision(cwd, options, raw) {
@@ -3769,6 +4284,7 @@ var require_verify = __commonJS({
     var { safeReadFile, cachedReadFile, findPhaseInternal, normalizePhaseName, parseMustHavesBlock, getArchivedPhaseDirs, getMilestoneInfo, getPhaseTree } = require_helpers();
     var { extractFrontmatter } = require_frontmatter();
     var { execGit } = require_git();
+    var { banner, sectionHeader, formatTable, summaryLine, color, SYMBOLS, colorByPercent, progressBar, box } = require_format();
     function cmdVerifyPlanStructure(cwd, filePath, raw) {
       if (!filePath) {
         error("file path required");
@@ -4574,6 +5090,46 @@ var require_verify = __commonJS({
         verdict
       }, raw, verdict);
     }
+    function formatVerifyRequirements(result) {
+      const lines = [];
+      lines.push(banner("Requirements"));
+      lines.push("");
+      if (result.error) {
+        lines.push(box(result.error, "warning"));
+        return lines.join("\n");
+      }
+      const addressedPercent = result.total > 0 ? Math.round(result.addressed / result.total * 100) : 0;
+      lines.push(`  ${result.addressed}/${result.total} requirements addressed`);
+      lines.push("  " + progressBar(addressedPercent));
+      lines.push("");
+      if (result.unaddressed_list && result.unaddressed_list.length > 0) {
+        lines.push(sectionHeader("Unaddressed"));
+        lines.push("");
+        const rows = result.unaddressed_list.map((u) => [
+          SYMBOLS.cross + " " + u.id,
+          u.phase ? "Phase " + u.phase : color.dim("n/a"),
+          u.reason || ""
+        ]);
+        lines.push(formatTable(["ID", "Phase", "Reason"], rows));
+        lines.push("");
+      }
+      if (result.assertions) {
+        const a = result.assertions;
+        lines.push(sectionHeader("Assertions"));
+        lines.push("");
+        const passStr = color.green(a.verified + " pass");
+        const failStr = a.failed > 0 ? color.red(a.failed + " fail") : color.dim(a.failed + " fail");
+        const humanStr = a.needs_human > 0 ? color.yellow(a.needs_human + " needs human") : color.dim(a.needs_human + " needs human");
+        lines.push("  " + passStr + ", " + failStr + ", " + humanStr);
+        lines.push("");
+      }
+      if (result.addressed === result.total) {
+        lines.push(summaryLine(SYMBOLS.check + " All requirements addressed"));
+      } else {
+        lines.push(summaryLine(result.unaddressed + " requirements need attention"));
+      }
+      return lines.join("\n");
+    }
     function cmdVerifyRequirements(cwd, options, raw) {
       const reqPath = path.join(cwd, ".planning", "REQUIREMENTS.md");
       const content = safeReadFile(reqPath);
@@ -4790,7 +5346,7 @@ var require_verify = __commonJS({
       } else {
         rawValue = unaddressedList.length === 0 ? "pass" : "fail";
       }
-      output(result, raw, rawValue);
+      output(result, { formatter: formatVerifyRequirements, rawValue });
     }
     function cmdVerifyRegression(cwd, options, raw) {
       const memoryDir = path.join(cwd, ".planning", "memory");
@@ -4982,29 +5538,29 @@ var require_verify = __commonJS({
         }
       }
       const WHITE = 0, GRAY = 1, BLACK = 2;
-      const color = {};
-      for (const id of planIds) color[id] = WHITE;
+      const color2 = {};
+      for (const id of planIds) color2[id] = WHITE;
       function dfs(node, pathStack) {
-        color[node] = GRAY;
+        color2[node] = GRAY;
         pathStack.push(node);
         const deps = plans[node] ? plans[node].deps : [];
         for (const dep of deps) {
           if (!planIds.has(dep)) continue;
-          if (color[dep] === GRAY) {
+          if (color2[dep] === GRAY) {
             const cycleStart = pathStack.indexOf(dep);
             const cycle = pathStack.slice(cycleStart).concat(dep);
             issues.push({ type: "cycle", plans: cycle, message: `Dependency cycle: ${cycle.join(" \u2192 ")}` });
             return;
           }
-          if (color[dep] === WHITE) {
+          if (color2[dep] === WHITE) {
             dfs(dep, pathStack);
           }
         }
         pathStack.pop();
-        color[node] = BLACK;
+        color2[node] = BLACK;
       }
       for (const id of planIds) {
-        if (color[id] === WHITE) {
+        if (color2[id] === WHITE) {
           dfs(id, []);
         }
       }
@@ -5031,6 +5587,45 @@ var require_verify = __commonJS({
         issues,
         verdict
       }, raw, verdict);
+    }
+    function formatVerifyQuality(result) {
+      const lines = [];
+      lines.push(banner("Quality"));
+      lines.push("");
+      const scorePct = Math.max(0, Math.min(100, result.score || 0));
+      const gradeColor = colorByPercent(scorePct);
+      lines.push("  " + color.bold(gradeColor(result.grade)) + " " + gradeColor("(" + scorePct + "/100)"));
+      lines.push("");
+      const dimNames = { tests: "Tests", must_haves: "Must-Haves", requirements: "Requirements", regression: "Regression" };
+      lines.push(sectionHeader("Dimensions"));
+      lines.push("");
+      const rows = [];
+      for (const [key, dim] of Object.entries(result.dimensions || {})) {
+        const name = dimNames[key] || key;
+        let scoreStr;
+        if (dim.score === null || dim.score === void 0) {
+          scoreStr = color.dim("n/a");
+        } else {
+          const dimColor = colorByPercent(dim.score);
+          scoreStr = dimColor(String(dim.score));
+        }
+        rows.push([name, scoreStr, String(dim.weight) + "%", dim.detail || ""]);
+      }
+      lines.push(formatTable(["Dimension", "Score", "Weight", "Detail"], rows));
+      lines.push("");
+      const trend = result.trend || "stable";
+      let trendStr;
+      if (trend === "improving") {
+        trendStr = color.green("\u2191 improving");
+      } else if (trend === "declining") {
+        trendStr = color.red("\u2193 declining");
+      } else {
+        trendStr = color.dim("\u2192 stable");
+      }
+      lines.push("  Trend: " + trendStr);
+      lines.push("");
+      lines.push(summaryLine("Quality: " + result.grade + " (" + scorePct + "/100) \u2014 " + trend));
+      return lines.join("\n");
     }
     function cmdVerifyQuality(cwd, options, raw) {
       const { execSync } = require("child_process");
@@ -5262,7 +5857,7 @@ var require_verify = __commonJS({
         trend,
         plan: planId,
         phase: phaseNum || (planId ? planId.split("-")[0] : null)
-      }, raw);
+      }, { formatter: formatVerifyQuality });
     }
     function cmdAssertionsList(cwd, options, raw) {
       const assertionsPath = path.join(cwd, ".planning", "ASSERTIONS.md");
@@ -5441,6 +6036,7 @@ var require_intent = __commonJS({
     var { execGit } = require_git();
     var { parseIntentMd, generateIntentMd, parsePlanIntent, getMilestoneInfo, normalizePhaseName } = require_helpers();
     var { extractFrontmatter } = require_frontmatter();
+    var { banner, sectionHeader, formatTable, summaryLine, color, SYMBOLS, box, colorByPercent, actionHint } = require_format();
     function cmdIntentCreate(cwd, args, raw) {
       const planningDir = path.join(cwd, ".planning");
       if (!fs.existsSync(planningDir)) {
@@ -5526,6 +6122,19 @@ var require_intent = __commonJS({
       output(result, raw, commitHash || "created");
     }
     var SECTION_ALIASES = ["objective", "users", "outcomes", "criteria", "constraints", "health", "history"];
+    function makeFormatIntentShow(args, rawContent) {
+      const sectionFilter = args.length > 0 && SECTION_ALIASES.includes(args[0]) ? args[0] : null;
+      const fullFlag = args.includes("--full");
+      return function formatIntentShow(data) {
+        if (fullFlag) {
+          return rawContent;
+        }
+        if (sectionFilter) {
+          return renderSection(data, sectionFilter);
+        }
+        return renderCompactSummary(data);
+      };
+    }
     function cmdIntentShow(cwd, args, raw) {
       const planningDir = path.join(cwd, ".planning");
       const intentPath = path.join(planningDir, "INTENT.md");
@@ -5535,7 +6144,6 @@ var require_intent = __commonJS({
       const content = fs.readFileSync(intentPath, "utf-8");
       const data = parseIntentMd(content);
       const sectionFilter = args.length > 0 && SECTION_ALIASES.includes(args[0]) ? args[0] : null;
-      const fullFlag = args.includes("--full");
       if (raw) {
         if (sectionFilter) {
           const sectionData = {};
@@ -5546,27 +6154,23 @@ var require_intent = __commonJS({
         }
         return;
       }
-      if (fullFlag) {
-        output(null, true, content);
-        return;
-      }
       if (sectionFilter) {
-        const sectionContent = renderSection(data, sectionFilter);
-        output(null, true, sectionContent);
-        return;
+        const sectionData = {};
+        sectionData[sectionFilter] = data[sectionFilter];
+        output(sectionData, { formatter: makeFormatIntentShow(args, content) });
+      } else {
+        output(data, { formatter: makeFormatIntentShow(args, content) });
       }
-      const summary = renderCompactSummary(data);
-      output(null, true, summary);
     }
     function renderCompactSummary(data) {
       const lines = [];
-      const isTTY = process.stdout.isTTY;
       const updated = data.updated || "unknown";
-      lines.push(`INTENT \u2014 Revision ${data.revision || "?"} (updated ${updated})`);
+      lines.push(banner("Intent"));
+      lines.push(`  Revision ${color.bold(String(data.revision || "?"))} (updated ${updated})`);
       lines.push("");
       const obj = data.objective.statement || "(not set)";
       const truncObj = obj.length > 80 ? obj.slice(0, 77) + "..." : obj;
-      lines.push(`Objective: ${truncObj}`);
+      lines.push(`  Objective: ${truncObj}`);
       lines.push("");
       if (data.outcomes.length > 0) {
         const sorted = [...data.outcomes].sort((a, b) => {
@@ -5582,37 +6186,40 @@ var require_intent = __commonJS({
         if (counts.P1 > 0) countParts.push(`${counts.P1}\xD7P1`);
         if (counts.P2 > 0) countParts.push(`${counts.P2}\xD7P2`);
         if (counts.P3 > 0) countParts.push(`${counts.P3}\xD7P3`);
-        lines.push(`Outcomes (${sorted.length}): ${countParts.join("  ")}`);
+        lines.push(sectionHeader("Outcomes"));
+        lines.push(`  ${sorted.length} outcomes: ${countParts.join("  ")}`);
         for (const o of sorted) {
-          const priorityLabel = colorPriority(o.priority, isTTY);
-          lines.push(`  ${priorityLabel}: ${o.id} \u2014 ${o.text}`);
+          const priorityLabel = colorPriority(o.priority);
+          lines.push(`  ${priorityLabel}: ${o.id} ${SYMBOLS.dash} ${o.text}`);
         }
       } else {
-        lines.push("Outcomes: none defined");
+        lines.push(sectionHeader("Outcomes"));
+        lines.push("  none defined");
       }
       lines.push("");
-      lines.push(`Success Criteria: ${data.criteria.length} defined`);
+      lines.push(`  Success Criteria: ${color.bold(String(data.criteria.length))} defined`);
       const techCount = data.constraints.technical.length;
       const bizCount = data.constraints.business.length;
       const timeCount = data.constraints.timeline.length;
-      lines.push(`Constraints: ${techCount} technical, ${bizCount} business, ${timeCount} timeline`);
+      lines.push(`  Constraints: ${techCount} technical, ${bizCount} business, ${timeCount} timeline`);
       const quantCount = data.health.quantitative.length;
       const hasQual = data.health.qualitative && data.health.qualitative.trim() ? "defined" : "none";
-      lines.push(`Health Metrics: ${quantCount} quantitative, qualitative ${hasQual}`);
-      lines.push(`Target Users: ${data.users.length} audience${data.users.length !== 1 ? "s" : ""}`);
+      lines.push(`  Health Metrics: ${quantCount} quantitative, qualitative ${hasQual}`);
+      lines.push(`  Target Users: ${data.users.length} audience${data.users.length !== 1 ? "s" : ""}`);
       if (data.history && data.history.length > 0) {
         const totalChanges = data.history.reduce((sum, e) => sum + e.changes.length, 0);
         const milestones = data.history.map((e) => e.milestone).join(", ");
-        lines.push(`Evolution: ${totalChanges} change${totalChanges !== 1 ? "s" : ""} across ${milestones}`);
+        lines.push(`  Evolution: ${totalChanges} change${totalChanges !== 1 ? "s" : ""} across ${milestones}`);
       }
+      lines.push("");
+      lines.push(summaryLine(`Rev ${data.revision || "?"} ${SYMBOLS.dash} ${data.outcomes.length} outcomes, ${data.criteria.length} criteria`));
       return lines.join("\n") + "\n";
     }
     function renderSection(data, section) {
-      const isTTY = process.stdout.isTTY;
       const lines = [];
       switch (section) {
         case "objective":
-          lines.push("## Objective");
+          lines.push(sectionHeader("Objective"));
           lines.push("");
           lines.push(data.objective.statement || "(not set)");
           if (data.objective.elaboration) {
@@ -5621,7 +6228,7 @@ var require_intent = __commonJS({
           }
           break;
         case "users":
-          lines.push("## Target Users");
+          lines.push(sectionHeader("Target Users"));
           lines.push("");
           if (data.users.length > 0) {
             for (const u of data.users) {
@@ -5632,7 +6239,7 @@ var require_intent = __commonJS({
           }
           break;
         case "outcomes":
-          lines.push("## Desired Outcomes");
+          lines.push(sectionHeader("Desired Outcomes"));
           lines.push("");
           if (data.outcomes.length > 0) {
             const sorted = [...data.outcomes].sort((a, b) => {
@@ -5641,7 +6248,7 @@ var require_intent = __commonJS({
               return pa - pb;
             });
             for (const o of sorted) {
-              const priorityLabel = colorPriority(o.priority, isTTY);
+              const priorityLabel = colorPriority(o.priority);
               lines.push(`- ${o.id} [${priorityLabel}]: ${o.text}`);
             }
           } else {
@@ -5649,7 +6256,7 @@ var require_intent = __commonJS({
           }
           break;
         case "criteria":
-          lines.push("## Success Criteria");
+          lines.push(sectionHeader("Success Criteria"));
           lines.push("");
           if (data.criteria.length > 0) {
             for (const c of data.criteria) {
@@ -5660,26 +6267,26 @@ var require_intent = __commonJS({
           }
           break;
         case "constraints":
-          lines.push("## Constraints");
+          lines.push(sectionHeader("Constraints"));
           if (data.constraints.technical.length > 0) {
             lines.push("");
-            lines.push("### Technical");
+            lines.push(`  ${color.bold("Technical")}`);
             for (const c of data.constraints.technical) {
-              lines.push(`- ${c.id}: ${c.text}`);
+              lines.push(`  - ${c.id}: ${c.text}`);
             }
           }
           if (data.constraints.business.length > 0) {
             lines.push("");
-            lines.push("### Business");
+            lines.push(`  ${color.bold("Business")}`);
             for (const c of data.constraints.business) {
-              lines.push(`- ${c.id}: ${c.text}`);
+              lines.push(`  - ${c.id}: ${c.text}`);
             }
           }
           if (data.constraints.timeline.length > 0) {
             lines.push("");
-            lines.push("### Timeline");
+            lines.push(`  ${color.bold("Timeline")}`);
             for (const c of data.constraints.timeline) {
-              lines.push(`- ${c.id}: ${c.text}`);
+              lines.push(`  - ${c.id}: ${c.text}`);
             }
           }
           if (data.constraints.technical.length === 0 && data.constraints.business.length === 0 && data.constraints.timeline.length === 0) {
@@ -5688,17 +6295,17 @@ var require_intent = __commonJS({
           }
           break;
         case "health":
-          lines.push("## Health Metrics");
+          lines.push(sectionHeader("Health Metrics"));
           if (data.health.quantitative.length > 0) {
             lines.push("");
-            lines.push("### Quantitative");
+            lines.push(`  ${color.bold("Quantitative")}`);
             for (const m of data.health.quantitative) {
-              lines.push(`- ${m.id}: ${m.text}`);
+              lines.push(`  - ${m.id}: ${m.text}`);
             }
           }
           if (data.health.qualitative && data.health.qualitative.trim()) {
             lines.push("");
-            lines.push("### Qualitative");
+            lines.push(`  ${color.bold("Qualitative")}`);
             lines.push(data.health.qualitative);
           }
           if (data.health.quantitative.length === 0 && (!data.health.qualitative || !data.health.qualitative.trim())) {
@@ -5707,15 +6314,15 @@ var require_intent = __commonJS({
           }
           break;
         case "history":
-          lines.push("## Intent Evolution");
+          lines.push(sectionHeader("Intent Evolution"));
           lines.push("");
           if (data.history && data.history.length > 0) {
             for (const entry of data.history) {
-              lines.push(`### ${entry.milestone} \u2014 ${entry.date}`);
+              lines.push(`  ${color.bold(entry.milestone)} ${SYMBOLS.dash} ${entry.date}`);
               for (const change of entry.changes) {
-                lines.push(`- **${change.type}** ${change.target}: ${change.description}`);
+                lines.push(`  - ${color.bold(change.type)} ${change.target}: ${change.description}`);
                 if (change.reason) {
-                  lines.push(`  - Reason: ${change.reason}`);
+                  lines.push(`    Reason: ${change.reason}`);
                 }
               }
               lines.push("");
@@ -5727,15 +6334,14 @@ var require_intent = __commonJS({
       }
       return lines.join("\n") + "\n";
     }
-    function colorPriority(priority, isTTY) {
-      if (!isTTY) return priority;
+    function colorPriority(priority) {
       switch (priority) {
         case "P1":
-          return "\x1B[31mP1\x1B[0m";
+          return color.red(priority);
         case "P2":
-          return "\x1B[33mP2\x1B[0m";
+          return color.yellow(priority);
         case "P3":
-          return "\x1B[2mP3\x1B[0m";
+          return color.dim(priority);
         default:
           return priority;
       }
@@ -6013,6 +6619,78 @@ var require_intent = __commonJS({
       const nextNum = (maxNum + 1).toString().padStart(2, "0");
       return `${prefix}-${nextNum}`;
     }
+    function formatIntentValidate(result) {
+      const lines = [];
+      lines.push(banner("Intent Validate"));
+      lines.push("");
+      if (result.valid) {
+        lines.push(box("Intent is valid", "success"));
+      } else {
+        lines.push(box(`${result.issues.length} issue${result.issues.length !== 1 ? "s" : ""} found`, "error"));
+      }
+      lines.push("");
+      lines.push(sectionHeader("Sections"));
+      const sections = result.sections;
+      const sym = (v) => v ? color.green(SYMBOLS.check) : color.red(SYMBOLS.cross);
+      lines.push(`  ${sym(sections.objective.valid)} Objective: ${sections.objective.message || "defined"}`);
+      if (sections.users.valid) {
+        lines.push(`  ${sym(true)} Target Users: ${sections.users.count} audience${sections.users.count !== 1 ? "s" : ""}`);
+      } else {
+        lines.push(`  ${sym(false)} Target Users: missing or empty`);
+      }
+      if (sections.outcomes.valid) {
+        lines.push(`  ${sym(true)} Outcomes: ${sections.outcomes.count} items, IDs valid`);
+      } else if (sections.outcomes.count > 0) {
+        lines.push(`  ${sym(false)} Outcomes: ${(sections.outcomes.issues || []).join("; ")}`);
+      } else {
+        lines.push(`  ${sym(false)} Outcomes: no items defined (minimum 1)`);
+      }
+      if (sections.criteria.valid) {
+        lines.push(`  ${sym(true)} Success Criteria: ${sections.criteria.count} items, IDs valid`);
+      } else if (sections.criteria.count > 0) {
+        lines.push(`  ${sym(false)} Success Criteria: ${(sections.criteria.issues || []).join("; ")}`);
+      } else {
+        lines.push(`  ${sym(false)} Success Criteria: no items defined (minimum 1)`);
+      }
+      if (sections.constraints.valid) {
+        const subCount = (sections.constraints.sub_sections || []).length;
+        lines.push(`  ${sym(true)} Constraints: ${subCount} sub-section${subCount !== 1 ? "s" : ""} (${(sections.constraints.sub_sections || []).join(", ")})`);
+      } else {
+        lines.push(`  ${sym(false)} Constraints: ${(sections.constraints.issues || []).join("; ")}`);
+      }
+      if (sections.health.valid) {
+        lines.push(`  ${sym(true)} Health Metrics: quantitative (${sections.health.quantitative_count} items), qualitative ${sections.health.qualitative ? "defined" : "none"}`);
+      } else {
+        lines.push(`  ${sym(false)} Health Metrics: ${(sections.health.issues || []).join("; ")}`);
+      }
+      if (result.revision && Number.isInteger(result.revision) && result.revision > 0) {
+        lines.push(`  ${sym(true)} Revision: ${result.revision}`);
+      } else {
+        lines.push(`  ${sym(false)} Revision: missing or invalid`);
+      }
+      if (sections.history) {
+        if (sections.history.valid) {
+          lines.push(`  ${sym(true)} History: ${sections.history.count} milestone${sections.history.count !== 1 ? "s" : ""} recorded`);
+        } else {
+          lines.push(`  ${color.yellow(SYMBOLS.warning)} History: ${(sections.history.issues || []).join("; ")}`);
+        }
+      }
+      if (result.issues.length > 0) {
+        lines.push("");
+        lines.push(sectionHeader("Issues"));
+        for (const iss of result.issues) {
+          lines.push(`  ${color.red(SYMBOLS.cross)} ${iss.message}`);
+        }
+      }
+      lines.push("");
+      if (result.valid) {
+        const warningNote = result.warnings && result.warnings.length > 0 ? ` (${result.warnings.length} advisory warning${result.warnings.length !== 1 ? "s" : ""})` : "";
+        lines.push(summaryLine(`${SYMBOLS.check} Intent valid${warningNote}`));
+      } else {
+        lines.push(summaryLine(`${result.issues.length} issue${result.issues.length !== 1 ? "s" : ""}`));
+      }
+      return lines.join("\n");
+    }
     function cmdIntentValidate(cwd, args, raw) {
       const planningDir = path.join(cwd, ".planning");
       const intentPath = path.join(planningDir, "INTENT.md");
@@ -6212,69 +6890,8 @@ var require_intent = __commonJS({
         sections,
         revision: revision || null
       };
-      if (raw) {
-        process.stdout.write(JSON.stringify(result, null, 2));
-        process.exit(valid ? 0 : 1);
-      } else {
-        const lines = [];
-        lines.push("INTENT Validation \u2014 .planning/INTENT.md");
-        lines.push("");
-        const sym = (v) => v ? "\u2713" : "\u2717";
-        lines.push(`${sym(sections.objective.valid)} Objective: ${sections.objective.message || "defined"}`);
-        if (sections.users.valid) {
-          lines.push(`${sym(true)} Target Users: ${sections.users.count} audience${sections.users.count !== 1 ? "s" : ""}`);
-        } else {
-          lines.push(`${sym(false)} Target Users: missing or empty`);
-        }
-        if (sections.outcomes.valid) {
-          lines.push(`${sym(true)} Outcomes: ${sections.outcomes.count} items, IDs valid`);
-        } else if (sections.outcomes.count > 0) {
-          lines.push(`${sym(false)} Outcomes: ${(sections.outcomes.issues || []).join("; ")}`);
-        } else {
-          lines.push(`${sym(false)} Outcomes: no items defined (minimum 1)`);
-        }
-        if (sections.criteria.valid) {
-          lines.push(`${sym(true)} Success Criteria: ${sections.criteria.count} items, IDs valid`);
-        } else if (sections.criteria.count > 0) {
-          lines.push(`${sym(false)} Success Criteria: ${(sections.criteria.issues || []).join("; ")}`);
-        } else {
-          lines.push(`${sym(false)} Success Criteria: no items defined (minimum 1)`);
-        }
-        if (sections.constraints.valid) {
-          const subCount = (sections.constraints.sub_sections || []).length;
-          lines.push(`${sym(true)} Constraints: ${subCount} sub-section${subCount !== 1 ? "s" : ""} (${(sections.constraints.sub_sections || []).join(", ")})`);
-        } else {
-          lines.push(`${sym(false)} Constraints: ${(sections.constraints.issues || []).join("; ")}`);
-        }
-        if (sections.health.valid) {
-          lines.push(`${sym(true)} Health Metrics: quantitative (${sections.health.quantitative_count} items), qualitative ${sections.health.qualitative ? "defined" : "none"}`);
-        } else {
-          lines.push(`${sym(false)} Health Metrics: ${(sections.health.issues || []).join("; ")}`);
-        }
-        if (revisionValid) {
-          lines.push(`${sym(true)} Revision: ${revision}`);
-        } else {
-          lines.push(`${sym(false)} Revision: missing or invalid`);
-        }
-        if (sections.history) {
-          if (sections.history.valid) {
-            lines.push(`${sym(true)} History: ${sections.history.count} milestone${sections.history.count !== 1 ? "s" : ""} recorded`);
-          } else {
-            lines.push(`\u26A0 History: ${(sections.history.issues || []).join("; ")}`);
-          }
-        }
-        lines.push("");
-        if (valid) {
-          lines.push("Result: valid");
-          if (warnings.length > 0) {
-            lines.push(`Warnings: ${warnings.length} advisory issue${warnings.length !== 1 ? "s" : ""}`);
-          }
-        } else {
-          lines.push(`Result: ${issues.length} issue${issues.length !== 1 ? "s" : ""} found`);
-        }
-        process.stdout.write(lines.join("\n") + "\n");
-        process.exit(valid ? 0 : 1);
-      }
+      if (!valid) process.exitCode = 1;
+      output(result, { formatter: formatIntentValidate });
     }
     function cmdIntentTrace(cwd, args, raw) {
       const planningDir = path.join(cwd, ".planning");
@@ -6580,6 +7197,58 @@ var require_intent = __commonJS({
         traced_plans: plans.length - untracedPlans.length
       };
     }
+    function formatIntentDrift(data) {
+      const lines = [];
+      lines.push(banner("Intent Drift"));
+      let scoreColorFn = color.green;
+      if (data.alignment === "moderate") scoreColorFn = color.yellow;
+      else if (data.alignment === "poor") scoreColorFn = color.red;
+      const scoreLabel = scoreColorFn(`${data.drift_score}/100 (${data.alignment})`);
+      lines.push(`  Score: ${scoreLabel}`);
+      lines.push("");
+      const cg = data.signals.coverage_gap;
+      lines.push(sectionHeader(`Coverage Gaps (${cg.score} pts)`));
+      if (cg.details.length === 0) {
+        lines.push(`  ${color.green(SYMBOLS.check)} All outcomes have plans`);
+      } else {
+        for (const gap of cg.details) {
+          lines.push(`  ${color.red(SYMBOLS.cross)} ${gap.outcome_id} [${colorPriority(gap.priority)}]: ${gap.text} ${SYMBOLS.dash} no plans`);
+        }
+      }
+      lines.push("");
+      const om = data.signals.objective_mismatch;
+      lines.push(sectionHeader(`Objective Mismatch (${om.score} pts)`));
+      if (om.plans.length === 0) {
+        lines.push(`  ${color.green(SYMBOLS.check)} All plans have intent sections`);
+      } else {
+        for (const planId of om.plans) {
+          lines.push(`  ${color.red(SYMBOLS.cross)} ${planId}: no intent section in frontmatter`);
+        }
+      }
+      lines.push("");
+      const fc = data.signals.feature_creep;
+      lines.push(sectionHeader(`Feature Creep (${fc.score} pts)`));
+      if (fc.invalid_refs.length === 0) {
+        lines.push(`  ${color.green(SYMBOLS.check)} No invalid outcome references`);
+      } else {
+        for (const ref of fc.invalid_refs) {
+          lines.push(`  ${color.red(SYMBOLS.cross)} ${ref.plan_id}: references non-existent ${ref.invalid_id}`);
+        }
+      }
+      lines.push("");
+      const pi = data.signals.priority_inversion;
+      lines.push(sectionHeader(`Priority Inversion (${pi.score} pts)`));
+      if (pi.inversions.length === 0) {
+        lines.push(`  ${color.green(SYMBOLS.check)} No priority inversions`);
+      } else {
+        for (const inv of pi.inversions) {
+          lines.push(`  ${color.yellow(SYMBOLS.warning)} ${inv.uncovered_id} [${inv.uncovered_priority}] uncovered, but ${inv.covered_id} [${inv.covered_priority}] has ${inv.covered_plan_count} plan${inv.covered_plan_count !== 1 ? "s" : ""}`);
+        }
+      }
+      lines.push("");
+      lines.push(summaryLine(`${data.covered_outcomes}/${data.total_outcomes} outcomes covered, ${data.traced_plans}/${data.total_plans} plans traced`));
+      return lines.join("\n");
+    }
     function cmdIntentDrift(cwd, args, raw) {
       const planningDir = path.join(cwd, ".planning");
       const intentPath = path.join(planningDir, "INTENT.md");
@@ -6590,63 +7259,7 @@ var require_intent = __commonJS({
       if (!data) {
         error("INTENT.md has no desired outcomes defined.");
       }
-      if (raw) {
-        output(data, false);
-        return;
-      }
-      const isTTY = process.stdout.isTTY;
-      const lines = [];
-      let scoreLabel = `${data.drift_score}/100 (${data.alignment})`;
-      if (isTTY) {
-        if (data.alignment === "excellent") scoreLabel = `\x1B[32m${scoreLabel}\x1B[0m`;
-        else if (data.alignment === "moderate") scoreLabel = `\x1B[33m${scoreLabel}\x1B[0m`;
-        else if (data.alignment === "poor") scoreLabel = `\x1B[31m${scoreLabel}\x1B[0m`;
-      }
-      lines.push("Intent Drift Analysis");
-      lines.push(`Score: ${scoreLabel}`);
-      lines.push("");
-      const cg = data.signals.coverage_gap;
-      lines.push(`Coverage Gaps (${cg.score} pts):`);
-      if (cg.details.length === 0) {
-        lines.push("  \u2713 All outcomes have plans");
-      } else {
-        for (const gap of cg.details) {
-          lines.push(`  \u2717 ${gap.outcome_id} [${gap.priority}]: ${gap.text} \u2014 no plans`);
-        }
-      }
-      lines.push("");
-      const om = data.signals.objective_mismatch;
-      lines.push(`Objective Mismatch (${om.score} pts):`);
-      if (om.plans.length === 0) {
-        lines.push("  \u2713 All plans have intent sections");
-      } else {
-        for (const planId of om.plans) {
-          lines.push(`  \u2717 ${planId}: no intent section in frontmatter`);
-        }
-      }
-      lines.push("");
-      const fc = data.signals.feature_creep;
-      lines.push(`Feature Creep (${fc.score} pts):`);
-      if (fc.invalid_refs.length === 0) {
-        lines.push("  \u2713 No invalid outcome references");
-      } else {
-        for (const ref of fc.invalid_refs) {
-          lines.push(`  \u2717 ${ref.plan_id}: references non-existent ${ref.invalid_id}`);
-        }
-      }
-      lines.push("");
-      const pi = data.signals.priority_inversion;
-      lines.push(`Priority Inversion (${pi.score} pts):`);
-      if (pi.inversions.length === 0) {
-        lines.push("  \u2713 No priority inversions");
-      } else {
-        for (const inv of pi.inversions) {
-          lines.push(`  \u26A0 ${inv.uncovered_id} [${inv.uncovered_priority}] uncovered, but ${inv.covered_id} [${inv.covered_priority}] has ${inv.covered_plan_count} plan${inv.covered_plan_count !== 1 ? "s" : ""}`);
-        }
-      }
-      lines.push("");
-      lines.push(`Summary: ${data.covered_outcomes}/${data.total_outcomes} outcomes covered, ${data.traced_plans}/${data.total_plans} plans traced`);
-      output(null, true, lines.join("\n") + "\n");
+      output(data, { formatter: formatIntentDrift });
     }
     function getIntentSummary(cwd) {
       const intentPath = path.join(cwd, ".planning", "INTENT.md");
@@ -9502,6 +10115,31 @@ var require_codebase = __commonJS({
       getGitInfo,
       getChangedFilesSinceCommit
     } = require_codebase_intel();
+    var { banner, sectionHeader, formatTable, summaryLine, color, SYMBOLS, box, relativeTime } = require_format();
+    function formatCodebaseAnalyze(result) {
+      const lines = [];
+      lines.push(banner("Codebase Analyze"));
+      lines.push("");
+      if (!result.success) {
+        lines.push(box("Analysis failed", "error"));
+        return lines.join("\n");
+      }
+      const mode = result.mode || "full";
+      lines.push("  " + color.green(SYMBOLS.check + " Analysis complete") + "  " + color.dim("(" + mode + ")"));
+      lines.push("");
+      const filesAnalyzed = result.files_analyzed || 0;
+      const totalFiles = result.total_files || 0;
+      lines.push("  " + filesAnalyzed + " files analyzed, " + totalFiles + " total");
+      if (result.languages && result.languages.length > 0) {
+        lines.push("  " + result.languages.join(", "));
+      }
+      if (result.duration_ms !== void 0) {
+        lines.push("  " + color.dim(result.duration_ms + "ms"));
+      }
+      lines.push("");
+      lines.push(summaryLine("Analysis complete (" + mode + ")"));
+      return lines.join("\n");
+    }
     function cmdCodebaseAnalyze(cwd, args, raw) {
       const forceFull = args.includes("--full");
       const startMs = Date.now();
@@ -9526,7 +10164,7 @@ var require_codebase = __commonJS({
               languages: Object.keys(previousIntel.languages),
               duration_ms: durationMs2,
               path: ".planning/codebase/codebase-intel.json"
-            }, raw);
+            }, { formatter: formatCodebaseAnalyze });
             return;
           }
         }
@@ -9557,7 +10195,46 @@ var require_codebase = __commonJS({
         languages: Object.keys(intel.languages),
         duration_ms: durationMs,
         path: ".planning/codebase/codebase-intel.json"
-      }, raw);
+      }, { formatter: formatCodebaseAnalyze });
+    }
+    function formatCodebaseStatus(result) {
+      const lines = [];
+      lines.push(banner("Codebase"));
+      lines.push("");
+      if (!result.exists) {
+        lines.push(box("No codebase intel. Run: codebase analyze", "warning"));
+        return lines.join("\n");
+      }
+      if (result.stale) {
+        lines.push(box("Intel is stale: " + (result.reason || "unknown"), "warning"));
+        lines.push("");
+        if (result.changed_files && result.changed_files.length > 0) {
+          lines.push("  " + color.yellow(result.changed_files.length + " files changed"));
+        }
+        if (result.changed_groups) {
+          const g = result.changed_groups;
+          const parts = [];
+          if (g.added && g.added.length > 0) parts.push(color.green(g.added.length + " added"));
+          if (g.modified && g.modified.length > 0) parts.push(color.yellow(g.modified.length + " modified"));
+          if (g.deleted && g.deleted.length > 0) parts.push(color.red(g.deleted.length + " deleted"));
+          if (parts.length > 0) {
+            lines.push("  " + parts.join(", "));
+          }
+        }
+        lines.push("");
+        lines.push(summaryLine("Stale \u2014 run codebase analyze"));
+      } else {
+        lines.push("  " + color.green(SYMBOLS.check + " Intel is fresh"));
+        if (result.generated_at) {
+          lines.push("  Generated " + relativeTime(result.generated_at));
+        }
+        const fileCount = result.total_files || 0;
+        const langCount = result.languages ? result.languages.length : 0;
+        lines.push("  " + fileCount + " files, " + langCount + " languages");
+        lines.push("");
+        lines.push(summaryLine("Fresh"));
+      }
+      return lines.join("\n");
     }
     function cmdCodebaseStatus(cwd, args, raw) {
       const intel = readIntel(cwd);
@@ -9565,7 +10242,7 @@ var require_codebase = __commonJS({
         output({
           exists: false,
           message: "No codebase intel. Run: codebase analyze"
-        }, raw);
+        }, { formatter: formatCodebaseStatus });
         return;
       }
       const staleness = checkStaleness(cwd);
@@ -9584,7 +10261,7 @@ var require_codebase = __commonJS({
           intel_commit: intel.git_commit_hash,
           current_commit: gitInfo.commit_hash,
           generated_at: intel.generated_at
-        }, raw);
+        }, { formatter: formatCodebaseStatus });
       } else {
         output({
           exists: true,
@@ -9595,7 +10272,7 @@ var require_codebase = __commonJS({
           total_lines: intel.stats.total_lines,
           languages: Object.keys(intel.languages),
           languages_detected: intel.stats.languages_detected
-        }, raw);
+        }, { formatter: formatCodebaseStatus });
       }
     }
     function groupChangedFiles(cwd, fromCommit, changedFiles) {
@@ -10772,6 +11449,7 @@ var require_init = __commonJS({
     var fs = require("fs");
     var path = require("path");
     var { output, error, debugLog } = require_output();
+    var { banner, sectionHeader, progressBar, formatTable, summaryLine, actionHint, color, SYMBOLS, colorByPercent } = require_format();
     var { loadConfig } = require_config();
     var { safeReadFile, cachedReadFile, findPhaseInternal, resolveModelInternal, getRoadmapPhaseInternal, getMilestoneInfo, getArchivedPhaseDirs, normalizePhaseName, isValidDateString, sanitizeShellArg, pathExistsInternal, generateSlugInternal, getPhaseTree } = require_helpers();
     var { extractFrontmatter } = require_frontmatter();
@@ -11800,6 +12478,57 @@ var require_init = __commonJS({
       }
       output(result, raw);
     }
+    function formatInitProgress(result) {
+      const lines = [];
+      lines.push(banner("Progress"));
+      lines.push("");
+      if (result.milestone_version || result.milestone_name) {
+        const version = result.milestone_version || "?";
+        const name = result.milestone_name || "";
+        lines.push(color.bold(`${version}`) + (name ? ` ${color.dim("\u2014")} ${name}` : ""));
+        lines.push("");
+      }
+      const completedCount = result.completed_count || 0;
+      const phaseCount = result.phase_count || 0;
+      const completedPercent = phaseCount > 0 ? Math.round(completedCount / phaseCount * 100) : 0;
+      lines.push(progressBar(completedPercent) + `  ${completedCount}/${phaseCount} phases`);
+      lines.push("");
+      if (result.phases && result.phases.length > 0) {
+        lines.push(sectionHeader("Phases"));
+        const rows = result.phases.map((p) => {
+          let statusIcon;
+          if (p.status === "complete") statusIcon = color.green(SYMBOLS.check);
+          else if (p.status === "in_progress") statusIcon = color.cyan(SYMBOLS.progress);
+          else statusIcon = color.dim(SYMBOLS.pending);
+          const plans = p.plan_count > 0 ? `${p.summary_count}/${p.plan_count}` : color.dim("TBD");
+          return [p.number, statusIcon + " " + (p.status || "pending"), p.name || "", plans];
+        });
+        lines.push(formatTable(["#", "Status", "Phase", "Plans"], rows, { maxRows: 20, showAll: true }));
+        lines.push("");
+      }
+      if (result.current_phase) {
+        lines.push(sectionHeader("Current"));
+        lines.push(` Phase ${result.current_phase.number}: ${result.current_phase.name || "unnamed"}`);
+        lines.push("");
+      }
+      if (result.next_phase) {
+        lines.push(actionHint(`Next: /gsd-discuss-phase ${result.next_phase.number}`));
+      }
+      if (result.session_diff && result.session_diff.commit_count > 0) {
+        lines.push("");
+        lines.push(sectionHeader("Session"));
+        lines.push(` ${result.session_diff.commit_count} commits since last session`);
+        if (result.session_diff.recent && result.session_diff.recent.length > 0) {
+          for (const commit of result.session_diff.recent.slice(0, 3)) {
+            lines.push(color.dim(`   ${commit}`));
+          }
+        }
+      }
+      lines.push("");
+      const milestoneSuffix = result.milestone_name ? ` \u2014 ${result.milestone_name}` : "";
+      lines.push(summaryLine(`${completedCount}/${phaseCount} phases complete${milestoneSuffix}`));
+      return lines.join("\n");
+    }
     function cmdInitProgress(cwd, raw) {
       const config = loadConfig(cwd);
       const milestone = getMilestoneInfo(cwd);
@@ -11941,7 +12670,7 @@ var require_init = __commonJS({
         if (global._gsdManifestMode) {
           compactResult._manifest = { files: manifestFiles };
         }
-        return output(compactResult, raw);
+        return output(compactResult, { formatter: formatInitProgress });
       }
       if (result.intent_summary === null) delete result.intent_summary;
       if (result.env_summary === null) {
@@ -11958,7 +12687,7 @@ var require_init = __commonJS({
       if (result.codebase_freshness === null) delete result.codebase_freshness;
       if (result.paused_at === null) delete result.paused_at;
       if (result.session_diff === null) delete result.session_diff;
-      output(result, raw);
+      output(result, { formatter: formatInitProgress });
     }
     function cmdInitMemory(cwd, args, raw) {
       const workflowIdx = args.indexOf("--workflow");
@@ -12597,7 +13326,60 @@ var require_misc = __commonJS({
         output(notFound, raw, "");
       }
     }
-    function cmdCommit(cwd, message, files, raw, amend) {
+    function preCommitChecks(cwd, force) {
+      if (force) return { passed: true, failures: [] };
+      const failures = [];
+      const shallowResult = execGit(cwd, ["rev-parse", "--is-shallow-repository"]);
+      if (shallowResult.exitCode === 0 && shallowResult.stdout === "true") {
+        failures.push({
+          check: "shallow_clone",
+          message: "Shallow clone detected.",
+          fix: "git fetch --unshallow"
+        });
+      }
+      const symbolicResult = execGit(cwd, ["symbolic-ref", "-q", "HEAD"]);
+      if (symbolicResult.exitCode !== 0) {
+        failures.push({
+          check: "detached_head",
+          message: "Detached HEAD.",
+          fix: "git checkout <branch>"
+        });
+      }
+      let gitDir = cwd;
+      try {
+        const gitDirResult = execGit(cwd, ["rev-parse", "--git-dir"]);
+        if (gitDirResult.exitCode === 0) {
+          gitDir = path.resolve(cwd, gitDirResult.stdout);
+        }
+      } catch (e) {
+        debugLog("preCommitChecks", "git-dir resolution failed", e);
+      }
+      if (fs.existsSync(path.join(gitDir, "rebase-merge")) || fs.existsSync(path.join(gitDir, "rebase-apply"))) {
+        failures.push({
+          check: "active_rebase",
+          message: "Rebase in progress.",
+          fix: "git rebase --continue or git rebase --abort"
+        });
+      }
+      const statusResult = execGit(cwd, ["status", "--porcelain"]);
+      if (statusResult.exitCode === 0 && statusResult.stdout) {
+        const dirtyNonPlanning = statusResult.stdout.split("\n").filter((line) => {
+          if (!line.trim()) return false;
+          const filePath = line.slice(3).trim();
+          const actualPath = filePath.includes(" -> ") ? filePath.split(" -> ")[1] : filePath;
+          return !actualPath.startsWith(".planning/") && !actualPath.startsWith(".planning\\");
+        });
+        if (dirtyNonPlanning.length > 0) {
+          failures.push({
+            check: "dirty_tree",
+            message: `Dirty working tree (${dirtyNonPlanning.length} files).`,
+            fix: "git stash or commit changes first"
+          });
+        }
+      }
+      return { passed: failures.length === 0, failures };
+    }
+    function cmdCommit(cwd, message, files, raw, amend, force) {
       if (!message && !amend) {
         error("commit message required");
       }
@@ -12610,6 +13392,13 @@ var require_misc = __commonJS({
       if (isGitIgnored(cwd, ".planning")) {
         const result2 = { committed: false, hash: null, reason: "skipped_gitignored" };
         output(result2, raw, "skipped");
+        return;
+      }
+      const checks = preCommitChecks(cwd, force);
+      if (!checks.passed) {
+        process.exitCode = 2;
+        const result2 = { committed: false, hash: null, reason: "pre_commit_blocked", failures: checks.failures };
+        output(result2, raw, "blocked");
         return;
       }
       const filesToStage = files && files.length > 0 ? files : [".planning/"];
@@ -13467,6 +14256,7 @@ _Pending verification_
       cmdHistoryDigest,
       cmdResolveModel,
       cmdFindPhase,
+      preCommitChecks,
       cmdCommit,
       cmdVerifySummary,
       cmdTemplateSelect,
@@ -13505,6 +14295,7 @@ var require_features = __commonJS({
     var { estimateTokens, estimateJsonTokens, checkBudget } = require_context();
     var { readIntel } = require_codebase_intel();
     var { getTransitiveDependents } = require_deps();
+    var { banner, sectionHeader, formatTable, summaryLine, actionHint, color, SYMBOLS, progressBar, colorByPercent } = require_format();
     function cmdSessionDiff(cwd, raw) {
       let since = null;
       try {
@@ -14180,6 +14971,36 @@ var require_features = __commonJS({
         warning: "Review the commits above before running rollback. This creates a revert commit (non-destructive)."
       }, raw);
     }
+    function formatVelocity(result) {
+      const lines = [];
+      lines.push(banner("Velocity"));
+      lines.push(`  Milestone: ${color.bold(result.milestone)}`);
+      lines.push("");
+      lines.push(sectionHeader("Metrics"));
+      lines.push(`  Plans completed: ${color.bold(String(result.metrics.plans_completed))}`);
+      lines.push(`  Active days:     ${color.bold(String(result.metrics.active_days))}`);
+      lines.push(`  Average:         ${color.bold(String(result.metrics.avg_plans_per_day))} plans/day`);
+      lines.push("");
+      if (result.plan_metrics && result.plan_metrics.length > 0) {
+        lines.push(sectionHeader("Recent Plans"));
+        const planRows = result.plan_metrics.slice(-10).map((m) => [
+          m.plan,
+          m.duration || "-",
+          m.tasks != null ? String(m.tasks) : "-",
+          m.files != null ? String(m.files) : "-"
+        ]);
+        lines.push(formatTable(["Plan", "Duration", "Tasks", "Files"], planRows, { maxRows: 10 }));
+        lines.push("");
+      }
+      const fc = result.forecast;
+      if (fc && fc.remaining_phases > 0) {
+        lines.push(sectionHeader("Forecast"));
+        lines.push(`  ${color.bold(String(fc.remaining_phases))} phases, ~${color.bold(String(fc.estimated_remaining_plans))} plans, ~${color.bold(fc.estimated_days_remaining != null ? String(fc.estimated_days_remaining) : "?")} days`);
+        lines.push("");
+      }
+      lines.push(summaryLine(`${result.metrics.avg_plans_per_day} plans/day ${SYMBOLS.dash} ${fc ? fc.remaining_phases : 0} phases remaining`));
+      return lines.join("\n");
+    }
     function cmdVelocity(cwd, raw) {
       const milestone = getMilestoneInfo(cwd);
       const metrics = [];
@@ -14245,7 +15066,7 @@ var require_features = __commonJS({
           estimated_remaining_plans: estimatedRemainingPlans,
           estimated_days_remaining: estimatedDaysRemaining
         }
-      }, raw);
+      }, { formatter: formatVelocity });
     }
     function cmdTraceRequirement(cwd, reqId, raw) {
       if (!reqId) {
@@ -14411,6 +15232,25 @@ var require_features = __commonJS({
         effective_config: effective
       }, raw);
     }
+    function formatQuickSummary(result) {
+      const lines = [];
+      lines.push(banner("Quick Summary"));
+      lines.push(`  Milestone: ${color.bold(result.milestone)}`);
+      lines.push(`  Total quick tasks: ${color.bold(String(result.total_quick_tasks))}`);
+      lines.push("");
+      if (result.tasks && result.tasks.length > 0) {
+        const rows = result.tasks.map((t) => [
+          t.number || "-",
+          t.description || "-",
+          t.date || "-",
+          t.status || "-"
+        ]);
+        lines.push(formatTable(["#", "Description", "Date", "Status"], rows));
+        lines.push("");
+      }
+      lines.push(summaryLine(`${result.total_quick_tasks} quick tasks completed`));
+      return lines.join("\n");
+    }
     function cmdQuickTaskSummary(cwd, raw) {
       const milestone = getMilestoneInfo(cwd);
       const quickTasks = [];
@@ -14439,7 +15279,7 @@ var require_features = __commonJS({
         milestone: milestone.version,
         total_quick_tasks: quickTasks.length,
         tasks: quickTasks
-      }, raw);
+      }, { formatter: formatQuickSummary });
     }
     function extractSectionsFromFile(filePath, sectionNames) {
       const content = safeReadFile(filePath);
@@ -15769,6 +16609,9 @@ var require_router = __commonJS({
     function lazyCodebase() {
       return _modules.codebase || (_modules.codebase = require_codebase());
     }
+    function lazyGit() {
+      return _modules.git || (_modules.git = require_git());
+    }
     async function main2() {
       const args = process.argv.slice(2);
       const prettyIdx = args.indexOf("--pretty");
@@ -15811,7 +16654,7 @@ var require_router = __commonJS({
       const command = args[0];
       const cwd = process.cwd();
       if (!command) {
-        error("Usage: gsd-tools <command> [args] [--pretty] [--verbose]\nCommands: assertions, codebase, codebase-impact, commit, config-ensure-section, config-get, config-migrate, config-set, context-budget, current-timestamp, env, extract-sections, find-phase, frontmatter, generate-slug, history-digest, init, intent, list-todos, mcp, mcp-profile, memory, milestone, phase, phase-plan-index, phases, progress, quick-summary, requirements, resolve-model, roadmap, rollback-info, scaffold, search-decisions, search-lessons, session-diff, state, state-snapshot, summary-extract, template, test-coverage, test-run, todo, token-budget, trace-requirement, validate, validate-config, validate-dependencies, velocity, verify, verify-path-exists, verify-summary, websearch, worktree");
+        error("Usage: gsd-tools <command> [args] [--pretty] [--verbose]\nCommands: assertions, codebase, codebase-impact, commit, config-ensure-section, config-get, config-migrate, config-set, context-budget, current-timestamp, env, extract-sections, find-phase, frontmatter, generate-slug, git, history-digest, init, intent, list-todos, mcp, mcp-profile, memory, milestone, phase, phase-plan-index, phases, progress, quick-summary, requirements, resolve-model, roadmap, rollback-info, scaffold, search-decisions, search-lessons, session-diff, state, state-snapshot, summary-extract, template, test-coverage, test-run, todo, token-budget, trace-requirement, validate, validate-config, validate-dependencies, velocity, verify, verify-path-exists, verify-summary, websearch, worktree");
       }
       if (args.includes("--help") || args.includes("-h")) {
         const subForHelp = args[1] && !args[1].startsWith("-") ? args[1] : "";
@@ -15901,10 +16744,11 @@ var require_router = __commonJS({
         }
         case "commit": {
           const amend = args.includes("--amend");
+          const forceFlag = args.includes("--force");
           const message = args[1];
           const filesIndex = args.indexOf("--files");
           const files = filesIndex !== -1 ? args.slice(filesIndex + 1).filter((a) => !a.startsWith("--")) : [];
-          lazyMisc().cmdCommit(cwd, message, files, raw, amend);
+          lazyMisc().cmdCommit(cwd, message, files, raw, amend, forceFlag);
           break;
         }
         case "verify-summary": {
@@ -16445,6 +17289,51 @@ Available: execute-phase, plan-phase, new-project, new-milestone, quick, resume,
             lazyWorktree().cmdWorktreeCheckOverlap(cwd, args[2], raw);
           } else {
             error("Unknown worktree subcommand. Available: create, list, remove, cleanup, merge, check-overlap");
+          }
+          break;
+        }
+        case "git": {
+          const gitSub = args[1];
+          const gitMod = lazyGit();
+          const { output: gitOutput } = require_output();
+          switch (gitSub) {
+            case "log": {
+              const countIdx = args.indexOf("--count");
+              const sinceIdx = args.indexOf("--since");
+              const untilIdx = args.indexOf("--until");
+              const authorIdx = args.indexOf("--author");
+              const pathIdx = args.indexOf("--path");
+              const gitOpts = {
+                count: countIdx !== -1 ? parseInt(args[countIdx + 1], 10) : 20,
+                since: sinceIdx !== -1 ? args[sinceIdx + 1] : void 0,
+                until: untilIdx !== -1 ? args[untilIdx + 1] : void 0,
+                author: authorIdx !== -1 ? args[authorIdx + 1] : void 0,
+                path: pathIdx !== -1 ? args[pathIdx + 1] : void 0
+              };
+              gitOutput(gitMod.structuredLog(cwd, gitOpts), raw);
+              break;
+            }
+            case "diff-summary": {
+              const fromIdx = args.indexOf("--from");
+              const toIdx = args.indexOf("--to");
+              const dsPathIdx = args.indexOf("--path");
+              gitOutput(gitMod.diffSummary(cwd, {
+                from: fromIdx !== -1 ? args[fromIdx + 1] : void 0,
+                to: toIdx !== -1 ? args[toIdx + 1] : void 0,
+                path: dsPathIdx !== -1 ? args[dsPathIdx + 1] : void 0
+              }), raw);
+              break;
+            }
+            case "blame": {
+              gitOutput(gitMod.blame(cwd, args[2]), raw);
+              break;
+            }
+            case "branch-info": {
+              gitOutput(gitMod.branchInfo(cwd), raw);
+              break;
+            }
+            default:
+              error("Unknown git subcommand: " + gitSub + ". Available: log, diff-summary, blame, branch-info");
           }
           break;
         }

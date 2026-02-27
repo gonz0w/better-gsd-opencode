@@ -1,0 +1,26 @@
+{
+  "config": {
+    "model_profile": "balanced",
+    "commit_docs": true,
+    "search_gitignored": false,
+    "branching_strategy": "none",
+    "phase_branch_template": "gsd/phase-{phase}-{slug}",
+    "milestone_branch_template": "gsd/{milestone}-{slug}",
+    "research": true,
+    "plan_checker": true,
+    "verifier": true,
+    "parallelization": true,
+    "brave_search": false,
+    "mode": "interactive",
+    "model_profiles": {},
+    "depth": "standard",
+    "test_commands": {},
+    "test_gate": true,
+    "context_window": 200000,
+    "context_target_percent": 50
+  },
+  "state_raw": "# Project State\n\n## Project Reference\n\nSee: .planning/PROJECT.md\n\n**Core value:** Test project\n**Current focus:** Testing\n\n## Current Position\n\nPhase: 1 of 1 (Foundation)\nPlan: 0 of 1 in current phase\nStatus: Ready\nLast activity: 2026-01-01\n\nProgress: [░░░░░░░░░░] 0%\n\n## Performance Metrics\n\n**Velocity:**\n- Total plans completed: 0\n\n## Accumulated Context\n\n### Decisions\n\nNone yet.\n\n### Pending Todos\n\nNone.\n\n### Blockers/Concerns\n\nNone.\n\n## Session Continuity\n\nLast session: 2026-01-01\nStopped at: Ready\nResume file: None\n",
+  "state_exists": true,
+  "roadmap_exists": false,
+  "config_exists": true
+}

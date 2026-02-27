@@ -13963,3 +13963,461 @@ describe('pre-commit checks', () => {
     assert.ok(data.failures.length >= 2, `Should report multiple failures, got ${data.failures.length}`);
   });
 });
+
+// ─── consumer contract tests ─────────────────────────────────────────────────
+
+/**
+ * Compare actual output against a stored snapshot fixture.
+ * On mismatch, produces diff-style output showing expected vs actual for each differing field.
+ * If GSD_UPDATE_SNAPSHOTS=1, writes actual as new fixture instead of failing.
+ *
+ * @param {object} actual - The actual output to compare
+ * @param {string} fixturePath - Path to the snapshot JSON file
+ * @returns {{ pass: boolean, message: string }}
+ */
+function snapshotCompare(actual, fixturePath) {
+  if (process.env.GSD_UPDATE_SNAPSHOTS === '1' || !fs.existsSync(fixturePath)) {
+    fs.mkdirSync(path.dirname(fixturePath), { recursive: true });
+    fs.writeFileSync(fixturePath, JSON.stringify(actual, null, 2) + '\n', 'utf-8');
+    return { pass: true, message: 'Snapshot written (bootstrap mode)' };
+  }
+
+  const expected = JSON.parse(fs.readFileSync(fixturePath, 'utf-8'));
+  const diffs = [];
+
+  function compare(exp, act, keyPath) {
+    if (exp === null || exp === undefined) {
+      if (act !== null && act !== undefined) {
+        diffs.push(`  - ${keyPath}: expected ${JSON.stringify(exp)}, got ${JSON.stringify(act)}`);
+      }
+      return;
+    }
+    if (Array.isArray(exp)) {
+      if (!Array.isArray(act)) {
+        diffs.push(`  - ${keyPath}: expected array, got ${typeof act}`);
+        return;
+      }
+      if (exp.length !== act.length) {
+        diffs.push(`  - ${keyPath}: expected array length ${exp.length}, got ${act.length}`);
+      }
+      const len = Math.max(exp.length, act.length);
+      for (let i = 0; i < len; i++) {
+        compare(exp[i], act[i], `${keyPath}[${i}]`);
+      }
+      return;
+    }
+    if (typeof exp === 'object') {
+      if (typeof act !== 'object' || act === null) {
+        diffs.push(`  - ${keyPath}: expected object, got ${typeof act}`);
+        return;
+      }
+      // Check all expected keys
+      for (const key of Object.keys(exp)) {
+        compare(exp[key], act[key], keyPath ? `${keyPath}.${key}` : key);
+      }
+      // Check for removed keys (keys in expected but not in actual)
+      for (const key of Object.keys(exp)) {
+        if (!(key in act)) {
+          diffs.push(`  - ${keyPath ? keyPath + '.' : ''}${key}: expected ${JSON.stringify(exp[key])}, got undefined (REMOVED)`);
+        }
+      }
+      return;
+    }
+    // Primitive comparison
+    if (exp !== act) {
+      diffs.push(`  - ${keyPath}: expected ${JSON.stringify(exp)}, got ${JSON.stringify(act)}`);
+    }
+  }
+
+  compare(expected, actual, '');
+
+  if (diffs.length === 0) {
+    return { pass: true, message: 'Snapshot matches' };
+  }
+
+  return {
+    pass: false,
+    message: `Snapshot mismatch (${path.basename(fixturePath)}):\n${diffs.join('\n')}\n\nRun with GSD_UPDATE_SNAPSHOTS=1 to update.`,
+  };
+}
+
+/**
+ * Field-level contract check: verifies required fields exist with correct types.
+ * New fields in actual are ALLOWED (additive-safe). Missing/wrong-type fields FAIL.
+ *
+ * @param {object} actual - The actual output
+ * @param {Array<{key: string, type: string}>} requiredFields - Required field specs
+ * @param {string} contextName - Name for error messages
+ * @returns {{ pass: boolean, message: string }}
+ */
+function contractCheck(actual, requiredFields, contextName) {
+  const violations = [];
+
+  for (const { key, type } of requiredFields) {
+    const parts = key.split('.');
+    let value = actual;
+    for (const part of parts) {
+      if (value === null || value === undefined) {
+        value = undefined;
+        break;
+      }
+      value = value[part];
+    }
+
+    if (value === undefined) {
+      violations.push(`  - ${key}: expected ${type}, got undefined`);
+      continue;
+    }
+
+    if (type === 'any') continue;
+
+    const actualType = Array.isArray(value) ? 'array' : typeof value;
+    if (actualType !== type) {
+      violations.push(`  - ${key}: expected ${type}, got ${actualType}`);
+    }
+  }
+
+  if (violations.length === 0) {
+    return { pass: true, message: 'Contract satisfied' };
+  }
+
+  return {
+    pass: false,
+    message: `Contract violation in ${contextName}:\n${violations.join('\n')}`,
+  };
+}
+
+// ─── Full Snapshot: init phase-op ────────────────────────────────────────────
+
+describe('contract: init phase-op (full snapshot)', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+    // Create a complete .planning structure
+    const phaseDir = path.join(tmpDir, '.planning', 'phases', '01-foundation');
+    fs.mkdirSync(phaseDir, { recursive: true });
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'ROADMAP.md'), `# Roadmap
+
+## Phases
+
+- [ ] Phase 1: Foundation (0/1 plans)
+`);
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'STATE.md'), `# Project State
+
+## Current Position
+
+Phase: 1 of 1 (Foundation)
+Plan: 0 of 1 in current phase
+Status: Ready
+
+## Accumulated Context
+
+### Decisions
+
+None yet.
+
+### Blockers/Concerns
+
+None.
+
+## Session Continuity
+
+Last session: 2026-01-01
+Stopped at: Ready
+`);
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'config.json'), JSON.stringify({
+      commit_docs: true,
+      model_profile: 'balanced',
+    }));
+    fs.writeFileSync(path.join(phaseDir, '01-CONTEXT.md'), '# Phase 1 Context\n\nTest context.\n');
+    fs.writeFileSync(path.join(phaseDir, '01-01-PLAN.md'), `---
+phase: 01-foundation
+plan: 01
+type: execute
+---
+
+# Test Plan
+`);
+  });
+
+  afterEach(() => { cleanup(tmpDir); });
+
+  test('init phase-op output matches snapshot', () => {
+    const result = runGsdTools('init phase-op 1 --verbose', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+    const actual = JSON.parse(result.output);
+
+    // Use project-level snapshot directory
+    const fixturePath = path.join(__dirname, '..', 'test', '__snapshots__', 'init-phase-op.json');
+    const snap = snapshotCompare(actual, fixturePath);
+    assert.ok(snap.pass, snap.message);
+  });
+});
+
+// ─── Full Snapshot: state read ───────────────────────────────────────────────
+
+describe('contract: state read (full snapshot)', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'STATE.md'), `# Project State
+
+## Project Reference
+
+See: .planning/PROJECT.md
+
+**Core value:** Test project
+**Current focus:** Testing
+
+## Current Position
+
+Phase: 1 of 1 (Foundation)
+Plan: 0 of 1 in current phase
+Status: Ready
+Last activity: 2026-01-01
+
+Progress: [░░░░░░░░░░] 0%
+
+## Performance Metrics
+
+**Velocity:**
+- Total plans completed: 0
+
+## Accumulated Context
+
+### Decisions
+
+None yet.
+
+### Pending Todos
+
+None.
+
+### Blockers/Concerns
+
+None.
+
+## Session Continuity
+
+Last session: 2026-01-01
+Stopped at: Ready
+Resume file: None
+`);
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'config.json'), JSON.stringify({
+      commit_docs: true,
+      model_profile: 'balanced',
+    }));
+  });
+
+  afterEach(() => { cleanup(tmpDir); });
+
+  test('state read output matches snapshot', () => {
+    const result = runGsdTools('state', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+    const actual = JSON.parse(result.output);
+
+    const fixturePath = path.join(__dirname, '..', 'test', '__snapshots__', 'state-read.json');
+    const snap = snapshotCompare(actual, fixturePath);
+    assert.ok(snap.pass, snap.message);
+  });
+});
+
+// ─── Field-level Contract: init plan-phase ───────────────────────────────────
+
+describe('contract: init plan-phase fields', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+    const phaseDir = path.join(tmpDir, '.planning', 'phases', '01-foundation');
+    fs.mkdirSync(phaseDir, { recursive: true });
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'ROADMAP.md'), `# Roadmap\n\n## Phases\n\n- [ ] Phase 1: Foundation (0/1 plans)\n`);
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'config.json'), JSON.stringify({ commit_docs: true }));
+    fs.writeFileSync(path.join(phaseDir, '01-01-PLAN.md'), `---\nphase: 01-foundation\nplan: 01\n---\n# Plan\n`);
+  });
+
+  afterEach(() => { cleanup(tmpDir); });
+
+  test('init plan-phase has required fields', () => {
+    const result = runGsdTools('init plan-phase 1 --verbose', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+    const actual = JSON.parse(result.output);
+
+    const contract = contractCheck(actual, [
+      { key: 'phase_found', type: 'boolean' },
+      { key: 'phase_dir', type: 'string' },
+      { key: 'phase_number', type: 'string' },
+      { key: 'phase_name', type: 'string' },
+      { key: 'has_research', type: 'boolean' },
+      { key: 'has_context', type: 'boolean' },
+      { key: 'has_plans', type: 'boolean' },
+      { key: 'plan_count', type: 'number' },
+      { key: 'research_enabled', type: 'boolean' },
+      { key: 'plan_checker_enabled', type: 'boolean' },
+    ], 'init-plan-phase');
+    assert.ok(contract.pass, contract.message);
+  });
+
+  test('adding new field to plan-phase does not break contract', () => {
+    const result = runGsdTools('init plan-phase 1 --verbose', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+    const actual = JSON.parse(result.output);
+
+    // Simulate adding a new field
+    actual.new_future_field = 'something';
+
+    const contract = contractCheck(actual, [
+      { key: 'phase_found', type: 'boolean' },
+      { key: 'phase_dir', type: 'string' },
+    ], 'init-plan-phase-additive');
+    assert.ok(contract.pass, 'New fields should not break contract');
+  });
+});
+
+// ─── Field-level Contract: init new-project ──────────────────────────────────
+
+describe('contract: init new-project fields', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'config.json'), JSON.stringify({ commit_docs: true }));
+  });
+
+  afterEach(() => { cleanup(tmpDir); });
+
+  test('init new-project has required fields', () => {
+    const result = runGsdTools('init new-project', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+    const actual = JSON.parse(result.output);
+
+    const contract = contractCheck(actual, [
+      { key: 'planning_exists', type: 'boolean' },
+      { key: 'has_existing_code', type: 'boolean' },
+      { key: 'is_brownfield', type: 'boolean' },
+      { key: 'project_exists', type: 'boolean' },
+      { key: 'has_git', type: 'boolean' },
+    ], 'init-new-project');
+    assert.ok(contract.pass, contract.message);
+  });
+});
+
+// ─── Field-level Contract: init execute-phase ────────────────────────────────
+
+describe('contract: init execute-phase fields', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+    const phaseDir = path.join(tmpDir, '.planning', 'phases', '01-foundation');
+    fs.mkdirSync(phaseDir, { recursive: true });
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'ROADMAP.md'), `# Roadmap\n\n## Phases\n\n- [ ] Phase 1: Foundation (0/1 plans)\n`);
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'STATE.md'), `# Project State\n\n## Current Position\n\nPhase: 1\nPlan: 0\nStatus: Ready\n`);
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'config.json'), JSON.stringify({ commit_docs: true }));
+    fs.writeFileSync(path.join(phaseDir, '01-01-PLAN.md'), `---\nphase: 01-foundation\nplan: 01\n---\n# Plan\n`);
+  });
+
+  afterEach(() => { cleanup(tmpDir); });
+
+  test('init execute-phase has required fields', () => {
+    const result = runGsdTools('init execute-phase 1 --verbose', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+    const actual = JSON.parse(result.output);
+
+    const contract = contractCheck(actual, [
+      { key: 'phase_found', type: 'boolean' },
+      { key: 'phase_dir', type: 'string' },
+      { key: 'phase_number', type: 'string' },
+      { key: 'phase_name', type: 'string' },
+      { key: 'plans', type: 'array' },
+      { key: 'plan_count', type: 'number' },
+    ], 'init-execute-phase');
+    assert.ok(contract.pass, contract.message);
+  });
+});
+
+// ─── Field-level Contract: state read fields ─────────────────────────────────
+
+describe('contract: state read fields', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'STATE.md'), `# Project State
+
+## Current Position
+
+Phase: 1
+Plan: 0
+Status: Ready
+
+## Accumulated Context
+
+### Decisions
+
+None.
+
+### Blockers/Concerns
+
+None.
+
+## Session Continuity
+
+Last session: 2026-01-01
+Stopped at: Ready
+`);
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'config.json'), JSON.stringify({ commit_docs: true }));
+  });
+
+  afterEach(() => { cleanup(tmpDir); });
+
+  test('state read has required fields', () => {
+    const result = runGsdTools('state', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+    const actual = JSON.parse(result.output);
+
+    const contract = contractCheck(actual, [
+      { key: 'config', type: 'object' },
+      { key: 'state_raw', type: 'string' },
+      { key: 'state_exists', type: 'boolean' },
+      { key: 'roadmap_exists', type: 'boolean' },
+      { key: 'config_exists', type: 'boolean' },
+    ], 'state-read');
+    assert.ok(contract.pass, contract.message);
+  });
+});
+
+// ─── Field-level Contract: init progress fields ──────────────────────────────
+
+describe('contract: init progress fields', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+    const phaseDir = path.join(tmpDir, '.planning', 'phases', '01-foundation');
+    fs.mkdirSync(phaseDir, { recursive: true });
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'ROADMAP.md'), `# Roadmap\n\n## Milestones\n\n- **v1.0 Test** — Phases 1-1\n\n## Phases\n\n- [ ] Phase 1: Foundation (0/1 plans)\n`);
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'STATE.md'), `# Project State\n\n## Current Position\n\nPhase: 1\n`);
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'config.json'), JSON.stringify({ commit_docs: true }));
+    fs.writeFileSync(path.join(phaseDir, '01-01-PLAN.md'), `---\nphase: 01-foundation\nplan: 01\n---\n# Plan\n`);
+  });
+
+  afterEach(() => { cleanup(tmpDir); });
+
+  test('init progress has required fields', () => {
+    const result = runGsdTools('init progress', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+    const actual = JSON.parse(result.output);
+
+    const contract = contractCheck(actual, [
+      { key: 'phases', type: 'array' },
+      { key: 'phase_count', type: 'number' },
+      { key: 'completed_count', type: 'number' },
+      { key: 'in_progress_count', type: 'number' },
+      { key: 'has_work_in_progress', type: 'boolean' },
+    ], 'init-progress');
+    assert.ok(contract.pass, contract.message);
+  });
+});
