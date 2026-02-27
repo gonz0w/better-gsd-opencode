@@ -188,7 +188,7 @@ Plans:
 3. Verification pipeline includes post-execution review step via gsd-reviewer
 4. Review findings are surfaced in plan SUMMARY.md
 
-**Plans:** 2 plans
+**Plans:** 1/2 plans executed
 Plans:
 - [ ] 41-01-PLAN.md — Commit attribution via git trailers + review context CLI command
 - [ ] 41-02-PLAN.md — Reviewer agent reference + pipeline integration (execute-plan, verify-phase, summary)

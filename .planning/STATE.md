@@ -9,10 +9,10 @@ See: .planning/PROJECT.md (updated 2026-02-26)
 
 ## Current Position
 
-Phase: 40 — Context Efficiency
-Plan: 2 of 2 complete
-Status: Phase complete
-Last activity: 2026-02-27 — Completed 40-02 (task-scoped file injection)
+Phase: 41 — Agent Quality Gates
+Plan: 1 of 2 complete
+Status: In progress
+Last activity: 2026-02-27 — Completed 41-01 (commit attribution + review context)
 
 ## Performance Metrics
 
@@ -49,6 +49,7 @@ All v1.0-v6.0 decisions recorded in PROJECT.md Key Decisions table with outcomes
 - Phase 39-01: task_routing added to compact mode whitelist so agents always get routing guidance
 - Phase 40-01: Agent manifests use whitelist (fields + optional) not blacklist for safety; --agent flag via process.argv
 - Phase 40-02: Duplicated scoreTaskFile (~15 lines) to avoid circular imports; AST signatures lazy-loaded only when requested
+- Phase 41-01: Git --trailer for Agent-Type commit attribution; gsd-reviewer manifest scoped to conventions + dependencies
 
 ### Pending Todos
 
@@ -61,5 +62,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-02-27
-Stopped at: Completed 40-02-PLAN.md (task-scoped file injection)
+Stopped at: Completed 41-01-PLAN.md (commit attribution + review context)
 Resume file: None
