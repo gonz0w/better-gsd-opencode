@@ -35,7 +35,7 @@ Requirements for UX overhaul milestone. Each maps to roadmap phases.
 
 - [ ] **WKFL-04**: All workflow .md files audited for token usage with before/after baselines measured
 - [ ] **WKFL-05**: Workflow output instructions tightened — status messages reduced, redundant information eliminated
-- [ ] **WKFL-06**: Updated `ui-brand.md` with tighter patterns and concrete examples for information-dense output
+- [x] **WKFL-06**: Updated `ui-brand.md` with tighter patterns and concrete examples for information-dense output
 - [ ] **WKFL-07**: Workflow table instructions use consistent column widths and alignment patterns
 
 ### Slash Commands & Integration
@@ -97,7 +97,7 @@ Requirements for UX overhaul milestone. Each maps to roadmap phases.
 | CMD-06 | Phase 34 | Pending | — |
 | WKFL-04 | Phase 35 | Pending | — |
 | WKFL-05 | Phase 35 | Pending | — |
-| WKFL-06 | Phase 35 | Pending | — |
+| WKFL-06 | Phase 35 | Complete | 2026-02-27 |
 | WKFL-07 | Phase 35 | Pending | — |
 | INTG-01 | Phase 36 | Pending | — |
 | INTG-02 | Phase 36 | Pending | — |
