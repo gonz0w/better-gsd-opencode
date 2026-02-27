@@ -110,10 +110,34 @@ Document in SUMMARY: per deviation with rule/category/task/issue/fix/files/commi
 </deviation_rules>
 
 <tdd_plan_execution>
-RED-GREEN-REFACTOR: Infrastructure (first TDD only) → RED (failing test, commit) → GREEN (minimal code, commit) → REFACTOR (cleanup, commit if changed).
+For `type: tdd` plans, follow the dedicated TDD workflow:
+@workflows/tdd.md
 
-See references/tdd.md for structure.
+The TDD workflow enforces RED→GREEN→REFACTOR gates via CLI validation commands. Do NOT use the standard task execution flow for TDD plans.
 </tdd_plan_execution>
+
+<auto_test_after_edit>
+After each file modification during task execution (not just at task end), for ALL plan types:
+
+1. Check if project has a test command:
+   - Config: read `test_commands` from config.json
+   - Fallback: check `package.json` scripts.test, or look for pytest/go test/cargo test
+   - If no test command found: skip auto-test
+
+2. Run auto-test:
+   ```bash
+   AUTOTEST=$(node {config_path}/bin/gsd-tools.cjs tdd auto-test --test-cmd "<test_command>")
+   ```
+
+3. If test fails:
+   - Log the failure: "Auto-test failed after editing {file}: {output_snippet}"
+   - Fix the issue immediately before continuing to next file edit
+   - Do NOT accumulate broken states across multiple edits
+
+4. Frequency: Run after each logical file change (not after every save, but after completing an edit to a file). For rapid multi-file changes within a single conceptual step, run once after the batch.
+
+Purpose: Catch compounding errors early. A test failure after editing file A is much easier to diagnose than a test failure after editing files A, B, C, D.
+</auto_test_after_edit>
 
 <task_commit>
 After each task: `git status --short` → stage individually (NEVER `git add .`) → commit as `{type}({phase}-{plan}): {description}` → record hash.
