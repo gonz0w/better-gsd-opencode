@@ -171,7 +171,7 @@ Plans:
 3. Task-scoped file injection loads only task-relevant files using dependency graph and relevance scoring
 4. Context reduction validated against quality baselines — no loss of agent decision quality
 
-**Plans:** 2 plans
+**Plans:** 1/2 plans executed
 Plans:
 - [ ] 40-01-PLAN.md — Agent context manifests + compact serializers for plan state and dep graphs
 - [ ] 40-02-PLAN.md — Task-scoped file injection using dep graph + AST signatures
