@@ -123,7 +123,9 @@ Plans:
 **Goal**: The most-used commands (init progress, init execute-phase, init plan-phase, state show) produce clean branded output developers want to read
 **Depends on**: Phase 30 (formatting foundation)
 **Requirements**: CMD-01, CMD-02
-**Plans**: 2 plans
+**Plans**: 1 plan
+Plans:
+- [ ] 32-01-PLAN.md — Add formatters to init progress, state show, state update-progress (user-facing only)
 **Success Criteria** (what must be TRUE):
   1. `init progress` in a TTY shows a branded banner, progress bar, phase checklist, and milestone summary — not raw JSON
   2. `state show` in a TTY renders a formatted state card with current position, velocity, and blockers
@@ -134,7 +136,9 @@ Plans:
 **Goal**: Verification and codebase analysis commands render summary tables with pass/fail indicators and formatted analysis output
 **Depends on**: Phase 30 (formatting foundation)
 **Requirements**: CMD-03, CMD-04
-**Plans**: 2 plans
+**Plans**: 1 plan
+Plans:
+- [ ] 33-01-PLAN.md — Add formatters to verify requirements/quality, codebase status/analyze (user-facing only)
 **Success Criteria** (what must be TRUE):
   1. `verify requirements` shows a table of requirements with ✓/✗ pass/fail status and a summary line
   2. `verify quality` shows quality dimensions (tests, must_haves, requirements, regression) with letter grades and an overall score
@@ -142,10 +146,12 @@ Plans:
   4. `codebase conventions`, `codebase deps`, and `codebase context` produce readable formatted output with tables and section headers
 
 #### Phase 34: Feature & Intent Command Renderers
-**Goal**: All remaining commands — feature utilities and intent commands — adopt the shared formatting for a consistent experience across the entire CLI
+**Goal**: All remaining user-facing commands — velocity, quick-summary, and intent commands — adopt shared formatting
 **Depends on**: Phase 30 (formatting foundation)
 **Requirements**: CMD-05, CMD-06
-**Plans**: 2 plans
+**Plans**: 1 plan
+Plans:
+- [ ] 34-01-PLAN.md — Add formatters to velocity, quick-summary, intent show/validate/drift (user-facing only)
 **Success Criteria** (what must be TRUE):
   1. `velocity` shows plans/day rate, forecast, and per-milestone table in formatted output
   2. `quick-summary`, `context-budget`, `search-decisions`, and `trace-requirement` all produce branded output with tables and section headers
@@ -157,6 +163,9 @@ Plans:
 **Depends on**: Phase 30 (formatting foundation)
 **Requirements**: WKFL-04, WKFL-05, WKFL-06, WKFL-07
 **Plans**: 2 plans
+Plans:
+- [ ] 35-01-PLAN.md — Update ui-brand.md to bGSD branding with concrete examples and tighter specs
+- [ ] 35-02-PLAN.md — Tighten all workflow and reference files, measure token reduction
 **Success Criteria** (what must be TRUE):
   1. Before/after token baselines measured for all workflow .md files with measurable reduction
   2. Status messages in workflows reduced — no "Starting...", "Processing...", "Done." noise patterns
@@ -209,8 +218,8 @@ Plans:
 | 29. Workflow Integration | v5.0 | 2/2 | Complete | 2026-02-26 |
 | 30. Formatting Foundation & Smart Output | 2/2 | Complete    | 2026-02-26 | — |
 | 31. Quality Gates & Format Testing | 2/2 | Complete   | 2026-02-27 | — |
-| 32. Init & State Command Renderers | v6.0 | 0/2 | Not started | — |
-| 33. Verify & Codebase Command Renderers | v6.0 | 0/2 | Not started | — |
-| 34. Feature & Intent Command Renderers | v6.0 | 0/2 | Not started | — |
+| 32. Init & State Command Renderers | v6.0 | 0/1 | Not started | — |
+| 33. Verify & Codebase Command Renderers | v6.0 | 0/1 | Not started | — |
+| 34. Feature & Intent Command Renderers | v6.0 | 0/1 | Not started | — |
 | 35. Workflow Output Tightening | v6.0 | 0/2 | Not started | — |
 | 36. Integration & Polish | v6.0 | 0/2 | Not started | — |
