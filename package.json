@@ -17,6 +17,7 @@
   },
   "private": true,
   "dependencies": {
+    "acorn": "^8.16.0",
     "tokenx": "^1.3.0"
   }
 }
