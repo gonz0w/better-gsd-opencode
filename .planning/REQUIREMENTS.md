@@ -40,8 +40,8 @@ Requirements for milestone v7.0 Agent Orchestration & Efficiency. Each maps to r
 
 ### Git Intelligence
 
-- [ ] **GIT-01**: User can query structured git log, diff summary, blame, and branch info via enhanced git.js commands
-- [ ] **GIT-02**: Pre-commit checks detect uncommitted changes, active rebase, detached HEAD, and shallow clones
+- [x] **GIT-01**: User can query structured git log, diff summary, blame, and branch info via enhanced git.js commands
+- [x] **GIT-02**: Pre-commit checks detect uncommitted changes, active rebase, detached HEAD, and shallow clones
 
 ## Future Requirements
 
@@ -91,8 +91,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 |-------------|-------|--------|--------------|
 | SAFE-01 | Phase 37 | Pending | npm test -- --grep contract |
 | SAFE-02 | Phase 37 | Pending | npm test -- --grep safety |
-| GIT-01 | Phase 37 | Pending | npm test -- --grep git |
-| GIT-02 | Phase 37 | Pending | npm test -- --grep precommit |
+| GIT-01 | Phase 37 | Complete | npm test -- --grep git |
+| GIT-02 | Phase 37 | Complete | npm test -- --grep precommit |
 | AST-01 | Phase 38 | Pending | npm test -- --grep ast |
 | AST-02 | Phase 38 | Pending | npm test -- --grep export |
 | AST-03 | Phase 38 | Pending | npm test -- --grep complexity |

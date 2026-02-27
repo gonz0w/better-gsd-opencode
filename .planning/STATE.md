@@ -10,9 +10,9 @@ See: .planning/PROJECT.md (updated 2026-02-26)
 ## Current Position
 
 Phase: 37 — Foundation & Safety Net
-Plan: —
-Status: Roadmap defined, ready for planning
-Last activity: 2026-02-26 — Milestone v7.0 roadmap created (6 phases, 18 requirements)
+Plan: 1 of 2 complete
+Status: Executing
+Last activity: 2026-02-27 — Completed 37-01 (git intelligence + pre-commit checks)
 
 ## Performance Metrics
 
@@ -39,6 +39,9 @@ Last activity: 2026-02-26 — Milestone v7.0 roadmap created (6 phases, 18 requi
 
 All v1.0-v6.0 decisions recorded in PROJECT.md Key Decisions table with outcomes.
 
+- Phase 37-01: Pre-commit checks run all checks before reporting (agents see all failures in one pass)
+- Phase 37-01: Exit code 2 for pre-commit blocks vs 1 for general errors
+
 ### Pending Todos
 
 None.
@@ -50,5 +53,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-02-27
-Stopped at: Completed v6.0 milestone — UX & Developer Experience shipped
+Stopped at: Completed 37-01-PLAN.md (git intelligence + pre-commit checks)
 Resume file: None

@@ -120,7 +120,7 @@ Full details: `.planning/milestones/v6.0-ROADMAP.md`
 3. Pre-commit checks detect dirty tree, active rebase, detached HEAD, and shallow clones before git-write operations
 4. All existing 574 tests continue passing with zero regressions
 
-**Plans:** 2 plans
+**Plans:** 1/2 plans executed
 Plans:
 - [ ] 37-01-PLAN.md — Git intelligence (enhanced git.js, CLI commands, pre-commit checks)
 - [ ] 37-02-PLAN.md — Safety net (contract tests, performance profiler)
