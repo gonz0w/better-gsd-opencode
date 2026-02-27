@@ -626,8 +626,12 @@ async function main() {
         lazyCodebase().cmdCodebaseAst(cwd, args.slice(2), raw);
       } else if (sub === 'exports') {
         lazyCodebase().cmdCodebaseExports(cwd, args.slice(2), raw);
+      } else if (sub === 'complexity') {
+        lazyCodebase().cmdCodebaseComplexity(cwd, args.slice(2), raw);
+      } else if (sub === 'repo-map') {
+        lazyCodebase().cmdCodebaseRepoMap(cwd, args.slice(2), raw);
       } else {
-        error('Usage: codebase <analyze|status|conventions|rules|deps|impact|context|lifecycle|ast|exports>');
+        error('Usage: codebase <analyze|status|conventions|rules|deps|impact|context|lifecycle|ast|exports|complexity|repo-map>');
       }
       break;
     }

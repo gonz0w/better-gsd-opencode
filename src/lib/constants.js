@@ -1116,6 +1116,45 @@ Examples:
   gsd-tools codebase exports src/lib/ast.js
   gsd-tools codebase exports src/router.js`,
 
+  'codebase complexity': `Usage: gsd-tools codebase complexity <file>
+
+Compute per-function cyclomatic complexity for a source file.
+
+For JS/TS: Uses acorn AST to walk each function body, counting branching
+nodes (if, for, while, switch, catch, ternary, logical operators) and
+tracking max nesting depth.
+
+For other languages: Uses regex approximation counting branching keywords.
+
+Arguments:
+  file   Source file path to analyze
+
+Output: { file, module_complexity, functions: [{name, line, complexity, nesting_max}] }
+
+Color coding (formatted mode): green(1-5), yellow(6-10), red(11+)
+
+Examples:
+  gsd-tools codebase complexity src/router.js
+  gsd-tools codebase complexity src/lib/ast.js`,
+
+  'codebase repo-map': `Usage: gsd-tools codebase repo-map [--budget <tokens>]
+
+Generate a compact repository map from AST signatures.
+
+Walks all source files, extracts function/class/method signatures and
+exports, then builds a compact text summary sorted by signature density.
+Designed for agent context injection (~1k tokens by default).
+
+Options:
+  --budget <tokens>   Token budget for output (default: 1000)
+
+Output (raw): { summary, files_included, total_signatures, token_estimate }
+Output (formatted): The summary text directly
+
+Examples:
+  gsd-tools codebase repo-map
+  gsd-tools codebase repo-map --budget 500`,
+
   'profile': 'Set GSD_PROFILE=1 to enable performance profiling. Baselines written to .planning/baselines/',
 
   'git': `Usage: gsd-tools git <log|diff-summary|blame|branch-info> [options]

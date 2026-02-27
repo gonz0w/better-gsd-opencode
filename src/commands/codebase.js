@@ -1345,6 +1345,102 @@ function cmdCodebaseExports(cwd, args, raw) {
 }
 
 
+// ─── Codebase Complexity Command ────────────────────────────────────────────
+
+function formatCodebaseComplexity(result) {
+  const lines = [];
+  lines.push(banner('Complexity Analysis'));
+  lines.push('');
+
+  if (result.error) {
+    lines.push(box(result.error, 'error'));
+    return lines.join('\n');
+  }
+
+  lines.push('  ' + color.dim('File: ') + result.file);
+  lines.push('  ' + color.dim('Module complexity: ') + result.module_complexity);
+  lines.push('');
+
+  if (result.functions && result.functions.length > 0) {
+    const tableData = result.functions.map(fn => {
+      const complexityStr = String(fn.complexity);
+      let coloredComplexity;
+      if (fn.complexity <= 5) coloredComplexity = color.green(complexityStr);
+      else if (fn.complexity <= 10) coloredComplexity = color.yellow(complexityStr);
+      else coloredComplexity = color.red(complexityStr);
+
+      return {
+        Name: fn.name,
+        Complexity: coloredComplexity,
+        'Max Nesting': String(fn.nesting_max),
+        Line: String(fn.line),
+      };
+    });
+    lines.push(formatTable(tableData, ['Name', 'Complexity', 'Max Nesting', 'Line']));
+  } else {
+    lines.push('  No functions found.');
+  }
+
+  lines.push('');
+  lines.push(summaryLine(result.functions.length + ' functions, module complexity ' + result.module_complexity));
+  return lines.join('\n');
+}
+
+/**
+ * cmdCodebaseComplexity — Compute per-function cyclomatic complexity for a file.
+ *
+ * @param {string} cwd - Project root
+ * @param {string[]} args - CLI arguments (after 'codebase complexity')
+ * @param {boolean} raw - Raw JSON output mode
+ */
+function cmdCodebaseComplexity(cwd, args, raw) {
+  const filePath = args.filter(a => !a.startsWith('-'))[0];
+
+  if (!filePath) {
+    error('Usage: codebase complexity <file>');
+    return;
+  }
+
+  const { computeComplexity } = require('../lib/ast');
+
+  const resolved = path.resolve(cwd, filePath);
+  const result = computeComplexity(resolved);
+
+  output({
+    file: filePath,
+    module_complexity: result.module_complexity,
+    functions: result.functions,
+    error: result.error || undefined,
+  }, { formatter: formatCodebaseComplexity });
+}
+
+
+// ─── Codebase Repo Map Command ──────────────────────────────────────────────
+
+/**
+ * cmdCodebaseRepoMap — Generate compact repository map from AST signatures.
+ *
+ * @param {string} cwd - Project root
+ * @param {string[]} args - CLI arguments (after 'codebase repo-map')
+ * @param {boolean} raw - Raw JSON output mode
+ */
+function cmdCodebaseRepoMap(cwd, args, raw) {
+  const budgetIdx = args.indexOf('--budget');
+  const tokenBudget = budgetIdx !== -1 ? parseInt(args[budgetIdx + 1], 10) : 1000;
+
+  const { generateRepoMap } = require('../lib/ast');
+
+  const result = generateRepoMap(cwd, { tokenBudget });
+
+  output({
+    summary: result.summary,
+    files_included: result.files_included,
+    total_signatures: result.total_signatures,
+    token_estimate: result.token_estimate,
+  }, raw, result.summary + '\n');
+}
+
+
 module.exports = {
   cmdCodebaseAnalyze,
   cmdCodebaseStatus,
@@ -1356,6 +1452,8 @@ module.exports = {
   cmdCodebaseContext,
   cmdCodebaseAst,
   cmdCodebaseExports,
+  cmdCodebaseComplexity,
+  cmdCodebaseRepoMap,
   readCodebaseIntel,
   checkCodebaseIntelStaleness,
   autoTriggerCodebaseIntel,
