@@ -8,6 +8,19 @@ A single-file Node.js CLI built from 34 organized `src/` modules via esbuild, pr
 
 Manage and deliver high-quality software with high-quality documentation, while continuously reducing token usage and improving performance.
 
+## Current Milestone: v7.1 Trajectory Engineering
+
+**Goal:** Structured exploration system — checkpoint, pivot, compare, and choose between multiple approaches at any workflow level, with a decision journal consumable by both agents and humans.
+
+**Target features:**
+- Checkpoint command — snapshot code state (git) + reasoning/decision context at a named point
+- Pivot command — record why current approach is being abandoned, rewind to checkpoint, start fresh
+- Compare command — outcome metrics (tests, complexity, LOC) across unbounded attempts
+- Choose command — merge winning attempt back, archive the rest as named branches
+- Decision journal — structured log of all trajectories, attempts, signals, and outcomes
+- Agent-consumable decision trail — prevents re-exploring dead ends in future sessions
+- Multi-level support — works at task, plan, and phase level
+
 ## Current State
 
 **Last shipped:** v7.0 Agent Orchestration & Efficiency (2026-02-27)
@@ -114,6 +127,15 @@ Manage and deliver high-quality software with high-quality documentation, while 
 - ✓ Auto test-after-edit and anti-pattern detection — v7.0
 - ✓ Stuck/loop detection with recovery — v7.0
 
+### Active
+
+- [ ] Checkpoint command — snapshot code + decision state at named points
+- [ ] Pivot command — abandon approach with recorded reasoning, rewind to checkpoint
+- [ ] Compare command — outcome metrics across multiple attempts
+- [ ] Choose command — merge winner, archive alternatives
+- [ ] Decision journal — structured trajectory log for agents and humans
+- [ ] Multi-level trajectory support (task, plan, phase)
+
 ### Out of Scope
 
 - Async I/O rewrite — Synchronous I/O is appropriate for CLI tool
@@ -173,4 +195,4 @@ Known tech debt: 3 pre-existing test failures in context-budget (plan path valid
 | Graduated review enforcement | Start advisory, graduate to blocking for BLOCKERs | Good — builds trust before gating |
 
 ---
-*Last updated: 2026-02-27 after v7.0 milestone completion*
+*Last updated: 2026-02-28 after v7.1 milestone start*
