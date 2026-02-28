@@ -206,7 +206,7 @@ Plans:
 4. No output format regressions detected by contract tests
 5. Bundle remains within 1000KB budget
 
-**Plans:** 3/3 plans (3/3 complete)
+**Plans:** 3/3 plans complete
 Plans:
 - [x] 42-01-PLAN.md — Canary cycle: Plan Phase 44 → Execute → Verify ✅ (complete)
 - [x] 42-02-PLAN.md — Token measurement, test suite, bundle size validation ✅ (complete)
@@ -264,6 +264,7 @@ Plans:
 | 18-22 | v4.0 | 13/13 | Complete | 2026-02-25 |
 | 23-29 | v5.0 | 14/14 | Complete | 2026-02-26 |
 | 30-36 | v6.0 | 11/11 | Complete | 2026-02-27 |
-| 37-43 | v7.0 | 13/13 | Complete | 2026-02-27 |
+| 37-41 | v7.0 | 11/11 | Complete | 2026-02-27 |
+| 42 | v7.0 | 3/3 | Complete | 2026-02-27 |
+| 43 | v7.0 | 2/2 | Complete | 2026-02-27 |
 | 44 | v7.0 | 1/1 | Complete | 2026-02-27 |
-| 42 | v7.0 | 1/3 | In progress | — |

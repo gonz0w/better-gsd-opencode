@@ -1,7 +1,7 @@
 {
-  "timestamp": "2026-02-27T14:18:33.380Z",
-  "workflow_count": 44,
-  "total_tokens": 74059,
+  "timestamp": "2026-02-28T00:33:00.305Z",
+  "workflow_count": 45,
+  "total_tokens": 78996,
   "workflows": [
     {
       "name": "execute-phase.md",
@@ -9,6 +9,13 @@
       "ref_count": 2,
       "ref_tokens": 4859,
       "total_tokens": 9121
+    },
+    {
+      "name": "execute-plan.md",
+      "workflow_tokens": 3561,
+      "ref_count": 1,
+      "ref_tokens": 1983,
+      "total_tokens": 5544
     },
     {
       "name": "new-milestone.md",
@@ -51,13 +58,6 @@
       "ref_count": 0,
       "ref_tokens": 0,
       "total_tokens": 3083
-    },
-    {
-      "name": "execute-plan.md",
-      "workflow_tokens": 2765,
-      "ref_count": 0,
-      "ref_tokens": 0,
-      "total_tokens": 2765
     },
     {
       "name": "audit-milestone.md",
@@ -109,11 +109,25 @@
       "total_tokens": 2090
     },
     {
+      "name": "tdd.md",
+      "workflow_tokens": 1983,
+      "ref_count": 0,
+      "ref_tokens": 0,
+      "total_tokens": 1983
+    },
+    {
       "name": "plan-milestone-gaps.md",
       "workflow_tokens": 1806,
       "ref_count": 0,
       "ref_tokens": 0,
       "total_tokens": 1806
+    },
+    {
+      "name": "verify-phase.md",
+      "workflow_tokens": 1668,
+      "ref_count": 0,
+      "ref_tokens": 0,
+      "total_tokens": 1668
     },
     {
       "name": "diagnose-issues.md",
@@ -128,13 +142,6 @@
       "ref_count": 0,
       "ref_tokens": 0,
       "total_tokens": 1572
-    },
-    {
-      "name": "verify-phase.md",
-      "workflow_tokens": 1493,
-      "ref_count": 0,
-      "ref_tokens": 0,
-      "total_tokens": 1493
     },
     {
       "name": "research-phase.md",
