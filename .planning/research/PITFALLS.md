@@ -1,316 +1,348 @@
-# Domain Pitfalls
+# Domain Pitfalls: Trajectory Engineering
 
-**Domain:** Adding state validation, cross-session memory, atomic planning, verification, integration testing, and dependency optimization to an existing Node.js CLI tool (GSD Plugin v2.0)
-**Researched:** 2026-02-22
-**Confidence:** HIGH — based on codebase analysis (15 src/ modules, 202 tests, 309+ regex patterns), industry context engineering patterns (Manus, Philschmid, Inkeep, LangChain), and testing anti-pattern research (Codepipes, Google Testing Blog)
+**Domain:** Adding checkpoint/pivot/compare/choose exploration system to an existing Node.js CLI that manages git state and markdown planning documents
+**Researched:** 2026-02-28
+**Confidence:** HIGH — based on codebase analysis (34 src/ modules, 669 tests, git.js + worktree.js integration surfaces), Kiro checkpointing architecture, Claude Code checkpoint patterns, git branch management literature, and prior v2.0 pitfall research
+
+## Compact Summary
+
+The 9 pitfalls below distill into three failure modes:
+
+1. **State coherence failures** (Pitfalls 1, 2, 5): Trajectory operations create divergent copies of `.planning/` files. If checkpoint/pivot/choose don't maintain bidirectional consistency between git branch state and planning document state, agents act on stale or contradictory information. This is THE critical risk for this codebase.
+
+2. **Git complexity explosion** (Pitfalls 3, 4, 6): Every checkpoint creates a branch. Every pivot creates another. Without aggressive lifecycle management, the repo accumulates `traj-*` branches that pollute `git branch` output, confuse the existing worktree system, and make `branchInfo()` return unexpected data. Single-developer doesn't mean single-branch-count.
+
+3. **Context window pollution** (Pitfalls 7, 8, 9): Decision journals, comparison metrics, and trajectory metadata are valuable for preventing re-exploration — but each token of trajectory history displaces a token of actual work context. The existing 200K-token context window and 50% target utilization leave ~100K tokens for work; a verbose decision journal can consume 10-20% of that.
+
+---
 
 ## Critical Pitfalls
 
-Mistakes that cause rewrites, data corruption, or features that make the system worse.
+Mistakes that cause data loss, agent confusion, or features that make the system actively worse.
 
 ---
 
-### Pitfall 1: State Validation That Creates More Problems Than State Drift
+### Pitfall 1: .planning/ File State Divergence Across Trajectory Branches
 
 **What goes wrong:**
-You add a `state validate` command that compares STATE.md against git/filesystem reality (e.g., "STATE.md says Phase 3, plan 2 is current, but no 03-02-PLAN.md exists on disk"). The validation fires false positives in legitimate scenarios:
+`checkpoint` creates a git branch (snapshot of code + planning files). The developer continues working on the original branch — STATE.md gets updated, PLAN.md progress changes, decisions accumulate. When `pivot` rewinds to the checkpoint branch, the `.planning/` files revert to their checkpoint-time state: wrong current plan, wrong progress percentage, missing decisions, stale session continuity data. The agent now operates on a STATE.md that says "Plan 2 of 5, 40% complete" when the actual trajectory context is "Attempt 2 of approach B, starting fresh from checkpoint."
 
-1. **Mid-execution false positives.** A plan is being executed right now — the plan file exists but the SUMMARY.md hasn't been written yet. Validation reports "plan incomplete" during active work, interrupting the agent with a false alarm.
-2. **Archive blindness.** After `milestone complete`, completed phase directories are archived to `.planning/milestones/vX.Y-phases/`. STATE.md still references "Phase 5 completed" but the directory moved. Validation reports "Phase 5 directory not found" — a false positive because archival is a correct state transition.
-3. **Stale detection that fires on legitimate pauses.** You add "stale state detection" — if STATE.md's `Last activity` is >24h old, warn the user. But weekend breaks, multi-project developers, and vacation returns all trigger the warning. The first interaction after a break starts with a false alarm instead of useful context.
-4. **Git history mismatch.** STATE.md says "3 commits in current plan" but `git log` returns 5 (because the developer made manual commits outside GSD). The validation reports "unexpected commits" which are actually legitimate.
-
-The worst outcome: the agent starts "fixing" false positives. If the workflow says "Resolve all state validation warnings before proceeding," and validation reports phantom issues, the agent begins modifying STATE.md to silence warnings — corrupting the real state to satisfy a buggy validator.
+Worse: `compare` needs to read STATE.md from multiple branches to extract metrics. Each branch has its own STATE.md with its own position/progress. The comparison output shows conflicting "current state" data because it's reading per-branch STATE.md rather than a centralized trajectory record.
 
 **Why it happens:**
-State drift detection requires an accurate model of ALL valid states and ALL valid transitions. The GSD system has at least 12 state transitions (plan start, plan complete, phase complete, milestone complete, blocker added, blocker resolved, session recorded, decision added, etc.) plus external events (manual git commits, file moves, archival). Missing even one legitimate transition in the validator produces false positives that erode trust.
+The existing architecture stores ALL state in `.planning/` markdown files within the git tree. This design is perfect for linear execution (one branch, one timeline) but breaks down for branching timelines. Git handles code divergence natively but `.planning/` files contain cross-cutting concerns (overall project progress, session state, decisions) that shouldn't diverge.
+
+Specifically in this codebase:
+- `cmdStateLoad()` reads `.planning/STATE.md` from `cwd` — whatever branch is checked out
+- `cmdStatePatch()` writes to `.planning/STATE.md` in the current branch
+- `stateReplaceField()` operates on the content of the currently-checked-out STATE.md
+- `cmdStateValidate()` compares STATE.md against `.planning/phases/` which are also branch-local
 
 **Consequences:**
-- Agent wastes tokens diagnosing and "fixing" phantom issues
-- User loses trust in state validation and ignores it (including real warnings)
-- STATE.md corruption from automated "fixes" to false positives
-- Workflows stall on validation gates that block legitimate work
+- Agent resumes from checkpoint and sees stale decisions — re-explores dead ends
+- `state validate` fires false positives after pivot (STATE.md references plans that exist on the previous branch but not this one)
+- `cmdStateAdvancePlan()` advances plan count on a trajectory branch, creating phantom progress
+- `state update-progress` computes completion percentage from branch-local phase directories, producing incorrect overall progress
 
 **Prevention:**
-1. **Start with read-only advisory mode.** The validator reports issues but NEVER blocks workflows or triggers automated fixes. Log warnings to `_validation` field in STATE.md JSON output — don't make them workflow-blocking gates.
-2. **Enumerate every valid state transition before writing the validator.** Create a state machine diagram: `{current_state} + {event} → {next_state}`. Include archival, manual commits, paused states, and fresh starts. Only flag transitions that aren't in the machine.
-3. **Require 3+ violations before triggering a warning.** A single mismatch between STATE.md and reality should be INFO level (logged), not WARNING (shown to agent). Only escalate to WARNING when multiple independent signals agree: wrong phase AND wrong plan count AND missing expected files.
-4. **Test the validator against various project states**, including after milestone completion, mid-execution, and fresh-start scenarios. If it fires false positives, it's not ready.
-5. **Never auto-correct state.** The validator identifies drift; a separate explicit command (`state repair`) fixes it, and only with user confirmation.
+1. **Separate trajectory-scoped state from branch-local state.** Create `.planning/trajectory/` directory that is NOT part of the trajectory branches. Trajectory metadata (which checkpoint we're on, attempt count, decision journal) lives in the *original* branch only, or in a sidecar file outside git.
+2. **`checkpoint` must snapshot STATE.md's current-position fields but NOT let them diverge.** When creating a checkpoint branch, strip the position/progress fields from the branch copy of STATE.md (or replace with a pointer: "Trajectory branch — see original branch for current state").
+3. **`pivot` must NOT revert STATE.md to checkpoint state.** It reverts CODE, but carries forward the current STATE.md (or at minimum: current decisions, current blockers, current session continuity). Implement this as: `git checkout checkpoint-branch -- . ':!.planning/STATE.md' ':!.planning/memory/'` — exclude planning state from the revert.
+4. **Test the round-trip:** checkpoint → work → update state → pivot → verify STATE.md is current, not stale. This is the #1 test case for the entire feature.
 
 **Warning signs:**
-- Validator fires on first run against a project that was working fine
-- Agent spends >30 seconds on "state validation" before starting real work
-- STATE.md gets modified by the validation process itself
-- Developer adds exceptions/ignores to suppress specific warnings
+- Agent says "I see we're on Plan 2" after pivot when we should be starting fresh
+- `state validate` fires errors immediately after `pivot`
+- Decision journal entries disappear after `pivot` (they were on the abandoned branch)
+- `compare` shows two different "Current Plan" values from the same trajectory
 
-**Phase to address:** State Validation phase — must be the FIRST task: design the state machine before writing any validation code.
+**Detection:** After any trajectory operation, run `state validate` — if it reports position/progress issues, state divergence has occurred.
+
+**Phase to address:** FIRST phase. This is the architectural foundation. Every other feature (pivot, compare, choose) depends on state coherence.
 
 ---
 
-### Pitfall 2: Cross-Session Memory That Bloats Context Instead of Reducing It
+### Pitfall 2: Losing Uncommitted Work During Pivot/Rewind
 
 **What goes wrong:**
-You implement cross-session memory to survive `/clear` — persisting decisions, codebase knowledge, and position to a file (e.g., `.planning/.memory/session.md`). But the memory accumulates without bounds and eventually consumes MORE context than the problem it solved:
+Developer (or agent) is mid-edit when `pivot` fires. They've modified 3 source files and `.planning/PLAN.md` but haven't committed. `pivot` does `git checkout checkpoint-branch` which fails with "Your local changes to the following files would be overwritten" — or worse, with `--force` it silently destroys uncommitted work.
 
-1. **Accumulation without decay.** Every decision, every file path, every architectural observation gets saved. After 20 sessions, the memory file is 8,000 tokens — 4% of context window consumed before any work begins. This is exactly the Manus `todo.md` problem: "~30% of tokens wasted on constant rewriting" of a growing working memory.
-2. **Stale memories pollute context.** Session 5 recorded "STATE.md uses flat keys." Session 12 migrated to nested keys. Both facts exist in memory. The agent now has contradictory context — the definition of "Context Pollution" per Philschmid (2025): "too much irrelevant, redundant, or conflicting information that distracts the LLM."
-3. **Memory becomes a second STATE.md.** Cross-session memory stores "current phase: 3, current plan: 2, last blocker: API timeout." But STATE.md already stores this. Now two sources of truth diverge, and the agent can't tell which is authoritative. This is the "retention without understanding" anti-pattern (Sphere Inc., 2025): persisting everything without semantic awareness of what's current.
-4. **Resumption overhead exceeds benefit.** The init command loads memory file + STATE.md + ROADMAP.md + config.json. If memory adds 2,000 tokens, but the information was already in STATE.md (or obsolete), you've added 2,000 tokens of noise for zero information gain.
+This is especially dangerous in this codebase because `execGit()` runs synchronously and the commit command (`cmdCommit()`) requires explicit invocation. There's no auto-save. The agent operates in a "modify files → test → commit" cycle, and the gap between "modify" and "commit" is exactly when pivot is most tempting (tests failed, want to try different approach).
 
 **Why it happens:**
-Memory feels like a pure win — "persist knowledge across sessions." But memory management requires TWO operations: writing AND forgetting. Without controlled forgetting, memory degrades from signal to noise. As Ajith Vallath Prabhakar (2025) noted: "If controlled forgetting is not implemented, memory bloat can occur, leading to decreased reasoning efficiency."
+The existing `worktree.js` handles this for worktrees via `--force` flag in `cmdWorktreeRemove()` (line 399: `['worktree', 'remove', worktreePath, '--force']`). This is intentional for worktree cleanup but would be destructive for trajectory pivots. The worktree system creates isolated directories; trajectory engineering operates on the SAME working directory.
+
+`execGit()` returns `{ exitCode, stdout, stderr }` — a failed checkout due to dirty state returns exitCode 1. If the pivot command doesn't check for this AND handle it gracefully, one of two things happens: (a) pivot fails silently, leaving the user confused, or (b) pivot forces the checkout, destroying work.
 
 **Consequences:**
-- Context window consumed by stale/redundant memory, leaving less room for actual work
-- Contradictory memories cause agent confusion and hallucinated reasoning
-- Two sources of truth (memory vs STATE.md) diverge, causing decision errors
-- "Context Rot" threshold hit earlier because memory fills the window faster
+- Uncommitted code changes permanently lost
+- Agent's in-progress work destroyed mid-task
+- User trust in the tool destroyed after one data loss incident
+- If auto-stash is used naively, stash pile-up creates its own confusion
 
 **Prevention:**
-1. **Memory must have explicit categories with TTL (time-to-live).** Three categories:
-   - **Position** (current phase/plan/status): overwritten each session, never accumulated. 50-100 tokens max.
-   - **Decisions** (architectural choices, resolved blockers): kept until milestone completion, then archived. Each decision is ONE line.
-   - **Codebase knowledge** (file locations, module relationships): refreshed by hashing `src/` directory listing; invalidated when hash changes.
-2. **Hard token budget for memory: 500 tokens max.** If memory exceeds 500 tokens, the oldest non-position entries are evicted. This prevents unbounded growth.
-3. **Memory is DERIVED from STATE.md, not a parallel store.** The `state record-session` command already records session continuity. Cross-session memory should be a curated SUBSET of STATE.md, not a separate document. Specifically: extract `Current Position` + `Decisions` (last 5) + `Blockers` into a compact format.
-4. **Test memory after 10 simulated sessions.** Write a test that calls `state record-session` 10 times with varying data and verifies the memory file stays under 500 tokens. If it grows unbounded, the design is wrong.
-5. **Use Manus's pattern: "Share context by communicating, not communicate by sharing context."** Don't inject memory into every workflow. Have workflows explicitly request memory when resuming (`init resume` returns memory; `init execute-phase` does not).
+1. **Pre-flight dirty check is MANDATORY before any branch-switching operation.** Use the existing `branchInfo()` which already detects `has_dirty_files` and `dirty_file_count`. If dirty: refuse to pivot and output a clear message: `"Cannot pivot: N uncommitted files. Commit or stash first."`
+2. **Offer auto-commit, not auto-stash.** `git stash` creates invisible state that's easy to lose. Instead: `pivot` should offer: "Uncommitted changes detected. Options: (a) commit current work first, (b) discard changes, (c) abort pivot." For agent workflows, always choose (a) — commit with message `"wip: checkpoint before pivot to [name]"`.
+3. **NEVER use `--force` for checkout in trajectory operations.** Unlike worktree removal (which operates on separate directories), trajectory checkout operates on the user's working directory. Force = data loss.
+4. **Test: create dirty state → attempt pivot → verify pivot refuses AND work is preserved.** This must be a test case, not just documentation.
 
 **Warning signs:**
-- `.planning/.memory/` directory grows beyond 5KB
-- `init resume` output exceeds 1,000 tokens
-- Agent asks "Should I use the memory or STATE.md?" — two sources of truth detected
-- Session start time increases as memory file grows
+- `pivot` command doesn't call `branchInfo()` before switching
+- Any git checkout call that doesn't check for dirty files first
+- Stash references appearing in trajectory metadata (means auto-stash was used)
+- Agent outputs "pivot successful" without mentioning dirty file handling
 
-**Phase to address:** Cross-Session Memory phase — establish the 500-token budget and 3-category structure in the first task, before implementing persistence.
+**Phase to address:** Checkpoint & Pivot phase — the `pivot` command implementation. Build the dirty-check as the first operation, before any git operations.
 
 ---
 
-### Pitfall 3: Atomic Plan Decomposition Rules That Are Too Rigid or Too Loose
+### Pitfall 3: Branch Proliferation from Unbounded Trajectory Creation
 
 **What goes wrong:**
-You add rules for plan granularity — "each plan should do one thing." But defining "one thing" is the hard part:
+Each `checkpoint` creates a branch. Each `pivot` may create another. A developer exploring 3 approaches to a problem creates 3 checkpoint branches + 3 attempt branches = 6 branches. Do this for 5 tasks in a phase = 30 branches. Over a milestone with 15 plans = potentially 90+ trajectory branches in the repo.
 
-1. **Too rigid: trivial plans.** Rules say "max 3 files modified per plan." A simple rename that touches 5 import statements across 5 files now requires 2 plans, with a dependency between them. The planning overhead exceeds the work itself. You've created bureaucratic overhead that slows the agent.
-2. **Too loose: bundled plans.** Rules say "one logical change per plan." An agent interprets "add state validation" as one logical change and produces a single 800-line plan that modifies 12 files. The plan exceeds context budget and fails mid-execution.
-3. **Decomposition rules conflict with wave/dependency system.** The existing PLAN.md frontmatter has `wave` and `depends_on` fields for parallel execution. If atomic decomposition creates 8 plans where 3 existed, the wave assignments become complex, and `validate-dependencies` starts finding circular dependencies in what was previously a simple linear chain.
-4. **Verification complexity scales with plan count.** Each plan gets a VERIFICATION.md. If decomposition triples plan count (3→9 plans), verification time triples too. A phase that previously took 4 sessions now takes 12 — most of it verifying trivial changes.
+`git branch` output becomes noise. The existing `branchInfo()` function returns `branch` as the current branch name — but listing branches via `git branch` (which worktree.js uses for cleanup) returns ALL branches, including trajectory detritus. The existing worktree system creates branches with pattern `worktree-NN-MM-W` — if trajectory branches use a similar pattern, cleanup logic could collide.
 
 **Why it happens:**
-Plan decomposition is a spectrum, not a binary. "Atomic" plans sound good in theory but the optimal granularity depends on context: a complex algorithm is better as one plan with internal steps; a broad refactoring is better as multiple plans. Fixed rules can't capture this.
+Git branches are cheap to create but expensive to manage mentally. The Kiro checkpointing system avoids this by using a "shadow repository" (separate bare git repo) that's cleaned up per session. Claude Code's checkpoints are session-scoped. Both recognized that persistent branches create persistent mess.
+
+This codebase's trajectory system is designed to be persistent (decision journal survives sessions) — which means branches must also persist until explicitly cleaned up. But "persist until cleaned up" in practice means "persist forever" because cleanup is the first thing developers forget.
 
 **Consequences:**
-- Agent spends more time planning and verifying than executing
-- Plan dependencies become tangled, blocking parallel execution
-- Context budget consumed by plan overhead (frontmatter, verification criteria, must_haves for each plan)
-- Developer frustration: "Why is this trivial change split into 3 plans?"
+- `git branch` output becomes unusable
+- `branchInfo()` upstream detection breaks on trajectory branches (they have no upstream)
+- Disk usage grows (each branch retains its own tree objects)
+- `worktree check-overlap` and `worktree merge` may accidentally discover trajectory branches
+- Agent confusion: "Which branch should I be on?"
 
 **Prevention:**
-1. **Use heuristics, not hard rules.** Instead of "max N files" or "max N lines," provide the planner with a decision framework:
-   - Is this change independently verifiable? → Yes = one plan. No = split.
-   - Will this plan exceed 50% of context budget? → Yes = must split.
-   - Can any part of this change be done in parallel? → Yes = split into parallel plans with wave assignments.
-2. **Set a context-budget threshold, not a file-count limit.** Use the existing `context-budget` command: estimate tokens for the plan + all referenced files + workflow overhead. If >60% of context window, recommend splitting. This is objective and measurable.
-3. **Keep existing plans working.** The decomposition rules should be guidance for the `plan-phase` workflow, not a validation gate that rejects existing plans. v1.0/v1.1 plans that work fine should NOT be flagged as "not atomic enough."
-4. **Test with real plans.** Take 5 existing PLAN.md files from v1.0/v1.1 and run the decomposition rules against them. If any working plan gets rejected or requires splitting, the rules are too rigid.
+1. **Namespacing: all trajectory branches MUST use prefix `traj/`** (e.g., `traj/task-21-02/checkpoint-1`, `traj/task-21-02/attempt-2`). This makes them: (a) filterable with `git branch --list 'traj/*'`, (b) distinguishable from worktree branches (`worktree-*`), (c) groupable in git GUIs.
+2. **`choose` command must delete non-winning branches.** When a trajectory is resolved (approach B wins), the `choose` command merges B and deletes the `traj/` branches for that task. This is the archival step. Without it, branches accumulate indefinitely.
+3. **Automatic cleanup on phase/milestone completion.** When `cmdPhaseComplete()` or `cmdMilestoneComplete()` runs, add a step: prune all `traj/` branches whose task is in the completed phase. This mirrors how `cmdWorktreeCleanup()` prunes worktrees.
+4. **Hard limit: configurable max trajectory branches per task (default: 5).** If a developer has 5 active attempts at one task, something is wrong. The 6th `checkpoint` should warn: "5 trajectory branches exist for this task. Clean up or increase limit."
+5. **`trajectory list` command that shows ONLY trajectory branches** with age, task association, and committed/merged status. Like `worktree list` but for trajectories.
 
 **Warning signs:**
-- Planner produces plans with <100 lines of actual work but 200 lines of metadata
-- Phase plan count jumps from 2-3 to 7-8 for equivalent scope
-- `validate-dependencies` finds issues in plans that the decomposition created
-- Agent requests "Can I merge these plans?" during execution
+- `git branch | wc -l` exceeds 20 in a single-developer repo
+- `worktree merge` finds unexpected branches
+- Agent asks "which branch am I on?" or "should I switch branches?"
+- `git branch --list 'traj/*'` returns branches from 3+ tasks ago
 
-**Phase to address:** Atomic Planning phase — first task: define the decomposition heuristics as workflow guidance, not validation gates. Test against existing real plans.
+**Phase to address:** Checkpoint phase (naming convention) and Choose phase (cleanup). Also: add cleanup hook to existing `cmdPhaseComplete()` and `cmdMilestoneComplete()`.
 
 ---
 
-### Pitfall 4: Verification That Takes Longer Than the Work It Verifies
+### Pitfall 4: Breaking Existing Worktree Functionality
 
 **What goes wrong:**
-"Comprehensive verification" sounds responsible. In practice, it can become the dominant cost of every phase:
+The existing worktree system (`worktree.js`, 791 lines) manages branches with pattern `worktree-NN-MM-W` and operates on paths under `/tmp/gsd-worktrees/`. It has:
+- `parsePlanId()` for branch naming
+- `parseWorktreeListPorcelain()` for listing
+- `isAutoResolvable()` for merge conflict handling
+- `cmdWorktreeMerge()` with `merge-tree` dry-run
 
-1. **Auto-test execution on every plan.** Adding `npm test` (or `node --test`) as a mandatory verification step after every plan sounds good. But the test suite (202 tests) takes ~8 seconds to run. In a phase with 5 plans, that's 5 runs = 40 seconds of test execution, plus the agent reading and reasoning about each test result (~500 tokens of output per run × 5 = 2,500 tokens of verification overhead). For trivial plans (update a help string), this is disproportionate.
-2. **Requirement tracing on every plan.** Checking "does this plan satisfy requirement X from REQUIREMENTS.md?" requires loading the requirements file (300+ tokens), the plan file, and the summary — then reasoning about the mapping. For 5 plans in a phase, that's 5 separate requirement-tracing operations consuming 1,500+ tokens total. The tracing itself doesn't find bugs; it confirms alignment that the planner already established.
-3. **Regression detection via `session-diff`.** After each plan, comparing git state to expected state to detect regressions. But "expected state" is undefined for most plans — what file SHOULDN'T have changed? Without a clear expectation, regression detection becomes "did anything unexpected happen?" which is computationally expensive and prone to false positives.
-4. **Verification of verification.** Adding `verify plan-structure` before execution AND `verify phase-completeness` after AND `verify artifacts` after AND `verify key-links` after. Four verification passes per plan × 5 plans = 20 verification calls. The existing verify commands total ~668 lines of code — more than many feature commands.
+If trajectory engineering introduces its own branch creation, checkout operations, or merge logic, it can collide with worktree operations in several ways:
+
+1. **Branch name collision.** A checkpoint branch `traj/worktree-21-02-1` (if poorly named) matches the worktree pattern. `cmdWorktreeList()` filters by path prefix, but `cmdWorktreeRemove()` finds branches by name pattern. An accidental match deletes the wrong branch.
+2. **Concurrent branch switching.** If a worktree is active on branch `worktree-21-02-1` and the main repo pivots to a checkpoint, the worktree's state becomes ambiguous. `git worktree list` shows both; `merge-tree` dry-run may pick up changes from the trajectory.
+3. **Merge conflict resolution collision.** `cmdWorktreeMerge()` uses `git merge-tree --write-tree` for dry-run and `git merge --no-ff` for actual merge. If a trajectory branch has been cherry-picked or partially merged, the merge-tree output includes those changes, creating phantom conflicts.
+4. **Config interaction.** Worktree config lives in `.planning/config.json` under `worktree` key. Trajectory config must NOT overlap with this namespace.
 
 **Why it happens:**
-Verification is the one area where "more is always better" feels true. But verification has diminishing returns just like test coverage. The first check catches 80% of issues; each additional check catches exponentially fewer.
+Both systems (worktree and trajectory) manage git branches, but for different purposes. Worktrees create isolated directories for parallel execution; trajectories create branches for sequential exploration. Without explicit boundary enforcement, they leak into each other's operations.
 
 **Consequences:**
-- Phase execution time doubles or triples from verification overhead
-- Token budget consumed by verification results instead of actual work
-- Agent becomes "verification-bound" — spending more time checking than doing
-- Developer disables verification ("too slow") and loses all benefit
+- Worktree merge picks up trajectory changes → corrupted merge
+- `worktree cleanup` deletes trajectory branches → lost exploration data
+- `worktree create` fails because the branch name is "already in use" by a trajectory
+- 669 existing tests start failing because worktree test fixtures encounter trajectory branches
 
 **Prevention:**
-1. **Tiered verification: light/standard/deep.** 
-   - **Light** (default for plans <200 lines): `verify plan-structure` before, `verify phase-completeness` after. No test execution, no requirement tracing.
-   - **Standard** (default for phases): test suite runs once at PHASE end, not per-plan. Requirement tracing at phase level.
-   - **Deep** (opt-in via `config.json`): full verification suite per plan. Reserved for critical phases (foundation, security).
-2. **Test execution: once per phase, not per plan.** Run `node --test` after all plans in a phase complete, not after each individual plan. If tests fail, bisect which plan broke them. This cuts test execution from 5× to 1× per phase.
-3. **Budget verification itself.** Verification should consume <10% of total phase tokens. Use `context-budget` to measure: if verification output exceeds 10% of the phase's total context consumption, reduce verification scope.
-4. **Make regression detection opt-in.** Don't add regression detection as a default — it requires defining "expected unchanged files" which is plan-specific overhead. Let the planner declare `expect_unchanged: [file1, file2]` in frontmatter; regression detection only runs when this field exists.
+1. **Strict namespace separation:** Worktree branches = `worktree-*`. Trajectory branches = `traj/*`. Add an assertion in both systems: worktree operations MUST reject branches matching `traj/*`; trajectory operations MUST reject branches matching `worktree-*`.
+2. **Filter trajectory branches from worktree list.** In `parseWorktreeListPorcelain()`, add: `if (wt.branch && wt.branch.startsWith('traj/')) continue;`
+3. **Trajectory operations must check for active worktrees.** Before `pivot` does a branch switch, verify no worktree is currently active (via `git worktree list`). If a worktree exists, pivot should refuse or warn.
+4. **Separate test suites.** Trajectory tests must NOT create branches that match worktree patterns. Worktree tests must NOT create branches that match trajectory patterns. Add cross-contamination assertions to both test suites.
+5. **Add `trajectory` as a new top-level command** (like `worktree`), not as subcommands on existing commands. This maintains separation in the router and prevents argument parsing collisions.
 
 **Warning signs:**
-- Agent output contains more verification summaries than code changes
-- Phase takes 3+ sessions where the work itself fits in 1
-- Developer asks "Can we skip verification?" frequently
-- Verification finds zero issues for 10 consecutive plans (ROI is zero)
+- Worktree tests start failing after trajectory code is added
+- `worktree list` shows trajectory branches
+- `worktree cleanup` deletes more branches than expected
+- `worktree merge` reports conflicts on files that weren't modified in the worktree
 
-**Phase to address:** Comprehensive Verification phase — first task: design the light/standard/deep tiers. Default to light. Prove standard is necessary with data before mandating it.
+**Phase to address:** FIRST phase (architecture). Define namespace conventions before writing any git operations. Add namespace guard to worktree.js as an early safety task.
 
 ---
 
-### Pitfall 5: Integration Tests That Test Implementation Details of a CLI Tool
+### Pitfall 5: Stale Checkpoint Data Leading Agents to Re-Explore Dead Ends
 
 **What goes wrong:**
-You add end-to-end integration tests (init → plan → execute → verify) and they become the most expensive part of the codebase to maintain:
+The decision journal records "Approach A failed because tests X and Y broke." Three sessions later, a new agent resumes the project. The decision journal is in `.planning/trajectory/journal.md` or `memory/trajectories.json`. But:
 
-1. **Snapshot fragility.** You snapshot the JSON output of `init execute-phase 1` as a golden file. Any change to output format — adding a field, changing a date, updating version number — breaks the snapshot. node:test has snapshot support but it requires `--test-update-snapshots` after every change, which defeats the purpose of regression detection.
-2. **Git-dependent tests are non-deterministic.** Integration tests that call `session-diff`, `commit`, or `rollback-info` depend on git state. If a test creates commits, the SHA changes every run. If it checks commit count, parallel test execution can see commits from other tests. The Codepipes blog (2018) identifies flaky tests as the #1 reason teams abandon test suites: "even a small number of flaky tests is enough to destroy the credibility of the rest."
-3. **Multi-step workflow tests are order-dependent.** A test for "init → plan → execute → verify" requires each step to succeed before the next. If step 2 fails, you get a cascade of 3 failures — all showing "execute failed" or "verify failed" when the root cause was in planning. Debugging requires understanding the full chain.
-4. **Temp directory explosion.** Each integration test creates a full `.planning/` directory structure with ROADMAP.md, STATE.md, config.json, phase directories, and plan files. A 10-test integration suite creates 10 temp directories with dozens of files each. Test setup is 50+ lines per test; the actual assertion is 5 lines. The test code becomes harder to read than the feature code.
-5. **Real project coupling.** The AGENTS.md directive says "Always test against current working directory's `.planning/`." Integration tests that rely on a specific real project are non-portable (they fail on any other developer's machine) and non-deterministic (the real project changes over time).
+1. **The agent doesn't load the journal.** Trajectory history isn't part of the `init execute-phase` output. The agent starts work, encounters the same problem, tries Approach A again, fails again, wastes 15 minutes rediscovering what was already known.
+2. **The journal IS loaded but is stale.** The codebase changed since the checkpoint. Tests X and Y were fixed in a later plan. Approach A would actually work now, but the journal says "dead end." The agent avoids a viable approach based on outdated failure data.
+3. **The journal is too verbose.** Every checkpoint, every pivot, every micro-decision is logged. The journal is 3,000 tokens. The agent reads all of it, consuming 3% of context for historical data that's mostly noise.
 
 **Why it happens:**
-Integration tests for a CLI tool that processes files are inherently I/O-heavy. The black-box testing approach (run CLI as subprocess, check output) means every test pays the Node.js startup cost (~80ms), file creation cost, and JSON parsing cost. This is the correct approach for API contract testing, but it's expensive for behavioral testing.
+Decision journals solve a real problem (preventing re-exploration) but create the same tension as cross-session memory: too little data = agents repeat mistakes; too much data = context pollution; stale data = agents make wrong decisions based on obsolete facts. This is literally Pitfall 2 from the v2.0 research ("Cross-Session Memory That Bloats Context") applied to trajectory data.
+
+The existing memory system has this exact pattern: `SACRED_STORES = ['decisions', 'lessons']` are never pruned (memory.js line 8). If trajectory decisions join sacred stores, they accumulate forever.
 
 **Consequences:**
-- Test suite takes 30+ seconds, discouraging frequent runs
-- Snapshot updates become a ritual chore after every change
-- Git-dependent tests fail randomly on CI, eroding trust
-- Team avoids writing new tests because the setup cost is high
+- Agent wastes tokens re-exploring known-dead approaches (no journal loaded)
+- Agent avoids viable approaches because journal says they failed (stale journal)
+- Context window consumed by trajectory history instead of current work (verbose journal)
+- Two agents in different sessions make contradictory decisions based on partial journal reads
 
 **Prevention:**
-1. **Separate integration tests from unit tests by directory.** Keep the existing `gsd-tools.test.cjs` (202 tests, fast, temp-dir-based) as the primary suite. Create `gsd-tools.integration.test.cjs` for workflow-level tests. Run integration tests only on `npm run test:integration`, not on every change.
-2. **Don't snapshot full JSON output.** Instead, assert specific fields that define the contract: `assert.ok(output.phase_found)`, `assert.strictEqual(output.plan_count, 3)`. This survives field additions without breaking.
-3. **Mock git for integration tests.** Create a helper that initializes a git repo in the temp directory with a known initial commit. Tests that need git history create deterministic commits with fixed messages/dates. Never depend on the real project's git history.
-4. **Use test fixtures, not inline file creation.** Create a `test/fixtures/basic-project/` directory with a canonical `.planning/` structure. Copy it into temp directories at test start. This eliminates the 50-line setup blocks and makes tests readable.
-5. **No real project dependencies in automated tests.** Testing against a specific project is for manual validation. Automated tests must use self-contained fixtures.
-6. **Limit integration tests to 5-10 per feature area.** They validate the critical paths only. Business logic is tested by the existing unit tests. Integration tests confirm: "Can the CLI parse this input format?" and "Does the multi-command workflow produce the expected state transition?"
+1. **Trajectory journal must be part of `init execute-phase` output** — but ONLY the active task's trajectory data. Not the full journal. Maximum 500 tokens of trajectory context per task.
+2. **Journal entries must be time-stamped and code-hash-stamped.** Each entry records the git commit hash at the time of the decision. When the journal is loaded, entries whose code-hash is more than N commits behind current HEAD are marked as `[possibly stale — codebase changed]`. The agent can still read them but knows to re-evaluate.
+3. **Compaction: resolve > archive.** When `choose` picks a winner, the journal entry for that task should be compacted to: `"Tried A (failed: tests broke), tried B (succeeded: all tests pass). Chose B."` — one line. The per-attempt detail gets archived (moved to `.planning/trajectory/archive/`), not kept in the active journal.
+4. **Token budget for trajectory context: 500 tokens per task, 2000 tokens total in any workflow.** Use the existing `context-budget` estimation. If trajectory context exceeds budget, oldest entries get summarized.
+5. **Distinguish "definitively dead" from "failed this time."** A journal entry should classify: `dead_end: true` (approach is fundamentally wrong) vs `failed_attempt: true` (approach might work with different parameters). Agents should re-try `failed_attempt` entries but avoid `dead_end` entries.
 
 **Warning signs:**
-- `npm test` takes >15 seconds (currently ~8 seconds for 202 tests)
-- A code change breaks >10 tests that are unrelated to the change
-- Tests contain `sleep()`, `setTimeout()`, or retry loops
-- Test file exceeds 5,000 lines (current test file is 4,591 lines — already large)
+- Agent says "Let me try approach X" when journal says X was already tried
+- `init execute-phase` output grows by >1000 tokens after trajectory feature ships
+- Journal file exceeds 5KB
+- Agent spends first 30 seconds reading trajectory history before starting work
 
-**Phase to address:** Integration Testing phase — first task: create the test infrastructure (fixtures directory, git mock helper, integration test runner). Don't write tests until infrastructure is solid.
-
----
-
-### Pitfall 6: Adding Dependencies That Break the Zero-Runtime-Dep Constraint or Bloat the Bundle
-
-**What goes wrong:**
-v2.0 says "may introduce bundled dependencies if they demonstrably reduce tokens or improve quality." This opens the door to dependency creep:
-
-1. **WASM dependencies that don't bundle.** A YAML parser like `js-yaml` (72KB) bundles fine via esbuild. A tokenizer with WASM binaries (e.g., `tiktoken` at ~2MB) does NOT bundle cleanly — esbuild can't tree-shake WASM, and the binary needs to be deployed alongside the JS bundle. This violates the single-file deploy constraint.
-2. **ESM-only packages.** The project outputs CJS (`gsd-tools.cjs`). Adding an ESM-only dependency requires esbuild to transpile it, which usually works but occasionally fails for packages with complex dynamic imports. The `tokenx` library (already bundled, 4.5KB) was chosen specifically because it works with CJS; many newer libraries don't.
-3. **Bundle size regression.** The current bundle is ~200KB. Each added dependency increases startup time. If the bundle grows to 500KB, Node.js cold-start goes from ~80ms to ~150ms. Multiply by 10 CLI invocations per workflow = 700ms added latency. This was already identified as a pitfall in v1.1 (Pitfall 3) — it's more dangerous in v2.0 because the scope of "allowed dependencies" is wider.
-4. **Transitive dependency explosion.** Adding one library pulls its dependencies. Even with bundling, esbuild includes all transitive code. A library that looks like 10KB might bundle to 100KB because of transitive dependencies. Example from the wild: `esbuild-based tools tend to have less accurate tree shaking, resulting in larger bundle sizes` (ryoppippi, 2025).
-5. **Test dependency vs runtime dependency confusion.** v2.0 adds integration tests that may need test helpers (a YAML assertion library, a git mock library). These should be devDependencies only. If they leak into the bundle (because esbuild resolves all requires), the production CLI carries test-only code.
-
-**Why it happens:**
-The "bundled dependency" permission feels like freedom. But the single-file constraint means EVERY byte of every dependency ships in the CLI. There's no tree-shaking for unused features; there's no lazy loading of separate modules.
-
-**Consequences:**
-- Bundle exceeds 500KB; CLI startup becomes noticeably slow
-- WASM dependency breaks single-file deploy
-- ESM-only package causes build failure that blocks deployment
-- Test code accidentally included in production bundle
-
-**Prevention:**
-1. **Bundle size budget: 300KB max.** Currently ~200KB. Allow 100KB growth for v2.0. If a dependency would push past 300KB, it needs explicit justification with measured benefit.
-2. **Pre-check every dependency before adding it:**
-   - `du -sh node_modules/<pkg>` — raw size
-   - `esbuild --bundle --analyze src/index.js` — bundled size with tree shaking
-   - Check for WASM/native binaries: `find node_modules/<pkg> -name "*.wasm" -o -name "*.node"`
-   - Check for ESM-only: `grep '"type": "module"' node_modules/<pkg>/package.json`
-3. **Prefer micro-libraries over full frameworks.** `tokenx` (4.5KB) over `tiktoken` (2MB). `yaml-tiny` (3KB) over `js-yaml` (72KB). If no micro-library exists, copy the 50 lines you need into `src/lib/` instead.
-4. **Mark devDependencies correctly in package.json** and configure esbuild with `--external` for test-only packages. Verify with `node -e "require('./bin/gsd-tools.cjs')"` after build — if it throws a missing module error, a test dep leaked.
-5. **Test startup time in CI.** Add to build pipeline: `time node bin/gsd-tools.cjs current-timestamp --raw`. If it exceeds 150ms, investigate.
-
-**Warning signs:**
-- `ls -la bin/gsd-tools.cjs` shows >300KB
-- `npm run build` emits esbuild warnings about unresolved imports
-- `node bin/gsd-tools.cjs current-timestamp` takes >150ms
-- `deploy.sh` copies more than one JS file
-
-**Phase to address:** Dependency & Token Optimization phase — first task: establish the 300KB budget and pre-check protocol. Every subsequent dependency addition must pass the check.
+**Phase to address:** Decision Journal phase. Design the compaction strategy and token budget BEFORE implementing persistence.
 
 ---
 
 ## Moderate Pitfalls
 
-Mistakes that cause rework or significant wasted effort, but not rewrites.
+Mistakes that cause rework or wasted effort but don't corrupt data.
 
 ---
 
-### Pitfall 7: Memory and State Validation Creating Circular Dependencies
+### Pitfall 6: Merge Conflicts When `choose` Merges Winning Attempt Back
 
 **What goes wrong:**
-Cross-session memory needs state validation to know if memory is stale. State validation needs memory to know what the last validated state was. You create a bootstrap problem: validating state requires loading memory, but loading memory requires validated state.
+Developer checkpoints at commit C, creates attempt A (3 commits) and attempt B (4 commits). Both modify some of the same files (both attempts solve the same problem, so they naturally touch the same code). `choose B` tries to merge attempt B back to the main branch, which has advanced past C. The merge hits conflicts in the files that both attempts modified.
 
-Concrete scenario: `init resume` loads memory file to restore position. Memory says "Phase 3, plan 2." It then validates state: STATE.md says "Phase 3, plan 1." Which is correct — memory (last session's snapshot) or STATE.md (current truth)? The answer should be STATE.md, but memory was loaded first, and the agent has already used memory's "plan 2" to orient itself.
+This is especially tricky because the existing `cmdWorktreeMerge()` has sophisticated conflict handling: `merge-tree --write-tree` dry-run, `isAutoResolvable()` for lockfiles, and auto-resolution via `checkout --theirs`. But trajectory merges are conceptually different from worktree merges: worktree merges combine *parallel* work; trajectory merges replace *alternative* work. The winning attempt should fully replace the code at the divergence point — it's not a merge, it's a "take theirs completely."
+
+**Why it happens:**
+The merge-based mental model is wrong for trajectory resolution. When you choose attempt B, you want B's code state, not a merge of B with whatever happened on main after the checkpoint. But `git merge` tries to combine both sides.
 
 **Prevention:**
-1. **STATE.md is always authoritative.** Memory is advisory only. Memory says "I think we were at..." State says "We are at..." If they disagree, state wins, memory updates.
-2. **Load order: STATE.md first, memory second, then reconcile.** Never load memory before state. The `init resume` command should: (1) load STATE.md, (2) load memory, (3) diff and warn if they disagree, (4) return STATE.md values with memory annotations.
-3. **Test the bootstrap: fresh project, stale memory, corrupted memory, missing memory.** Four test cases that validate the load-order contract.
+1. **`choose` should NOT use `git merge`.** Instead: (a) record the winning branch name, (b) on the target branch, do `git checkout winning-branch -- .` to take all files from the winner, (c) commit with message `"choose: accept attempt B for task X"`. This is a "theirs wins entirely" strategy, not a merge.
+2. **Or use `git merge -X theirs` equivalent:** which resolves all conflicts by taking the winning branch's version.
+3. **Pre-flight: verify no work has been done on main after the checkpoint.** If main has advanced (new commits after the checkpoint), the merge is more complex. `choose` should warn: "Main branch has N commits since checkpoint. Merge may have conflicts." In this case, fall back to interactive merge or abort.
+4. **Reuse `isAutoResolvable()` from worktree.js** for any remaining conflicts (lockfiles, baselines). Don't reinvent conflict classification.
 
-**Phase to address:** Cross-Session Memory phase AND State Validation phase — define the precedence rule in the first task of whichever ships first.
+**Warning signs:**
+- `choose` attempts `git merge` and hits conflicts on files the winning attempt modified
+- User has to manually resolve conflicts after `choose` (should be automatic for the winning attempt)
+- `choose` output says "merged" but the code is a hybrid of both attempts (merge, not replacement)
+
+**Phase to address:** Choose phase. Implement as `checkout --` file replacement, not `merge`.
 
 ---
 
-### Pitfall 8: Verification Suite Testing Its Own Output Format Instead of Behavior
+### Pitfall 7: Context Window Pollution from Over-Engineered Comparison Metrics
 
 **What goes wrong:**
-The existing verification commands (`verify plan-structure`, `verify phase-completeness`, `verify references`, etc.) return structured JSON with `errors`, `warnings`, and `valid` fields. When adding "comprehensive verification," you write tests that assert the exact JSON structure of verification output — not whether verification catches real problems.
+`compare` is designed to show outcome metrics across attempts: test results, code complexity, LOC delta, etc. The temptation is to make comparison comprehensive — show everything: test counts, LOC, complexity scores, file lists, commit counts, duration, AST deltas, dependency changes, coverage. This is ~500 tokens per attempt. With 3 attempts = 1,500 tokens of comparison data. The agent reads all of it, reasons about each metric, and produces a 2,000-token analysis. Total: 3,500 tokens spent on comparison — more than most PLAN.md files.
 
-Example test: `assert.deepStrictEqual(output.errors, ['Missing required frontmatter field: phase'])`. This breaks when you rename the error message string, even though the verification still works correctly. This is the "testing internal implementation" anti-pattern from Codepipes: "tests were instructed to verify internal implementation which is always a recipe for disaster."
+Meanwhile, the actual decision factors are usually just: "Which attempt passes all tests?" and "Which is simpler?"
+
+**Why it happens:**
+Comparison metrics feel objectively valuable. Each metric seems cheap to add. But the aggregate cost — in tokens consumed and agent reasoning time — is substantial. This is the Verification Pitfall from v2.0 research applied to comparison: more metrics ≠ better decisions.
+
+The existing `codebase complexity` and `codebase ast` commands already produce rich metrics. The temptation to pipe all of them into `compare` is strong but wrong.
+
+**Consequences:**
+- Agent spends more time comparing than building
+- Comparison output exceeds context budget for the decision
+- Marginal metrics (coverage delta, AST complexity) add noise without changing the decision
+- The "decision" becomes an analysis exercise instead of a clear signal
 
 **Prevention:**
-1. **Test verification by behavior:** Create a plan with a known defect → run verify → assert `valid === false`. Create a good plan → run verify → assert `valid === true`. Don't assert error message strings.
-2. **Test error categories, not messages:** `assert.ok(output.errors.length > 0, 'should find errors')` and `assert.ok(output.errors.some(e => e.includes('frontmatter')), 'should mention frontmatter')` — contains-check, not exact-match.
-3. **Use regression tests from real bugs.** When verification misses a real issue (false negative) or flags a good file (false positive), capture that file as a test fixture. These are the highest-value tests.
+1. **Compare output must be ≤300 tokens total.** Hard limit. This forces metric selection.
+2. **Default metrics: test pass/fail, LOC delta, file count.** These three are the decision-relevant signals. Everything else is opt-in via `--verbose`.
+3. **Decision signal, not data dump.** The compare output should end with a recommendation: `"Attempt B: all tests pass, +15 LOC vs +342 LOC for A. Recommended: B."` — one sentence. The agent doesn't need to reason about the data; the tool already did.
+4. **Leverage existing commands, don't duplicate.** `compare` should call `git diff --stat` and the test runner, not reimplement LOC counting or complexity analysis.
 
-**Phase to address:** Comprehensive Verification phase AND Integration Testing phase — establish the behavioral testing pattern before writing verification tests.
+**Warning signs:**
+- Compare output exceeds 500 tokens
+- Agent writes multi-paragraph analysis of comparison results
+- Comparison includes metrics that never change the decision (e.g., commit count)
+- `compare` takes >5 seconds to run (means it's running expensive analysis)
+
+**Phase to address:** Compare phase — define the metric set (3 defaults) in the first task. Resist pressure to add more.
 
 ---
 
-### Pitfall 9: Integration Tests That Require Specific Node.js Version Features
+### Pitfall 8: Decision Journal Becomes a Second Memory System
 
 **What goes wrong:**
-node:test in Node.js 18 supports basic `describe`/`test`/`assert`. Node.js 20+ adds snapshot testing, `mock`, and `test.plan()`. Node.js 22+ adds `--test-isolation`. Writing integration tests that use Node 22+ features locks out Node 18 users (the minimum version in package.json `engines`).
+The existing memory system has 4 stores: `decisions`, `bookmarks`, `lessons`, `todos` (memory.js). The trajectory decision journal is conceptually a 5th store. But if it's implemented as a separate system (e.g., `.planning/trajectory/journal.json`), the codebase now has TWO systems that record decisions:
+
+1. `memory write --store decisions --entry '{"summary":"..."}'`
+2. `trajectory journal add --entry '{"approach":"A", "outcome":"failed"}'`
+
+Agents don't know which to query. Workflows inject `memory read --store decisions` but not `trajectory journal read`. Important trajectory decisions get recorded in the journal but never surface in the decisions memory store. Or vice versa: the agent records a trajectory outcome in memory/decisions instead of the journal, and `compare` can't find it.
+
+**Why it happens:**
+The memory system was designed before trajectory engineering was planned. The journal is a natural extension of decisions, but implementing it separately is easier than extending the existing memory system. This is the "second system" trap — building a parallel structure instead of extending the first.
+
+**Consequences:**
+- Agent queries wrong store for trajectory decisions
+- Decisions duplicated across both systems (waste + divergence risk)
+- `memory compact` doesn't know about journal entries
+- `search-decisions` slash command doesn't search trajectory journal
+- Token overhead of loading both systems
 
 **Prevention:**
-1. **Test only with features available in Node.js 18.** No `t.mock()`, no `assert.snapshot()`, no `--test-isolation`. The project constraint is `>=18`.
-2. **If mocking is needed, use manual mocking patterns:** inject dependencies via function parameters or environment variables, not framework-level mocking.
-3. **Document node:test version compatibility** in TESTING.md: "Tests must work on Node.js 18. Do not use: mock, snapshot, plan, isolation features."
+1. **Trajectory journal IS a memory store.** Add `trajectories` to `VALID_STORES` in memory.js. Entries follow the same `{ timestamp, ... }` pattern. This means `memory read --store trajectories` works, `memory compact` works, and the existing `search-decisions` command can be extended to search trajectories.
+2. **OR: journal entries auto-copy to decisions store.** When `choose` resolves a trajectory, it writes a summary entry to `memory write --store decisions`. The detailed per-attempt data stays in trajectory-specific storage, but the outcome is in the canonical decisions store.
+3. **NEVER create a parallel persistence mechanism.** No new JSON files, no new directories, no new read/write patterns. Use the existing `cmdMemoryWrite` / `cmdMemoryRead` infrastructure. If it needs extension, extend it.
+4. **Add `trajectories` to `SACRED_STORES`** (like `decisions` and `lessons`). Trajectory outcomes should never be auto-compacted.
 
-**Phase to address:** Integration Testing phase — document in the first task before anyone writes tests.
+**Warning signs:**
+- New JSON file created outside `.planning/memory/`
+- New read/write code that doesn't use `cmdMemoryWrite`/`cmdMemoryRead`
+- Agent asks "Where do I record this trajectory outcome?"
+- `memory list` doesn't show trajectory entries
+
+**Phase to address:** Decision Journal phase — first task: decide memory integration, not storage format.
 
 ---
 
-### Pitfall 10: Atomic Decomposition Inflating the Phase Directory Structure
+### Pitfall 9: Agent Confusion from Multiple Active Trajectories in Context
 
 **What goes wrong:**
-Current phases have 1-4 plans each (e.g., Phase 1 had 4 plans, Phase 8 had 3 plans). Atomic decomposition could inflate this to 6-10 plans per phase. Each plan requires:
-- `XX-NN-PLAN.md` (the plan file)
-- `XX-NN-SUMMARY.md` (the completion record)
-- Wave/dependency frontmatter
-- Verification criteria in must_haves
+An agent reads the init output which includes: current plan, current trajectory state (attempt 2 of 3), checkpoint data, journal entries for this task, AND journal entries from the previous task's trajectory. The agent's context now contains information about multiple exploration paths simultaneously. It conflates "Approach A failed for Task 5" with "Approach A failed for Task 6" and avoids Approach A for Task 6 when it might have worked.
 
-A phase directory grows from 6-8 files to 12-20 files. The `phase-plan-index` command that inventories plans now returns a larger JSON blob. The `init execute-phase` output grows. Wave visualization becomes complex. The overhead per phase increases even when the actual work stays the same.
+Or: the agent is on trajectory attempt B for a task, but the context includes code snippets from attempt A (from the comparison output). The agent accidentally references attempt A's implementation patterns while building attempt B, creating a hybrid that doesn't match either approach.
+
+**Why it happens:**
+The existing `init execute-phase` output already includes plan context, phase context, decisions, and blockers. Adding trajectory context (journal, comparison data, attempt history) to this creates a multi-layered context that LLMs struggle with. LLMs are sequential reasoners; simultaneous awareness of multiple alternative timelines is inherently confusing.
+
+This is "Context Confusion" from the Philschmid context engineering research: multiple valid-but-contradictory pieces of information in the same context window.
+
+**Consequences:**
+- Agent conflates decisions from different tasks' trajectories
+- Agent references wrong attempt's code patterns
+- Agent's confidence about approach viability is based on wrong trajectory data
+- Increased hallucination rate from contradictory context
 
 **Prevention:**
-1. **Allow "tasks within plans" as an alternative to splitting.** A plan can contain multiple `<task>` elements. Atomic decomposition should prefer task-level splitting within a single plan file over creating separate plans. Only create separate plans when tasks need different waves or have different dependencies.
-2. **Set a plan-count guideline: 2-5 plans per phase.** If decomposition produces >5 plans, reconsider whether the phase scope is too large (split the phase) rather than adding more plans.
-3. **Measure overhead: total metadata tokens per phase.** For each phase, sum frontmatter + must_haves + verification criteria tokens across all plans. If metadata exceeds 25% of total plan content, the decomposition is too fine-grained.
+1. **Trajectory context is task-scoped, ALWAYS.** When working on Task 6, the agent sees ONLY Task 6's trajectory data. No journal entries from Task 5. No comparison data from Task 4. This requires the init output to filter trajectory data by current task ID.
+2. **Only the ACTIVE trajectory is in context.** If we're on attempt B, don't inject attempt A's code, metrics, or reasoning into context. The journal entry for A should be one line: "Attempt A: failed (test X broke)." Not the full approach description.
+3. **Comparison output is ephemeral.** `compare` produces output, the agent reads it, makes a decision, and the comparison data is NOT injected into subsequent init outputs. It's consumed once at decision time.
+4. **Clear trajectory framing in init output.** Instead of mixing trajectory data into the general context, use a clear section: `## Active Trajectory\nTask: 21-02 | Attempt: 2/3 | Checkpoint: abc123 | Previous: A (failed: tests), B (in progress)`. This is ≤100 tokens and orients the agent without confusion.
 
-**Phase to address:** Atomic Planning phase — second task: test decomposition rules against v1.0/v1.1 phases and verify plan counts stay in 2-5 range.
+**Warning signs:**
+- Init output includes trajectory data from multiple tasks
+- Agent references "attempt A showed that..." while building attempt B
+- Agent context grows >5% from trajectory metadata
+- Agent asks "Which attempt am I on?"
+
+**Phase to address:** Architecture phase (context injection design) and Decision Journal phase (scoping rules).
 
 ---
 
@@ -320,27 +352,30 @@ Annoyances that waste time but don't derail the project.
 
 ---
 
-### Pitfall 11: Verification Commands Duplicating Logic From Verify Suite
+### Pitfall 10: Over-Engineering Multi-Level Trajectory Support
 
-The existing verify suite has 5 commands in `src/commands/verify.js` (668 lines). "Comprehensive verification" adds new checks (auto-test, requirement tracing, regression detection). If these are added as separate commands rather than extending existing ones, you get two verify paths: the old `verify plan-structure` and the new `verify comprehensive` that partially overlap. Agents don't know which to call.
+The spec says "works at task, plan, and phase level." In practice, 95% of trajectory exploration happens at task level (trying different implementations of a specific change). Plan-level trajectories (trying different plan decompositions) are rare. Phase-level trajectories (trying entirely different phase structures) are almost never needed — that's what the roadmap revision workflow handles.
 
-**Prevention:** Extend existing verify commands with new capabilities. Add `--deep` flag to existing commands rather than creating new top-level commands. The verify suite should remain a single entry point.
-
----
-
-### Pitfall 12: Integration Test File Becoming Larger Than the Source It Tests
-
-The existing test file is 4,591 lines (vs source bundle at ~6,500 lines). Integration tests with their extensive setup blocks could easily add 2,000+ lines. A test file larger than the source is a maintenance smell — it means tests are doing more work than the feature.
-
-**Prevention:** Use shared fixtures and helper functions. A well-designed `test/helpers.js` with `createBasicProject()`, `createProjectWithPhases(3)`, `createProjectWithState({phase: 3, plan: 2})` can reduce per-test setup from 50 lines to 1 line.
+**Prevention:** Implement task-level trajectories first. Plan-level and phase-level are stretch goals. Don't design for three levels upfront; design for one level well and ensure it can be extended later. The naming convention `traj/<scope>/<task-id>/...` supports future extension without current complexity.
 
 ---
 
-### Pitfall 13: Dependency Optimization Finding Savings That Don't Survive the Bundle
+### Pitfall 11: Checkpoint Command Conflicting with Existing Git Pre-Commit Checks
 
-You profile tokenx and find a "better" tokenizer that's 2KB smaller. You replace it. But esbuild's bundling adds overhead (CJS wrappers, module resolution) that negates the 2KB savings. Net bundle size is the same or larger.
+The existing `cmdCommit()` in misc.js has pre-commit safety checks (git trailers, agent attribution). If `checkpoint` creates commits (to snapshot state), those commits need to either: (a) go through the same pre-commit pipeline, which adds overhead to what should be a lightweight operation, or (b) bypass pre-commit, which creates commits without proper attribution.
 
-**Prevention:** Always measure bundle size, not package size. `esbuild --bundle --analyze` shows actual contribution per module. Only pursue savings >10KB net bundle impact.
+**Prevention:** Checkpoint commits should use a lightweight commit path: `execGit(cwd, ['commit', '-m', 'checkpoint: <name>', '--allow-empty'])`. No pre-commit hooks, no trailers. Mark these commits with a `checkpoint:` prefix so they're identifiable. If pre-commit hooks are configured, use `--no-verify` ONLY for checkpoint commits.
+
+---
+
+### Pitfall 12: Test Suite Fragility from Git State Mutations
+
+Trajectory tests will create branches, switch branches, create commits, and delete branches. The existing 669 tests run in temp directories with isolated git repos (per test fixture setup). But if trajectory tests don't properly isolate their git state, they can:
+- Leave `traj/` branches in the test repo that affect subsequent tests
+- Change HEAD to a trajectory branch, making subsequent tests run on wrong branch
+- Create merge commits that change the git log output for other tests
+
+**Prevention:** Every trajectory test must: (a) create its own temp directory with fresh git repo, (b) verify current branch on test teardown matches test setup, (c) delete all `traj/*` branches on teardown. Use the pattern from existing worktree tests. Add a `cleanup` helper that runs `git branch --list 'traj/*' | xargs git branch -D` on teardown.
 
 ---
 
@@ -348,66 +383,66 @@ You profile tokenx and find a "better" tokenizer that's 2KB smaller. You replace
 
 | Phase Topic | Likely Pitfall | Mitigation |
 |-------------|---------------|------------|
-| State Validation | False positives on legitimate state transitions (archival, manual commits, mid-execution) | Advisory-only mode first; enumerate all valid transitions before coding |
-| Atomic Plan Decomposition | Plans too granular, verification overhead per plan, wave complexity explosion | Context-budget threshold, not file-count limits; tasks-within-plans over separate plans |
-| Cross-Session Memory | Unbounded growth, stale facts, second source of truth vs STATE.md | 500-token budget, 3-category TTL system, STATE.md always authoritative |
-| Comprehensive Verification | Takes longer than the work; per-plan test execution wasteful for trivial plans | Light/standard/deep tiers; tests run per-phase not per-plan |
-| Integration Tests | Snapshot fragility, git non-determinism, multi-step cascade failures | Behavioral assertions, git mock helper, separate test runner |
-| Dependency/Token Optimization | Bundle bloat, WASM breaks single-file deploy, ESM-only packages | 300KB budget, pre-check protocol, prefer micro-libraries |
+| Architecture / Foundation | STATE.md divergence across branches (P1), worktree collision (P4) | Separate trajectory state from branch-local state; enforce namespace guards |
+| Checkpoint Implementation | Losing uncommitted work (P2), pre-commit hook conflict (P11) | Mandatory dirty check; lightweight checkpoint commits |
+| Pivot Implementation | STATE.md revert to stale state (P1), dirty file loss (P2) | Exclude .planning/ from git checkout; pre-flight dirty check |
+| Compare Implementation | Over-engineered metrics (P7), context pollution (P9) | 300-token output limit; 3 default metrics only |
+| Choose Implementation | Merge conflicts (P6), branch cleanup (P3) | File replacement not merge; delete non-winning branches |
+| Decision Journal | Second memory system (P8), stale data (P5), context pollution (P9) | Use existing memory stores; task-scoped context; 500-token budget |
+| Multi-Level Support | Over-engineering (P10) | Task-level only in v7.1; plan/phase level deferred |
+| Testing | Git state fragility (P12), worktree test collision (P4) | Per-test isolation; branch cleanup on teardown; namespace separation |
 
-## Integration Gotchas
+## Integration Gotchas with Existing Systems
 
-Cross-cutting mistakes when these features interact with each other.
-
-| Feature A | Feature B | What Goes Wrong | Prevention |
-|-----------|-----------|----------------|------------|
-| State Validation | Cross-Session Memory | Circular dependency: validation needs memory for baseline, memory needs validation for freshness | STATE.md is authoritative; memory is advisory; load STATE.md first always |
-| Atomic Decomposition | Verification | 3× more plans = 3× more verification calls; overhead dominates | Verification at phase level, not plan level (except for deep mode) |
-| Integration Tests | Dependencies | Test helpers become runtime dependencies via bundler mistake | Separate test infrastructure; `--external` flags for test packages in esbuild |
-| Cross-Session Memory | Atomic Decomposition | Memory tracks "last plan" but decomposition changes plan numbering between sessions | Memory references phase + plan by content hash or description, not by number |
-| State Validation | Integration Tests | Testing validation requires many fixture states; test setup becomes complex | Shared fixture library with pre-built states: valid, drifted, archived, mid-execution |
-| Verification | Dependencies | Adding a test framework dependency (assertion library) gets bundled into production | Use only `node:assert` and `node:test`; no external test frameworks |
+| Existing System | Trajectory Feature | What Goes Wrong | Prevention |
+|----------------|-------------------|----------------|------------|
+| `worktree.js` branch naming | `checkpoint` branch creation | Name collision: `traj-*` looks like `worktree-*` to grep | Strict prefix: `traj/` (with slash) vs `worktree-` (with dash) |
+| `worktree merge` dry-run | `choose` merge | `merge-tree` picks up trajectory branch changes | Filter `traj/` branches from worktree operations |
+| `worktree cleanup` | trajectory branch cleanup | `git branch -D` deletes trajectory branches | Scope cleanup to `worktree-*` pattern only |
+| `branchInfo()` upstream detection | trajectory branches | `rev-list HEAD...@{upstream}` fails on branches without upstream | Handle null upstream gracefully (already does, but verify) |
+| `cmdCommit()` pre-commit checks | checkpoint commits | Pre-commit hooks slow down what should be instant snapshots | `--no-verify` for checkpoint-prefixed commits only |
+| `STATE.md` update/patch | `pivot` branch switch | STATE.md reverts to checkpoint-era content | Exclude STATE.md from git checkout during pivot |
+| `memory.js` stores | decision journal | Parallel persistence = two decision systems | Journal IS a memory store, or journal auto-copies to decisions |
+| `cmdStateValidate()` | post-pivot state | Validator finds mismatches between STATE.md and phase files | Validator knows about active trajectories; suppress known-divergent checks |
+| `init execute-phase` output | trajectory context | Output grows by 1000+ tokens with trajectory data | Task-scoped injection; 500-token trajectory budget |
+| `cachedReadFile()` | branch switching | File cache returns pre-switch content | Call `invalidateFileCache()` after any branch switch |
+| `getPhaseTree()` cache | branch switching | Phase tree cache returns pre-switch directory listing | Reset `_phaseTreeCache` after any branch switch |
+| Snapshot tests (`state-read.json`) | new trajectory fields | Adding trajectory fields to state output breaks snapshots | Don't add trajectory fields to existing state output; use separate command |
 
 ## "Looks Done But Isn't" Checklist
 
-Things that appear complete but have critical gaps.
-
-- [ ] **State validation "works":** Run it against projects in various states: mid-phase-execution, after milestone-complete, after manual commit, and with stale STATE.md. All 4 scenarios must either pass or produce accurate warnings.
-- [ ] **Cross-session memory "persists":** After 10 sessions, memory file is under 500 tokens. After a codebase change that restructures files, memory invalidates stale knowledge.
-- [ ] **Atomic decomposition "enforced":** Existing v1.0/v1.1 PLAN.md files pass the decomposition validator without changes. New plans that genuinely need splitting are detected.
-- [ ] **Verification "comprehensive":** Light mode adds <5% overhead to phase execution. Deep mode is opt-in. Test execution runs once at phase end, not per-plan.
-- [ ] **Integration tests "stable":** 50+ consecutive runs with zero flaky failures. No dependency on real project paths. Run time under 30 seconds for the integration suite.
-- [ ] **Dependencies "optimized":** Bundle under 300KB. `time node bin/gsd-tools.cjs current-timestamp --raw` under 150ms. `deploy.sh` still deploys a single JS file.
+- [ ] **Checkpoint "works":** Create checkpoint → modify 5 files → pivot back → ALL 5 files restored to checkpoint state AND STATE.md is still current (not reverted). The round-trip preserves planning state while reverting code state.
+- [ ] **Pivot "safe":** With 3 uncommitted files, attempt pivot → pivot REFUSES with clear message. No data lost. Commit the files → pivot succeeds.
+- [ ] **Compare "useful":** Compare output for 3 attempts is ≤300 tokens total. An agent reading the output can immediately identify the winner without additional analysis.
+- [ ] **Choose "clean":** After choosing attempt B: (a) main branch has B's code, (b) all `traj/` branches for this task are deleted, (c) journal records the choice, (d) `git branch --list 'traj/*'` returns empty for this task.
+- [ ] **Journal "compact":** After 5 tasks with trajectories (15 total attempts), the journal is ≤2000 tokens. Resolved tasks have one-line entries. Only the active task has detailed attempt data.
+- [ ] **Worktree "unbroken":** All 669 existing tests pass. `worktree create`, `worktree list`, `worktree merge`, `worktree cleanup` work exactly as before. No trajectory branches appear in worktree output.
+- [ ] **File cache "coherent":** After `pivot` switches branch, `cachedReadFile()` for STATE.md returns the new branch's content, not the cached pre-switch content. Explicitly test: `invalidateFileCache()` is called after every branch switch.
+- [ ] **State validation "aware":** After `pivot`, `state validate` does NOT report false positives for trajectory-related state differences. Validator either knows about active trajectories or trajectory operations update state to be consistent.
 
 ## Recovery Strategies
 
 | Pitfall | Recovery Cost | Recovery Steps |
-|---------|---------------|----------------|
-| State validation false positives | LOW | Add the missing state transition to the validator. Switch to advisory mode. |
-| Memory bloat | LOW | Truncate memory file to 500 tokens, add eviction logic. |
-| Plans too granular | MEDIUM | Merge plans back; relax decomposition rules to heuristics. |
-| Verification too slow | LOW | Switch from deep to light mode as default. |
-| Integration tests flaky | MEDIUM | Delete flaky tests. Rebuild with deterministic fixtures. Separate from main test suite. |
-| Bundle too large | MEDIUM | Remove the offending dependency. Replace with micro-library or inline code. |
-| Memory contradicts state | LOW | Delete memory file. Regenerate from STATE.md. |
-| Decomposition breaks wave system | MEDIUM | Revert to pre-decomposition plan structure. Re-plan with looser rules. |
+|---------|--------------|----------------|
+| STATE.md divergence (P1) | HIGH | Redesign state separation; affects all trajectory commands |
+| Lost uncommitted work (P2) | UNRECOVERABLE | Data is gone. Prevention is the only strategy. |
+| Branch proliferation (P3) | LOW | `git branch --list 'traj/*' \| xargs git branch -D` + add cleanup to choose |
+| Worktree collision (P4) | MEDIUM | Rename trajectory branches; add namespace guards to both systems |
+| Stale journal (P5) | LOW | Add code-hash stamps; mark old entries as stale |
+| Choose merge conflicts (P6) | LOW | Switch from `merge` to `checkout --` file replacement |
+| Comparison bloat (P7) | LOW | Reduce metrics to 3 defaults; add token limit |
+| Dual memory systems (P8) | MEDIUM | Migrate journal to memory store; delete separate persistence |
+| Context confusion (P9) | LOW | Add task-scoping filter to init output |
 
 ## Sources
 
-- **Codebase analysis:** `src/commands/state.js` (390 lines), `src/commands/verify.js` (668 lines), `src/commands/features.js` (1,461 lines), `bin/gsd-tools.test.cjs` (4,591 lines), `.planning/codebase/ARCHITECTURE.md`, `.planning/codebase/CONCERNS.md`, `.planning/codebase/TESTING.md`
-- **PROJECT.md:** v2.0 scope, constraints, key decisions
-- **Manus context engineering:** (Philschmid, Dec 2025) — Context Rot, Context Pollution, Context Confusion; todo.md wasted ~30% tokens; "share context by communicating, not communicate by sharing context"; prefer compaction > summarization — https://www.philschmid.de/context-engineering-part-2
-- **Inkeep context rot analysis** (Oct 2025) — "Every unnecessary token actively degrades performance"; just-in-time retrieval over upfront loading; attention budget concept — https://inkeep.com/blog/fighting-context-rot
-- **AI-native memory** (Ajith Vallath Prabhakar, Jun 2025) — "If controlled forgetting is not implemented, memory bloat can occur, leading to decreased reasoning efficiency" — https://ajithp.com/2025/06/30/ai-native-memory-persistent-agents-second-me/
-- **Mem0 production memory** (2025) — "the absence of persistence, prioritization, and salience makes [large context] insufficient for true intelligence" — https://mem0.ai/blog/memory-in-agents-what-why-and-how
-- **Cross-session agent memory** (MGX.dev, 2025) — "Intelligent Filtering: Using priority scoring and contextual tagging to store only highly relevant information, preventing memory bloat" — https://mgx.dev/insights/cross-session-agent-memory-foundations-implementations-challenges-and-future-directions/
-- **Sphere Inc memory vs context** (2025) — "2025 was the year of retention without understanding — vendors rushed to add retention features" — https://www.sphereinc.com/blogs/ai-memory-and-context/
-- **OpenAI Agents SDK session memory** (2025) — "prevents context bloat by discarding older turns wholesale" — https://cookbook.openai.com/examples/agents_sdk/session_memory
-- **Software testing anti-patterns** (Codepipes, 2018, updated 2026) — integration test complexity/debugging, testing implementation vs behavior, flaky tests destroying suite credibility — https://blog.codepipes.com/testing/software-testing-antipatterns.html
-- **Node.js CLI bundle concerns** (ryoppippi, 2025) — "esbuild-based tools tend to have less accurate tree shaking, resulting in larger bundle sizes" — https://ryoppippi.com/blog/2025-08-12-my-js-cli-stack-2025-en
-- **esbuild FAQ** — startup performance characteristics for bundled CLI tools — https://esbuild.github.io/faq/
-- **Configuration drift detection** (multiple 2025 sources) — false positive prevention techniques, drift detection lifecycle — https://www.josys.com/article/understanding-the-lifecycle-of-configuration-drift-detection-remediation-and-prevention
+- **Codebase analysis:** `src/lib/git.js` (301 lines, execGit/branchInfo/diffSummary), `src/commands/worktree.js` (791 lines, full worktree lifecycle), `src/commands/state.js` (716 lines, state load/patch/validate), `src/commands/memory.js` (307 lines, 4-store memory system), `src/lib/helpers.js` (cachedReadFile/invalidateFileCache/getPhaseTree), `src/lib/output.js` (196 lines), `src/router.js` (897 lines, command routing)
+- **Kiro checkpointing docs** (2025): Shadow repository architecture, session-scoped checkpoints, auto-cleanup on session end — validates the "don't persist branches forever" pattern — https://kiro.dev/docs/cli/experimental/checkpointing/
+- **Claude Code checkpoint feature** (2025): Conversation history unwinds with checkpoint restore — validates the "state must unwind consistently" pattern
+- **Git branch proliferation literature** (2025): Multiple sources confirm branches are cheap to create, expensive to manage; cleanup must be automated — https://pullpanda.io/blog/deleting-feature-branches-cleanup-strategies
+- **Prior v2.0 PITFALLS.md:** Cross-session memory bloat (Pitfall 2), verification overhead (Pitfall 4) — same patterns apply to trajectory data
+- **Philschmid context engineering** (2025): Context Confusion — "multiple valid-but-contradictory pieces of information" directly maps to multi-trajectory context
 
 ---
-*Pitfalls research for: GSD Plugin v2.0 Quality & Intelligence*
-*Researched: 2026-02-22*
+*Pitfalls research for: GSD Plugin v7.1 Trajectory Engineering*
+*Researched: 2026-02-28*

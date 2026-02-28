@@ -1,46 +1,45 @@
 # Project Research Summary
 
-**Project:** bGSD v7.0 — Agent Orchestration & Efficiency
-**Domain:** CLI agent orchestration, context optimization, git intelligence
-**Researched:** 2026-02-26
+**Project:** bGSD Plugin v7.1 — Trajectory Engineering
+**Domain:** CLI-based structured exploration system for AI-driven development
+**Researched:** 2026-02-28
 **Confidence:** HIGH
 
 <!-- section: compact -->
 <compact_summary>
 
-**Summary:** bGSD v7.0 adds intelligent agent orchestration (task routing, context budgeting, role-scoped data) and context efficiency (AST-based repo maps, compact serialization) to the existing CLI planning plugin. The recommended approach is conservative: one new dependency (acorn ~121KB), four new modules (~850 lines total), enhanced git.js, and intelligence-as-data instead of new agent roles. The #1 risk is output format regression breaking all 11 agent consumers silently — contract tests must come first.
+**Summary:** Trajectory engineering adds checkpoint/pivot/compare/choose commands to the existing 34-module CLI with zero new dependencies (~900-1650 LOC across 2 new modules). The decision journal extends memory.js as a 5th sacred store. The #1 risk is STATE.md coherence during pivot — selective file checkout (not `reset --hard`) must preserve `.planning/` while rewinding source code.
 
-**Recommended stack:** acorn + acorn-walk (AST extraction, ~121KB), node:perf_hooks (profiling, 0KB), enhanced execGit (git intelligence, 0KB), custom orchestrator/serializer/profiler modules (~33-50KB)
+**Recommended stack:** No additions — existing git.js (execGit), ast.js (computeComplexity), memory.js (sacred stores), format.js (tables/color) cover all requirements.
 
-**Architecture:** Hybrid CLI-data + workflow-coordination pattern: 4 new modules (ast-intel, orchestrator, serializer, profiler) feeding data to existing agent roles through enhanced CLI commands. No new agent roles — intelligence is data, not agents.
+**Architecture:** Two new modules (lib/trajectory.js + commands/trajectory.js) following existing lib/command split; journal as `trajectories` sacred store in memory.js; `gsd/` namespaced git tags+branches for checkpoints and attempts.
 
 **Top pitfalls:**
-1. Output format regression — add consumer contract tests BEFORE any output changes (Phase 1)
-2. Context reduction info loss — measure agent quality before/after, not just token count (Phase 3-4)
-3. Agent role explosion — cap at 11 roles, new intelligence = CLI data for existing agents (all phases)
-4. Self-referential corruption — pin tool version during milestone, use canary project (all phases)
-5. Git automation surprise — every write operation is gated, preview-first (Phase 2)
+1. `.planning/` state divergence on pivot — use selective `git checkout <ref> -- src/ test/ bin/`, never `reset --hard`
+2. Losing uncommitted work during pivot — mandatory `branchInfo()` dirty-check before any branch operation
+3. Worktree namespace collision — strict `gsd/trajectory/` prefix vs `worktree-*` dash pattern; cross-system guards
 
 **Suggested phases:**
-1. Foundation & Contracts — contract tests, profiler, enhanced git.js (safety net first)
-2. AST Intelligence — acorn integration, signature extraction, repo map generation (enables everything)
-3. Orchestration Intelligence — task classification, agent routing, context budgeting (core value)
-4. Context Efficiency — compact serialization, agent context scoping, conversation compaction (token savings)
-5. Agent Quality — code review agent, writer/reviewer separation, commit attribution (quality gates)
-6. Integration & Validation — execution wave optimization, performance validation, canary testing (ship it)
+1. Foundation — journal store + STATE.md coherence design (must be first — everything writes to journal)
+2. Checkpoint — git tag/branch creation + metrics snapshot (primitive everything builds on)
+3. Pivot — selective rewind + archive branches (highest-risk phase, needs journal+checkpoint solid)
+4. Compare — multi-attempt metrics aggregation + signal detection (needs 2+ attempts to test)
+5. Choose — merge winner + cleanup losers (depends on compare for informed selection)
+6. Integration — init context injection + dead-end detection + stuck→pivot wiring (only valuable with real journal data)
 
-**Confidence:** HIGH | **Gaps:** Exact token savings from compact serialization (estimated 40-60%, needs measurement), orchestration routing heuristics (need iterative refinement)
+**Confidence:** HIGH overall | **Gaps:** `computeComplexity()` needs `{code}` option for git-show integration; multi-level scoping deferred to task-level only; test results need structured cache for compare metrics
+
 </compact_summary>
 <!-- /section -->
 
 <!-- section: executive_summary -->
 ## Executive Summary
 
-bGSD v7.0 is a self-improvement milestone for a CLI-based AI planning plugin that orchestrates LLM agent workflows. The core challenge is well-understood: agents need the *right* context (not all context), tasks need intelligent routing (not manual agent selection), and the system needs performance observability. Research across competitive tools (AI Agent Teams, Aider, Cursor, OpenHands) confirms bGSD's existing architecture — hierarchical agent roles communicating through files, not messages — is the correct topology. Cursor's failed experiment with equal-status agents and Gas Town's production DB incident both validate bGSD's human-in-the-loop approach. The innovation gap is in context efficiency (Aider's repo map pattern) and automatic orchestration (no CLI planning tool does this well).
+Trajectory engineering is a structured exploration layer for AI agents that frequently hit dead ends during development. The core problem: agents currently explore, fail, and lose all context about *why* an approach failed — leading to repeated exploration of known dead ends across sessions. The solution is four commands (checkpoint, pivot, compare, choose) backed by a persistent decision journal that captures reasoning alongside code state. MIT's EnCompass research (NeurIPS 2025) validates the branchpoint/backtracking/parallel exploration pattern; GSD applies it at the task/plan level with git-backed code state.
 
-The recommended approach is surgical: add one external dependency (acorn + acorn-walk, ~121KB for AST parsing), build four new modules (orchestrator ~300 lines, ast-intel ~300 lines, serializer ~200 lines, profiler ~250 lines), and enhance existing git.js with structured operations. The critical architectural principle is "intelligence as data, not as agents" — new capabilities are CLI commands that produce richer data for existing agent roles, not new agent roles. This avoids the agent role explosion anti-pattern identified by DeepMind (coordination overhead grows quadratically, 17x error amplification in unstructured networks). The bundle stays within budget (~850-870KB of 1000KB).
+The recommended approach requires **zero new runtime dependencies**. Every capability maps to proven primitives already in the codebase: `git.js` execGit for branch/tag/diff operations (301 lines, battle-tested), `ast.js` computeComplexity for code metrics (1192 lines), `memory.js` for journal persistence as a 5th sacred store, and `format.js` for comparison output. Implementation adds 2 new modules (~750-1100 LOC for lib + commands) plus ~500 LOC of tests, modifying 4-5 existing modules minimally. Bundle impact is negligible: ~2-4KB added to the ~1000KB bundle.
 
-The primary risks are output format regression (silent breaks across 11 agent consumers), context reduction that degrades agent quality (easy to measure tokens, hard to measure decision quality), and self-referential corruption (using in-development bGSD to manage its own development). Mitigation is straightforward: contract tests before any output changes (Phase 1), quality baselines before any context reduction (Phase 3-4), and version pinning throughout. The competitive landscape confirms this milestone's features are table stakes (task routing, code review agent, repo map) and differentiators (automatic orchestration mode, execution wave optimization, compact serialization).
+The critical risk is **STATE.md coherence during pivot operations**. A naive `git reset --hard` reverts the entire working tree — including `.planning/` files containing the decision journal, session state, and progress tracking. This destroys the very reasoning trail that makes trajectory engineering valuable. The proven mitigation is selective file checkout (`git checkout <ref> -- src/ test/ bin/`) that rewinds source code while preserving planning state. Secondary risks include worktree namespace collisions (solved by strict `gsd/` prefix convention) and branch proliferation (solved by mandatory cleanup in `choose` command and phase-completion hooks). All prevention strategies use existing git plumbing — no new tools required.
 <!-- /section -->
 
 <!-- section: key_findings -->
@@ -48,134 +47,127 @@ The primary risks are output format regression (silent breaks across 11 agent co
 
 ### Recommended Stack
 
-The stack strategy is maximally conservative: one new npm dependency, everything else built on Node.js builtins and custom code. This preserves the zero-server, single-file, synchronous architecture validated through 574 tests and 5+ milestones.
+No new dependencies. The existing stack covers every trajectory engineering requirement without additions. This is a code-architecture milestone, not a dependency milestone.
 
-**Core technologies:**
-- **acorn + acorn-walk** (~121KB bundled): JS/TS AST parsing for function signature extraction, export surface analysis, complexity metrics. Same parser esbuild uses internally. Zero dependencies. Enables repo map generation (60-80% context reduction for code files).
-- **node:perf_hooks** (0KB, built-in): Opt-in performance profiling via `GSD_PROFILE=1`. Wraps `performance.mark()`/`performance.measure()`. Zero cost when disabled. Instruments CLI startup, git calls, file reads, token estimation.
-- **Enhanced git.js** (0KB new deps): Structured git log, diff summary, blame, branch info — all built on existing `execGit()` wrapper. Rejected simple-git (async-only, 4+ deps, 80-120KB). Rejected isomorphic-git (500KB+).
-- **Custom orchestrator** (~15-25KB): Task classification, agent role selection, context budget allocation. A context router, not a job scheduler. Rejected Temporal (requires server), bull/bullmq (requires Redis), LangChain (wrong abstraction — bGSD produces prompts, doesn't call LLM APIs).
-- **Custom serializer** (~5-10KB): Chrome DevTools-inspired compact format with one-time schema description. Estimated 40-60% overall context reduction.
+**Core technologies (all existing):**
+- **git.js `execGit()`:** All branch, tag, diff, merge, checkout, reset operations — proven 301-line wrapper around `execFileSync('git', args)`
+- **git.js `branchInfo()`:** Dirty-file detection, current branch, detached HEAD check — critical safety pre-flight for pivot
+- **git.js `diffSummary()`:** LOC delta, file count between refs — primary comparison metrics
+- **ast.js `computeComplexity()`:** Cyclomatic complexity scoring — needs minor 3-line enhancement to accept `{code}` string option for `git show` integration
+- **memory.js sacred store pattern:** `trajectories` added as 5th store alongside decisions/lessons/bookmarks/todos — same JSON read/write/query, never auto-compacted
+- **worktree.js merge patterns:** `parseMergeTreeConflicts()` and `isAutoResolvable()` reusable for trajectory choose/merge operations
+- **format.js `formatTable()`:** Comparison matrix rendering with color-coded winners
 
-**Bundle projection:** ~850-870KB (from current 681KB), leaving ~130-150KB headroom within 1000KB budget.
-
-**What NOT to add:** No LLM SDKs (bGSD produces prompts, doesn't call APIs), no database (JSON + git history suffices), no web framework (CLI tool, not a service), no schema validation library (existing regex + custom works), no CLI framework (machine-consumed tool doesn't need yargs), no TypeScript (not worth 18-module migration cost this milestone).
+**Critical version requirements:** Git 2.38+ (already required since v4.0 for `merge-tree --write-tree`). Node.js 18+ (already minimum). No new version requirements.
 
 ### Expected Features
 
-**Must have (table stakes):**
-- **Task complexity estimation** — Foundation for all routing. Score tasks 1-5 based on file count, cross-module reach, test requirements. Every competitor classifies tasks before routing.
-- **Smart agent/model routing** — Auto-select agent type + model tier based on task classification. Aider's architect mode, AI coding assistant model selection, AI-Fast's 5-tier complexity all do this.
-- **Code review agent (gsd-reviewer)** — Writer/reviewer separation prevents confirmation bias. CodeRabbit, Qodo PR-Agent prove this is baseline for serious tooling.
-- **Repository map generation** — Aider's proven pattern: AST → signatures → ranking → token budget. ~1k tokens instead of full file contents. Now industry standard.
-- **Agent context scoping** — Each agent type declares required context. System provides only that at spawn. Partially built via `<files_to_read>` blocks; needs formalization.
-- **Compact serialization format** — Dense CLI output for agent consumption. One-time schema, dense data. Immediate token savings across all existing commands.
+The feature set divides cleanly into MVP (complete exploration loop) and post-MVP (optimization).
 
-**Should have (differentiators):**
-- **Automatic orchestration mode selection** — No CLI tool auto-selects between single/parallel/team mode based on plan structure.
-- **Execution wave optimization** — Parallel subagent execution for independent plan waves. Extends existing wave grouping.
-- **Agent performance tracking** — Per-agent success/failure rates fed back into routing decisions.
-- **Commit attribution** — Tag commits with agent type in metadata. LOW effort, HIGH observability.
-- **Conversation compaction** — Hook into LLM compaction API for long-running sessions.
-- **Task-scoped file injection** — Load only task-relevant files using dependency graph. Major context savings on large codebases.
+**Must have (table stakes — MVP):**
+- Decision journal store (trajectories as sacred memory store) — foundation, everything writes to it
+- Checkpoint creation with named tags, auto-metrics capture, journal entry
+- Pivot with reason capture, selective code rewind, attempt archival
+- Compare with test/LOC/complexity metrics across attempts, signal detection
+- Session-portable journal that survives session boundaries
 
-**Defer (v2+):**
-- Security scanning agent (use snyk/semgrep instead), dependency management agent (use dependabot/renovate), refactoring agent, documentation agent, full PR automation (dangerous without human gate), merge intelligence, incremental context loading, stacked PR workflow, autonomous agent teams.
+**Should have (differentiators — complete v7.1):**
+- Choose command with merge winner, archive losers, cleanup branches
+- Dead-end detection from journal (query before starting: "has this been tried?")
+- Signal-based comparison matrix with automated recommendation
+- Stuck→pivot integration (stuck-detector suggests pivot to last checkpoint)
+
+**Defer (v2+ / post-v7.1):**
+- Multi-level trajectories (plan/phase level) — 95% of use is task-level
+- Parallel attempt exploration (requires worktree orchestrator changes)
+- Init context injection of trajectory data — can manually query until automated
+- Trajectory "playback" / action replay — record decisions and signals, not actions
 
 ### Architecture Approach
 
-The architecture is a hybrid: analytical intelligence lives in CLI modules (testable, measurable, cacheable), coordination logic lives in workflow markdown (readable, auditable, agent-consumed). Four new modules slot into the existing dependency graph with strict downward-only dependencies. The orchestrator is the top-level coordinator — it consumes data from ast-intel, context, and codebase-intel, then produces structured output that workflows pass to existing agents.
+Two new modules following the established lib/command split pattern. `src/lib/trajectory.js` (~400 LOC) owns the data model, state machine, and git operations — pure logic, testable independently. `src/commands/trajectory.js` (~350 LOC) handles CLI routing, arg parsing, and output formatting. The decision journal extends memory.js by adding `trajectories` to `VALID_STORES` and `SACRED_STORES` — all existing `cmdMemoryWrite/Read/List` work automatically. Module count grows from 34 → 36.
 
 **Major components:**
-1. **ast-intel.js** (~300 lines) — Acorn-based JS/TS parsing. Extracts function signatures, exports, class shapes, complexity metrics. Detector registry pattern (like conventions.js) for multi-language support. Invocation-scoped cache. Non-JS languages fall back to regex extractors.
-2. **orchestrator.js** (~300 lines) — Task classification → agent role assignment → context budget allocation → output assembly. Specific functions per role (`assembleExecutorContext()`, `assemblePlannerContext()`), not generic workflow engine. Consumes all other new modules.
-3. **serializer.js** (~200 lines) — Compact format converters: plan state (~70-80% reduction), dependency graphs (~50-60% reduction), code summaries (~60-80% reduction). Chrome DevTools dense-format-with-description pattern.
-4. **profiler.js** (~250 lines) — `node:perf_hooks` wrapper. Opt-in via `GSD_PROFILE=1`. Wraps git calls, file reads, regex parsing, token estimation. Outputs to `.planning/baselines/profile-{timestamp}.json`. Standalone module — imports nothing from project.
-5. **git.js** (enhanced to ~200 lines) — Structured log, diff summary, blame, branch info, conventional commit parsing. All through existing `execGit()`. No async, no new deps.
-
-**Key patterns to follow:**
-- Detector Registry (existing: conventions.js, lifecycle.js — extend for AST extractors)
-- Lazy Loading (existing: router.js — all new modules must use `lazy*()` pattern)
-- Invocation-Scoped Caching (existing: helpers.js — AST results cached per CLI invocation)
-- Opt-In Instrumentation (new: zero-cost profiling when GSD_PROFILE not set)
-- Compact Format with Schema (new: dense data with one-time format description)
-- Intelligence as Data, Not Agents (architectural principle: new CLI commands, not new agent roles)
+1. **Trajectory State Machine** (lib/trajectory.js) — lifecycle management: create → checkpoint → attempt → pivot/choose; state transitions with validation
+2. **CLI Command Handlers** (commands/trajectory.js) — 6-7 subcommands routed via lazy-loaded router entry; structured JSON output with TTY formatting
+3. **Decision Journal** (memory.js extension) — `trajectories` sacred store at `.planning/memory/trajectory.json`; entries scoped by phase+plan+task
+4. **Metrics Collection** — `collectMetrics()` aggregates test pass/fail, LOC delta, complexity delta, files changed; `collectCheapMetrics()` for fast-path (LOC + files only)
+5. **Selective Rewind Engine** — `git checkout <ref> -- src/ test/ bin/` pattern that preserves `.planning/`; journal-first write order (record decision before destructive operation)
 
 ### Critical Pitfalls
 
-1. **Output Format Regression** — Every `outputJSON()` call is an API contract consumed by 11 agents. A renamed field passes unit tests but silently breaks all workflows. **Prevention:** Consumer contract tests (snapshot-based) before ANY output changes. This must be Phase 1. **Recovery:** Add backward-compat alias emitting both old and new field names (~2 hours).
+1. **STATE.md divergence across trajectory branches** — `.planning/` files revert to checkpoint-era state during pivot, causing agents to operate on stale decisions, wrong progress, missing context. **Prevent:** Selective file checkout excluding `.planning/`; journal committed before any destructive git operation; round-trip test is #1 test case.
 
-2. **Context Reduction Information Loss** — Token count is easy to measure, agent decision quality is not. Reducing context "improves" metrics while degrading agent output (generic commit messages, dropped requirements, missed architectural decisions). **Prevention:** Establish quality baselines before reduction. A/B test every compaction change. Never remove fields from JSON. **Recovery:** Revert reduction, establish baseline, re-apply incrementally (~1 day).
+2. **Losing uncommitted work during pivot** — Agent is mid-edit, tests fail, pivot fires, `git checkout` destroys uncommitted changes. Unrecoverable. **Prevent:** Mandatory `branchInfo()` dirty-check as first operation in pivot; refuse with clear message if dirty; offer auto-commit WIP, never `--force`.
 
-3. **Agent Role Explosion** — The temptation to create `gsd-git-analyst`, `gsd-context-optimizer`, `gsd-task-router` fragments the system. Research shows diminishing returns past ~4 active agents, coordination overhead grows quadratically (DeepMind), 17x error amplification in unstructured networks. **Prevention:** Hard cap at current 11 roles. New intelligence = CLI data consumed by existing agents. Only justified new role: gsd-reviewer (writer/reviewer separation is an industry-standard split).
+3. **Worktree namespace collision** — Trajectory branches collide with `worktree-*` pattern; `worktree cleanup` deletes trajectory branches; `worktree merge` picks up trajectory changes. **Prevent:** Strict `gsd/trajectory/` prefix (slash-separated) vs `worktree-` (dash-separated); cross-system namespace guards; filter `gsd/*` branches from worktree operations.
 
-4. **Self-Referential Corruption** — bGSD improving itself means bugs in Phase N affect planning of Phase N+1. v6.0 had exactly this: `--raw` removal caused 243 test failures caught by tests, but if tests had been affected, bug would have propagated silently. **Prevention:** Pin tool version at milestone start, test against current project, separate dev/deploy via `deploy.sh`.
+4. **Branch proliferation** — Unchecked trajectory creation leads to 90+ `gsd/*` branches polluting `git branch` output. **Prevent:** `choose` command deletes non-winning branches; phase-completion cleanup hook; configurable max branches per task (default 5); `trajectory list` command for visibility.
 
-5. **Git Automation Surprise** — "Smart" git features conflict with developer's actual git state (dirty tree, rebase in progress, detached HEAD, shallow clones). **Prevention:** Every git-write operation is preview-first and gated. Read operations always safe. Test with pathological git states. **Recovery:** `git reflog` to find pre-automation state (minutes if reflog intact).
+5. **Decision journal becomes second memory system** — Parallel persistence creates two places agents must query for decisions. **Prevent:** Journal IS a memory store (`trajectories` in VALID_STORES); entries follow same `{timestamp, ...}` pattern; `memory read --store trajectories` works natively.
 <!-- /section -->
 
 <!-- section: roadmap_implications -->
 ## Implications for Roadmap
 
-Based on research, suggested phase structure:
+Based on research, suggested 6-phase structure following the natural user workflow: set up → snapshot → explore → evaluate → decide → learn.
 
-### Phase 1: Foundation & Safety Net
-**Rationale:** Pitfall #1 (output format regression) is the highest risk and must be addressed before any feature work touches output. Profiler provides measurement infrastructure for all subsequent phases. Enhanced git.js is a dependency for orchestration.
-**Delivers:** Consumer contract test suite (snapshot tests for all `init` and `state` JSON output), profiler module with `GSD_PROFILE=1` instrumentation, enhanced git.js (structured log, diff summary, blame, branch info).
-**Features from FEATURES.md:** Pre-commit dirty file handling (LOW effort, safety), commit attribution (LOW effort, observability).
-**Avoids:** Pitfall #1 (regression) by establishing contract tests first. Pitfall #5 (git automation) by establishing safety protocol and testing with pathological git states.
+### Phase 1: Foundation — Decision Journal + STATE.md Coherence
+**Rationale:** Everything writes to the journal — it must exist and be tested before any command. STATE.md coherence (the #1 architectural risk) must be designed and proven here, not retrofitted.
+**Delivers:** `trajectories` sacred store in memory.js; journal entry schema; selective checkout pattern for `.planning/` preservation; namespace convention (`gsd/trajectory/`, `gsd/checkpoint/`, `gsd/archive/`); worktree namespace guards.
+**Addresses:** F1 (journal store), Pitfall 1 (state divergence), Pitfall 4 (worktree collision), Pitfall 8 (dual memory systems)
+**Avoids:** Building commands on an unproven foundation; discovering state coherence issues after 3 phases of work
 
-### Phase 2: AST Intelligence & Repo Map
-**Rationale:** Repository map generation is the highest-impact feature (60-80% code context reduction) and a dependency for both context efficiency and task-scoped file injection. acorn is the only new npm dependency — get it integrated, bundled, and tested early to remove highest-uncertainty technical risk.
-**Delivers:** ast-intel.js module with acorn integration, function signature extraction, export surface analysis, complexity metrics. Repo map generation (~1k token compact codebase summary). Detector registry for multi-language support (regex fallback for non-JS).
-**Uses from STACK.md:** acorn ^8.16.0, acorn-walk ^8.3.5 (~121KB total).
-**Implements:** Detector Registry pattern, Invocation-Scoped Caching pattern.
-**Avoids:** Anti-Pattern 2 (over-parsing) — incremental parsing with file change detection, 50-file cap per invocation.
+### Phase 2: Checkpoint + Metrics Collection
+**Rationale:** Can't pivot without a checkpoint. Can't compare without metrics. This is the primitive everything builds on.
+**Delivers:** `trajectory checkpoint <name>` command; git tag creation; auto-metrics collection (tests, LOC, complexity, files changed); journal entry on checkpoint; `collectMetrics()` and `collectCheapMetrics()` functions.
+**Addresses:** F2 (checkpoint), metrics snapshot at checkpoint time
+**Avoids:** Pitfall 11 (pre-commit hook conflict) — use lightweight `--no-verify` for checkpoint commits
 
-### Phase 3: Orchestration Intelligence
-**Rationale:** Task classification and agent routing are the core value proposition of v7.0. Depends on ast-intel (for complexity metrics) and enhanced git (for change context). This is where bGSD differentiates from every competitor.
-**Delivers:** orchestrator.js module — task classification (type, complexity 1-5, scope, affected modules), agent role selection, context budget allocation per role. Enhanced `init` commands with routing data. Agent context manifests declaring what each role needs.
-**Features from FEATURES.md:** Task complexity estimation (P1), smart agent/model routing (P1), agent context scoping (P1).
-**Avoids:** Pitfall #3 (role explosion) — intelligence as data for existing agents, not new roles. Anti-Pattern 3 (generic orchestration) — specific `assembleXContext()` functions, not a generic workflow engine. Anti-Pattern 5 (config-driven everything) — opinionated defaults, minimal override surface.
+### Phase 3: Pivot + Selective Rewind
+**Rationale:** This is the highest-risk phase — git state manipulation with selective checkout. Must have journal and checkpoint solid first to provide a safety net. The core value proposition of the entire feature.
+**Delivers:** `trajectory pivot <checkpoint> --reason <text>` command; selective file rewind; attempt archival; journal-first write pattern; dirty-file safety gate; attempt counter increment.
+**Addresses:** F3 (pivot), stuck→pivot trigger point
+**Avoids:** Pitfall 1 (state divergence via selective checkout), Pitfall 2 (data loss via mandatory dirty-check)
 
-### Phase 4: Context Efficiency
-**Rationale:** Compact serialization and context scoping depend on having the orchestrator (which defines role budgets) and ast-intel (which produces summaries). Token savings compound across all subsequent workflow executions. Must include quality measurement infrastructure BEFORE implementing reductions.
-**Delivers:** serializer.js module — compact plan state (~70-80% reduction), dependency graph compression (~50-60% reduction), code summary format (~60-80% reduction). Context budget enforcement per agent role with automatic truncation. Conversation compaction integration via LLM compaction API.
-**Features from FEATURES.md:** Compact serialization format (P1), conversation compaction (P1), context budget tracking enhancement.
-**Avoids:** Pitfall #2 (context reduction info loss) — establish quality baselines using Phase 1 profiler BEFORE any reduction, A/B test every compaction change against agent output quality.
+### Phase 4: Compare + Signal Detection
+**Rationale:** Needs 2+ checkpoints/attempts to be testable. Makes exploration data-driven rather than gut-feel. Populates the journal with comparison data needed by choose.
+**Delivers:** `trajectory compare` command; multi-attempt metrics aggregation; signal detection (test regression, complexity increase); comparison matrix (≤300 tokens); automated recommendation line.
+**Addresses:** F4 (compare), F6 partial (dead-end data)
+**Avoids:** Pitfall 7 (comparison bloat) — 3 default metrics only (tests, LOC, files); verbose opt-in
 
-### Phase 5: Agent Quality Gates
-**Rationale:** Code review agent and writer/reviewer separation require the orchestration layer (Phase 3) to route review tasks and the context scoping (Phase 4) to provide focused review context. This phase fills the quality gap that every serious competitor has already addressed.
-**Delivers:** gsd-reviewer agent definition (code review against CONVENTIONS.md), writer/reviewer separation workflow update, enhanced verification pipeline with post-execution review step.
-**Features from FEATURES.md:** Code review agent (P1), writer/reviewer separation (table stakes).
-**Avoids:** Pitfall #3 (role explosion) — gsd-reviewer is the ONE justified new role (writer vs. reviewer is an industry-standard separation validated by Anthropic, CodeRabbit, Qodo). No other new agent roles.
+### Phase 5: Choose + Merge + Cleanup
+**Rationale:** Depends on compare data to inform selection. Merge logic reuses proven worktree.js patterns (lower risk than it appears). Closes the exploration loop.
+**Delivers:** `trajectory choose <attempt-N>` command; file-replacement merge (not `git merge`); archive non-winners as `gsd/archive/` tags; cleanup trajectory branches; final journal entry with rationale.
+**Addresses:** F5 (choose), branch cleanup (Pitfall 3)
+**Avoids:** Pitfall 6 (merge conflicts) — use `git checkout winner -- .` file replacement, not 3-way merge
 
-### Phase 6: Integration, Waves & Validation
-**Rationale:** Execution wave optimization is the highest-complexity differentiator and depends on all previous phases (orchestrator for routing, context scoping for parallel agents, git intelligence for worktree coordination). Final phase validates everything works together end-to-end.
-**Delivers:** Execution wave optimization (parallel subagent execution for independent plan waves, capped at 3-5 agents), end-to-end performance validation against Phase 1 baselines, agent performance tracking foundation for feedback loop.
-**Features from FEATURES.md:** Execution wave optimization (P2), agent performance tracking (P2).
-**Avoids:** Pitfall #4 (self-referential corruption) — full canary validation and version comparison before milestone ship. Dynamic agent spawning anti-pattern (pre-planned parallelism, not self-spawning agents — Cursor's lesson).
+### Phase 6: Integration — Agent Context + Dead-End Detection
+**Rationale:** Only valuable after the journal has real data from phases 1-5. Extends existing init and stuck-detector patterns.
+**Delivers:** Dead-end detection (`trajectory check-dead-ends`); init context injection (≤500 tokens per task); stuck→pivot wiring; `trajectory list` and `trajectory cleanup` commands.
+**Addresses:** F6 (dead-end detection), F7 (init injection), Pitfall 5 (stale data), Pitfall 9 (context confusion)
+**Avoids:** Pitfall 9 (context pollution) — task-scoped injection only; 500-token budget; comparison data is ephemeral
 
 ### Phase Ordering Rationale
 
-- **Safety before features:** Phase 1 establishes the test safety net and measurement infrastructure that all subsequent phases depend on. Research identified output regression as the #1 risk — this cannot be deferred.
-- **Dependencies flow downward:** AST (Phase 2) → Orchestration (Phase 3) → Serialization (Phase 4) → Quality (Phase 5) → Integration (Phase 6). Each phase produces infrastructure consumed by the next.
-- **Biggest external dependency first:** acorn is the only new npm dependency. Getting it integrated, bundled, and tested in Phase 2 removes the highest-uncertainty technical risk early.
-- **Avoid the "reads everything to decide what to include" trap:** Building AST extraction (Phase 2) before orchestration (Phase 3) ensures the orchestrator routes based on file metadata and signatures rather than reading full file contents.
-- **Measurement before reduction:** Profiler in Phase 1, baselines established, THEN context reduction in Phase 4. Prevents Pitfall #2 (measuring tokens instead of quality).
-- **Quality gates before parallel execution:** Writer/reviewer separation (Phase 5) before execution waves (Phase 6) ensures parallel agents produce verified output.
+- **Foundation first** because STATE.md coherence is the #1 risk identified across all research. Building commands on a flawed state model means redesigning everything later (HIGH recovery cost per pitfalls research).
+- **Checkpoint before pivot** because pivot requires a checkpoint to rewind to — hard dependency.
+- **Pivot before compare** because compare needs 2+ attempts to compare, and attempts are created via checkpoint→work→pivot cycles.
+- **Compare before choose** because choose needs comparison data to make an informed selection.
+- **Integration last** because dead-end detection and context injection only add value when the journal has real entries from the complete exploration loop.
+- **Each phase can be tested independently** with real trajectory data generated by the previous phase's output.
 
 ### Research Flags
 
 Phases likely needing deeper research during planning:
-- **Phase 3 (Orchestration):** Task classification heuristics need iterative refinement. How to score complexity (file count vs. cross-module reach vs. API surface) is empirical. Routing accuracy thresholds need experimentation. MEDIUM confidence on initial heuristics.
-- **Phase 4 (Context Efficiency):** Exact token savings are estimated (40-60%), not measured against bGSD's specific output shapes. Compact format LLM compatibility needs testing — pipe-delimited format must not cause LLM parsing confusion. Need A/B testing with actual agent tasks.
-- **Phase 6 (Execution Waves):** Parallel subagent coordination at scale is highest-complexity work. Cursor's 20-agent failure is instructive but bGSD's hierarchical model is different. Conservative agent cap (3-5) needs validation.
+- **Phase 1 (Foundation):** STATE.md coherence design needs careful specification — which fields are branch-local vs trajectory-global? How does `state validate` handle active trajectories? Needs `/gsd-research-phase`.
+- **Phase 3 (Pivot):** Selective checkout edge cases — what about files added/deleted since checkpoint? What about `.planning/` files created during the attempt? Needs careful test design.
 
-Phases with standard patterns (skip deep research):
-- **Phase 1 (Foundation):** Contract testing and profiling are well-established patterns. Enhanced git.js extends a proven 29-line module with standard git CLI output parsing.
-- **Phase 2 (AST Intelligence):** acorn is the most widely used JS parser (webpack, eslint/espree). API is well-documented. Aider's repo map pattern is documented and production-proven.
-- **Phase 5 (Agent Quality):** Writer/reviewer separation is an industry-standard pattern documented by Anthropic, validated by CodeRabbit and Qodo with 15+ specialized review agents.
+Phases with standard patterns (skip research-phase):
+- **Phase 2 (Checkpoint):** Well-documented git tag/branch patterns; metrics collection uses existing ast.js/git.js directly.
+- **Phase 4 (Compare):** Straightforward aggregation + formatting; reuses existing `formatTable` and `diffSummary`.
+- **Phase 5 (Choose):** Reuses proven `parseMergeTreeConflicts()` and `isAutoResolvable()` from worktree.js.
+- **Phase 6 (Integration):** Standard init injection follows existing intent/codebase injection patterns.
 <!-- /section -->
 
 <!-- section: confidence -->
@@ -183,56 +175,43 @@ Phases with standard patterns (skip deep research):
 
 | Area | Confidence | Notes |
 |------|------------|-------|
-| Stack | HIGH | acorn verified via npm/bundlephobia (v8.16.0, 114KB, 0 deps). perf_hooks stable since Node 8.5.0. simple-git rejection validated via Context7 + npm registry. Bundle projection verified. |
-| Features | HIGH | Primary sources: AI Agent Teams docs, Aider docs, Cursor blog, OpenHands paper, GitHub multi-agent engineering blog. 6+ competitors cross-referenced. |
-| Architecture | HIGH | Direct inspection of all 18 existing modules. Patterns extend proven existing patterns (detector registry, lazy loading, invocation cache). Dependency direction validated — no cycles. |
-| Pitfalls | HIGH | DeepMind scaling research, real failure cases (Gas Town DB down 2 days, Cursor equal-status agents, 67% AI PR rejection rate), bGSD v6.0's own --raw removal incident (243 failures). |
+| Stack | HIGH | Zero new deps. Every operation verified against existing git.js (301 LOC), ast.js (1192 LOC), memory.js (307 LOC). All git commands are stable plumbing. |
+| Features | HIGH | Clear user need (INTENT.md DO-21 through DO-26). Feature scope validated against EnCompass (NeurIPS 2025) branchpoint/backtracking pattern. MVP is 4 commands + journal. |
+| Architecture | HIGH | Two new modules following proven lib/command split. Module interactions mapped to 10 existing integration points. Journal extends existing sacred store pattern. |
+| Pitfalls | HIGH | 12 pitfalls identified from codebase analysis (34 modules, 669 tests, worktree.js integration surface), Kiro/Claude Code checkpoint architectures, and prior v2.0 pitfall research. Prevention strategies verified against git documentation. |
 
 **Overall confidence:** HIGH
 
 ### Gaps to Address
 
-- **Token savings precision:** 40-60% overall reduction is estimated from Chrome DevTools patterns and TU Wien research, not measured against bGSD's specific data structures. **Handle:** Build measurement infrastructure in Phase 1, empirically validate in Phase 4.
-- **Orchestration routing accuracy:** Task classification heuristics (complexity scoring, agent selection thresholds) need iterative refinement. Research provides the framework but not tuned values. **Handle:** Make thresholds configurable in Phase 3, adjust based on real usage data.
-- **TypeScript AST coverage:** acorn parses JS. TS-specific patterns (decorators, type annotations) may need acorn-typescript plugin or regex fallback. **Handle:** Assess in Phase 2 planning — current bGSD codebase is JS, so JS coverage is sufficient for self-hosting. Multi-language is an extension point.
-- **Conversation compaction API stability:** LLM compaction API is documented as beta. **Handle:** Abstract behind a thin wrapper in Phase 4 serializer. If API changes, only wrapper needs update.
-- **Execution wave parallelism limits:** Worktree-based parallel execution at >3 agents is not well-tested in the ecosystem. **Handle:** Cap at 3-5 parallel agents in Phase 6, validate with real tasks before increasing.
+- **`computeComplexity()` code-from-string option:** Currently reads from disk only. Needs `{code}` parameter to compute complexity from `git show <ref>:<file>` output. 3-line change to `ast.js`, but must be planned as an early task in Phase 2.
+- **Multi-level scoping deferred:** Task-level trajectories cover 95% of use cases. Plan/phase-level scoping has unresolved questions (which files to rewind at each level, how scope nesting works). Recommend implementing task-level only, expanding after real usage validates the pattern.
+- **Test results structured cache:** Compare command needs test metrics per attempt. Currently test output is plain text in `test-results.txt`. May need a structured JSON cache for reliable metric extraction. Can punt by storing test counts in journal at checkpoint time.
+- **Cache invalidation after branch switch:** `cachedReadFile()` and `getPhaseTree()` cache file contents. After `pivot` switches code state, caches hold pre-switch content. Must call `invalidateFileCache()` after every branch-affecting operation. Easy fix but easy to forget.
+- **Concurrent trajectory handling:** What happens if two trajectories are active at different scopes? Research assumes one active trajectory per scope, but scope interaction needs testing in Phase 1.
 <!-- /section -->
 
 <!-- section: sources -->
 ## Sources
 
 ### Primary (HIGH confidence)
-- **acorn:** npm registry (v8.16.0 verified 2026-02-26), bundlephobia API (114KB bundled, 0 deps confirmed)
-- **acorn-walk:** npm registry (v8.3.5), bundlephobia API (7KB bundled)
-- **Node.js perf_hooks:** Official docs (v25.7.0, API stable since v8.5.0)
-- **AI Agent Teams:** [removed - platform-specific URL]
-- **LLM API Compaction:** [removed - platform-specific URL]
-- **Aider repo map:** https://aider.chat/docs/repomap.html
-- **Aider git integration:** https://aider.chat/docs/git.html
-- **Cursor scaling agents blog:** https://cursor.com/blog/scaling-agents
-- **OpenHands architecture:** https://arxiv.org/html/2511.03690v1
-- **GitHub multi-agent engineering:** https://github.blog/ai-and-ml/generative-ai/multi-agent-workflows-often-fail-heres-how-to-engineer-ones-that-dont/
-- **DeepMind scaling agent systems:** https://arxiv.org/pdf/2512.08296
-- **Chrome DevTools AI assistance:** Blog post 2026-01-30 (compact serialization pattern)
-- **bGSD codebase:** Direct inspection of all 18 src/ modules, 574 tests, 11 agent definitions, 44 workflow files
+- Existing codebase: `src/lib/git.js` (301 lines), `src/commands/worktree.js` (791 lines), `src/lib/ast.js` (1192 lines), `src/commands/memory.js` (307 lines), `src/commands/state.js` (716 lines), `src/lib/helpers.js` (cachedReadFile/invalidateFileCache), `src/router.js` (897 lines) — direct code review
+- Git documentation: `git-tag(1)`, `git-branch(1)`, `git-reset(1)`, `git-checkout(1)`, `git-show(1)`, `git-diff(1)`, `git-merge-tree(1)` — all stable plumbing commands
+- Node.js `child_process`, `crypto` documentation (Context7)
+- MIT EnCompass framework (NeurIPS 2025, arxiv.org/pdf/2512.03571) — branchpoint/backtracking/parallel exploration pattern validation
 
 ### Secondary (MEDIUM confidence)
-- **Mike Mason synthesis:** https://mikemason.ca/writing/ai-coding-agents-jan-2026/ (cross-references primary sources)
-- **TU Wien diploma thesis:** "Reducing Token Usage of Software Engineering Agents" (2025) — function signatures vs full files approach
-- **Context Rot research (Chroma):** https://research.trychroma.com/context-rot — performance degradation with context length
-- **LLM Context Management (16x Engineer):** https://eval.16x.engineer/blog/llm-context-management-guide — 11/12 models <50% accuracy at 32k tokens
-- **Augment Code:** https://www.augmentcode.com/guides/why-multi-agent-llm-systems-fail-and-how-to-fix-them — 41-86.7% failure rates
-- **Qodo/CodeRabbit:** https://www.qodo.ai/, https://www.coderabbit.ai/ (vendor sites)
-- **Steve Yegge Gas Town/Beads:** Medium posts via Mason article
-- **simple-git:** Context7 /steveukx/git-js (API verification, async-only confirmed)
-- **tree-sitter:** npm registry (v0.25.0, native binding deps confirmed — disqualified)
+- Kiro checkpointing docs (2025) — shadow repository architecture, session-scoped cleanup
+- Claude Code checkpoint feature (2025) — conversation state unwind consistency
+- AWS ADR best practices — decision record structure (adapted for CLI)
+- MADR 4.0.0 (adr.github.io/madr/) — Context/Decision/Consequences record pattern
+- Community consensus: branches > stash for named checkpoints, lightweight tags > annotated for disposable snapshots (Stack Overflow, Reddit r/git, Software Engineering SE)
 
 ### Tertiary (LOW confidence)
-- Token savings estimates (40-60%) — extrapolated from Chrome DevTools pattern to bGSD's specific data structures, needs empirical validation
-- Execution wave parallelism cap (3-5 agents) — inferred from Cursor's 20-agent failure, bGSD's hierarchical model may handle differently
-- AI-Fast agent guide (community site, not official docs)
+- Multi-level trajectory scoping — inferred from task/plan/phase hierarchy, no direct precedent for 3-level exploration systems. Deferred to post-task-level validation.
+- Context window pollution thresholds — 500-token per-task and 2000-token total budgets are estimates based on existing context-budget analysis, not empirically validated for trajectory data.
+<!-- /section -->
 
 ---
-*Research completed: 2026-02-26*
+*Research completed: 2026-02-28*
 *Ready for roadmap: yes*
