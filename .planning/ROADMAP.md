@@ -10,6 +10,7 @@
 - ✅ **v5.0 Codebase Intelligence** — Phases 23-29 (shipped 2026-02-26)
 - ✅ **v6.0 UX & Developer Experience** — Phases 30-36 (shipped 2026-02-27)
 - ✅ **v7.0 Agent Orchestration & Efficiency** — Phases 37-44 (shipped 2026-02-27)
+- 🚧 **v7.1 Trajectory Engineering** — Phases 45-50 (in progress)
 
 ## Phases
 
@@ -121,6 +122,86 @@ Full details: `.planning/milestones/v7.0-ROADMAP.md`
 
 </details>
 
+### 🚧 v7.1 Trajectory Engineering (In Progress)
+
+**Milestone Goal:** Structured exploration system — checkpoint, pivot, compare, and choose between multiple approaches at any workflow level, with a decision journal consumable by both agents and humans.
+
+- [ ] **Phase 45: Foundation — Decision Journal & State Coherence** - Sacred trajectory store and selective checkout pattern for `.planning/` preservation
+- [ ] **Phase 46: Checkpoint — Snapshot & Metrics Collection** - Named checkpoints with git state capture and auto-metrics
+- [ ] **Phase 47: Pivot — Selective Rewind & Attempt Archival** - Abandon approach with recorded reasoning, rewind to checkpoint safely
+- [ ] **Phase 48: Compare — Multi-Attempt Metrics Aggregation** - Outcome metrics comparison across attempts with signal detection
+- [ ] **Phase 49: Choose — Merge Winner & Cleanup** - Select winning attempt, archive alternatives, clean up branches
+- [ ] **Phase 50: Integration — Agent Context & Dead-End Detection** - Journal-driven context injection and stuck-to-pivot wiring
+
+## Phase Details
+
+### Phase 45: Foundation — Decision Journal & State Coherence
+**Goal**: Trajectory data has a persistent, session-portable home and code rewinds never corrupt planning state
+**Depends on**: Nothing (first phase of v7.1)
+**Requirements**: FOUND-01, FOUND-02
+**Success Criteria** (what must be TRUE):
+  1. `memory write --store trajectories` and `memory read --store trajectories` work — journal entries persist in `.planning/memory/trajectory.json`
+  2. Journal entries survive session boundaries — data written in one session is fully readable in the next with no auto-compaction
+  3. Selective `git checkout <ref> -- src/ test/ bin/` rewinds source code while `.planning/` files remain untouched (round-trip test passes)
+  4. Trajectory branch namespace (`gsd/trajectory/`) is distinct from worktree namespace (`worktree-*`) with no cross-system collisions
+**Plans**: TBD
+
+### Phase 46: Checkpoint — Snapshot & Metrics Collection
+**Goal**: Users can name and save points in their exploration with automatic metrics capture
+**Depends on**: Phase 45
+**Requirements**: CHKPT-01, CHKPT-02, CHKPT-03, CHKPT-04
+**Success Criteria** (what must be TRUE):
+  1. User can run `trajectory checkpoint <name>` and a git branch is created at `trajectory/<scope>/<name>/attempt-N` with a journal entry recording the snapshot
+  2. User can run `trajectory list` and see all checkpoints with name, scope, timestamp, git ref, and metrics summary
+  3. Checkpoint creation auto-collects test count, cyclomatic complexity, and LOC delta — metrics are stored in the journal entry without user intervention
+  4. Checkpoint branches follow the `trajectory/<scope>/<name>/attempt-N` naming convention consistently
+**Plans**: TBD
+
+### Phase 47: Pivot — Selective Rewind & Attempt Archival
+**Goal**: Users can abandon a failing approach with full reasoning capture and safely rewind to a prior checkpoint
+**Depends on**: Phase 46
+**Requirements**: PIVOT-01, PIVOT-02, PIVOT-03, PIVOT-04
+**Success Criteria** (what must be TRUE):
+  1. User can run `trajectory pivot <checkpoint>` and source code rewinds to the checkpoint state while `.planning/` directory is fully preserved
+  2. Pivot refuses to run on a dirty working tree (uncommitted changes) — clear error message with guidance
+  3. Pivot requires a structured reason (what failed, why, what signals) and the reason is persisted in the journal as an "abandoned" entry
+  4. Current work is auto-checkpointed as an "abandoned" attempt before rewind — no work is ever lost silently
+  5. Stuck-detector integration: when stuck detection fires (3 failures), it suggests pivoting to the last checkpoint
+**Plans**: TBD
+
+### Phase 48: Compare — Multi-Attempt Metrics Aggregation
+**Goal**: Users can see data-driven comparison of all attempts to make informed exploration decisions
+**Depends on**: Phase 47
+**Requirements**: COMP-01, COMP-02, COMP-03, COMP-04, COMP-05
+**Success Criteria** (what must be TRUE):
+  1. User can run `trajectory compare` and see test results (pass/fail/skip) for each attempt side-by-side
+  2. Compare shows LOC delta (lines added/removed) and cyclomatic complexity per attempt
+  3. Compare produces an aggregated matrix identifying the best attempt per metric (most tests passing, lowest complexity, smallest LOC delta)
+  4. TTY output renders as a color-coded table (green=best, red=worst per metric) with automatic JSON fallback when piped
+**Plans**: TBD
+
+### Phase 49: Choose — Merge Winner & Cleanup
+**Goal**: Users can select the winning approach, merge it back, and have all exploration artifacts cleanly archived
+**Depends on**: Phase 48
+**Requirements**: CHOOSE-01, CHOOSE-02, CHOOSE-03
+**Success Criteria** (what must be TRUE):
+  1. User can run `trajectory choose <attempt-N>` and the winning attempt's code is merged back to the base branch
+  2. Non-chosen attempts are preserved as archived tags (`archived/trajectory/<scope>/<name>/attempt-N`) for future reference
+  3. Trajectory working branches are deleted after archival — `git branch` output is not polluted with stale trajectory branches
+  4. Journal records the final choice with rationale, completing the trajectory lifecycle
+**Plans**: TBD
+
+### Phase 50: Integration — Agent Context & Dead-End Detection
+**Goal**: Agents automatically learn from past exploration failures and never re-explore known dead ends
+**Depends on**: Phase 49
+**Requirements**: INTEG-01, INTEG-02, INTEG-03, INTEG-04
+**Success Criteria** (what must be TRUE):
+  1. Before starting new work, dead-end detection queries the trajectory journal for similar past approaches and surfaces warnings if matches are found
+  2. Init execute-phase and execute-plan commands include a "previous attempts" section (capped at ~500 tokens) drawn from the trajectory journal
+  3. Failed attempt lessons are formatted as "what NOT to do" context — agents receive specific signals about why prior approaches failed
+  4. All trajectory commands accept a `--scope` parameter supporting task, plan, and phase levels
+**Plans**: TBD
+
 ## Progress
 
 | Phase | Milestone | Plans | Status | Completed |
@@ -133,3 +214,9 @@ Full details: `.planning/milestones/v7.0-ROADMAP.md`
 | 23-29 | v5.0 | 14/14 | Complete | 2026-02-26 |
 | 30-36 | v6.0 | 11/11 | Complete | 2026-02-27 |
 | 37-44 | v7.0 | 15/15 | Complete | 2026-02-27 |
+| 45. Foundation | v7.1 | 0/TBD | Not started | - |
+| 46. Checkpoint | v7.1 | 0/TBD | Not started | - |
+| 47. Pivot | v7.1 | 0/TBD | Not started | - |
+| 48. Compare | v7.1 | 0/TBD | Not started | - |
+| 49. Choose | v7.1 | 0/TBD | Not started | - |
+| 50. Integration | v7.1 | 0/TBD | Not started | - |

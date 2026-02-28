@@ -5,14 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-02-28)
 
 **Core value:** Manage and deliver high-quality software with high-quality documentation, while continuously reducing token usage and improving performance
-**Current focus:** v7.1 Trajectory Engineering
+**Current focus:** v7.1 Trajectory Engineering — Phase 45 Foundation
 
 ## Current Position
 
-Phase: Not started (defining requirements)
+Phase: 45 of 50 (Foundation — Decision Journal & State Coherence)
 Plan: —
-Status: Defining requirements
-Last activity: 2026-02-28 — Milestone v7.1 started
+Status: Ready to plan
+Last activity: 2026-02-28 — Roadmap created for v7.1 (6 phases, 22 requirements)
+
+Progress: [████████████████████░░░░░░░░░░] 100/100 plans complete (v1.0-v7.0) | v7.1: 0%
 
 ## Performance Metrics
 
@@ -47,10 +49,12 @@ None — milestone starting fresh.
 ### Blockers/Concerns
 
 - 3 pre-existing test failures in context-budget (plan path validation) — carried from v6.0
+- Phase 45 (Foundation): STATE.md coherence during pivot is the #1 architectural risk — selective checkout design must be proven before building commands on top
+- Phase 47 (Pivot): Selective checkout edge cases need careful testing — files added/deleted since checkpoint, `.planning/` files created during attempt
 
 ## Session Continuity
 
 Last session: 2026-02-28
-Stopped at: Milestone v7.1 initialization
+Stopped at: Roadmap created for v7.1 Trajectory Engineering
 Resume file: None
-Next step: Define requirements and roadmap for v7.1
+Next step: `/gsd-plan-phase 45`

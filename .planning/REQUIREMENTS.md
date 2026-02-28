@@ -78,34 +78,34 @@ Requirements for trajectory engineering milestone. Each maps to roadmap phases.
 
 | Requirement | Phase | Status | Test Command |
 |-------------|-------|--------|--------------|
-| FOUND-01 | — | Pending | npm test -- --grep trajectory |
-| FOUND-02 | — | Pending | npm test -- --grep trajectory |
-| CHKPT-01 | — | Pending | npm test -- --grep checkpoint |
-| CHKPT-02 | — | Pending | npm test -- --grep checkpoint |
-| CHKPT-03 | — | Pending | npm test -- --grep metrics |
-| CHKPT-04 | — | Pending | npm test -- --grep trajectory |
-| PIVOT-01 | — | Pending | npm test -- --grep pivot |
-| PIVOT-02 | — | Pending | npm test -- --grep pivot |
-| PIVOT-03 | — | Pending | npm test -- --grep pivot |
-| PIVOT-04 | — | Pending | npm test -- --grep stuck |
-| COMP-01 | — | Pending | npm test -- --grep compare |
-| COMP-02 | — | Pending | npm test -- --grep compare |
-| COMP-03 | — | Pending | npm test -- --grep compare |
-| COMP-04 | — | Pending | npm test -- --grep compare |
-| COMP-05 | — | Pending | npm test -- --grep compare |
-| CHOOSE-01 | — | Pending | npm test -- --grep choose |
-| CHOOSE-02 | — | Pending | npm test -- --grep choose |
-| CHOOSE-03 | — | Pending | npm test -- --grep choose |
-| INTEG-01 | — | Pending | npm test -- --grep dead-end |
-| INTEG-02 | — | Pending | npm test -- --grep init |
-| INTEG-03 | — | Pending | npm test -- --grep context |
-| INTEG-04 | — | Pending | npm test -- --grep scope |
+| FOUND-01 | Phase 45 | Pending | npm test -- --grep trajectory |
+| FOUND-02 | Phase 45 | Pending | npm test -- --grep trajectory |
+| CHKPT-01 | Phase 46 | Pending | npm test -- --grep checkpoint |
+| CHKPT-02 | Phase 46 | Pending | npm test -- --grep checkpoint |
+| CHKPT-03 | Phase 46 | Pending | npm test -- --grep metrics |
+| CHKPT-04 | Phase 46 | Pending | npm test -- --grep trajectory |
+| PIVOT-01 | Phase 47 | Pending | npm test -- --grep pivot |
+| PIVOT-02 | Phase 47 | Pending | npm test -- --grep pivot |
+| PIVOT-03 | Phase 47 | Pending | npm test -- --grep pivot |
+| PIVOT-04 | Phase 47 | Pending | npm test -- --grep stuck |
+| COMP-01 | Phase 48 | Pending | npm test -- --grep compare |
+| COMP-02 | Phase 48 | Pending | npm test -- --grep compare |
+| COMP-03 | Phase 48 | Pending | npm test -- --grep compare |
+| COMP-04 | Phase 48 | Pending | npm test -- --grep compare |
+| COMP-05 | Phase 48 | Pending | npm test -- --grep compare |
+| CHOOSE-01 | Phase 49 | Pending | npm test -- --grep choose |
+| CHOOSE-02 | Phase 49 | Pending | npm test -- --grep choose |
+| CHOOSE-03 | Phase 49 | Pending | npm test -- --grep choose |
+| INTEG-01 | Phase 50 | Pending | npm test -- --grep dead-end |
+| INTEG-02 | Phase 50 | Pending | npm test -- --grep init |
+| INTEG-03 | Phase 50 | Pending | npm test -- --grep context |
+| INTEG-04 | Phase 50 | Pending | npm test -- --grep scope |
 
 **Coverage:**
 - v7.1 requirements: 22 total
-- Mapped to phases: 0 (pending roadmap)
-- Unmapped: 22
+- Mapped to phases: 22/22 (100%)
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-02-28*
-*Last updated: 2026-02-28 after initial definition*
+*Last updated: 2026-02-28 after roadmap creation*
