@@ -16432,3 +16432,149 @@ describe('trajectory checkpoint', () => {
     assert.deepStrictEqual(entries[0].tags, ['checkpoint']);
   });
 });
+
+// ─── Trajectory List Tests ───────────────────────────────────────────────────
+
+describe('trajectory list', () => {
+  let tmpDir;
+
+  function writeCheckpointEntries(dir, entries) {
+    const memDir = path.join(dir, '.planning', 'memory');
+    fs.mkdirSync(memDir, { recursive: true });
+    fs.writeFileSync(path.join(memDir, 'trajectory.json'), JSON.stringify(entries, null, 2), 'utf-8');
+  }
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('empty list returns zero checkpoints', () => {
+    const result = runGsdTools('trajectory list', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+    const output = JSON.parse(result.output);
+    assert.deepStrictEqual(output.checkpoints, []);
+    assert.strictEqual(output.count, 0);
+  });
+
+  test('list returns checkpoints after writing entries', () => {
+    const entries = [
+      { id: 'tj-aaa111', timestamp: '2026-02-28T20:00:00Z', category: 'checkpoint', checkpoint_name: 'my-feature', scope: 'phase', attempt: 1, branch: 'trajectory/phase/my-feature/attempt-1', git_ref: 'abc1234567890', metrics: { tests: { total: 24, pass: 24, fail: 0 }, loc_delta: { insertions: 50, deletions: 12 }, complexity: null }, tags: ['checkpoint'] },
+    ];
+    writeCheckpointEntries(tmpDir, entries);
+
+    const result = runGsdTools('trajectory list', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.count, 1);
+    assert.strictEqual(output.checkpoints[0].checkpoint_name, 'my-feature');
+    assert.strictEqual(output.checkpoints[0].scope, 'phase');
+    assert.strictEqual(output.checkpoints[0].attempt, 1);
+  });
+
+  test('scope filter returns only matching scope', () => {
+    const entries = [
+      { id: 'tj-aaa111', timestamp: '2026-02-28T20:00:00Z', category: 'checkpoint', checkpoint_name: 'feat-a', scope: 'phase', attempt: 1, branch: 'trajectory/phase/feat-a/attempt-1', git_ref: 'abc1234', metrics: {}, tags: ['checkpoint'] },
+      { id: 'tj-bbb222', timestamp: '2026-02-28T20:01:00Z', category: 'checkpoint', checkpoint_name: 'feat-b', scope: 'task', attempt: 1, branch: 'trajectory/task/feat-b/attempt-1', git_ref: 'def5678', metrics: {}, tags: ['checkpoint'] },
+      { id: 'tj-ccc333', timestamp: '2026-02-28T20:02:00Z', category: 'checkpoint', checkpoint_name: 'feat-c', scope: 'phase', attempt: 1, branch: 'trajectory/phase/feat-c/attempt-1', git_ref: 'ghi9012', metrics: {}, tags: ['checkpoint'] },
+    ];
+    writeCheckpointEntries(tmpDir, entries);
+
+    const result = runGsdTools('trajectory list --scope phase', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.count, 2);
+    assert.ok(output.checkpoints.every(c => c.scope === 'phase'), 'All should be phase scope');
+  });
+
+  test('name filter returns only matching name', () => {
+    const entries = [
+      { id: 'tj-aaa111', timestamp: '2026-02-28T20:00:00Z', category: 'checkpoint', checkpoint_name: 'my-feat', scope: 'phase', attempt: 1, branch: 'trajectory/phase/my-feat/attempt-1', git_ref: 'abc1234', metrics: {}, tags: ['checkpoint'] },
+      { id: 'tj-bbb222', timestamp: '2026-02-28T20:01:00Z', category: 'checkpoint', checkpoint_name: 'my-feat', scope: 'phase', attempt: 2, branch: 'trajectory/phase/my-feat/attempt-2', git_ref: 'def5678', metrics: {}, tags: ['checkpoint'] },
+      { id: 'tj-ccc333', timestamp: '2026-02-28T20:02:00Z', category: 'checkpoint', checkpoint_name: 'other', scope: 'phase', attempt: 1, branch: 'trajectory/phase/other/attempt-1', git_ref: 'ghi9012', metrics: {}, tags: ['checkpoint'] },
+    ];
+    writeCheckpointEntries(tmpDir, entries);
+
+    const result = runGsdTools('trajectory list --name my-feat', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.count, 2);
+    assert.ok(output.checkpoints.every(c => c.checkpoint_name === 'my-feat'), 'All should be my-feat');
+  });
+
+  test('limit restricts number of results', () => {
+    const entries = [
+      { id: 'tj-aaa111', timestamp: '2026-02-28T20:00:00Z', category: 'checkpoint', checkpoint_name: 'a', scope: 'phase', attempt: 1, branch: 'trajectory/phase/a/attempt-1', git_ref: 'abc1234', metrics: {}, tags: ['checkpoint'] },
+      { id: 'tj-bbb222', timestamp: '2026-02-28T20:01:00Z', category: 'checkpoint', checkpoint_name: 'b', scope: 'phase', attempt: 1, branch: 'trajectory/phase/b/attempt-1', git_ref: 'def5678', metrics: {}, tags: ['checkpoint'] },
+      { id: 'tj-ccc333', timestamp: '2026-02-28T20:02:00Z', category: 'checkpoint', checkpoint_name: 'c', scope: 'phase', attempt: 1, branch: 'trajectory/phase/c/attempt-1', git_ref: 'ghi9012', metrics: {}, tags: ['checkpoint'] },
+    ];
+    writeCheckpointEntries(tmpDir, entries);
+
+    const result = runGsdTools('trajectory list --limit 2', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.count, 2);
+  });
+
+  test('sort order is newest first', () => {
+    const entries = [
+      { id: 'tj-aaa111', timestamp: '2026-02-28T18:00:00Z', category: 'checkpoint', checkpoint_name: 'oldest', scope: 'phase', attempt: 1, branch: 'trajectory/phase/oldest/attempt-1', git_ref: 'abc1234', metrics: {}, tags: ['checkpoint'] },
+      { id: 'tj-bbb222', timestamp: '2026-02-28T22:00:00Z', category: 'checkpoint', checkpoint_name: 'newest', scope: 'phase', attempt: 1, branch: 'trajectory/phase/newest/attempt-1', git_ref: 'def5678', metrics: {}, tags: ['checkpoint'] },
+      { id: 'tj-ccc333', timestamp: '2026-02-28T20:00:00Z', category: 'checkpoint', checkpoint_name: 'middle', scope: 'phase', attempt: 1, branch: 'trajectory/phase/middle/attempt-1', git_ref: 'ghi9012', metrics: {}, tags: ['checkpoint'] },
+    ];
+    writeCheckpointEntries(tmpDir, entries);
+
+    const result = runGsdTools('trajectory list', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.checkpoints[0].checkpoint_name, 'newest', 'First should be newest');
+    assert.strictEqual(output.checkpoints[1].checkpoint_name, 'middle', 'Second should be middle');
+    assert.strictEqual(output.checkpoints[2].checkpoint_name, 'oldest', 'Third should be oldest');
+  });
+
+  test('entry structure has expected fields', () => {
+    const entries = [
+      { id: 'tj-aaa111', timestamp: '2026-02-28T20:00:00Z', category: 'checkpoint', checkpoint_name: 'struct-test', scope: 'phase', attempt: 1, branch: 'trajectory/phase/struct-test/attempt-1', git_ref: 'abc1234567890', metrics: { tests: { total: 10, pass: 10, fail: 0 }, loc_delta: { insertions: 20, deletions: 5 }, complexity: { total: 8, files_analyzed: 2 } }, tags: ['checkpoint'] },
+    ];
+    writeCheckpointEntries(tmpDir, entries);
+
+    const result = runGsdTools('trajectory list', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+    const output = JSON.parse(result.output);
+    const cp = output.checkpoints[0];
+
+    assert.ok(cp.checkpoint_name, 'should have checkpoint_name');
+    assert.ok(cp.scope, 'should have scope');
+    assert.strictEqual(typeof cp.attempt, 'number', 'attempt should be number');
+    assert.ok(cp.branch, 'should have branch');
+    assert.ok(cp.git_ref, 'should have git_ref');
+    assert.ok(cp.timestamp, 'should have timestamp');
+    assert.ok(cp.metrics, 'should have metrics');
+    assert.ok(cp.metrics.tests, 'should have metrics.tests');
+    assert.ok(cp.metrics.loc_delta, 'should have metrics.loc_delta');
+  });
+
+  test('unknown trajectory subcommand includes list in error', () => {
+    const result = runGsdTools('trajectory foo', tmpDir);
+    assert.strictEqual(result.success, false, 'Should fail with unknown subcommand');
+    assert.ok(result.error.includes('list'), 'Error should mention list as available subcommand');
+  });
+
+  test('non-checkpoint entries are excluded from list', () => {
+    const entries = [
+      { id: 'tj-aaa111', timestamp: '2026-02-28T20:00:00Z', category: 'checkpoint', checkpoint_name: 'cp-one', scope: 'phase', attempt: 1, branch: 'trajectory/phase/cp-one/attempt-1', git_ref: 'abc1234', metrics: {}, tags: ['checkpoint'] },
+      { id: 'tj-bbb222', timestamp: '2026-02-28T20:01:00Z', category: 'decision', text: 'Some decision', scope: 'phase', tags: ['decision'] },
+      { id: 'tj-ccc333', timestamp: '2026-02-28T20:02:00Z', category: 'observation', text: 'Some observation', scope: 'task', tags: [] },
+    ];
+    writeCheckpointEntries(tmpDir, entries);
+
+    const result = runGsdTools('trajectory list', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.count, 1, 'Only checkpoint entries should be listed');
+    assert.strictEqual(output.checkpoints[0].checkpoint_name, 'cp-one');
+  });
+});
