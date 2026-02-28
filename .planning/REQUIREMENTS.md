@@ -14,10 +14,10 @@ Requirements for trajectory engineering milestone. Each maps to roadmap phases.
 
 ### Checkpoint
 
-- [ ] **CHKPT-01**: User can create a named checkpoint that snapshots current git state with semantic name and optional context description
+- [x] **CHKPT-01**: User can create a named checkpoint that snapshots current git state with semantic name and optional context description
 - [ ] **CHKPT-02**: User can list all checkpoints with metadata (name, scope, timestamp, git ref, metrics summary)
-- [ ] **CHKPT-03**: Checkpoint auto-collects metrics at creation time (test count, complexity, LOC delta)
-- [ ] **CHKPT-04**: Checkpoint branches follow predictable naming convention `trajectory/<scope>/<name>/attempt-N`
+- [x] **CHKPT-03**: Checkpoint auto-collects metrics at creation time (test count, complexity, LOC delta)
+- [x] **CHKPT-04**: Checkpoint branches follow predictable naming convention `trajectory/<scope>/<name>/attempt-N`
 
 ### Pivot
 
@@ -80,10 +80,10 @@ Requirements for trajectory engineering milestone. Each maps to roadmap phases.
 |-------------|-------|--------|--------------|
 | FOUND-01 | Phase 45 | Complete | npm test -- --grep trajectory |
 | FOUND-02 | Phase 45 | Complete | npm test -- --grep trajectory |
-| CHKPT-01 | Phase 46 | Pending | npm test -- --grep checkpoint |
+| CHKPT-01 | Phase 46 | Complete | npm test -- --grep checkpoint |
 | CHKPT-02 | Phase 46 | Pending | npm test -- --grep checkpoint |
-| CHKPT-03 | Phase 46 | Pending | npm test -- --grep metrics |
-| CHKPT-04 | Phase 46 | Pending | npm test -- --grep trajectory |
+| CHKPT-03 | Phase 46 | Complete | npm test -- --grep metrics |
+| CHKPT-04 | Phase 46 | Complete | npm test -- --grep trajectory |
 | PIVOT-01 | Phase 47 | Pending | npm test -- --grep pivot |
 | PIVOT-02 | Phase 47 | Pending | npm test -- --grep pivot |
 | PIVOT-03 | Phase 47 | Pending | npm test -- --grep pivot |

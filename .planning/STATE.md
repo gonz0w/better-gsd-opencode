@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-02-28)
 
 **Core value:** Manage and deliver high-quality software with high-quality documentation, while continuously reducing token usage and improving performance
-**Current focus:** v7.1 Trajectory Engineering — Phase 45 Foundation
+**Current focus:** v7.1 Trajectory Engineering — Phase 46 Checkpoint Snapshot & Metrics Collection
 
 ## Current Position
 
-Phase: 45 of 50 (Foundation — Decision Journal & State Coherence)
-Plan: 2 of 2
-Status: Phase 45 complete
-Last activity: 2026-02-28 — Completed 45-01 trajectories memory store
+Phase: 46 of 50 (Checkpoint — Snapshot & Metrics Collection)
+Plan: 1 of 1
+Status: Phase 46 complete
+Last activity: 2026-02-28 — Completed 46-01 trajectory checkpoint command
 
-Progress: [████████████████████░░░░░░░░░░] 100/100 plans complete (v1.0-v7.0) | v7.1: 2/2 plans (Phase 45 complete)
+Progress: [████████████████████░░░░░░░░░░] 100/100 plans complete (v1.0-v7.0) | v7.1: 3/3 plans (Phase 46 complete)
 
 ## Performance Metrics
 
@@ -41,6 +41,7 @@ Progress: [████████████████████░░░
 | Phase | Plan | Duration | Tasks | Files |
 |-------|------|----------|-------|-------|
 | 45 | 01 | 20 min | 2 | 4 |
+| 46 | 01 | 10 min | 2 | 5 |
 
 ## Accumulated Context
 
@@ -52,6 +53,9 @@ All v1.0-v7.0 decisions recorded in PROJECT.md Key Decisions table with outcomes
 - **Phase 45-02:** Used denylist approach for protected paths in selective rewind (safer default)
 - [Phase 45]: Used crypto.randomBytes(3) for trajectory IDs with collision detection
 - [Phase 45]: Mapped store name 'trajectories' to filename 'trajectory.json' via STORE_FILES
+- [Phase 46]: Excluded .planning/ from dirty working tree check for consecutive checkpoints
+- [Phase 46]: Used fault-tolerant metrics collection — partial metrics if any collector fails
+- [Phase 46]: Branch ref-only creation (git branch, not checkout) to preserve working tree
 
 ### Pending Todos
 
@@ -66,6 +70,6 @@ None — milestone starting fresh.
 ## Session Continuity
 
 Last session: 2026-02-28
-Stopped at: Completed 45-01-PLAN.md (Phase 45 fully complete)
+Stopped at: Completed 46-01-PLAN.md (Phase 46 fully complete)
 Resume file: None
-Next step: Phase 45 complete — run `/gsd-verify-work 45` or proceed to Phase 46
+Next step: Phase 46 complete — proceed to Phase 47 (Pivot: Selective Checkout & Branch Switching)
