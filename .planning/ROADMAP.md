@@ -206,10 +206,10 @@ Plans:
 4. No output format regressions detected by contract tests
 5. Bundle remains within 1000KB budget
 
-**Plans:** 3/3 plans (1/3 complete)
+**Plans:** 3/3 plans (2/3 complete)
 Plans:
-- [x] 42-01-PLAN.md — Canary cycle: Plan Phase 44 → Execute → Verify ✅ (in progress)
-- [x] 42-02-PLAN.md — Token measurement, test suite, bundle size validation
+- [x] 42-01-PLAN.md — Canary cycle: Plan Phase 44 → Execute → Verify ✅ (complete)
+- [x] 42-02-PLAN.md — Token measurement, test suite, bundle size validation ✅ (complete)
 - [x] 42-03-PLAN.md — Generate validation report with all criterion results
 
 ### Phase 43: TDD Execution Engine
