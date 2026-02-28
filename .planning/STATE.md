@@ -11,10 +11,10 @@ See: .planning/PROJECT.md (updated 2026-02-28)
 
 Phase: 45 of 50 (Foundation — Decision Journal & State Coherence)
 Plan: 2 of 2
-Status: Plan 02 complete
-Last activity: 2026-02-28 — Completed 45-02 selective rewind & trajectory branch
+Status: Phase 45 complete
+Last activity: 2026-02-28 — Completed 45-01 trajectories memory store
 
-Progress: [████████████████████░░░░░░░░░░] 100/100 plans complete (v1.0-v7.0) | v7.1: 1/2 plans (Phase 45)
+Progress: [████████████████████░░░░░░░░░░] 100/100 plans complete (v1.0-v7.0) | v7.1: 2/2 plans (Phase 45 complete)
 
 ## Performance Metrics
 
@@ -36,6 +36,12 @@ Progress: [████████████████████░░░
 | v6.0 | 7 | 11 | 1 day |
 | v7.0 | 8 | 15 | 2 days |
 
+**v7.1 Progress:**
+
+| Phase | Plan | Duration | Tasks | Files |
+|-------|------|----------|-------|-------|
+| 45 | 01 | 20 min | 2 | 4 |
+
 ## Accumulated Context
 
 ### Decisions
@@ -44,6 +50,8 @@ All v1.0-v7.0 decisions recorded in PROJECT.md Key Decisions table with outcomes
 
 - **Phase 45-02:** Bumped bundle budget from 1000KB to 1050KB for v7.1 feature growth
 - **Phase 45-02:** Used denylist approach for protected paths in selective rewind (safer default)
+- [Phase 45]: Used crypto.randomBytes(3) for trajectory IDs with collision detection
+- [Phase 45]: Mapped store name 'trajectories' to filename 'trajectory.json' via STORE_FILES
 
 ### Pending Todos
 
@@ -58,6 +66,6 @@ None — milestone starting fresh.
 ## Session Continuity
 
 Last session: 2026-02-28
-Stopped at: Completed 45-02-PLAN.md
+Stopped at: Completed 45-01-PLAN.md (Phase 45 fully complete)
 Resume file: None
 Next step: Phase 45 complete — run `/gsd-verify-work 45` or proceed to Phase 46

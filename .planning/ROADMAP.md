@@ -126,7 +126,7 @@ Full details: `.planning/milestones/v7.0-ROADMAP.md`
 
 **Milestone Goal:** Structured exploration system — checkpoint, pivot, compare, and choose between multiple approaches at any workflow level, with a decision journal consumable by both agents and humans.
 
-- [ ] **Phase 45: Foundation — Decision Journal & State Coherence** - Sacred trajectory store and selective checkout pattern for `.planning/` preservation
+- [x] **Phase 45: Foundation — Decision Journal & State Coherence** - Sacred trajectory store and selective checkout pattern for `.planning/` preservation (completed 2026-02-28)
 - [ ] **Phase 46: Checkpoint — Snapshot & Metrics Collection** - Named checkpoints with git state capture and auto-metrics
 - [ ] **Phase 47: Pivot — Selective Rewind & Attempt Archival** - Abandon approach with recorded reasoning, rewind to checkpoint safely
 - [ ] **Phase 48: Compare — Multi-Attempt Metrics Aggregation** - Outcome metrics comparison across attempts with signal detection
@@ -144,7 +144,7 @@ Full details: `.planning/milestones/v7.0-ROADMAP.md`
   2. Journal entries survive session boundaries — data written in one session is fully readable in the next with no auto-compaction
   3. Selective `git checkout <ref> -- src/ test/ bin/` rewinds source code while `.planning/` files remain untouched (round-trip test passes)
   4. Trajectory branch namespace (`gsd/trajectory/`) is distinct from worktree namespace (`worktree-*`) with no cross-system collisions
-**Plans**: 1/2 plans executed
+**Plans**: 2/2 plans complete
 
 ### Phase 46: Checkpoint — Snapshot & Metrics Collection
 **Goal**: Users can name and save points in their exploration with automatic metrics capture
@@ -214,7 +214,7 @@ Full details: `.planning/milestones/v7.0-ROADMAP.md`
 | 23-29 | v5.0 | 14/14 | Complete | 2026-02-26 |
 | 30-36 | v6.0 | 11/11 | Complete | 2026-02-27 |
 | 37-44 | v7.0 | 15/15 | Complete | 2026-02-27 |
-| 45. Foundation | 1/2 | In Progress|  | - |
+| 45. Foundation | 2/2 | Complete   | 2026-02-28 | - |
 | 46. Checkpoint | v7.1 | 0/TBD | Not started | - |
 | 47. Pivot | v7.1 | 0/TBD | Not started | - |
 | 48. Compare | v7.1 | 0/TBD | Not started | - |
