@@ -13894,6 +13894,156 @@ describe('git branch-info', () => {
   });
 });
 
+// ─── git rewind ─────────────────────────────────────────────────────────────
+
+describe('git rewind', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+    // Create initial repo with src/ and .planning/ files
+    fs.mkdirSync(path.join(tmpDir, 'src'), { recursive: true });
+    fs.writeFileSync(path.join(tmpDir, 'src', 'a.js'), 'const a = 1;\n');
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'STATE.md'), '# State v1\n');
+    execSync('git init && git config user.email "test@test.com" && git config user.name "Test" && git add . && git commit -m "init: first commit"', { cwd: tmpDir, stdio: 'pipe' });
+    // Second commit: modify both src and .planning
+    fs.writeFileSync(path.join(tmpDir, 'src', 'a.js'), 'const a = 2;\n');
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'STATE.md'), '# State v2\n');
+    execSync('git add . && git commit -m "feat: second commit"', { cwd: tmpDir, stdio: 'pipe' });
+  });
+
+  afterEach(() => { cleanup(tmpDir); });
+
+  test('rewind dry-run shows changes without .planning files', () => {
+    const result = runGsdTools('git rewind --ref HEAD~1 --dry-run', tmpDir);
+    assert.ok(result.success, 'Command should succeed');
+    const data = JSON.parse(result.output);
+    assert.strictEqual(data.dry_run, true, 'Should be dry run');
+    assert.ok(data.changes.some(c => c.file === 'src/a.js'), 'Should include src/a.js in changes');
+    assert.ok(!data.changes.some(c => c.file.startsWith('.planning')), 'Should not include .planning files');
+    assert.ok(data.files_protected > 0, 'Should have protected files');
+  });
+
+  test('rewind without confirm returns needs_confirm', () => {
+    const result = runGsdTools('git rewind --ref HEAD~1', tmpDir);
+    assert.ok(result.success, 'Command should succeed');
+    const data = JSON.parse(result.output);
+    assert.strictEqual(data.needs_confirm, true, 'Should need confirmation');
+    assert.ok(data.changes.length > 0, 'Should list changes');
+    assert.ok(data.message.includes('--confirm'), 'Should mention --confirm');
+  });
+
+  test('rewind with confirm performs checkout', () => {
+    const result = runGsdTools('git rewind --ref HEAD~1 --confirm', tmpDir);
+    assert.ok(result.success, 'Command should succeed');
+    const data = JSON.parse(result.output);
+    assert.strictEqual(data.rewound, true, 'Should report rewound');
+    assert.ok(data.files_changed > 0, 'Should have changed files');
+    // Verify src/a.js content reverted
+    const content = fs.readFileSync(path.join(tmpDir, 'src', 'a.js'), 'utf-8');
+    assert.ok(content.includes('const a = 1'), 'src/a.js should be reverted to first commit');
+  });
+
+  test('protected paths survive rewind', () => {
+    const result = runGsdTools('git rewind --ref HEAD~1 --confirm', tmpDir);
+    assert.ok(result.success, 'Command should succeed');
+    const data = JSON.parse(result.output);
+    assert.strictEqual(data.rewound, true, 'Should report rewound');
+    // .planning/STATE.md should retain second-commit content
+    const stateContent = fs.readFileSync(path.join(tmpDir, '.planning', 'STATE.md'), 'utf-8');
+    assert.ok(stateContent.includes('v2'), '.planning/STATE.md should retain second-commit content');
+  });
+
+  test('protected root configs survive rewind', () => {
+    // Add package.json in both commits
+    fs.writeFileSync(path.join(tmpDir, 'package.json'), '{"version":"2.0"}');
+    execSync('git add . && git commit -m "feat: add package.json v2"', { cwd: tmpDir, stdio: 'pipe' });
+    // Go back and create package.json in first version
+    const firstCommit = execSync('git rev-list --max-parents=0 HEAD', { cwd: tmpDir, encoding: 'utf-8' }).trim();
+    // Rewind to commit before package.json was added (HEAD~1, which had v2 package.json)
+    // Actually, let's set up properly: HEAD~2 is the init commit with no package.json,
+    // HEAD~1 has the modifications, HEAD has package.json. Rewind to HEAD~1.
+    const result = runGsdTools('git rewind --ref HEAD~1 --confirm', tmpDir);
+    assert.ok(result.success, 'Command should succeed');
+    // package.json should still exist (protected)
+    assert.ok(fs.existsSync(path.join(tmpDir, 'package.json')), 'package.json should survive rewind');
+  });
+
+  test('auto-stash on dirty tree', () => {
+    // Make uncommitted change
+    fs.writeFileSync(path.join(tmpDir, 'src', 'dirty.js'), 'uncommitted\n');
+    const result = runGsdTools('git rewind --ref HEAD~1 --confirm', tmpDir);
+    assert.ok(result.success, 'Command should succeed');
+    const data = JSON.parse(result.output);
+    assert.strictEqual(data.stash_used, true, 'Should use auto-stash');
+    assert.strictEqual(data.rewound, true, 'Should complete rewind');
+  });
+
+  test('invalid ref returns error', () => {
+    const result = runGsdTools('git rewind --ref nonexistent-ref-xyz', tmpDir);
+    assert.ok(result.success, 'Command should return JSON (not crash)');
+    const data = JSON.parse(result.output);
+    assert.ok(data.error, 'Should have error');
+    assert.ok(data.error.includes('Invalid ref'), 'Error should mention invalid ref');
+  });
+
+  test('rewind to HEAD returns no changes', () => {
+    const result = runGsdTools('git rewind --ref HEAD --dry-run', tmpDir);
+    assert.ok(result.success, 'Command should succeed');
+    const data = JSON.parse(result.output);
+    assert.strictEqual(data.files_affected, 0, 'No files should be affected');
+  });
+});
+
+// ─── git trajectory-branch ──────────────────────────────────────────────────
+
+describe('git trajectory-branch', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+    fs.writeFileSync(path.join(tmpDir, '.gitkeep'), '');
+    execSync('git init && git config user.email "test@test.com" && git config user.name "Test" && git add . && git commit -m "init"', { cwd: tmpDir, stdio: 'pipe' });
+  });
+
+  afterEach(() => { cleanup(tmpDir); });
+
+  test('creates branch with correct name', () => {
+    const result = runGsdTools('git trajectory-branch --phase 45 --slug test', tmpDir);
+    assert.ok(result.success, 'Command should succeed');
+    const data = JSON.parse(result.output);
+    assert.strictEqual(data.created, true, 'Should create branch');
+    assert.strictEqual(data.branch, 'gsd/trajectory/45-test', 'Branch name should match pattern');
+    assert.strictEqual(data.pushed, false, 'Should not push by default');
+    // Verify branch exists
+    const branches = execSync('git branch', { cwd: tmpDir, encoding: 'utf-8' });
+    assert.ok(branches.includes('gsd/trajectory/45-test'), 'Branch should exist in git');
+  });
+
+  test('existing branch returns exists', () => {
+    // Create branch first
+    runGsdTools('git trajectory-branch --phase 45 --slug dup', tmpDir);
+    // Switch back to main
+    execSync('git checkout main 2>/dev/null || git checkout master', { cwd: tmpDir, stdio: 'pipe' });
+    // Try again
+    const result = runGsdTools('git trajectory-branch --phase 45 --slug dup', tmpDir);
+    assert.ok(result.success, 'Command should succeed');
+    const data = JSON.parse(result.output);
+    assert.strictEqual(data.exists, true, 'Should report branch exists');
+    assert.strictEqual(data.branch, 'gsd/trajectory/45-dup', 'Should report correct branch name');
+  });
+
+  test('branch is local-only by default', () => {
+    const result = runGsdTools('git trajectory-branch --phase 45 --slug local', tmpDir);
+    assert.ok(result.success, 'Command should succeed');
+    const data = JSON.parse(result.output);
+    assert.strictEqual(data.pushed, false, 'Should not push');
+    // Verify no remote tracking
+    const trackResult = execSync('git config --get branch.gsd/trajectory/45-local.remote 2>&1 || echo "no-remote"', { cwd: tmpDir, encoding: 'utf-8' }).trim();
+    assert.ok(trackResult.includes('no-remote') || trackResult === '', 'Should have no remote tracking');
+  });
+});
+
 // ─── pre-commit checks ──────────────────────────────────────────────────────
 
 describe('pre-commit checks', () => {
