@@ -15,14 +15,15 @@ Complete history of every bGSD milestone, what was delivered, and the metrics.
 | v4.0 | Environment & Execution Intelligence | 5 | 13 | 1 day | 502 | 549KB |
 | v5.0 | Codebase Intelligence | 7 | 14 | 2 days | 572 | 672KB |
 | v6.0 | UX & Developer Experience | 7 | 11 | 1 day | 574 | 681KB |
-| v7.0 | Agent Orchestration & Efficiency | 8 | 16 | 1 day | 669 | 1000KB |
-| **Total** | | **44** | **101** | **~10 days** | | |
+| v7.0 | Agent Orchestration & Efficiency | 8 | 15 | 2 days | 669 | 1000KB |
+| v7.1 | Trajectory Engineering | 2+ | 4+ | In progress | 716 | 1050KB |
+| **Total** | | **46+** | **104+** | **~10 days** | | |
 
 ---
 
 ## v7.0 Agent Orchestration & Efficiency
 
-**Shipped:** 2026-02-27 | **Phases:** 37-44 | **Plans:** 16
+**Shipped:** 2026-02-27 | **Phases:** 37-44 | **Plans:** 15
 
 **Goal:** Make bGSD the definitive agent orchestrator for building large software — add missing agent roles, improve orchestration intelligence, optimize performance, and reduce context load.
 
@@ -62,6 +63,32 @@ Complete history of every bGSD milestone, what was delivered, and the metrics.
 - **All tests passing** — 669 tests with zero regressions
 
 **Requirements:** 29 total, all mapped to phases. See `.planning/REQUIREMENTS.md`.
+
+---
+
+## v7.1 Trajectory Engineering (In Progress)
+
+**Started:** 2026-02-28 | **Phases:** 45-50 | **Plans:** 4+ completed
+
+**Goal:** Add trajectory engineering capabilities — named checkpoints with auto-metrics, selective code rewind, and decision journaling for safe experimentation.
+
+**What has been delivered so far:**
+
+### Foundation (Phase 45)
+- **Trajectory store** — New memory store type (`trajectories`) with auto-generated 6-char hex IDs and collision detection
+- **Checkpoint command** — `gsd-tools trajectory checkpoint <name>` creates named git branch at `trajectory/<scope>/<name>/attempt-N` with automatic metrics collection (test count, LOC delta, cyclomatic complexity)
+- **Selective rewind** — `gsd-tools git rewind --ref <ref>` reverts code to a checkpoint while protecting `.planning/` directory, root configs (package.json, tsconfig.json, etc.), and auto-stashes dirty working tree. Denylist approach for protected paths.
+- **Trajectory branch creation** — `gsd-tools git trajectory-branch --phase N --slug name` creates branches in `gsd/trajectory/` namespace
+
+### Checkpoint & Metrics (Phase 46)
+- **Snapshot metrics collection** — Fault-tolerant collection of test count, LOC delta, and cyclomatic complexity at checkpoint time. Partial metrics if any collector fails.
+- **Branch ref-only creation** — Uses `git branch` (not checkout) to preserve working tree during checkpoint
+- **Trajectory list command** — `gsd-tools trajectory list` with scope/name filtering, limit control, and dual-mode output (JSON for agents, formatted for humans). Sorted newest-first.
+- **Dirty tree exclusion** — Excludes `.planning/` from dirty working tree checks for consecutive checkpoints
+
+### Upcoming
+- Phase 47: Pivot — Selective Checkout & Branch Switching
+- Phases 48-50: Remaining trajectory engineering features
 
 ---
 
@@ -177,9 +204,10 @@ Complete history of every bGSD milestone, what was delivered, and the metrics.
 2026-02-25  v3.0 shipped, v4.0 shipped (same day)
 2026-02-26  v5.0 shipped
 2026-02-27  v6.0 shipped, v7.0 shipped (same day)
+2026-02-28  v7.1 started (Trajectory Engineering)
 ```
 
-Total: 7 milestones, 44 phases, 101 plans, ~21 hours execution time across ~10 days.
+Total: 7 milestones shipped + v7.1 in progress, 46+ phases, 104+ plans, ~25 hours execution time across ~10 days.
 
 ---
 
