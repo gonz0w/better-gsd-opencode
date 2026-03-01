@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-02-28)
 
 **Core value:** Manage and deliver high-quality software with high-quality documentation, while continuously reducing token usage and improving performance
-**Current focus:** v7.1 Trajectory Engineering — Phase 46 Checkpoint Snapshot & Metrics Collection
+**Current focus:** v7.1 Trajectory Engineering — Phase 47 Pivot — Selective Rewind & Attempt Archival
 
 ## Current Position
 
-Phase: 46 of 50 (Checkpoint — Snapshot & Metrics Collection)
-Plan: 2 of 2
-Status: Phase 46 complete
-Last activity: 2026-02-28 - Completed quick task 2: Update docs and README.md for all new undocumented features, include user guides
+Phase: 47 of 50 (Pivot — Selective Rewind & Attempt Archival)
+Plan: 1 of 2
+Status: In progress
+Last activity: 2026-03-01 - Completed 47-01-PLAN.md: Pivot command with reason capture, auto-checkpoint, and selective rewind
 
-Progress: [████████████████████░░░░░░░░░░] 100/100 plans complete (v1.0-v7.0) | v7.1: 4/4 plans (Phase 46 complete)
+Progress: [████████████████████░░░░░░░░░░] 100/100 plans complete (v1.0-v7.0) | v7.1: 5/6 plans (Phase 47 in progress)
 
 ## Performance Metrics
 
@@ -43,6 +43,7 @@ Progress: [████████████████████░░░
 | 45 | 01 | 20 min | 2 | 4 |
 | 46 | 01 | 10 min | 2 | 5 |
 | 46 | 02 | 9 min | 2 | 5 |
+| 47 | 01 | 7 min | 2 | 4 |
 
 ## Accumulated Context
 
@@ -59,6 +60,9 @@ All v1.0-v7.0 decisions recorded in PROJECT.md Key Decisions table with outcomes
 - [Phase 46]: Branch ref-only creation (git branch, not checkout) to preserve working tree
 - [Phase 46]: Used output(result, { formatter }) pattern for trajectory list dual-mode output
 - [Phase 46]: Trajectory list sorted newest-first by default for relevance
+- [Phase 47]: Reason capture via --reason flag (not interactive prompts) since gsd-tools runs via execFileSync
+- [Phase 47]: Abandoned branches use archived/trajectory/<scope>/<name>/attempt-N namespace
+- [Phase 47]: Reuse selectiveRewind() from lib/git for code rewind — no reimplementation
 
 ### Pending Todos
 
@@ -78,7 +82,7 @@ None — milestone starting fresh.
 
 ## Session Continuity
 
-Last session: 2026-02-28
-Stopped at: Completed quick task 2 — documentation update (README.md, docs/commands.md, docs/milestones.md)
+Last session: 2026-03-01
+Stopped at: Completed 47-01-PLAN.md — pivot command implementation
 Resume file: None
-Next step: Phase 46 complete — proceed to Phase 47 (Pivot: Selective Checkout & Branch Switching)
+Next step: Continue with 47-02-PLAN.md (Stuck-detector integration and comprehensive pivot tests)

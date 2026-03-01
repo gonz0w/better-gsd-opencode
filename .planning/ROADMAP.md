@@ -170,7 +170,7 @@ Plans:
   3. Pivot requires a structured reason (what failed, why, what signals) and the reason is persisted in the journal as an "abandoned" entry
   4. Current work is auto-checkpointed as an "abandoned" attempt before rewind — no work is ever lost silently
   5. Stuck-detector integration: when stuck detection fires (3 failures), it suggests pivoting to the last checkpoint
-**Plans**: 2 plans
+**Plans**: 1/2 plans executed
 Plans:
 - [ ] 47-01-PLAN.md — Pivot command with reason capture, auto-checkpoint, and selective rewind
 - [ ] 47-02-PLAN.md — Stuck-detector integration and comprehensive pivot tests
@@ -222,7 +222,7 @@ Plans:
 | 37-44 | v7.0 | 15/15 | Complete | 2026-02-27 |
 | 45. Foundation | 2/2 | Complete    | 2026-02-28 | - |
 | 46. Checkpoint | 2/2 | Complete    | 2026-02-28 | - |
-| 47. Pivot | v7.1 | 0/TBD | Not started | - |
+| 47. Pivot | 1/2 | In Progress|  | - |
 | 48. Compare | v7.1 | 0/TBD | Not started | - |
 | 49. Choose | v7.1 | 0/TBD | Not started | - |
 | 50. Integration | v7.1 | 0/TBD | Not started | - |
