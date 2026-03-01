@@ -184,7 +184,10 @@ Plans:
   2. Compare shows LOC delta (lines added/removed) and cyclomatic complexity per attempt
   3. Compare produces an aggregated matrix identifying the best attempt per metric (most tests passing, lowest complexity, smallest LOC delta)
   4. TTY output renders as a color-coded table (green=best, red=worst per metric) with automatic JSON fallback when piped
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+- [ ] 48-01-PLAN.md — Compare command implementation with color-coded TTY output
+- [ ] 48-02-PLAN.md — Comprehensive compare test suite validating all COMP requirements
 
 ### Phase 49: Choose — Merge Winner & Cleanup
 **Goal**: Users can select the winning approach, merge it back, and have all exploration artifacts cleanly archived
@@ -223,6 +226,6 @@ Plans:
 | 45. Foundation | 2/2 | Complete    | 2026-02-28 | - |
 | 46. Checkpoint | 2/2 | Complete    | 2026-02-28 | - |
 | 47. Pivot | 2/2 | Complete    | 2026-03-01 | - |
-| 48. Compare | v7.1 | 0/TBD | Not started | - |
+| 48. Compare | v7.1 | 0/2 | Not started | - |
 | 49. Choose | v7.1 | 0/TBD | Not started | - |
 | 50. Integration | v7.1 | 0/TBD | Not started | - |
