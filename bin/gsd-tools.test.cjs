@@ -16786,6 +16786,454 @@ describe('trajectory pivot', () => {
   });
 });
 
+// ─── Trajectory Compare Tests (COMP-01 through COMP-05) ─────────────────────
+
+describe('trajectory compare', () => {
+  let tmpDir;
+
+  function initGitForCompare(dir) {
+    fs.mkdirSync(path.join(dir, '.planning', 'memory'), { recursive: true });
+    fs.writeFileSync(path.join(dir, 'dummy.txt'), 'hello');
+    execSync(
+      'git init && git config user.email "test@test.com" && git config user.name "Test" && git add . && git commit -m "init"',
+      { cwd: dir, stdio: 'pipe' }
+    );
+  }
+
+  function writeTrajectoryEntries(dir, entries) {
+    const memDir = path.join(dir, '.planning', 'memory');
+    fs.mkdirSync(memDir, { recursive: true });
+    fs.writeFileSync(path.join(memDir, 'trajectory.json'), JSON.stringify(entries, null, 2), 'utf-8');
+  }
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('COMP-01: compare shows test results across attempts', () => {
+    initGitForCompare(tmpDir);
+    writeTrajectoryEntries(tmpDir, [
+      {
+        id: 'tj-001', category: 'checkpoint', checkpoint_name: 'my-feat',
+        scope: 'phase', attempt: 1,
+        branch: 'trajectory/phase/my-feat/attempt-1',
+        git_ref: 'abc1234',
+        timestamp: '2026-03-01T01:00:00Z',
+        metrics: {
+          tests: { total: 100, pass: 95, fail: 5 },
+          loc_delta: { insertions: 50, deletions: 10, files_changed: 4 },
+          complexity: { total: 15, files_analyzed: 3 }
+        },
+        tags: ['checkpoint']
+      },
+      {
+        id: 'tj-002', category: 'checkpoint', checkpoint_name: 'my-feat',
+        scope: 'phase', attempt: 2,
+        branch: 'trajectory/phase/my-feat/attempt-2',
+        git_ref: 'def5678',
+        timestamp: '2026-03-01T02:00:00Z',
+        metrics: {
+          tests: { total: 100, pass: 100, fail: 0 },
+          loc_delta: { insertions: 40, deletions: 8, files_changed: 3 },
+          complexity: { total: 12, files_analyzed: 3 }
+        },
+        tags: ['checkpoint']
+      }
+    ]);
+
+    const result = runGsdTools('trajectory compare my-feat', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.attempt_count, 2);
+    assert.strictEqual(output.attempts[0].tests_pass, 95);
+    assert.strictEqual(output.attempts[1].tests_pass, 100);
+    assert.strictEqual(output.attempts[0].tests_fail, 5);
+    assert.strictEqual(output.attempts[1].tests_fail, 0);
+  });
+
+  test('COMP-02: compare shows LOC delta across attempts', () => {
+    initGitForCompare(tmpDir);
+    writeTrajectoryEntries(tmpDir, [
+      {
+        id: 'tj-001', category: 'checkpoint', checkpoint_name: 'loc-test',
+        scope: 'phase', attempt: 1,
+        branch: 'trajectory/phase/loc-test/attempt-1',
+        git_ref: 'abc1234',
+        timestamp: '2026-03-01T01:00:00Z',
+        metrics: {
+          tests: { total: 50, pass: 50, fail: 0 },
+          loc_delta: { insertions: 50, deletions: 10, files_changed: 4 },
+          complexity: { total: 10, files_analyzed: 2 }
+        },
+        tags: ['checkpoint']
+      },
+      {
+        id: 'tj-002', category: 'checkpoint', checkpoint_name: 'loc-test',
+        scope: 'phase', attempt: 2,
+        branch: 'trajectory/phase/loc-test/attempt-2',
+        git_ref: 'def5678',
+        timestamp: '2026-03-01T02:00:00Z',
+        metrics: {
+          tests: { total: 50, pass: 50, fail: 0 },
+          loc_delta: { insertions: 30, deletions: 5, files_changed: 2 },
+          complexity: { total: 8, files_analyzed: 2 }
+        },
+        tags: ['checkpoint']
+      }
+    ]);
+
+    const result = runGsdTools('trajectory compare loc-test', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.attempts[0].loc_insertions, 50);
+    assert.strictEqual(output.attempts[0].loc_deletions, 10);
+    assert.strictEqual(output.attempts[1].loc_insertions, 30);
+    assert.strictEqual(output.attempts[1].loc_deletions, 5);
+  });
+
+  test('COMP-03: compare shows complexity across attempts', () => {
+    initGitForCompare(tmpDir);
+    writeTrajectoryEntries(tmpDir, [
+      {
+        id: 'tj-001', category: 'checkpoint', checkpoint_name: 'cx-test',
+        scope: 'phase', attempt: 1,
+        branch: 'trajectory/phase/cx-test/attempt-1',
+        git_ref: 'abc1234',
+        timestamp: '2026-03-01T01:00:00Z',
+        metrics: {
+          tests: { total: 80, pass: 80, fail: 0 },
+          loc_delta: { insertions: 60, deletions: 20, files_changed: 5 },
+          complexity: { total: 15, files_analyzed: 3 }
+        },
+        tags: ['checkpoint']
+      },
+      {
+        id: 'tj-002', category: 'checkpoint', checkpoint_name: 'cx-test',
+        scope: 'phase', attempt: 2,
+        branch: 'trajectory/phase/cx-test/attempt-2',
+        git_ref: 'def5678',
+        timestamp: '2026-03-01T02:00:00Z',
+        metrics: {
+          tests: { total: 80, pass: 80, fail: 0 },
+          loc_delta: { insertions: 55, deletions: 18, files_changed: 4 },
+          complexity: { total: 12, files_analyzed: 3 }
+        },
+        tags: ['checkpoint']
+      }
+    ]);
+
+    const result = runGsdTools('trajectory compare cx-test', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.attempts[0].complexity, 15);
+    assert.strictEqual(output.attempts[1].complexity, 12);
+  });
+
+  test('COMP-04: best/worst identification per metric', () => {
+    initGitForCompare(tmpDir);
+    writeTrajectoryEntries(tmpDir, [
+      {
+        id: 'tj-001', category: 'checkpoint', checkpoint_name: 'bw-test',
+        scope: 'phase', attempt: 1,
+        branch: 'trajectory/phase/bw-test/attempt-1',
+        git_ref: 'abc1234',
+        timestamp: '2026-03-01T01:00:00Z',
+        metrics: {
+          tests: { total: 100, pass: 98, fail: 2 },
+          loc_delta: { insertions: 80, deletions: 20, files_changed: 6 },
+          complexity: { total: 25, files_analyzed: 5 }
+        },
+        tags: ['checkpoint']
+      },
+      {
+        id: 'tj-002', category: 'checkpoint', checkpoint_name: 'bw-test',
+        scope: 'phase', attempt: 2,
+        branch: 'trajectory/phase/bw-test/attempt-2',
+        git_ref: 'def5678',
+        timestamp: '2026-03-01T02:00:00Z',
+        metrics: {
+          tests: { total: 100, pass: 90, fail: 10 },
+          loc_delta: { insertions: 40, deletions: 8, files_changed: 3 },
+          complexity: { total: 10, files_analyzed: 4 }
+        },
+        tags: ['checkpoint']
+      }
+    ]);
+
+    const result = runGsdTools('trajectory compare bw-test', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+    const output = JSON.parse(result.output);
+
+    // tests_pass: higher is better — attempt 1 (idx 0) has 98, attempt 2 (idx 1) has 90
+    assert.strictEqual(output.best_per_metric.tests_pass, 0, 'Best tests_pass should be attempt 1 (index 0)');
+    assert.strictEqual(output.worst_per_metric.tests_pass, 1, 'Worst tests_pass should be attempt 2 (index 1)');
+
+    // complexity: lower is better — attempt 1 (idx 0) has 25, attempt 2 (idx 1) has 10
+    assert.strictEqual(output.best_per_metric.complexity, 1, 'Best complexity should be attempt 2 (index 1)');
+    assert.strictEqual(output.worst_per_metric.complexity, 0, 'Worst complexity should be attempt 1 (index 0)');
+
+    // loc_insertions: lower is better — attempt 1 (idx 0) has 80, attempt 2 (idx 1) has 40
+    assert.strictEqual(output.best_per_metric.loc_insertions, 1, 'Best loc_insertions should be attempt 2 (index 1)');
+    assert.strictEqual(output.worst_per_metric.loc_insertions, 0, 'Worst loc_insertions should be attempt 1 (index 0)');
+  });
+
+  test('COMP-05: JSON output schema validation', () => {
+    initGitForCompare(tmpDir);
+    writeTrajectoryEntries(tmpDir, [
+      {
+        id: 'tj-001', category: 'checkpoint', checkpoint_name: 'schema-test',
+        scope: 'phase', attempt: 1,
+        branch: 'trajectory/phase/schema-test/attempt-1',
+        git_ref: 'abc1234',
+        timestamp: '2026-03-01T01:00:00Z',
+        metrics: {
+          tests: { total: 100, pass: 95, fail: 5 },
+          loc_delta: { insertions: 50, deletions: 10, files_changed: 4 },
+          complexity: { total: 15, files_analyzed: 3 }
+        },
+        tags: ['checkpoint']
+      },
+      {
+        id: 'tj-002', category: 'checkpoint', checkpoint_name: 'schema-test',
+        scope: 'phase', attempt: 2,
+        branch: 'trajectory/phase/schema-test/attempt-2',
+        git_ref: 'def5678',
+        timestamp: '2026-03-01T02:00:00Z',
+        metrics: {
+          tests: { total: 100, pass: 100, fail: 0 },
+          loc_delta: { insertions: 40, deletions: 8, files_changed: 3 },
+          complexity: { total: 12, files_analyzed: 3 }
+        },
+        tags: ['checkpoint']
+      }
+    ]);
+
+    const result = runGsdTools('trajectory compare schema-test', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+    const output = JSON.parse(result.output);
+
+    // Top-level schema
+    assert.ok('checkpoint' in output, 'should have checkpoint field');
+    assert.ok('scope' in output, 'should have scope field');
+    assert.ok('attempt_count' in output, 'should have attempt_count field');
+    assert.ok(Array.isArray(output.attempts), 'attempts should be an array');
+    assert.ok(typeof output.best_per_metric === 'object', 'best_per_metric should be an object');
+    assert.ok(typeof output.worst_per_metric === 'object', 'worst_per_metric should be an object');
+
+    // Attempt entry schema
+    const attempt = output.attempts[0];
+    assert.ok('attempt' in attempt, 'attempt entry should have attempt');
+    assert.ok('branch' in attempt, 'attempt entry should have branch');
+    assert.ok('git_ref' in attempt, 'attempt entry should have git_ref');
+    assert.ok('timestamp' in attempt, 'attempt entry should have timestamp');
+    assert.ok('tests_pass' in attempt, 'attempt entry should have tests_pass');
+    assert.ok('tests_fail' in attempt, 'attempt entry should have tests_fail');
+    assert.ok('tests_total' in attempt, 'attempt entry should have tests_total');
+    assert.ok('loc_insertions' in attempt, 'attempt entry should have loc_insertions');
+    assert.ok('loc_deletions' in attempt, 'attempt entry should have loc_deletions');
+    assert.ok('complexity' in attempt, 'attempt entry should have complexity');
+  });
+
+  test('null metrics handled gracefully', () => {
+    initGitForCompare(tmpDir);
+    writeTrajectoryEntries(tmpDir, [
+      {
+        id: 'tj-001', category: 'checkpoint', checkpoint_name: 'null-test',
+        scope: 'phase', attempt: 1,
+        branch: 'trajectory/phase/null-test/attempt-1',
+        git_ref: 'abc1234',
+        timestamp: '2026-03-01T01:00:00Z',
+        metrics: {
+          tests: { total: 100, pass: 95, fail: 5 },
+          loc_delta: { insertions: 50, deletions: 10, files_changed: 4 },
+          complexity: { total: 15, files_analyzed: 3 }
+        },
+        tags: ['checkpoint']
+      },
+      {
+        id: 'tj-002', category: 'checkpoint', checkpoint_name: 'null-test',
+        scope: 'phase', attempt: 2,
+        branch: 'trajectory/phase/null-test/attempt-2',
+        git_ref: 'def5678',
+        timestamp: '2026-03-01T02:00:00Z',
+        metrics: null,
+        tags: ['checkpoint']
+      }
+    ]);
+
+    const result = runGsdTools('trajectory compare null-test', tmpDir);
+    assert.ok(result.success, `Command should not crash with null metrics: ${result.error}`);
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.attempt_count, 2);
+    assert.strictEqual(output.attempts[1].tests_pass, null);
+    assert.strictEqual(output.attempts[1].tests_fail, null);
+    assert.strictEqual(output.attempts[1].tests_total, null);
+    assert.strictEqual(output.attempts[1].loc_insertions, null);
+    assert.strictEqual(output.attempts[1].loc_deletions, null);
+    assert.strictEqual(output.attempts[1].complexity, null);
+  });
+
+  test('abandoned entries excluded from comparison', () => {
+    initGitForCompare(tmpDir);
+    writeTrajectoryEntries(tmpDir, [
+      {
+        id: 'tj-001', category: 'checkpoint', checkpoint_name: 'abandon-test',
+        scope: 'phase', attempt: 1,
+        branch: 'trajectory/phase/abandon-test/attempt-1',
+        git_ref: 'abc1234',
+        timestamp: '2026-03-01T01:00:00Z',
+        metrics: {
+          tests: { total: 50, pass: 45, fail: 5 },
+          loc_delta: { insertions: 30, deletions: 5, files_changed: 2 },
+          complexity: { total: 10, files_analyzed: 2 }
+        },
+        tags: ['checkpoint']
+      },
+      {
+        id: 'tj-002', category: 'checkpoint', checkpoint_name: 'abandon-test',
+        scope: 'phase', attempt: 2,
+        branch: 'archived/trajectory/phase/abandon-test/attempt-2',
+        git_ref: 'def5678',
+        timestamp: '2026-03-01T02:00:00Z',
+        metrics: null,
+        tags: ['checkpoint', 'abandoned']
+      },
+      {
+        id: 'tj-003', category: 'checkpoint', checkpoint_name: 'abandon-test',
+        scope: 'phase', attempt: 3,
+        branch: 'trajectory/phase/abandon-test/attempt-3',
+        git_ref: 'ghi9012',
+        timestamp: '2026-03-01T03:00:00Z',
+        metrics: {
+          tests: { total: 50, pass: 50, fail: 0 },
+          loc_delta: { insertions: 25, deletions: 3, files_changed: 2 },
+          complexity: { total: 8, files_analyzed: 2 }
+        },
+        tags: ['checkpoint']
+      }
+    ]);
+
+    const result = runGsdTools('trajectory compare abandon-test', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.attempt_count, 2, 'Should exclude abandoned entry');
+    // The two non-abandoned entries should be attempts 1 and 3
+    assert.strictEqual(output.attempts[0].attempt, 1);
+    assert.strictEqual(output.attempts[1].attempt, 3);
+  });
+
+  test('single attempt shows data without best/worst', () => {
+    initGitForCompare(tmpDir);
+    writeTrajectoryEntries(tmpDir, [
+      {
+        id: 'tj-001', category: 'checkpoint', checkpoint_name: 'single-test',
+        scope: 'phase', attempt: 1,
+        branch: 'trajectory/phase/single-test/attempt-1',
+        git_ref: 'abc1234',
+        timestamp: '2026-03-01T01:00:00Z',
+        metrics: {
+          tests: { total: 100, pass: 100, fail: 0 },
+          loc_delta: { insertions: 50, deletions: 10, files_changed: 4 },
+          complexity: { total: 15, files_analyzed: 3 }
+        },
+        tags: ['checkpoint']
+      }
+    ]);
+
+    const result = runGsdTools('trajectory compare single-test', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.attempt_count, 1);
+    assert.deepStrictEqual(output.best_per_metric, {}, 'Single attempt should have empty best_per_metric');
+    assert.deepStrictEqual(output.worst_per_metric, {}, 'Single attempt should have empty worst_per_metric');
+  });
+
+  test('missing checkpoint name errors', () => {
+    initGitForCompare(tmpDir);
+    writeTrajectoryEntries(tmpDir, []);
+
+    const result = runGsdTools('trajectory compare', tmpDir);
+    assert.strictEqual(result.success, false, 'Should fail without checkpoint name');
+    assert.ok(result.error.includes('Missing') || result.error.includes('name'), 'Error should mention missing name');
+  });
+
+  test('non-existent checkpoint name errors', () => {
+    initGitForCompare(tmpDir);
+    writeTrajectoryEntries(tmpDir, [
+      {
+        id: 'tj-001', category: 'checkpoint', checkpoint_name: 'exists',
+        scope: 'phase', attempt: 1,
+        branch: 'trajectory/phase/exists/attempt-1',
+        git_ref: 'abc1234',
+        timestamp: '2026-03-01T01:00:00Z',
+        metrics: { tests: { total: 10, pass: 10, fail: 0 }, loc_delta: null, complexity: null },
+        tags: ['checkpoint']
+      }
+    ]);
+
+    const result = runGsdTools('trajectory compare nonexistent', tmpDir);
+    assert.strictEqual(result.success, false, 'Should fail with non-existent checkpoint name');
+    assert.ok(result.error.includes('not found') || result.error.includes('nonexistent'), 'Error should mention not found');
+  });
+
+  test('scope filtering works', () => {
+    initGitForCompare(tmpDir);
+    writeTrajectoryEntries(tmpDir, [
+      {
+        id: 'tj-001', category: 'checkpoint', checkpoint_name: 'scope-test',
+        scope: 'phase', attempt: 1,
+        branch: 'trajectory/phase/scope-test/attempt-1',
+        git_ref: 'abc1234',
+        timestamp: '2026-03-01T01:00:00Z',
+        metrics: {
+          tests: { total: 100, pass: 100, fail: 0 },
+          loc_delta: { insertions: 50, deletions: 10, files_changed: 4 },
+          complexity: { total: 15, files_analyzed: 3 }
+        },
+        tags: ['checkpoint']
+      },
+      {
+        id: 'tj-002', category: 'checkpoint', checkpoint_name: 'scope-test',
+        scope: 'task', attempt: 1,
+        branch: 'trajectory/task/scope-test/attempt-1',
+        git_ref: 'def5678',
+        timestamp: '2026-03-01T02:00:00Z',
+        metrics: {
+          tests: { total: 50, pass: 48, fail: 2 },
+          loc_delta: { insertions: 20, deletions: 3, files_changed: 1 },
+          complexity: { total: 5, files_analyzed: 1 }
+        },
+        tags: ['checkpoint']
+      },
+      {
+        id: 'tj-003', category: 'checkpoint', checkpoint_name: 'scope-test',
+        scope: 'task', attempt: 2,
+        branch: 'trajectory/task/scope-test/attempt-2',
+        git_ref: 'ghi9012',
+        timestamp: '2026-03-01T03:00:00Z',
+        metrics: {
+          tests: { total: 50, pass: 50, fail: 0 },
+          loc_delta: { insertions: 18, deletions: 2, files_changed: 1 },
+          complexity: { total: 4, files_analyzed: 1 }
+        },
+        tags: ['checkpoint']
+      }
+    ]);
+
+    const result = runGsdTools('trajectory compare scope-test --scope task', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.attempt_count, 2, 'Should only return task-scoped entries');
+    assert.strictEqual(output.scope, 'task');
+    assert.strictEqual(output.attempts[0].tests_pass, 48);
+    assert.strictEqual(output.attempts[1].tests_pass, 50);
+  });
+});
+
 // ─── Stuck-Detector Trajectory Suggestion Tests (PIVOT-04) ───────────────────
 
 describe('stuck-detector trajectory suggestion (PIVOT-04)', () => {
