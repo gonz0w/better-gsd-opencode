@@ -974,6 +974,8 @@ Subcommands:
     --scope <scope>       Filter by scope
     --name <name>         Filter by checkpoint name
     --limit <N>           Limit results
+  compare <name>     Compare metrics across all attempts for a checkpoint
+    --scope <scope>       Scope level (default: phase)
   pivot <checkpoint>   Abandon current approach, rewind to checkpoint
     --scope <scope>       Scope level (default: phase)
     --reason <text>       Why this approach is being abandoned (required)
@@ -989,7 +991,25 @@ Examples:
   gsd-tools trajectory checkpoint try-redis --scope task --description "Redis caching approach"
   gsd-tools trajectory list
   gsd-tools trajectory list --scope phase --limit 5
+  gsd-tools trajectory compare my-feat
   gsd-tools trajectory pivot explore-auth --reason "JWT approach too complex"`,
+      "trajectory compare": `Usage: gsd-tools trajectory compare <name> [--scope <scope>]
+
+Compare metrics across all attempts for a named checkpoint.
+Shows test results, LOC delta, and cyclomatic complexity side-by-side.
+Best values highlighted green, worst highlighted red.
+
+Arguments:
+  name              Checkpoint name to compare attempts for
+
+Options:
+  --scope <scope>   Scope level (default: phase)
+
+Output: { checkpoint, scope, attempt_count, attempts, best_per_metric, worst_per_metric }
+
+Examples:
+  gsd-tools trajectory compare my-feat
+  gsd-tools trajectory compare try-redis --scope task`,
       "trajectory pivot": `Usage: gsd-tools trajectory pivot <checkpoint> --reason "what failed and why"
 
 Abandon current approach with recorded reasoning and rewind to checkpoint.
@@ -25766,8 +25786,11 @@ Available: execute-phase, plan-phase, new-project, new-milestone, quick, resume,
             case "pivot":
               lazyTrajectory().cmdTrajectoryPivot(cwd, args.slice(1), raw);
               break;
+            case "compare":
+              lazyTrajectory().cmdTrajectoryCompare(cwd, args.slice(1), raw);
+              break;
             default:
-              error("Unknown trajectory subcommand: " + trajSub + ". Available: checkpoint, list, pivot");
+              error("Unknown trajectory subcommand: " + trajSub + ". Available: checkpoint, list, pivot, compare");
           }
           break;
         }
