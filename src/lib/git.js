@@ -329,6 +329,14 @@ function selectiveRewind(cwd, opts = {}) {
   const sr = execGit(cwd, ['status', '--porcelain']);
   if (sr.exitCode === 0 && sr.stdout && execGit(cwd, ['stash', 'push', '-m', 'gsd-rewind-auto-stash']).exitCode === 0) stashed = true;
 
+  // Separate files to checkout (exist at ref) from files to delete (don't exist at ref, status D)
+  const toCheckout = [], toDelete = [];
+  for (const c of changes) {
+    if (isProtectedPath(c.file)) continue;
+    if (c.status === 'D') toDelete.push(c.file);
+    else toCheckout.push(c.file);
+  }
+
   let err = null;
   try {
     if (nonProt.length > 50) {
@@ -341,8 +349,18 @@ function selectiveRewind(cwd, opts = {}) {
         if (ls.exitCode === 0 && ls.stdout) for (const f of ls.stdout.split('\n').filter(Boolean)) if (/^tsconfig\..*\.json$/.test(f) || /^\.env\./.test(f)) execGit(cwd, ['checkout', 'HEAD', '--', f]);
       }
     } else {
-      const r = execGit(cwd, ['checkout', ref, '--', ...nonProt]);
-      if (r.exitCode !== 0) err = r.stderr || 'checkout failed';
+      // Checkout files that exist at ref
+      if (toCheckout.length > 0) {
+        const r = execGit(cwd, ['checkout', ref, '--', ...toCheckout]);
+        if (r.exitCode !== 0) err = r.stderr || 'checkout failed';
+      }
+      // Remove files that don't exist at ref (added after checkpoint)
+      if (!err) {
+        for (const f of toDelete) {
+          const fp = require('path').join(cwd, f);
+          try { require('fs').unlinkSync(fp); } catch (e) { /* already gone */ }
+        }
+      }
     }
   } catch (e) { err = e.message; }
   if (stashed) execGit(cwd, ['stash', 'pop']);

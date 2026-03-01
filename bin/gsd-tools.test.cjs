@@ -16578,3 +16578,252 @@ describe('trajectory list', () => {
     assert.strictEqual(output.checkpoints[0].checkpoint_name, 'cp-one');
   });
 });
+
+// ─── Trajectory Pivot Tests ──────────────────────────────────────────────────
+
+describe('trajectory pivot', () => {
+  let tmpDir;
+
+  function initGitForPivot(dir) {
+    fs.mkdirSync(path.join(dir, '.planning', 'memory'), { recursive: true });
+    fs.writeFileSync(path.join(dir, 'dummy.txt'), 'hello');
+    execSync(
+      'git init && git config user.email "test@test.com" && git config user.name "Test" && git add . && git commit -m "init"',
+      { cwd: dir, stdio: 'pipe' }
+    );
+  }
+
+  function setupCheckpoint(dir, name, scope, attempt) {
+    scope = scope || 'phase';
+    attempt = attempt || 1;
+    const headSha = execSync('git rev-parse HEAD', { cwd: dir, encoding: 'utf-8' }).trim();
+    const branchName = `trajectory/${scope}/${name}/attempt-${attempt}`;
+    execSync(`git branch "${branchName}"`, { cwd: dir, stdio: 'pipe' });
+
+    const trajPath = path.join(dir, '.planning', 'memory', 'trajectory.json');
+    let entries = [];
+    try { entries = JSON.parse(fs.readFileSync(trajPath, 'utf-8')); } catch (e) { entries = []; }
+
+    entries.push({
+      id: `tj-${String(entries.length + 1).padStart(6, '0')}`,
+      timestamp: new Date().toISOString(),
+      category: 'checkpoint',
+      text: `Checkpoint: ${name} (attempt ${attempt})`,
+      scope,
+      checkpoint_name: name,
+      attempt,
+      branch: branchName,
+      git_ref: headSha,
+      description: null,
+      metrics: null,
+      tags: ['checkpoint'],
+    });
+
+    fs.writeFileSync(trajPath, JSON.stringify(entries, null, 2), 'utf-8');
+    return headSha;
+  }
+
+  function addPostCheckpointCommit(dir, filename) {
+    filename = filename || 'src/new-feature.js';
+    const dirPart = path.dirname(filename);
+    if (dirPart !== '.') fs.mkdirSync(path.join(dir, dirPart), { recursive: true });
+    fs.writeFileSync(path.join(dir, filename), 'console.log("new feature");');
+    execSync(`git add "${filename}" && git commit -m "post-checkpoint work"`, { cwd: dir, stdio: 'pipe' });
+  }
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('pivot rewrites to checkpoint state (PIVOT-01)', () => {
+    initGitForPivot(tmpDir);
+    setupCheckpoint(tmpDir, 'my-checkpoint', 'phase', 1);
+    addPostCheckpointCommit(tmpDir, 'src/new-feature.js');
+
+    // Verify file exists before pivot
+    assert.ok(fs.existsSync(path.join(tmpDir, 'src/new-feature.js')), 'File should exist before pivot');
+
+    const result = runGsdTools('trajectory pivot my-checkpoint --reason "approach failed"', tmpDir);
+    assert.ok(result.success, `Pivot failed: ${result.error}`);
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.pivoted, true);
+    assert.strictEqual(output.checkpoint, 'my-checkpoint');
+    assert.ok(output.abandoned_branch.startsWith('archived/trajectory/'), 'Abandoned branch should start with archived/trajectory/');
+
+    // File should be gone after rewind
+    assert.ok(!fs.existsSync(path.join(tmpDir, 'src/new-feature.js')), 'src/new-feature.js should not exist after rewind');
+
+    // .planning/ should survive rewind
+    assert.ok(fs.existsSync(path.join(tmpDir, '.planning', 'memory', 'trajectory.json')), 'trajectory.json should still exist');
+  });
+
+  test('pivot refuses on dirty working tree (PIVOT-01 prerequisite)', () => {
+    initGitForPivot(tmpDir);
+    setupCheckpoint(tmpDir, 'my-checkpoint', 'phase', 1);
+    // Create uncommitted file
+    fs.writeFileSync(path.join(tmpDir, 'src-dirty.js'), 'dirty');
+
+    const result = runGsdTools('trajectory pivot my-checkpoint --reason "test"', tmpDir);
+    assert.strictEqual(result.success, false, 'Should fail with dirty working tree');
+    assert.ok(result.error.includes('Uncommitted') || result.error.includes('stash'), 'Error should mention dirty tree');
+  });
+
+  test('pivot with --stash on dirty tree succeeds', () => {
+    initGitForPivot(tmpDir);
+    setupCheckpoint(tmpDir, 'my-checkpoint', 'phase', 1);
+    addPostCheckpointCommit(tmpDir, 'src/post.js');
+    // Create dirty file
+    fs.writeFileSync(path.join(tmpDir, 'src-dirty.js'), 'dirty');
+
+    const result = runGsdTools('trajectory pivot my-checkpoint --reason "test" --stash', tmpDir);
+    assert.ok(result.success, `Pivot with --stash failed: ${result.error}`);
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.pivoted, true);
+    assert.strictEqual(output.stash_used, true);
+  });
+
+  test('pivot requires --reason flag', () => {
+    initGitForPivot(tmpDir);
+    setupCheckpoint(tmpDir, 'my-checkpoint', 'phase', 1);
+
+    const result = runGsdTools('trajectory pivot my-checkpoint', tmpDir);
+    assert.strictEqual(result.success, false, 'Should fail without --reason');
+    assert.ok(result.error.includes('Reason') || result.error.includes('--reason'), 'Error should mention reason requirement');
+  });
+
+  test('pivot on nonexistent checkpoint shows error with available list', () => {
+    initGitForPivot(tmpDir);
+    setupCheckpoint(tmpDir, 'existing-cp', 'phase', 1);
+
+    const result = runGsdTools('trajectory pivot nonexistent --reason "test"', tmpDir);
+    assert.strictEqual(result.success, false, 'Should fail with nonexistent checkpoint');
+    assert.ok(result.error.includes('not found'), 'Error should mention not found');
+  });
+
+  test('auto-checkpoint creates abandoned journal entry (PIVOT-03)', () => {
+    initGitForPivot(tmpDir);
+    setupCheckpoint(tmpDir, 'my-checkpoint', 'phase', 1);
+    addPostCheckpointCommit(tmpDir, 'src/failed-approach.js');
+
+    const result = runGsdTools('trajectory pivot my-checkpoint --reason "JWT approach too complex"', tmpDir);
+    assert.ok(result.success, `Pivot failed: ${result.error}`);
+
+    // Read trajectory.json and find the abandoned entry
+    const trajPath = path.join(tmpDir, '.planning', 'memory', 'trajectory.json');
+    const entries = JSON.parse(fs.readFileSync(trajPath, 'utf-8'));
+    const abandoned = entries.find(e => e.tags && e.tags.includes('abandoned'));
+    assert.ok(abandoned, 'Should have an abandoned entry');
+    assert.ok(abandoned.tags.includes('checkpoint'), 'Abandoned entry should have checkpoint tag');
+    assert.ok(abandoned.tags.includes('abandoned'), 'Abandoned entry should have abandoned tag');
+    assert.ok(abandoned.reason.text.includes('JWT approach too complex'), 'Reason should contain the provided text');
+    assert.ok(abandoned.branch.startsWith('archived/trajectory/'), 'Abandoned branch should be in archived namespace');
+  });
+
+  test('archived branch is created for abandoned attempt', () => {
+    initGitForPivot(tmpDir);
+    setupCheckpoint(tmpDir, 'my-checkpoint', 'phase', 1);
+    addPostCheckpointCommit(tmpDir, 'src/to-archive.js');
+
+    const result = runGsdTools('trajectory pivot my-checkpoint --reason "archiving approach"', tmpDir);
+    assert.ok(result.success, `Pivot failed: ${result.error}`);
+
+    // Check git branches for archived branch
+    const brResult = execSync('git branch --list "archived/*"', { cwd: tmpDir, encoding: 'utf-8' });
+    assert.ok(brResult.includes('archived/'), 'Should have an archived branch');
+  });
+
+  test('pivot with --scope flag', () => {
+    initGitForPivot(tmpDir);
+    setupCheckpoint(tmpDir, 'my-checkpoint', 'task', 1);
+    addPostCheckpointCommit(tmpDir, 'src/scoped.js');
+
+    const result = runGsdTools('trajectory pivot my-checkpoint --scope task --reason "test"', tmpDir);
+    assert.ok(result.success, `Pivot with --scope failed: ${result.error}`);
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.pivoted, true);
+  });
+
+  test('pivot with --attempt flag picks specific attempt', () => {
+    initGitForPivot(tmpDir);
+    // Create attempt 1
+    const ref1 = setupCheckpoint(tmpDir, 'my-checkpoint', 'phase', 1);
+    // Commit trajectory.json and make a post-checkpoint commit
+    execSync('git add .planning && git commit -m "trajectory checkpoint 1"', { cwd: tmpDir, stdio: 'pipe' });
+    addPostCheckpointCommit(tmpDir, 'src/between.js');
+    // Create attempt 2
+    const ref2 = setupCheckpoint(tmpDir, 'my-checkpoint', 'phase', 2);
+    // Commit trajectory.json and make another post-checkpoint commit
+    execSync('git add .planning && git commit -m "trajectory checkpoint 2"', { cwd: tmpDir, stdio: 'pipe' });
+    addPostCheckpointCommit(tmpDir, 'src/latest.js');
+
+    const result = runGsdTools('trajectory pivot my-checkpoint --attempt 1 --reason "reverting to attempt 1"', tmpDir);
+    assert.ok(result.success, `Pivot with --attempt failed: ${result.error}`);
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.target_ref, ref1, 'Should target attempt 1 ref');
+  });
+
+  test('.planning/ directory preserved after pivot (PIVOT-01)', () => {
+    initGitForPivot(tmpDir);
+    setupCheckpoint(tmpDir, 'my-checkpoint', 'phase', 1);
+    // Commit trajectory.json so tree is clean for pivot
+    execSync('git add .planning && git commit -m "trajectory checkpoint"', { cwd: tmpDir, stdio: 'pipe' });
+    addPostCheckpointCommit(tmpDir, 'src/post-work.js');
+
+    // Create .planning file after checkpoint
+    fs.mkdirSync(path.join(tmpDir, '.planning', 'phases', '47-test'), { recursive: true });
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'phases', '47-test', 'test.md'), '# Test');
+    execSync('git add .planning && git commit -m "add planning file"', { cwd: tmpDir, stdio: 'pipe' });
+
+    const result = runGsdTools('trajectory pivot my-checkpoint --reason "test preservation"', tmpDir);
+    assert.ok(result.success, `Pivot failed: ${result.error}`);
+
+    // .planning file should survive rewind
+    assert.ok(fs.existsSync(path.join(tmpDir, '.planning', 'phases', '47-test', 'test.md')), '.planning/phases/47-test/test.md should be preserved after pivot');
+  });
+});
+
+// ─── Stuck-Detector Trajectory Suggestion Tests (PIVOT-04) ───────────────────
+
+describe('stuck-detector trajectory suggestion (PIVOT-04)', () => {
+  test('stuck-detector includes pivot suggestion in alternatives', () => {
+    const { createStuckDetector } = require('../src/lib/recovery/stuck-detector');
+    const detector = createStuckDetector();
+    const taskId = 'test-task-1';
+
+    // Record 3+ failed attempts for same task
+    detector.recordAttempt(taskId, { error: 'build failed: cannot find module X' });
+    detector.recordAttempt(taskId, { error: 'build failed: cannot find module X' });
+    detector.recordAttempt(taskId, { error: 'build failed: cannot find module X' });
+
+    const status = detector.getStatus(taskId);
+    assert.strictEqual(status.isStuck, true, 'Should be stuck after 3 identical failures');
+
+    // Verify alternatives include pivot suggestion
+    const history = detector.taskHistory.get(taskId);
+    const alternatives = detector._generateAlternatives(history);
+    const pivotSuggestion = alternatives.find(a => a.approach === 'Pivot to checkpoint');
+    assert.ok(pivotSuggestion, 'Should include "Pivot to checkpoint" in alternatives');
+    assert.ok(pivotSuggestion.description.includes('trajectory pivot'), 'Pivot suggestion should mention trajectory pivot command');
+  });
+
+  test('pivot suggestion appears even with generic errors', () => {
+    const { createStuckDetector } = require('../src/lib/recovery/stuck-detector');
+    const detector = createStuckDetector();
+    const taskId = 'test-task-2';
+
+    // Record 3 identical timeout errors
+    detector.recordAttempt(taskId, { error: 'timeout' });
+    detector.recordAttempt(taskId, { error: 'timeout' });
+    detector.recordAttempt(taskId, { error: 'timeout' });
+
+    const history = detector.taskHistory.get(taskId);
+    const alternatives = detector._generateAlternatives(history);
+    const pivotSuggestion = alternatives.find(a => a.approach === 'Pivot to checkpoint');
+    assert.ok(pivotSuggestion, 'Pivot suggestion should appear even for generic timeout errors');
+    assert.ok(pivotSuggestion.description.includes('checkpoint'), 'Should mention checkpoint in description');
+  });
+});

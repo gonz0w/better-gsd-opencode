@@ -2460,6 +2460,12 @@ var require_git = __commonJS({
       let stashed = false;
       const sr = execGit(cwd, ["status", "--porcelain"]);
       if (sr.exitCode === 0 && sr.stdout && execGit(cwd, ["stash", "push", "-m", "gsd-rewind-auto-stash"]).exitCode === 0) stashed = true;
+      const toCheckout = [], toDelete = [];
+      for (const c of changes) {
+        if (isProtectedPath(c.file)) continue;
+        if (c.status === "D") toDelete.push(c.file);
+        else toCheckout.push(c.file);
+      }
       let err = null;
       try {
         if (nonProt.length > 50) {
@@ -2474,8 +2480,19 @@ var require_git = __commonJS({
             }
           }
         } else {
-          const r = execGit(cwd, ["checkout", ref, "--", ...nonProt]);
-          if (r.exitCode !== 0) err = r.stderr || "checkout failed";
+          if (toCheckout.length > 0) {
+            const r = execGit(cwd, ["checkout", ref, "--", ...toCheckout]);
+            if (r.exitCode !== 0) err = r.stderr || "checkout failed";
+          }
+          if (!err) {
+            for (const f of toDelete) {
+              const fp = require("path").join(cwd, f);
+              try {
+                require("fs").unlinkSync(fp);
+              } catch (e) {
+              }
+            }
+          }
         }
       } catch (e) {
         err = e.message;
