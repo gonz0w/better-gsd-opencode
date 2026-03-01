@@ -24699,7 +24699,126 @@ var require_trajectory = __commonJS({
       lines.push(actionHint("trajectory list"));
       return lines.join("\n");
     }
-    module2.exports = { cmdTrajectoryCheckpoint, cmdTrajectoryList, cmdTrajectoryPivot };
+    function cmdTrajectoryCompare(cwd, args, raw) {
+      const posArgs = [];
+      let scope = "phase";
+      for (let i = 1; i < args.length; i++) {
+        if (args[i] === "--scope" && args[i + 1]) {
+          scope = args[++i];
+          continue;
+        }
+        if (!args[i].startsWith("-")) posArgs.push(args[i]);
+      }
+      const name = posArgs[0];
+      if (!name) error("Missing checkpoint name. Usage: trajectory compare <name> [--scope <scope>]");
+      const trajPath = path.join(cwd, ".planning", "memory", "trajectory.json");
+      let entries = [];
+      try {
+        const data = fs.readFileSync(trajPath, "utf-8");
+        entries = JSON.parse(data);
+        if (!Array.isArray(entries)) entries = [];
+      } catch (e) {
+        debugLog("trajectory.compare", "no trajectory.json found", e);
+        entries = [];
+      }
+      const attempts = entries.filter(
+        (e) => e.category === "checkpoint" && e.checkpoint_name === name && e.scope === scope && !(e.tags && e.tags.includes("abandoned"))
+      ).sort((a, b) => a.attempt - b.attempt);
+      if (attempts.length === 0) {
+        const allCheckpoints = entries.filter((e) => e.category === "checkpoint" && !(e.tags && e.tags.includes("abandoned")));
+        const byName = {};
+        for (const cp of allCheckpoints) {
+          const key = `${cp.checkpoint_name} (scope: ${cp.scope})`;
+          if (!byName[key]) byName[key] = [];
+          byName[key].push(cp.attempt);
+        }
+        const availableList = Object.keys(byName).length > 0 ? Object.entries(byName).map(([k, v]) => `  ${k} \u2014 attempt${v.length > 1 ? "s" : ""} ${v.join(", ")}`).join("\n") : "  (none)";
+        error('Checkpoint "' + name + '" not found (scope: ' + scope + ").\nAvailable checkpoints:\n" + availableList);
+      }
+      const metrics = attempts.map((a) => ({
+        attempt: a.attempt,
+        branch: a.branch,
+        git_ref: a.git_ref,
+        timestamp: a.timestamp,
+        tests_pass: a.metrics?.tests?.pass ?? null,
+        tests_fail: a.metrics?.tests?.fail ?? null,
+        tests_total: a.metrics?.tests?.total ?? null,
+        loc_insertions: a.metrics?.loc_delta?.insertions ?? null,
+        loc_deletions: a.metrics?.loc_delta?.deletions ?? null,
+        complexity: a.metrics?.complexity?.total ?? null
+      }));
+      const bestPerMetric = {};
+      const worstPerMetric = {};
+      const metricKeys = ["tests_pass", "tests_fail", "loc_insertions", "loc_deletions", "complexity"];
+      const direction = {
+        tests_pass: "higher",
+        tests_fail: "lower",
+        loc_insertions: "lower",
+        loc_deletions: "lower",
+        complexity: "lower"
+      };
+      for (const key of metricKeys) {
+        let bestIdx = -1, worstIdx = -1, bestVal = null, worstVal = null;
+        for (let i = 0; i < metrics.length; i++) {
+          const val = metrics[i][key];
+          if (val === null) continue;
+          if (bestVal === null || (direction[key] === "higher" ? val > bestVal : val < bestVal)) {
+            bestVal = val;
+            bestIdx = i;
+          }
+          if (worstVal === null || (direction[key] === "higher" ? val < worstVal : val > worstVal)) {
+            worstVal = val;
+            worstIdx = i;
+          }
+        }
+        if (bestIdx !== -1 && bestIdx !== worstIdx) {
+          bestPerMetric[key] = bestIdx;
+          worstPerMetric[key] = worstIdx;
+        }
+      }
+      const result = {
+        checkpoint: name,
+        scope,
+        attempt_count: metrics.length,
+        attempts: metrics,
+        best_per_metric: bestPerMetric,
+        worst_per_metric: worstPerMetric
+      };
+      output(result, { formatter: formatCompareResult });
+    }
+    function formatCompareResult(result) {
+      const lines = [];
+      lines.push(banner("TRAJECTORY COMPARE"));
+      lines.push("");
+      lines.push(`  Checkpoint: ${color.bold(result.checkpoint)} (scope: ${result.scope})`);
+      lines.push(`  Attempts: ${result.attempt_count}`);
+      lines.push("");
+      const headers = ["Attempt", "Tests Pass", "Tests Fail", "LOC +/-", "Complexity"];
+      const rows = result.attempts.map((a) => [
+        `#${a.attempt}`,
+        a.tests_pass !== null ? String(a.tests_pass) : "-",
+        a.tests_fail !== null ? String(a.tests_fail) : "-",
+        a.loc_insertions !== null ? `+${a.loc_insertions}/-${a.loc_deletions || 0}` : "-",
+        a.complexity !== null ? String(a.complexity) : "-"
+      ]);
+      const colToMetric = [null, "tests_pass", "tests_fail", "loc_insertions", "complexity"];
+      lines.push(formatTable(headers, rows, {
+        showAll: true,
+        colorFn: (value, colIdx, rowIdx) => {
+          if (colIdx === 0) return String(value != null ? value : "");
+          const metric = colToMetric[colIdx];
+          if (!metric) return String(value != null ? value : "");
+          if (result.best_per_metric[metric] === rowIdx) return color.green(String(value != null ? value : ""));
+          if (result.worst_per_metric[metric] === rowIdx) return color.red(String(value != null ? value : ""));
+          return String(value != null ? value : "");
+        }
+      }));
+      lines.push("");
+      lines.push(summaryLine("Best attempt per metric highlighted in green"));
+      lines.push(actionHint("trajectory choose <attempt-N>"));
+      return lines.join("\n");
+    }
+    module2.exports = { cmdTrajectoryCheckpoint, cmdTrajectoryList, cmdTrajectoryPivot, cmdTrajectoryCompare };
   }
 });
 
