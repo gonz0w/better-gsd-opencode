@@ -17234,6 +17234,401 @@ describe('trajectory compare', () => {
   });
 });
 
+// ─── Trajectory Choose Tests (CHOOSE-01 through CHOOSE-03) ──────────────────
+
+describe('trajectory choose', () => {
+  let tmpDir;
+
+  function initGitForChoose(dir) {
+    fs.mkdirSync(path.join(dir, '.planning', 'memory'), { recursive: true });
+    fs.writeFileSync(path.join(dir, 'dummy.txt'), 'hello');
+    execSync(
+      'git init && git config user.email "test@test.com" && git config user.name "Test" && git add . && git commit -m "init"',
+      { cwd: dir, stdio: 'pipe' }
+    );
+  }
+
+  function writeTrajectoryEntries(dir, entries) {
+    const memDir = path.join(dir, '.planning', 'memory');
+    fs.mkdirSync(memDir, { recursive: true });
+    fs.writeFileSync(path.join(memDir, 'trajectory.json'), JSON.stringify(entries, null, 2), 'utf-8');
+  }
+
+  function createBranchWithFile(dir, branchName, filename, content) {
+    // Create a branch, switch to it, commit a file, switch back
+    execSync(`git checkout -b "${branchName}"`, { cwd: dir, stdio: 'pipe' });
+    const dirPart = path.dirname(filename);
+    if (dirPart !== '.') fs.mkdirSync(path.join(dir, dirPart), { recursive: true });
+    fs.writeFileSync(path.join(dir, filename), content);
+    execSync(`git add "${filename}" && git commit -m "add ${filename} on ${branchName}"`, { cwd: dir, stdio: 'pipe' });
+    const sha = execSync('git rev-parse HEAD', { cwd: dir, encoding: 'utf-8' }).trim();
+    // Switch back to the original branch (main/master)
+    const defaultBranch = execSync('git rev-parse --abbrev-ref HEAD', { cwd: dir, encoding: 'utf-8' }).trim();
+    if (defaultBranch === branchName) {
+      // Determine the initial branch name
+      const branches = execSync('git branch', { cwd: dir, encoding: 'utf-8' }).trim().split('\n').map(b => b.trim().replace('* ', ''));
+      const mainBranch = branches.find(b => b === 'main' || b === 'master') || branches.find(b => b !== branchName);
+      if (mainBranch) execSync(`git checkout "${mainBranch}"`, { cwd: dir, stdio: 'pipe' });
+    }
+    return sha;
+  }
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('CHOOSE-01: basic choose merges winning attempt', () => {
+    initGitForChoose(tmpDir);
+
+    // Create 2 branches with unique files
+    const sha1 = createBranchWithFile(tmpDir, 'trajectory/phase/my-feat/attempt-1', 'feature-a.txt', 'attempt 1 code');
+    const sha2 = createBranchWithFile(tmpDir, 'trajectory/phase/my-feat/attempt-2', 'feature-b.txt', 'attempt 2 code');
+
+    writeTrajectoryEntries(tmpDir, [
+      {
+        id: 'tj-001', category: 'checkpoint', checkpoint_name: 'my-feat',
+        scope: 'phase', attempt: 1,
+        branch: 'trajectory/phase/my-feat/attempt-1',
+        git_ref: sha1,
+        timestamp: '2026-03-01T01:00:00Z',
+        metrics: { tests: { total: 50, pass: 50, fail: 0 }, loc_delta: null, complexity: null },
+        tags: ['checkpoint']
+      },
+      {
+        id: 'tj-002', category: 'checkpoint', checkpoint_name: 'my-feat',
+        scope: 'phase', attempt: 2,
+        branch: 'trajectory/phase/my-feat/attempt-2',
+        git_ref: sha2,
+        timestamp: '2026-03-01T02:00:00Z',
+        metrics: { tests: { total: 50, pass: 50, fail: 0 }, loc_delta: null, complexity: null },
+        tags: ['checkpoint']
+      }
+    ]);
+
+    const result = runGsdTools('trajectory choose my-feat --attempt 2', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.chosen, true);
+    assert.strictEqual(output.chosen_attempt, 2);
+    // Verify the winning branch's file exists in working tree after merge
+    assert.ok(fs.existsSync(path.join(tmpDir, 'feature-b.txt')), 'Winning attempt file should exist after merge');
+  });
+
+  test('CHOOSE-01: choose requires --attempt flag', () => {
+    initGitForChoose(tmpDir);
+
+    const sha1 = createBranchWithFile(tmpDir, 'trajectory/phase/req-test/attempt-1', 'req-a.txt', 'code');
+    writeTrajectoryEntries(tmpDir, [
+      {
+        id: 'tj-001', category: 'checkpoint', checkpoint_name: 'req-test',
+        scope: 'phase', attempt: 1,
+        branch: 'trajectory/phase/req-test/attempt-1',
+        git_ref: sha1,
+        timestamp: '2026-03-01T01:00:00Z',
+        metrics: null, tags: ['checkpoint']
+      }
+    ]);
+
+    const result = runGsdTools('trajectory choose req-test', tmpDir);
+    assert.strictEqual(result.success, false, 'Should fail without --attempt');
+    assert.ok(result.error.includes('Must specify winning attempt') || result.error.includes('--attempt'),
+      'Error should mention --attempt requirement');
+  });
+
+  test('CHOOSE-01: choose validates attempt exists', () => {
+    initGitForChoose(tmpDir);
+
+    const sha1 = createBranchWithFile(tmpDir, 'trajectory/phase/val-test/attempt-1', 'val-a.txt', 'code');
+    writeTrajectoryEntries(tmpDir, [
+      {
+        id: 'tj-001', category: 'checkpoint', checkpoint_name: 'val-test',
+        scope: 'phase', attempt: 1,
+        branch: 'trajectory/phase/val-test/attempt-1',
+        git_ref: sha1,
+        timestamp: '2026-03-01T01:00:00Z',
+        metrics: null, tags: ['checkpoint']
+      }
+    ]);
+
+    const result = runGsdTools('trajectory choose val-test --attempt 99', tmpDir);
+    assert.strictEqual(result.success, false, 'Should fail with non-existent attempt');
+    assert.ok(result.error.includes('not found') || result.error.includes('99'),
+      'Error should mention attempt not found');
+  });
+
+  test('CHOOSE-01: choose rejects abandoned attempt as winner', () => {
+    initGitForChoose(tmpDir);
+
+    const sha1 = createBranchWithFile(tmpDir, 'trajectory/phase/aband-test/attempt-1', 'aband-a.txt', 'code');
+    writeTrajectoryEntries(tmpDir, [
+      {
+        id: 'tj-001', category: 'checkpoint', checkpoint_name: 'aband-test',
+        scope: 'phase', attempt: 1,
+        branch: 'trajectory/phase/aband-test/attempt-1',
+        git_ref: sha1,
+        timestamp: '2026-03-01T01:00:00Z',
+        metrics: null, tags: ['checkpoint', 'abandoned']
+      }
+    ]);
+
+    const result = runGsdTools('trajectory choose aband-test --attempt 1', tmpDir);
+    assert.strictEqual(result.success, false, 'Should fail for abandoned attempt');
+    assert.ok(result.error.includes('abandoned') || result.error.includes('not found'),
+      'Error should indicate abandoned or not found');
+  });
+
+  test('CHOOSE-02: non-chosen attempts archived as tags', () => {
+    initGitForChoose(tmpDir);
+
+    const sha1 = createBranchWithFile(tmpDir, 'trajectory/phase/tag-test/attempt-1', 'tag-a.txt', 'attempt 1');
+    const sha2 = createBranchWithFile(tmpDir, 'trajectory/phase/tag-test/attempt-2', 'tag-b.txt', 'attempt 2');
+    const sha3 = createBranchWithFile(tmpDir, 'trajectory/phase/tag-test/attempt-3', 'tag-c.txt', 'attempt 3');
+
+    writeTrajectoryEntries(tmpDir, [
+      {
+        id: 'tj-001', category: 'checkpoint', checkpoint_name: 'tag-test',
+        scope: 'phase', attempt: 1,
+        branch: 'trajectory/phase/tag-test/attempt-1',
+        git_ref: sha1,
+        timestamp: '2026-03-01T01:00:00Z',
+        metrics: null, tags: ['checkpoint']
+      },
+      {
+        id: 'tj-002', category: 'checkpoint', checkpoint_name: 'tag-test',
+        scope: 'phase', attempt: 2,
+        branch: 'trajectory/phase/tag-test/attempt-2',
+        git_ref: sha2,
+        timestamp: '2026-03-01T02:00:00Z',
+        metrics: null, tags: ['checkpoint']
+      },
+      {
+        id: 'tj-003', category: 'checkpoint', checkpoint_name: 'tag-test',
+        scope: 'phase', attempt: 3,
+        branch: 'trajectory/phase/tag-test/attempt-3',
+        git_ref: sha3,
+        timestamp: '2026-03-01T03:00:00Z',
+        metrics: null, tags: ['checkpoint']
+      }
+    ]);
+
+    const result = runGsdTools('trajectory choose tag-test --attempt 2', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+    const output = JSON.parse(result.output);
+
+    // Verify git tags exist for non-chosen attempts
+    const tagList = execSync('git tag -l', { cwd: tmpDir, encoding: 'utf-8' }).trim();
+    assert.ok(tagList.includes('trajectory/phase/tag-test/attempt-1'), 'Attempt 1 should be archived as tag');
+    assert.ok(tagList.includes('trajectory/phase/tag-test/attempt-3'), 'Attempt 3 should be archived as tag');
+    assert.ok(output.archived_tags.length >= 2, 'Should have at least 2 archived tags');
+  });
+
+  test('CHOOSE-03: working branches deleted after choose', () => {
+    initGitForChoose(tmpDir);
+
+    const sha1 = createBranchWithFile(tmpDir, 'trajectory/phase/del-test/attempt-1', 'del-a.txt', 'attempt 1');
+    const sha2 = createBranchWithFile(tmpDir, 'trajectory/phase/del-test/attempt-2', 'del-b.txt', 'attempt 2');
+
+    writeTrajectoryEntries(tmpDir, [
+      {
+        id: 'tj-001', category: 'checkpoint', checkpoint_name: 'del-test',
+        scope: 'phase', attempt: 1,
+        branch: 'trajectory/phase/del-test/attempt-1',
+        git_ref: sha1,
+        timestamp: '2026-03-01T01:00:00Z',
+        metrics: null, tags: ['checkpoint']
+      },
+      {
+        id: 'tj-002', category: 'checkpoint', checkpoint_name: 'del-test',
+        scope: 'phase', attempt: 2,
+        branch: 'trajectory/phase/del-test/attempt-2',
+        git_ref: sha2,
+        timestamp: '2026-03-01T02:00:00Z',
+        metrics: null, tags: ['checkpoint']
+      }
+    ]);
+
+    const result = runGsdTools('trajectory choose del-test --attempt 2', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+    const output = JSON.parse(result.output);
+
+    // Verify trajectory branches are gone
+    const branchList = execSync('git branch --list "trajectory/*"', { cwd: tmpDir, encoding: 'utf-8' }).trim();
+    assert.strictEqual(branchList, '', 'All trajectory working branches should be deleted');
+
+    // Verify deleted_branches reported
+    assert.ok(output.deleted_branches.length >= 2, 'Should report deleted branches');
+  });
+
+  test('journal records choose entry with correct fields', () => {
+    initGitForChoose(tmpDir);
+
+    const sha1 = createBranchWithFile(tmpDir, 'trajectory/phase/jrnl-test/attempt-1', 'jrnl-a.txt', 'attempt 1');
+    const sha2 = createBranchWithFile(tmpDir, 'trajectory/phase/jrnl-test/attempt-2', 'jrnl-b.txt', 'attempt 2');
+
+    writeTrajectoryEntries(tmpDir, [
+      {
+        id: 'tj-001', category: 'checkpoint', checkpoint_name: 'jrnl-test',
+        scope: 'phase', attempt: 1,
+        branch: 'trajectory/phase/jrnl-test/attempt-1',
+        git_ref: sha1,
+        timestamp: '2026-03-01T01:00:00Z',
+        metrics: null, tags: ['checkpoint']
+      },
+      {
+        id: 'tj-002', category: 'checkpoint', checkpoint_name: 'jrnl-test',
+        scope: 'phase', attempt: 2,
+        branch: 'trajectory/phase/jrnl-test/attempt-2',
+        git_ref: sha2,
+        timestamp: '2026-03-01T02:00:00Z',
+        metrics: null, tags: ['checkpoint']
+      }
+    ]);
+
+    const result = runGsdTools('trajectory choose jrnl-test --attempt 2', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    // Read journal and find choose entry
+    const trajPath = path.join(tmpDir, '.planning', 'memory', 'trajectory.json');
+    const entries = JSON.parse(fs.readFileSync(trajPath, 'utf-8'));
+    const chooseEntry = entries.find(e => e.category === 'choose');
+    assert.ok(chooseEntry, 'Should have a choose journal entry');
+    assert.strictEqual(chooseEntry.chosen_attempt, 2);
+    assert.ok(chooseEntry.tags.includes('choose'), 'Tags should include "choose"');
+    assert.ok(chooseEntry.tags.includes('lifecycle-complete'), 'Tags should include "lifecycle-complete"');
+    assert.ok(Array.isArray(chooseEntry.archived_tags), 'archived_tags should be an array');
+    assert.ok(Array.isArray(chooseEntry.deleted_branches), 'deleted_branches should be an array');
+  });
+
+  test('choose with --reason records rationale', () => {
+    initGitForChoose(tmpDir);
+
+    const sha1 = createBranchWithFile(tmpDir, 'trajectory/phase/rsn-test/attempt-1', 'rsn-a.txt', 'attempt 1');
+
+    writeTrajectoryEntries(tmpDir, [
+      {
+        id: 'tj-001', category: 'checkpoint', checkpoint_name: 'rsn-test',
+        scope: 'phase', attempt: 1,
+        branch: 'trajectory/phase/rsn-test/attempt-1',
+        git_ref: sha1,
+        timestamp: '2026-03-01T01:00:00Z',
+        metrics: null, tags: ['checkpoint']
+      }
+    ]);
+
+    const result = runGsdTools('trajectory choose rsn-test --attempt 1 --reason "Best test coverage"', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const trajPath = path.join(tmpDir, '.planning', 'memory', 'trajectory.json');
+    const entries = JSON.parse(fs.readFileSync(trajPath, 'utf-8'));
+    const chooseEntry = entries.find(e => e.category === 'choose');
+    assert.ok(chooseEntry.reason, 'Should have a reason');
+    assert.strictEqual(chooseEntry.reason.text, 'Best test coverage');
+  });
+
+  test('choose without --reason still works', () => {
+    initGitForChoose(tmpDir);
+
+    const sha1 = createBranchWithFile(tmpDir, 'trajectory/phase/norsn-test/attempt-1', 'norsn-a.txt', 'attempt 1');
+
+    writeTrajectoryEntries(tmpDir, [
+      {
+        id: 'tj-001', category: 'checkpoint', checkpoint_name: 'norsn-test',
+        scope: 'phase', attempt: 1,
+        branch: 'trajectory/phase/norsn-test/attempt-1',
+        git_ref: sha1,
+        timestamp: '2026-03-01T01:00:00Z',
+        metrics: null, tags: ['checkpoint']
+      }
+    ]);
+
+    const result = runGsdTools('trajectory choose norsn-test --attempt 1', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const trajPath = path.join(tmpDir, '.planning', 'memory', 'trajectory.json');
+    const entries = JSON.parse(fs.readFileSync(trajPath, 'utf-8'));
+    const chooseEntry = entries.find(e => e.category === 'choose');
+    assert.strictEqual(chooseEntry.reason, null, 'Reason should be null when not provided');
+  });
+
+  test('choose with missing checkpoint name errors', () => {
+    initGitForChoose(tmpDir);
+    writeTrajectoryEntries(tmpDir, []);
+
+    const result = runGsdTools('trajectory choose', tmpDir);
+    assert.strictEqual(result.success, false, 'Should fail without checkpoint name');
+    assert.ok(result.error.includes('Missing') || result.error.includes('name'),
+      'Error should mention missing checkpoint name');
+  });
+
+  test('choose with non-existent branch errors gracefully', () => {
+    initGitForChoose(tmpDir);
+
+    // Create journal entry but DON'T create the actual git branch
+    writeTrajectoryEntries(tmpDir, [
+      {
+        id: 'tj-001', category: 'checkpoint', checkpoint_name: 'nobranch-test',
+        scope: 'phase', attempt: 1,
+        branch: 'trajectory/phase/nobranch-test/attempt-1',
+        git_ref: 'abc1234',
+        timestamp: '2026-03-01T01:00:00Z',
+        metrics: null, tags: ['checkpoint']
+      }
+    ]);
+
+    const result = runGsdTools('trajectory choose nobranch-test --attempt 1', tmpDir);
+    assert.strictEqual(result.success, false, 'Should fail with non-existent branch');
+    assert.ok(result.error.includes('Branch not found') || result.error.includes('not found'),
+      'Error should mention branch not found');
+  });
+
+  test('JSON output schema validation', () => {
+    initGitForChoose(tmpDir);
+
+    const sha1 = createBranchWithFile(tmpDir, 'trajectory/phase/schema-test/attempt-1', 'schema-a.txt', 'attempt 1');
+    const sha2 = createBranchWithFile(tmpDir, 'trajectory/phase/schema-test/attempt-2', 'schema-b.txt', 'attempt 2');
+
+    writeTrajectoryEntries(tmpDir, [
+      {
+        id: 'tj-001', category: 'checkpoint', checkpoint_name: 'schema-test',
+        scope: 'phase', attempt: 1,
+        branch: 'trajectory/phase/schema-test/attempt-1',
+        git_ref: sha1,
+        timestamp: '2026-03-01T01:00:00Z',
+        metrics: null, tags: ['checkpoint']
+      },
+      {
+        id: 'tj-002', category: 'checkpoint', checkpoint_name: 'schema-test',
+        scope: 'phase', attempt: 2,
+        branch: 'trajectory/phase/schema-test/attempt-2',
+        git_ref: sha2,
+        timestamp: '2026-03-01T02:00:00Z',
+        metrics: null, tags: ['checkpoint']
+      }
+    ]);
+
+    const result = runGsdTools('trajectory choose schema-test --attempt 2', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+    const output = JSON.parse(result.output);
+
+    // Top-level schema
+    assert.ok('chosen' in output, 'should have chosen field');
+    assert.ok('checkpoint' in output, 'should have checkpoint field');
+    assert.ok('scope' in output, 'should have scope field');
+    assert.ok('chosen_attempt' in output, 'should have chosen_attempt field');
+    assert.ok('chosen_branch' in output, 'should have chosen_branch field');
+    assert.ok('merge_ref' in output, 'should have merge_ref field');
+    assert.ok(Array.isArray(output.archived_tags), 'archived_tags should be an array');
+    assert.ok(Array.isArray(output.deleted_branches), 'deleted_branches should be an array');
+    assert.strictEqual(output.chosen, true);
+    assert.strictEqual(output.scope, 'phase');
+    assert.strictEqual(output.checkpoint, 'schema-test');
+  });
+});
+
 // ─── Stuck-Detector Trajectory Suggestion Tests (PIVOT-04) ───────────────────
 
 describe('stuck-detector trajectory suggestion (PIVOT-04)', () => {
