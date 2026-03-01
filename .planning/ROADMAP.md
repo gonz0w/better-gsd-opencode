@@ -128,7 +128,7 @@ Full details: `.planning/milestones/v7.0-ROADMAP.md`
 
 - [x] **Phase 45: Foundation — Decision Journal & State Coherence** - Sacred trajectory store and selective checkout pattern for `.planning/` preservation (completed 2026-02-28)
 - [x] **Phase 46: Checkpoint — Snapshot & Metrics Collection** - Named checkpoints with git state capture and auto-metrics (completed 2026-02-28)
-- [ ] **Phase 47: Pivot — Selective Rewind & Attempt Archival** - Abandon approach with recorded reasoning, rewind to checkpoint safely
+- [x] **Phase 47: Pivot — Selective Rewind & Attempt Archival** - Abandon approach with recorded reasoning, rewind to checkpoint safely (completed 2026-03-01)
 - [ ] **Phase 48: Compare — Multi-Attempt Metrics Aggregation** - Outcome metrics comparison across attempts with signal detection
 - [ ] **Phase 49: Choose — Merge Winner & Cleanup** - Select winning attempt, archive alternatives, clean up branches
 - [ ] **Phase 50: Integration — Agent Context & Dead-End Detection** - Journal-driven context injection and stuck-to-pivot wiring
@@ -170,7 +170,7 @@ Plans:
   3. Pivot requires a structured reason (what failed, why, what signals) and the reason is persisted in the journal as an "abandoned" entry
   4. Current work is auto-checkpointed as an "abandoned" attempt before rewind — no work is ever lost silently
   5. Stuck-detector integration: when stuck detection fires (3 failures), it suggests pivoting to the last checkpoint
-**Plans**: 1/2 plans executed
+**Plans**: 2/2 plans complete
 Plans:
 - [ ] 47-01-PLAN.md — Pivot command with reason capture, auto-checkpoint, and selective rewind
 - [ ] 47-02-PLAN.md — Stuck-detector integration and comprehensive pivot tests
@@ -222,7 +222,7 @@ Plans:
 | 37-44 | v7.0 | 15/15 | Complete | 2026-02-27 |
 | 45. Foundation | 2/2 | Complete    | 2026-02-28 | - |
 | 46. Checkpoint | 2/2 | Complete    | 2026-02-28 | - |
-| 47. Pivot | 1/2 | In Progress|  | - |
+| 47. Pivot | 2/2 | Complete   | 2026-03-01 | - |
 | 48. Compare | v7.1 | 0/TBD | Not started | - |
 | 49. Choose | v7.1 | 0/TBD | Not started | - |
 | 50. Integration | v7.1 | 0/TBD | Not started | - |

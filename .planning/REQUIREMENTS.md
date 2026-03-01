@@ -24,7 +24,7 @@ Requirements for trajectory engineering milestone. Each maps to roadmap phases.
 - [x] **PIVOT-01**: User can rewind code to a named checkpoint via selective git checkout that preserves `.planning/` directory
 - [x] **PIVOT-02**: Pivot requires and records a structured reason (what failed, why, what signals indicated failure)
 - [x] **PIVOT-03**: Current state is auto-checkpointed as "abandoned" before rewind to preserve work
-- [ ] **PIVOT-04**: Stuck-detector suggests pivot to last checkpoint when stuck detection fires
+- [x] **PIVOT-04**: Stuck-detector suggests pivot to last checkpoint when stuck detection fires
 
 ### Compare
 
@@ -87,7 +87,7 @@ Requirements for trajectory engineering milestone. Each maps to roadmap phases.
 | PIVOT-01 | Phase 47 | Complete | npm test -- --grep pivot |
 | PIVOT-02 | Phase 47 | Complete | npm test -- --grep pivot |
 | PIVOT-03 | Phase 47 | Complete | npm test -- --grep pivot |
-| PIVOT-04 | Phase 47 | Pending | npm test -- --grep stuck |
+| PIVOT-04 | Phase 47 | Complete | npm test -- --grep stuck |
 | COMP-01 | Phase 48 | Pending | npm test -- --grep compare |
 | COMP-02 | Phase 48 | Pending | npm test -- --grep compare |
 | COMP-03 | Phase 48 | Pending | npm test -- --grep compare |

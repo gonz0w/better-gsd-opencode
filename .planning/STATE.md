@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-02-28)
 ## Current Position
 
 Phase: 47 of 50 (Pivot — Selective Rewind & Attempt Archival)
-Plan: 1 of 2
-Status: In progress
-Last activity: 2026-03-01 - Completed 47-01-PLAN.md: Pivot command with reason capture, auto-checkpoint, and selective rewind
+Plan: 2 of 2
+Status: Phase complete
+Last activity: 2026-03-01 - Completed 47-02-PLAN.md: Stuck-detector integration and comprehensive pivot tests
 
-Progress: [████████████████████░░░░░░░░░░] 100/100 plans complete (v1.0-v7.0) | v7.1: 5/6 plans (Phase 47 in progress)
+Progress: [████████████████████░░░░░░░░░░] 100/100 plans complete (v1.0-v7.0) | v7.1: 6/6 plans (Phase 47 complete)
 
 ## Performance Metrics
 
@@ -44,6 +44,7 @@ Progress: [████████████████████░░░
 | 46 | 01 | 10 min | 2 | 5 |
 | 46 | 02 | 9 min | 2 | 5 |
 | 47 | 01 | 7 min | 2 | 4 |
+| 47 | 02 | 14 min | 2 | 4 |
 
 ## Accumulated Context
 
@@ -63,6 +64,8 @@ All v1.0-v7.0 decisions recorded in PROJECT.md Key Decisions table with outcomes
 - [Phase 47]: Reason capture via --reason flag (not interactive prompts) since gsd-tools runs via execFileSync
 - [Phase 47]: Abandoned branches use archived/trajectory/<scope>/<name>/attempt-N namespace
 - [Phase 47]: Reuse selectiveRewind() from lib/git for code rewind — no reimplementation
+- [Phase 47]: Fixed selectiveRewind to handle D-status files (added after checkpoint) by deletion instead of checkout
+- [Phase 47]: Pivot suggestion placed first in stuck-detector alternatives for maximum visibility
 
 ### Pending Todos
 
@@ -83,6 +86,6 @@ None — milestone starting fresh.
 ## Session Continuity
 
 Last session: 2026-03-01
-Stopped at: Completed 47-01-PLAN.md — pivot command implementation
+Stopped at: Completed 47-02-PLAN.md — stuck-detector integration and comprehensive pivot tests
 Resume file: None
-Next step: Continue with 47-02-PLAN.md (Stuck-detector integration and comprehensive pivot tests)
+Next step: Phase 47 complete. Proceed to Phase 48 (compare) or verify phase completion.
