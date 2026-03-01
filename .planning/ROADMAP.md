@@ -222,7 +222,7 @@ Plans:
 | 37-44 | v7.0 | 15/15 | Complete | 2026-02-27 |
 | 45. Foundation | 2/2 | Complete    | 2026-02-28 | - |
 | 46. Checkpoint | 2/2 | Complete    | 2026-02-28 | - |
-| 47. Pivot | 2/2 | Complete   | 2026-03-01 | - |
+| 47. Pivot | 2/2 | Complete    | 2026-03-01 | - |
 | 48. Compare | v7.1 | 0/TBD | Not started | - |
 | 49. Choose | v7.1 | 0/TBD | Not started | - |
 | 50. Integration | v7.1 | 0/TBD | Not started | - |
