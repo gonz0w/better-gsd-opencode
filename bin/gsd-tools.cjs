@@ -974,6 +974,11 @@ Subcommands:
     --scope <scope>       Filter by scope
     --name <name>         Filter by checkpoint name
     --limit <N>           Limit results
+  pivot <checkpoint>   Abandon current approach, rewind to checkpoint
+    --scope <scope>       Scope level (default: phase)
+    --reason <text>       Why this approach is being abandoned (required)
+    --attempt <N>         Target specific attempt (default: most recent)
+    --stash               Auto-stash dirty working tree before pivot
 
 Creates a git branch at trajectory/<scope>/<name>/attempt-N and writes a
 journal entry to the trajectories memory store with test count, LOC delta,
@@ -983,7 +988,28 @@ Examples:
   gsd-tools trajectory checkpoint explore-auth
   gsd-tools trajectory checkpoint try-redis --scope task --description "Redis caching approach"
   gsd-tools trajectory list
-  gsd-tools trajectory list --scope phase --limit 5`,
+  gsd-tools trajectory list --scope phase --limit 5
+  gsd-tools trajectory pivot explore-auth --reason "JWT approach too complex"`,
+      "trajectory pivot": `Usage: gsd-tools trajectory pivot <checkpoint> --reason "what failed and why"
+
+Abandon current approach with recorded reasoning and rewind to checkpoint.
+Auto-checkpoints current work as abandoned attempt before rewinding.
+
+Arguments:
+  checkpoint          Name of checkpoint to rewind to
+
+Options:
+  --scope <scope>     Scope level (default: phase)
+  --reason <text>     Structured reason for abandoning (required)
+  --attempt <N>       Target specific attempt number (default: most recent)
+  --stash             Auto-stash dirty working tree before pivot
+
+Output: { pivoted, checkpoint, target_ref, abandoned_branch, files_rewound, stash_used }
+
+Examples:
+  gsd-tools trajectory pivot explore-auth --reason "JWT approach too complex, session-based simpler"
+  gsd-tools trajectory pivot try-redis --scope task --reason "Redis overkill for this cache size"
+  gsd-tools trajectory pivot my-feature --attempt 2 --reason "Attempt 2 had better foundation"`,
       "classify": `Usage: gsd-tools classify <plan|phase> <path-or-number>
 
 Classify task complexity and recommend execution strategy.
@@ -25601,8 +25627,11 @@ Available: execute-phase, plan-phase, new-project, new-milestone, quick, resume,
             case "list":
               lazyTrajectory().cmdTrajectoryList(cwd, args.slice(2), raw);
               break;
+            case "pivot":
+              lazyTrajectory().cmdTrajectoryPivot(cwd, args.slice(1), raw);
+              break;
             default:
-              error("Unknown trajectory subcommand: " + trajSub + ". Available: checkpoint, list");
+              error("Unknown trajectory subcommand: " + trajSub + ". Available: checkpoint, list, pivot");
           }
           break;
         }

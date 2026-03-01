@@ -927,7 +927,8 @@ async function main() {
       switch (trajSub) {
         case 'checkpoint': lazyTrajectory().cmdTrajectoryCheckpoint(cwd, args.slice(1), raw); break;
         case 'list': lazyTrajectory().cmdTrajectoryList(cwd, args.slice(2), raw); break;
-        default: error('Unknown trajectory subcommand: ' + trajSub + '. Available: checkpoint, list');
+        case 'pivot': lazyTrajectory().cmdTrajectoryPivot(cwd, args.slice(1), raw); break;
+        default: error('Unknown trajectory subcommand: ' + trajSub + '. Available: checkpoint, list, pivot');
       }
       break;
     }
