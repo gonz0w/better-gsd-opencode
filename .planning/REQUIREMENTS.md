@@ -1,0 +1,96 @@
+# Requirements: bGSD Plugin v8.0
+
+**Defined:** 2026-03-01
+**Core Value:** Manage and deliver high-quality software with high-quality documentation, while continuously reducing token usage and improving performance
+
+## v8.0 Requirements
+
+Requirements for v8.0 Performance & Agent Architecture milestone. Each maps to roadmap phases.
+
+### Cache Layer
+
+- [ ] **CACHE-01**: SQLite read cache module persists parsed data across CLI invocations using `node:sqlite` (DatabaseSync)
+- [ ] **CACHE-02**: Cache validates freshness via mtime on every read, re-parses on stale
+- [ ] **CACHE-03**: Any file write through gsd-tools invalidates the corresponding cache entry
+- [ ] **CACHE-04**: Cache gracefully degrades to in-memory Map on Node <22.5 (no crashes, no warnings)
+- [ ] **CACHE-05**: User can pre-populate cache via `cache warm` command after checkout or pull
+- [ ] **CACHE-06**: User can compare performance baselines via `profiler compare` command
+
+### Agent Architecture
+
+- [ ] **AGENT-01**: RACI matrix maps every product lifecycle step to exactly one responsible agent
+- [ ] **AGENT-02**: Agent context loading is manifest-driven — agents receive pre-declared files, no ad-hoc discovery
+- [ ] **AGENT-03**: Overlapping agents consolidated (integration-checker→verifier, synthesizer→roadmapper), 11→9 agents
+- [ ] **AGENT-04**: Automated lifecycle audit reports gaps (uncovered steps) and overlaps (multiple owners)
+- [ ] **AGENT-05**: Agent manifests declare max token budgets; context builder enforces limits
+
+### Command Consolidation
+
+- [ ] **CMD-01**: Orphan commands grouped under namespaced parents (~15-20 commands relocated)
+- [ ] **CMD-02**: All references (tests, workflows, agent prompts) updated to new command names
+- [ ] **CMD-03**: Milestone wrapup workflow generates documentation artifact automatically
+
+### Performance
+
+- [ ] **PERF-01**: Hot-path profiler instrumentation covers file reads, git ops, markdown parsing, and AST analysis
+- [ ] **PERF-02**: Baseline comparison tool shows before/after timing deltas with regression highlighting
+
+## Future Requirements
+
+Deferred to future release. Tracked but not in current roadmap.
+
+### Cache Enhancements
+
+- **CACHE-F01**: Parsed-result caching (cache parsed JSON, not just raw content) — validate raw caching first
+- **CACHE-F02**: Cross-project cache sharing
+- **CACHE-F03**: Cache analytics dashboard (hit rates, miss reasons, space usage)
+
+### Agent Enhancements
+
+- **AGENT-F01**: Agent context condensation (auto-summarize stale context when over budget)
+
+## Out of Scope
+
+Explicitly excluded. Documented to prevent scope creep.
+
+| Feature | Reason |
+|---------|--------|
+| Full async I/O rewrite | Wrong paradigm for <5s CLI — sync I/O is appropriate |
+| Agent self-spawning | Caps at 12 roles by design; intelligence = data, not agents |
+| better-sqlite3 native addon | Breaks single-file deploy; node:sqlite preferred |
+| Commander.js/yargs migration | Adds ~200KB dep for marginal benefit; existing router sufficient |
+| Command alias backward compat | Single user — rename directly, update all references |
+| Cross-invocation daemon mode | Requires long-running process; SQLite cache achieves same goal |
+| Real-time file watching | CLI is short-lived; mtime check on read is sufficient |
+
+## Traceability
+
+Which phases cover which requirements. Updated during roadmap creation.
+
+| Requirement | Phase | Status | Test Command |
+|-------------|-------|--------|--------------|
+| CACHE-01 | Pending | Pending | npm test |
+| CACHE-02 | Pending | Pending | npm test |
+| CACHE-03 | Pending | Pending | npm test |
+| CACHE-04 | Pending | Pending | npm test |
+| CACHE-05 | Pending | Pending | npm test |
+| CACHE-06 | Pending | Pending | npm test |
+| AGENT-01 | Pending | Pending | npm test |
+| AGENT-02 | Pending | Pending | npm test |
+| AGENT-03 | Pending | Pending | npm test |
+| AGENT-04 | Pending | Pending | npm test |
+| AGENT-05 | Pending | Pending | npm test |
+| CMD-01 | Pending | Pending | npm test |
+| CMD-02 | Pending | Pending | npm test |
+| CMD-03 | Pending | Pending | npm test |
+| PERF-01 | Pending | Pending | npm test |
+| PERF-02 | Pending | Pending | npm test |
+
+**Coverage:**
+- v8.0 requirements: 16 total
+- Mapped to phases: 0
+- Unmapped: 16 ⚠️
+
+---
+*Requirements defined: 2026-03-01*
+*Last updated: 2026-03-01 after initial definition*
