@@ -25,6 +25,7 @@ function lazyCodebase() { return _modules.codebase || (_modules.codebase = requi
 function lazyTrajectory() { return _modules.trajectory || (_modules.trajectory = require('./commands/trajectory')); }
 function lazyGit() { return _modules.git || (_modules.git = require('./lib/git')); }
 function lazyOrchestration() { return _modules.orchestration || (_modules.orchestration = require('./lib/orchestration')); }
+function lazyCache() { return _modules.cache || (_modules.cache = require('./commands/cache')); }
 
 
 async function main() {
@@ -935,6 +936,24 @@ async function main() {
         case 'choose': lazyTrajectory().cmdTrajectoryChoose(cwd, args.slice(1), raw); break;
         case 'dead-ends': lazyTrajectory().cmdTrajectoryDeadEnds(cwd, args.slice(2), raw); break;
         default: error('Unknown trajectory subcommand: ' + trajSub + '. Available: checkpoint, list, pivot, compare, choose, dead-ends');
+      }
+      break;
+    }
+
+    case 'cache': {
+      const subcommand = args[1];
+      if (subcommand === 'status') {
+        lazyCache().cmdCacheStatus(cwd, args, raw);
+      } else if (subcommand === 'clear') {
+        lazyCache().cmdCacheClear(cwd, args, raw);
+      } else if (subcommand === 'warm') {
+        lazyCache().cmdCacheWarm(cwd, args, raw);
+      } else {
+        // No subcommand: show help
+        output({
+          commands: ['status', 'clear', 'warm'],
+          help: 'gsd-tools cache <status|clear|warm> [files...]'
+        }, raw, 'cache');
       }
       break;
     }
