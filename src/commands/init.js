@@ -663,7 +663,7 @@ function cmdInitNewProject(cwd, raw) {
   const result = {
     // Models
     researcher_model: resolveModelInternal(cwd, 'gsd-project-researcher'),
-    synthesizer_model: resolveModelInternal(cwd, 'gsd-research-synthesizer'),
+    synthesizer_model: resolveModelInternal(cwd, 'gsd-roadmapper'),  // merged from gsd-research-synthesizer
     roadmapper_model: resolveModelInternal(cwd, 'gsd-roadmapper'),
 
     // Config
@@ -722,7 +722,7 @@ function cmdInitNewMilestone(cwd, raw) {
   const result = {
     // Models
     researcher_model: resolveModelInternal(cwd, 'gsd-project-researcher'),
-    synthesizer_model: resolveModelInternal(cwd, 'gsd-research-synthesizer'),
+    synthesizer_model: resolveModelInternal(cwd, 'gsd-roadmapper'),  // merged from gsd-research-synthesizer
     roadmapper_model: resolveModelInternal(cwd, 'gsd-roadmapper'),
 
     // Config
