@@ -12,7 +12,7 @@ Read all execution_context files before starting.
 **Load progress context (paths only):**
 
 ```bash
-INIT=$(node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs init progress)
+INIT=$(node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs init:progress)
 ```
 
 Extract from init JSON: `project_exists`, `roadmap_exists`, `state_exists`, `phases`, `current_phase`, `next_phase`, `milestone_version`, `completed_count`, `phase_count`, `paused_at`, `state_path`, `roadmap_path`, `project_path`, `config_path`.
@@ -40,7 +40,7 @@ If missing both ROADMAP.md and PROJECT.md: suggest `/gsd-new-project`.
 **Load structured data:**
 
 ```bash
-ROADMAP=$(node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs roadmap analyze)
+ROADMAP=$(node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs plan:roadmap analyze)
 STATE=$(node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs state-snapshot)
 ```
 
@@ -60,7 +60,7 @@ STATE=$(node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs state-snapshot)
 
 ```bash
 # Get formatted progress bar
-PROGRESS_BAR=$(node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs progress bar)
+PROGRESS_BAR=$(node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs util:progress bar)
 ```
 
 Present:

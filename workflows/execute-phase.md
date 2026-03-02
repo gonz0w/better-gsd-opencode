@@ -14,7 +14,7 @@ Read STATE.md before starting.
 
 <step name="initialize" priority="first">
 ```bash
-INIT=$(node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs init execute-phase "${PHASE_ARG}" --compact)
+INIT=$(node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs init:execute-phase "${PHASE_ARG}" --compact)
 ```
 
 Parse JSON for: `phase_found`, `phase_dir`, `phase_number`, `phase_name`, `plans`, `incomplete_plans`, `plan_count`, `incomplete_count`, `parallelization`, `branching_strategy`, `branch_name`, `executor_model`, `verifier_model`, `commit_docs`, `pre_flight_validation`, `worktree_enabled`, `worktree_config`, `worktree_active`, `file_overlaps`.
@@ -51,9 +51,9 @@ Otherwise, run auto-fix first, then validate:
 
 ```bash
 # Auto-fix what we can
-FIX_RESULT=$(node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs state validate --fix 2>/dev/null)
+FIX_RESULT=$(node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs verify:state validate --fix 2>/dev/null)
 # Then check for remaining issues
-VALIDATE_RESULT=$(node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs state validate 2>/dev/null)
+VALIDATE_RESULT=$(node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs verify:state validate 2>/dev/null)
 ```
 
 Parse `FIX_RESULT` for `fixes_applied` array. If non-empty: display "Pre-flight auto-fixed: {count} issue(s)".
@@ -156,16 +156,16 @@ Execute each wave in sequence. Within a wave: parallel if `PARALLELIZATION=true`
 
    a. **Create worktrees** for each plan in wave:
       ```bash
-      node gsd-tools.cjs worktree create {plan_id}
+      node gsd-tools.cjs execute:worktree create {plan_id}
       ```
       Record each worktree path from output. If create fails (e.g., max_concurrent), fall back to sequential.
       If setup_status is `failed`: skip that plan, mark as setup-failed, continue with remaining.
 
    b. **Inject codebase context** (same as Mode B):
       ```bash
-      PLAN_FILES=$(node gsd-tools.cjs frontmatter "${PLAN_PATH}" --field files_modified 2>/dev/null)
-      if [ -n "$PLAN_FILES" ]; then
-        CODEBASE_CTX=$(node gsd-tools.cjs codebase context --files ${PLAN_FILES} --plan ${PLAN_PATH} 2>/dev/null)
+PLAN_FILES=$(node gsd-tools.cjs util:frontmatter "${PLAN_PATH}" --field files_modified 2>/dev/null)
+if [ -n "$PLAN_FILES" ]; then
+  CODEBASE_CTX=$(node gsd-tools.cjs util:codebase context --files ${PLAN_FILES} --plan ${PLAN_PATH} 2>/dev/null)
       fi
       ```
       If `CODEBASE_CTX` is non-empty, include the `<codebase_context>` block in the spawn prompt. If commands fail or return empty, omit the block entirely (graceful no-op).
@@ -212,7 +212,7 @@ Execute each wave in sequence. Within a wave: parallel if `PARALLELIZATION=true`
 
    f. **Sequential merge** — for each completed plan (in plan-number order, smallest first):
       ```bash
-      node gsd-tools.cjs worktree merge {plan_id}
+      node gsd-tools.cjs execute:worktree merge {plan_id}
       ```
       After EACH merge: run test command if configured in config.json (`test_command` field).
       If merge fails (real conflicts): offer options:
@@ -223,7 +223,7 @@ Execute each wave in sequence. Within a wave: parallel if `PARALLELIZATION=true`
 
    g. **Cleanup** — after all merges (or failure handling):
       ```bash
-      node gsd-tools.cjs worktree cleanup
+      node gsd-tools.cjs execute:worktree cleanup
       ```
 
    h. **Continue** to next wave.
@@ -232,9 +232,9 @@ Execute each wave in sequence. Within a wave: parallel if `PARALLELIZATION=true`
 
    **Before spawning each executor**, inject codebase context if available:
    ```bash
-   PLAN_FILES=$(node gsd-tools.cjs frontmatter "${PLAN_PATH}" --field files_modified 2>/dev/null)
+   PLAN_FILES=$(node gsd-tools.cjs util:frontmatter "${PLAN_PATH}" --field files_modified 2>/dev/null)
    if [ -n "$PLAN_FILES" ]; then
-     CODEBASE_CTX=$(node gsd-tools.cjs codebase context --files ${PLAN_FILES} --plan ${PLAN_PATH} 2>/dev/null)
+     CODEBASE_CTX=$(node gsd-tools.cjs util:codebase context --files ${PLAN_FILES} --plan ${PLAN_PATH} 2>/dev/null)
    fi
    ```
    If `CODEBASE_CTX` is non-empty, include the `<codebase_context>` block below. If the commands fail or return empty, omit the block entirely (graceful no-op).
@@ -366,14 +366,14 @@ Read status from VERIFICATION.md:
 <step name="update_roadmap">
 ```bash
 node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs validate roadmap --repair 2>/dev/null
-COMPLETION=$(node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs phase complete "${PHASE_NUMBER}")
+COMPLETION=$(node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs plan:phase complete "${PHASE_NUMBER}")
 ```
 
 CLI handles: phase checkbox, Progress table, plan count, STATE.md advance, REQUIREMENTS.md traceability.
 Note: `validate roadmap --repair` ensures checklist/section parity before phase completion, preventing false `is_last_phase` detection.
 
 ```bash
-node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs commit "docs(phase-{X}): complete phase execution" --files .planning/ROADMAP.md .planning/STATE.md .planning/REQUIREMENTS.md {phase_dir}/*-VERIFICATION.md
+node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs execute:commit "docs(phase-{X}): complete phase execution" --files .planning/ROADMAP.md .planning/STATE.md .planning/REQUIREMENTS.md {phase_dir}/*-VERIFICATION.md
 ```
 </step>
 

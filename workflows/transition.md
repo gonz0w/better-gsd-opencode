@@ -99,7 +99,7 @@ If found, delete them — phase is complete, handoffs are stale.
 
 <step name="update_roadmap_and_state">
 ```bash
-TRANSITION=$(node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs phase complete "${current_phase}")
+TRANSITION=$(node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs plan:phase complete "${current_phase}")
 ```
 
 CLI handles: phase checkbox `[x]`, plan count, Progress table, STATE.md advance, last-phase detection.
@@ -207,7 +207,7 @@ After (Phase 2 shipped JWT auth, discovered rate limiting needed):
 Verify the updates are correct by reading STATE.md. If the progress bar needs updating, use:
 
 ```bash
-PROGRESS=$(node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs progress bar)
+PROGRESS=$(node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs util:progress bar)
 ```
 
 Update the progress bar line in STATE.md with the result.
@@ -316,7 +316,7 @@ The `next_phase` and `next_phase_name` fields give you the next phase details.
 
 If you need additional context, use:
 ```bash
-ROADMAP=$(node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs roadmap analyze)
+ROADMAP=$(node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs plan:roadmap analyze)
 ```
 
 This returns all phases with goals, disk status, and completion info.
@@ -422,7 +422,7 @@ Exit and run: /gsd-discuss-phase [X+1] --auto
 
 **Clear auto-advance** — milestone boundary is the natural stopping point:
 ```bash
-node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs config-set workflow.auto_advance false
+node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs util:config-set workflow.auto_advance false
 ```
 
 <if mode="yolo">

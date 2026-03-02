@@ -97,7 +97,7 @@ node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs memory write --store bo
 ```
 
 ```bash
-node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs commit "wip: [phase-name] paused at task [X]/[Y]" --files .planning/phases/*/.continue-here.md
+node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs execute:commit "wip: [phase-name] paused at task [X]/[Y]" --files .planning/phases/*/.continue-here.md
 ```
 </step>
 

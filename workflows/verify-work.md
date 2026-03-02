@@ -14,7 +14,7 @@ Show expected, ask if reality matches. "yes"/"pass"/"next" → pass. Anything el
 
 <step name="initialize" priority="first">
 ```bash
-INIT=$(node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs init verify-work "${PHASE_ARG}" --compact)
+INIT=$(node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs init:verify-work "${PHASE_ARG}" --compact)
 ```
 Parse: `planner_model`, `checker_model`, `commit_docs`, `phase_found`, `phase_dir`, `phase_number`, `phase_name`, `has_verification`.
 </step>

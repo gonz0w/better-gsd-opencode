@@ -53,7 +53,7 @@ Status: {current_position.status}
 Update STATE.md session continuity with the stopped-at description:
 
 ```bash
-node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs state record-session \
+node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs verify:state record-session \
   --stopped-at "{session_continuity.stopped_at}" \
   --resume-file "None"
 ```

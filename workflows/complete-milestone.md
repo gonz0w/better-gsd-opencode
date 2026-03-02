@@ -10,7 +10,7 @@ templates/milestone.md, templates/milestone-archive.md, .planning/ROADMAP.md, .p
 
 <step name="verify_readiness">
 ```bash
-ROADMAP=$(node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs roadmap analyze)
+ROADMAP=$(node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs plan:roadmap analyze)
 ```
 
 Verify: all milestone phases complete (`disk_status === 'complete'`), `progress_percent` 100%.
@@ -100,7 +100,7 @@ Ask: push to remote?
 
 <step name="git_commit_milestone">
 ```bash
-node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs commit "chore: complete v[X.Y] milestone" --files .planning/milestones/v[X.Y]-ROADMAP.md .planning/milestones/v[X.Y]-REQUIREMENTS.md .planning/MILESTONES.md .planning/PROJECT.md .planning/STATE.md
+node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs execute:commit "chore: complete v[X.Y] milestone" --files .planning/milestones/v[X.Y]-ROADMAP.md .planning/milestones/v[X.Y]-REQUIREMENTS.md .planning/MILESTONES.md .planning/PROJECT.md .planning/STATE.md
 ```
 </step>
 

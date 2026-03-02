@@ -30,7 +30,7 @@ If `$FULL_MODE`:
 **Step 2: Initialize**
 
 ```bash
-INIT=$(node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs init quick "$DESCRIPTION" --compact)
+INIT=$(node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs init:quick "$DESCRIPTION" --compact)
 ```
 
 Parse JSON for: `planner_model`, `executor_model`, `checker_model`, `verifier_model`, `commit_docs`, `next_num`, `slug`, `date`, `timestamp`, `quick_dir`, `task_dir`, `roadmap_exists`, `planning_exists`.
@@ -249,7 +249,7 @@ If table exists, match its column format. If adding --full to project with exist
 Build file list: `${QUICK_DIR}/${next_num}-PLAN.md`, `${QUICK_DIR}/${next_num}-SUMMARY.md`, `.planning/STATE.md`, (if full mode: `${QUICK_DIR}/${next_num}-VERIFICATION.md`)
 
 ```bash
-node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs commit "docs(quick-${next_num}): ${DESCRIPTION}" --files ${file_list}
+node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs execute:commit "docs(quick-${next_num}): ${DESCRIPTION}" --files ${file_list}
 commit_hash=$(git rev-parse --short HEAD)
 ```
 

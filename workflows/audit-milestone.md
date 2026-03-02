@@ -11,7 +11,7 @@ Read all execution_context files before starting.
 ## 0. Initialize Milestone Context
 
 ```bash
-INIT=$(node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs init milestone-op)
+INIT=$(node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs init:milestone-op)
 ```
 
 Extract from init JSON: `milestone_version`, `milestone_name`, `phase_count`, `completed_phases`, `commit_docs`.
@@ -25,7 +25,7 @@ CHECKER_MODEL=$(node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs resolve
 
 ```bash
 # Get phases in milestone (sorted numerically, handles decimals)
-node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs phases list
+node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs plan:phases list
 ```
 
 - Parse version from arguments or detect current from ROADMAP.md
@@ -39,7 +39,7 @@ For each phase directory, read the VERIFICATION.md:
 
 ```bash
 # For each phase, use find-phase to resolve the directory (handles archived phases)
-PHASE_INFO=$(node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs find-phase 01)
+PHASE_INFO=$(node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs plan:find-phase 01)
 # Extract directory from JSON, then read VERIFICATION.md from that directory
 # Repeat for each phase number from ROADMAP.md
 ```

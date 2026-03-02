@@ -12,7 +12,7 @@ Load ui-brand.md sections as needed via extract-sections.
 ## 1. Initialize
 
 ```bash
-INIT=$(node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs init plan-phase "$PHASE" --compact)
+INIT=$(node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs init:plan-phase "$PHASE" --compact)
 ```
 
 Parse: `researcher_model`, `planner_model`, `checker_model`, `research_enabled`, `plan_checker_enabled`, `commit_docs`, `phase_found`, `phase_dir`, `phase_number`, `phase_name`, `phase_slug`, `padded_phase`, `has_research`, `has_context`, `has_plans`, `plan_count`.
@@ -31,7 +31,7 @@ No phase number → detect next unplanned. Phase not found → create dir from s
 ## 3. Validate Phase
 
 ```bash
-PHASE_INFO=$(node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs roadmap get-phase "${PHASE}")
+PHASE_INFO=$(node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs plan:roadmap get-phase "${PHASE}")
 ```
 Extract `phase_number`, `phase_name`, `goal`.
 
@@ -47,7 +47,7 @@ If RESEARCH.md exists and no `--research`: use existing.
 Otherwise spawn researcher:
 
 ```bash
-PHASE_DESC=$(node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs roadmap get-phase "${PHASE}" | jq -r '.section')
+PHASE_DESC=$(node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs plan:roadmap get-phase "${PHASE}" | jq -r '.section')
 PHASE_REQ_IDS=$(echo "$PHASE_DESC" | grep -i "Requirements:" | head -1 | sed 's/.*Requirements:\*\*\s*//' | sed 's/[\[\]]//g')
 ```
 

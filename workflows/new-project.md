@@ -20,7 +20,7 @@ If `--auto` flag present:
 ## 1. Setup
 
 ```bash
-INIT=$(node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs init new-project --compact)
+INIT=$(node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs init:new-project --compact)
 ```
 
 Parse: `researcher_model`, `synthesizer_model`, `roadmapper_model`, `commit_docs`, `project_exists`, `needs_codebase_map`, `has_git`, `project_path`.
@@ -60,7 +60,7 @@ Write `.planning/PROJECT.md` using templates/project.md. For greenfield: require
 
 ```bash
 mkdir -p .planning
-node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs commit "docs: initialize project" --files .planning/PROJECT.md
+node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs execute:commit "docs: initialize project" --files .planning/PROJECT.md
 ```
 
 ## 4.5. Capture Project Intent
@@ -101,13 +101,13 @@ Also derive:
 Write INTENT.md using `intent create` with the structured data from answers:
 
 ```bash
-node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs intent create
+node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs plan:intent create
 ```
 
 Note: `intent create` reads from stdin when no arguments provided — pipe the structured intent data to it. Alternatively, write INTENT.md directly using the Write tool following the INTENT.md template format, then commit.
 
 ```bash
-node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs commit "docs: capture project intent" --files .planning/INTENT.md
+node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs execute:commit "docs: capture project intent" --files .planning/INTENT.md
 ```
 
 Present intent summary:
@@ -131,7 +131,7 @@ Check `~/.gsd/defaults.json` — if exists, offer to use saved defaults (skip qu
 Create config.json. If commit_docs=No: add `.planning/` to `.gitignore`.
 
 ```bash
-node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs commit "chore: add project config" --files .planning/config.json
+node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs execute:commit "chore: add project config" --files .planning/config.json
 ```
 
 ## 5.5. Resolve Model Profile
@@ -213,7 +213,7 @@ Requirements must be specific, testable, user-centric, and atomic.
 Present full list for confirmation. If "adjust" → loop.
 
 ```bash
-node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs commit "docs: define v1 requirements" --files .planning/REQUIREMENTS.md
+node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs execute:commit "docs: define v1 requirements" --files .planning/REQUIREMENTS.md
 ```
 
 ## 8. Create Roadmap
@@ -240,7 +240,7 @@ If ROADMAP CREATED: present inline (phases table + details).
 
 ```bash
 node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs validate roadmap --repair 2>/dev/null
-node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs commit "docs: create roadmap ([N] phases)" --files .planning/ROADMAP.md .planning/STATE.md .planning/REQUIREMENTS.md
+node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs execute:commit "docs: create roadmap ([N] phases)" --files .planning/ROADMAP.md .planning/STATE.md .planning/REQUIREMENTS.md
 ```
 
 ## 9. Done

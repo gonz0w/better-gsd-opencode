@@ -27,7 +27,7 @@ Fallback: check `package.json` scripts.test, or detect `pytest`/`go test`/`cargo
 Default: `npm test`.
 
 ```bash
-TEST_CMD=$(node {config_path}/bin/gsd-tools.cjs tdd auto-test --test-cmd "npm test" 2>/dev/null | jq -r '.test_cmd // "npm test"')
+TEST_CMD=$(node {config_path}/bin/gsd-tools.cjs execute:tdd auto-test --test-cmd "npm test" 2>/dev/null | jq -r '.test_cmd // "npm test"')
 ```
 </step>
 
@@ -43,7 +43,7 @@ TEST_CMD=$(node {config_path}/bin/gsd-tools.cjs tdd auto-test --test-cmd "npm te
 
 2. Run anti-pattern check:
    ```bash
-   node {config_path}/bin/gsd-tools.cjs tdd detect-antipattern --phase red --files <modified_files>
+    node {config_path}/bin/gsd-tools.cjs execute:tdd detect-antipattern --phase red --files <modified_files>
    ```
    - If warnings about **pre-test code** (non-test files modified): **STOP**.
      Remove non-test changes before proceeding. This is the Iron Law of TDD.
@@ -51,7 +51,7 @@ TEST_CMD=$(node {config_path}/bin/gsd-tools.cjs tdd auto-test --test-cmd "npm te
 
 3. Run validation gate:
    ```bash
-   node {config_path}/bin/gsd-tools.cjs tdd validate-red --test-cmd "<test_command>"
+    node {config_path}/bin/gsd-tools.cjs execute:tdd validate-red --test-cmd "<test_command>"
    ```
    - If `valid: false` (test passed when it should fail):
      Fix the test. The test must exercise genuinely missing behavior.
@@ -60,10 +60,10 @@ TEST_CMD=$(node {config_path}/bin/gsd-tools.cjs tdd auto-test --test-cmd "npm te
 
 4. Commit the failing test:
    ```bash
-   node {config_path}/bin/gsd-tools.cjs commit "test({phase}-{plan}): add failing test for {feature}" \
-     --files <test_file> \
-     --agent gsd-executor \
-     --tdd-phase red
+    node {config_path}/bin/gsd-tools.cjs execute:commit "test({phase}-{plan}): add failing test for {feature}" \
+      --files <test_file> \
+      --agent gsd-executor \
+      --tdd-phase red
    ```
 
 **Iron Law:** NEVER write implementation code before the RED gate passes.
@@ -81,7 +81,7 @@ TEST_CMD=$(node {config_path}/bin/gsd-tools.cjs tdd auto-test --test-cmd "npm te
 
 2. Run anti-pattern check:
    ```bash
-   node {config_path}/bin/gsd-tools.cjs tdd detect-antipattern --phase green --files <modified_files>
+    node {config_path}/bin/gsd-tools.cjs execute:tdd detect-antipattern --phase green --files <modified_files>
    ```
    - If warnings about **test modification**: investigate. Tests should be stable in GREEN.
      Exception: fixing a genuine test bug (typo, wrong assertion). Document as deviation.
@@ -90,17 +90,17 @@ TEST_CMD=$(node {config_path}/bin/gsd-tools.cjs tdd auto-test --test-cmd "npm te
 
 3. Run validation gate:
    ```bash
-   node {config_path}/bin/gsd-tools.cjs tdd validate-green --test-cmd "<test_command>"
+    node {config_path}/bin/gsd-tools.cjs execute:tdd validate-green --test-cmd "<test_command>"
    ```
    - If `valid: false` (test still fails): Debug the implementation. Iterate until green.
    - If `valid: true` (test passes): Proceed to commit.
 
 4. Commit the implementation:
    ```bash
-   node {config_path}/bin/gsd-tools.cjs commit "feat({phase}-{plan}): implement {feature}" \
-     --files <source_file> \
-     --agent gsd-executor \
-     --tdd-phase green
+    node {config_path}/bin/gsd-tools.cjs execute:commit "feat({phase}-{plan}): implement {feature}" \
+      --files <source_file> \
+      --agent gsd-executor \
+      --tdd-phase green
    ```
 </step>
 
@@ -120,7 +120,7 @@ TEST_CMD=$(node {config_path}/bin/gsd-tools.cjs tdd auto-test --test-cmd "npm te
 
 3. If refactoring, run validation gate after changes:
    ```bash
-   node {config_path}/bin/gsd-tools.cjs tdd validate-refactor --test-cmd "<test_command>"
+    node {config_path}/bin/gsd-tools.cjs execute:tdd validate-refactor --test-cmd "<test_command>"
    ```
    - If `valid: false` (tests broke): **Undo the refactor.**
      Either refactor in smaller steps or skip the refactor entirely.
@@ -128,10 +128,10 @@ TEST_CMD=$(node {config_path}/bin/gsd-tools.cjs tdd auto-test --test-cmd "npm te
 
 4. Commit the refactored code:
    ```bash
-   node {config_path}/bin/gsd-tools.cjs commit "refactor({phase}-{plan}): clean up {feature}" \
-     --files <modified_files> \
-     --agent gsd-executor \
-     --tdd-phase refactor
+    node {config_path}/bin/gsd-tools.cjs execute:commit "refactor({phase}-{plan}): clean up {feature}" \
+      --files <modified_files> \
+      --agent gsd-executor \
+      --tdd-phase refactor
    ```
 </step>
 
