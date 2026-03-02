@@ -8,6 +8,18 @@ A single-file Node.js CLI built from 34 organized `src/` modules via esbuild, pr
 
 Manage and deliver high-quality software with high-quality documentation, while continuously reducing token usage and improving performance.
 
+## Current Milestone: v8.0 Performance & Agent Architecture
+
+**Goal:** Make every agent do one thing well, eliminate overlap and gaps across the product lifecycle, and dramatically reduce execution time through caching (SQLite or similar), context optimization, and command consolidation.
+
+**Target features:**
+- Agent architecture audit — identify overlap, gaps, and consolidate roles
+- SQLite (or similar) read cache layer — markdown stays authoritative, cache eliminates repeated disk I/O
+- Context optimization — each agent gets exactly what it needs, deterministic context loading
+- Command consolidation — reduce sprawl via subcommand patterns (`/phase plan`, `/phase execute`)
+- Performance profiling — identify and fix disk I/O and memory bottlenecks
+- Milestone documentation — add docs generation to milestone wrapup workflow
+
 ## Current State
 
 **Last shipped:** v7.1 Trajectory Engineering (2026-03-02)
@@ -136,7 +148,12 @@ Manage and deliver high-quality software with high-quality documentation, while 
 
 ### Active
 
-(No active requirements — next milestone not yet started)
+- [ ] Agent architecture audit and consolidation (no overlap, no gaps)
+- [ ] SQLite/cache read layer for context loading (markdown authoritative)
+- [ ] Deterministic context loading per agent (only what's needed)
+- [ ] Command consolidation via subcommand patterns
+- [ ] Performance profiling and optimization (disk I/O, memory)
+- [ ] Milestone documentation generation in wrapup workflow
 
 ### Out of Scope
 
@@ -144,7 +161,7 @@ Manage and deliver high-quality software with high-quality documentation, while 
 - npm package publishing — Plugin deployed via file copy, not a library
 - ESM output format — CJS avoids __dirname/require rewriting
 - RAG / vector search — Wrong architecture for a CLI tool
-- SQLite codebase index — Heavy dependency, marginal ROI
+- ~~SQLite codebase index~~ — Reconsidered for v8.0 as read cache layer
 - Runtime MCP server connection — Static analysis sufficient
 - CI/CD pipeline management — Handled by external tooling
 - TypeScript migration — Not worth 34-module migration cost
@@ -205,4 +222,4 @@ Known tech debt: Bundle at 1058KB (slightly over 1050KB budget).
 | Trajectory analytics | Deferred to future milestone |
 
 ---
-*Last updated: 2026-03-02 after v7.1 milestone completion*
+*Last updated: 2026-03-01 after v8.0 milestone start*

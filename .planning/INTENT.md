@@ -14,12 +14,18 @@ An intelligent agent orchestration engine for building large-scale software. Pro
 
 <outcomes>
 - DO-20 [P2]: Commands that are slow get profiled and optimized — measurable latency improvement where it matters
-- DO-21 [P1]: Developer can checkpoint code state and decision context at any named point during execution
-- DO-22 [P1]: Developer can pivot to a different approach with recorded reasoning, rewinding to a prior checkpoint
-- DO-23 [P1]: Multiple attempts at the same task/plan/phase can be compared on outcome metrics (tests, complexity, LOC)
-- DO-24 [P1]: Winning approach can be merged back while alternatives are archived as named branches
-- DO-25 [P1]: Decision journal captures all trajectories — what was tried, why it was abandoned, what was chosen — consumable by agents and humans
-- DO-26 [P2]: Trajectory exploration works at task, plan, and phase levels with appropriate granularity at each
+- DO-21 [P1] [achieved v7.1]: Developer can checkpoint code state and decision context at any named point during execution
+- DO-22 [P1] [achieved v7.1]: Developer can pivot to a different approach with recorded reasoning, rewinding to a prior checkpoint
+- DO-23 [P1] [achieved v7.1]: Multiple attempts at the same task/plan/phase can be compared on outcome metrics (tests, complexity, LOC)
+- DO-24 [P1] [achieved v7.1]: Winning approach can be merged back while alternatives are archived as named branches
+- DO-25 [P1] [achieved v7.1]: Decision journal captures all trajectories — what was tried, why it was abandoned, what was chosen — consumable by agents and humans
+- DO-26 [P2] [achieved v7.1]: Trajectory exploration works at task, plan, and phase levels with appropriate granularity at each
+- DO-27 [P1]: Agent roles have zero overlap — each agent has a single, clear responsibility with no duplicated work
+- DO-28 [P1]: Context loading is deterministic — agents receive pre-computed context, not search-and-discover
+- DO-29 [P1]: Read cache (SQLite or similar) eliminates repeated filesystem reads — markdown authoritative, cache serves hot data
+- DO-30 [P1]: Commands consolidated into subcommand groups — fewer top-level commands, same capabilities
+- DO-31 [P2]: Milestone wrapup generates documentation automatically
+- DO-32 [P2]: Memory and disk I/O usage measurably reduced vs v7.1 baselines
 </outcomes>
 
 <criteria>
@@ -28,11 +34,16 @@ An intelligent agent orchestration engine for building large-scale software. Pro
 - SC-03: `intent drift` produces numeric score; init commands show drift advisory
 - SC-04: All GSD workflows (research, plan, execute, verify) receive intent context automatically
 - SC-05: GSD's own .planning/INTENT.md is maintained alongside its roadmap
-- SC-14: `trajectory checkpoint` creates named snapshot with code state + decision context
-- SC-15: `trajectory pivot` records abandonment reason, rewinds code to checkpoint, writes context bridge file
-- SC-16: `trajectory compare` shows outcome metrics (tests, complexity, LOC) across all attempts
-- SC-17: `trajectory choose` merges winner and archives alternatives as named git branches
-- SC-18: Decision journal entries are auto-injected into agent context during execution to prevent dead-end re-exploration
+- SC-14 [achieved v7.1]: `trajectory checkpoint` creates named snapshot with code state + decision context
+- SC-15 [achieved v7.1]: `trajectory pivot` records abandonment reason, rewinds code to checkpoint, writes context bridge file
+- SC-16 [achieved v7.1]: `trajectory compare` shows outcome metrics (tests, complexity, LOC) across all attempts
+- SC-17 [achieved v7.1]: `trajectory choose` merges winner and archives alternatives as named git branches
+- SC-18 [achieved v7.1]: Decision journal entries are auto-injected into agent context during execution to prevent dead-end re-exploration
+- SC-19: Agent audit document maps every lifecycle stage to exactly one agent with no overlapping responsibilities
+- SC-20: SQLite (or similar) cache serves context reads; cache miss falls through to filesystem transparently
+- SC-21: Agent init commands load context from cache in <100ms (vs current filesystem baseline)
+- SC-22: Top-level slash commands reduced by ≥50% via subcommand grouping
+- SC-23: Milestone wrapup workflow produces documentation artifact automatically
 </criteria>
 
 <constraints>
@@ -47,9 +58,10 @@ An intelligent agent orchestration engine for building large-scale software. Pro
 
 <health>
 ### Quantitative
-- HM-02: All tests pass (669 currently) with zero regressions after each phase
-- HM-03: Init commands complete in <500ms even with analysis context injection
-- HM-04: Agent context load is measurably reduced vs v6.0 baselines (tokens per agent invocation)
+- HM-02: All tests pass (751 currently) with zero regressions after each phase
+- HM-03: Init commands complete in <100ms with cache layer (current baseline <500ms)
+- HM-04: Agent context load is measurably reduced vs v7.1 baselines (tokens per agent invocation)
+- HM-05: Disk I/O operations per agent invocation measurably reduced vs v7.1 baseline
 
 ### Qualitative
 Orchestration should feel invisible — the right agent gets the right task with the right context, and the developer only sees results. Agent coordination overhead should decrease, not increase, as more specialized roles are added.
