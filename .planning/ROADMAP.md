@@ -11,7 +11,7 @@
 - ✅ **v6.0 UX & Developer Experience** — Phases 30-36 (shipped 2026-02-27)
 - ✅ **v7.0 Agent Orchestration & Efficiency** — Phases 37-44 (shipped 2026-02-27)
 - ✅ **v7.1 Trajectory Engineering** — Phases 45-50 (shipped 2026-03-02)
-- 🚧 **v8.0 Performance & Agent Architecture** — Phases 51-55 (1/2 plans complete in Phase 55)
+- 🚧 **v8.0 Performance & Agent Architecture** — Phases 51-55 (2/2 plans complete in Phase 55)
 
 ## Phases
 
@@ -145,7 +145,7 @@ Full details: `.planning/milestones/v7.1-ROADMAP.md`
 - [x] **Phase 52: Cache Integration & Warm-up** - Wire cache into hot paths, add warm command, prove test parity (2/2 plans, ready to execute)
 - [x] **Phase 53: Agent Consolidation** - RACI matrix, agent merges, manifest-driven context, token budgets, lifecycle audit (completed 2026-03-02)
 - [x] **Phase 54: Command Consolidation** - Namespace grouping, reference updates, milestone docs generation (completed 2026-03-02)
-- [ ] **Phase 55: Profiler & Performance Validation** - Hot-path instrumentation, baseline comparison, prove speedup (2/2 plans)
+- [x] **Phase 55: Profiler & Performance Validation** - Hot-path instrumentation, baseline comparison, prove speedup (2/2 plans)
 
 ## Phase Details
 
