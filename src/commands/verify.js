@@ -556,7 +556,7 @@ function cmdValidateHealth(cwd, options, raw) {
 
   // Check 8: Run existing consistency checks
   if (fs.existsSync(roadmapPath)) {
-    const roadmapContent = fs.readFileSync(roadmapPath, 'utf-8');
+    const roadmapContent = cachedReadFile(roadmapPath);
     const roadmapPhases = new Set();
     const phasePattern = /#{2,4}\s*Phase\s+(\d+(?:\.\d+)?)\s*:/gi;
     let m;
@@ -2134,7 +2134,7 @@ function cmdValidateRoadmap(cwd, options, raw) {
 
   // Repair: add missing checklist entries
   if (options && options.repair) {
-    let content = fs.readFileSync(roadmapPath, 'utf-8');
+    let content = cachedReadFile(roadmapPath);
     let fixed = false;
     for (const [n, info] of sections) {
       if (!checklist.has(n)) {

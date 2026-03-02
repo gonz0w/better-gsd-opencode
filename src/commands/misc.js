@@ -673,7 +673,7 @@ function cmdVerifySummary(cwd, summaryPath, checkFileCount, raw) {
     return;
   }
 
-  const content = fs.readFileSync(fullPath, 'utf-8');
+  const content = cachedReadFile(fullPath);
   const errors = [];
 
   // Check 2: Spot-check files mentioned in summary
@@ -752,7 +752,7 @@ function cmdTemplateSelect(cwd, planPath, raw) {
 
   try {
     const fullPath = path.join(cwd, planPath);
-    const content = fs.readFileSync(fullPath, 'utf-8');
+    const content = cachedReadFile(fullPath);
     
     // Simple heuristics
     const taskMatch = content.match(/###\s*Task\s*\d+/g) || [];
@@ -1004,7 +1004,7 @@ function cmdPhasePlanIndex(cwd, phase, raw) {
   for (const planFile of planFiles) {
     const planId = planFile.replace('-PLAN.md', '').replace('PLAN.md', '');
     const planPath = path.join(phaseDir, planFile);
-    const content = fs.readFileSync(planPath, 'utf-8');
+    const content = cachedReadFile(planPath);
     const fm = extractFrontmatter(content);
 
     // Count tasks (## Task N patterns)
@@ -1074,7 +1074,7 @@ function cmdStateSnapshot(cwd, raw) {
     return;
   }
 
-  const content = fs.readFileSync(statePath, 'utf-8');
+  const content = cachedReadFile(statePath);
 
   // Helper to extract **Field:** value patterns
   const extractField = (fieldName) => {
@@ -1179,7 +1179,7 @@ function cmdSummaryExtract(cwd, summaryPath, fields, raw) {
     return;
   }
 
-  const content = fs.readFileSync(fullPath, 'utf-8');
+  const content = cachedReadFile(fullPath);
   const fm = extractFrontmatter(content);
 
   // Parse key-decisions into structured format
@@ -1304,7 +1304,7 @@ function cmdFrontmatterSet(cwd, filePath, field, value, raw) {
   if (!filePath || !field || value === undefined) { error('file, field, and value required'); }
   const fullPath = path.isAbsolute(filePath) ? filePath : path.join(cwd, filePath);
   if (!fs.existsSync(fullPath)) { output({ error: 'File not found', path: filePath }, raw); return; }
-  const content = fs.readFileSync(fullPath, 'utf-8');
+  const content = cachedReadFile(fullPath);
   const fm = extractFrontmatter(content);
   let parsedValue;
   try { parsedValue = JSON.parse(value); } catch (e) { debugLog('frontmatter.set', 'JSON parse value failed, using string', e); parsedValue = value; }
@@ -1318,7 +1318,7 @@ function cmdFrontmatterMerge(cwd, filePath, data, raw) {
   if (!filePath || !data) { error('file and data required'); }
   const fullPath = path.isAbsolute(filePath) ? filePath : path.join(cwd, filePath);
   if (!fs.existsSync(fullPath)) { output({ error: 'File not found', path: filePath }, raw); return; }
-  const content = fs.readFileSync(fullPath, 'utf-8');
+  const content = cachedReadFile(fullPath);
   const fm = extractFrontmatter(content);
   let mergeData;
   try { mergeData = JSON.parse(data); } catch (e) { debugLog('frontmatter.merge', 'JSON parse --data failed', e); error('Invalid JSON for --data'); return; }
@@ -1572,7 +1572,7 @@ function cmdReview(cwd, args, raw) {
   let conventions = null;
   try { const intel = require('../lib/codebase-intel').readIntel(cwd); if (intel) conventions = intel.conventions || null; } catch (e) { debugLog('review', 'intel', e); }
   let conventionsDoc = null;
-  try { conventionsDoc = fs.readFileSync(path.join(cwd, '.planning', 'codebase', 'CONVENTIONS.md'), 'utf-8'); } catch (e) { /* optional */ }
+  try { conventionsDoc = cachedReadFile(path.join(cwd, '.planning', 'codebase', 'CONVENTIONS.md')); } catch (e) { /* optional */ }
 
   output({
     phase: `${phaseInfo.phase_number}-${phaseInfo.phase_name}`,

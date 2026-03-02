@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const { output, error, debugLog } = require('../lib/output');
-const { normalizePhaseName, getArchivedPhaseDirs, findPhaseInternal, generateSlugInternal, getMilestoneInfo, invalidateFileCache } = require('../lib/helpers');
+const { normalizePhaseName, getArchivedPhaseDirs, findPhaseInternal, generateSlugInternal, getMilestoneInfo, invalidateFileCache, cachedReadFile } = require('../lib/helpers');
 const { extractFrontmatter } = require('../lib/frontmatter');
 const { execGit } = require('../lib/git');
 
@@ -179,7 +179,7 @@ function cmdPhaseAdd(cwd, description, raw) {
     error('ROADMAP.md not found');
   }
 
-  const content = fs.readFileSync(roadmapPath, 'utf-8');
+  const content = cachedReadFile(roadmapPath);
   const slug = generateSlugInternal(description);
 
   // Find highest integer phase number
@@ -237,7 +237,7 @@ function cmdPhaseInsert(cwd, afterPhase, description, raw) {
     error('ROADMAP.md not found');
   }
 
-  const content = fs.readFileSync(roadmapPath, 'utf-8');
+  const content = cachedReadFile(roadmapPath);
   const slug = generateSlugInternal(description);
 
   // Normalize input then strip leading zeros for flexible matching
@@ -455,7 +455,7 @@ function cmdPhaseRemove(cwd, targetPhase, options, raw) {
   }
 
   // Update ROADMAP.md
-  let roadmapContent = fs.readFileSync(roadmapPath, 'utf-8');
+  let roadmapContent = cachedReadFile(roadmapPath);
 
   // Remove the target phase section
   const targetEscaped = targetPhase.replace(/\./g, '\\.');
@@ -518,7 +518,7 @@ function cmdPhaseRemove(cwd, targetPhase, options, raw) {
   // Update STATE.md phase count
   const statePath = path.join(cwd, '.planning', 'STATE.md');
   if (fs.existsSync(statePath)) {
-    let stateContent = fs.readFileSync(statePath, 'utf-8');
+    let stateContent = cachedReadFile(statePath);
     const totalPattern = /(\*\*Total Phases:\*\*\s*)(\d+)/;
     const totalMatch = stateContent.match(totalPattern);
     if (totalMatch) {
@@ -569,7 +569,7 @@ function cmdRequirementsMarkComplete(cwd, reqIdsRaw, raw) {
     return;
   }
 
-  let reqContent = fs.readFileSync(reqPath, 'utf-8');
+  let reqContent = cachedReadFile(reqPath);
   const updated = [];
   const notFound = [];
 
@@ -632,7 +632,7 @@ function cmdPhaseComplete(cwd, phaseNum, raw) {
 
   // Update ROADMAP.md: mark phase complete
   if (fs.existsSync(roadmapPath)) {
-    let roadmapContent = fs.readFileSync(roadmapPath, 'utf-8');
+    let roadmapContent = cachedReadFile(roadmapPath);
 
     const checkboxPattern = new RegExp(
       `(-\\s*\\[)[ ](\\]\\s*.*Phase\\s+${phaseNum.replace('.', '\\.')}[:\\s][^\\n]*)`,
@@ -671,7 +671,7 @@ function cmdPhaseComplete(cwd, phaseNum, raw) {
 
       if (reqMatch) {
         const reqIds = reqMatch[1].replace(/[\[\]]/g, '').split(/[,\s]+/).map(r => r.trim()).filter(Boolean);
-        let reqContent = fs.readFileSync(reqPath, 'utf-8');
+        let reqContent = cachedReadFile(reqPath);
 
         for (const reqId of reqIds) {
           reqContent = reqContent.replace(
@@ -720,7 +720,7 @@ function cmdPhaseComplete(cwd, phaseNum, raw) {
   let uncheckedRoadmapPhases = [];
   if (fs.existsSync(roadmapPath)) {
     try {
-      const roadmapContent = fs.readFileSync(roadmapPath, 'utf-8');
+      const roadmapContent = cachedReadFile(roadmapPath);
 
       // Collect all ### Phase N: sections
       const sectionPhases = [];
@@ -783,7 +783,7 @@ function cmdPhaseComplete(cwd, phaseNum, raw) {
 
   // Update STATE.md
   if (fs.existsSync(statePath)) {
-    let stateContent = fs.readFileSync(statePath, 'utf-8');
+    let stateContent = cachedReadFile(statePath);
 
     stateContent = stateContent.replace(
       /(\*\*Current Phase:\*\*\s*).*/,
@@ -875,7 +875,7 @@ function cmdMilestoneComplete(cwd, version, options, raw) {
 
       for (const s of summaries) {
         try {
-          const content = fs.readFileSync(path.join(phasesDir, dir, s), 'utf-8');
+          const content = cachedReadFile(path.join(phasesDir, dir, s));
           const fm = extractFrontmatter(content);
           if (fm['one-liner']) {
             accomplishments.push(fm['one-liner']);
@@ -889,13 +889,13 @@ function cmdMilestoneComplete(cwd, version, options, raw) {
 
   // Archive ROADMAP.md
   if (fs.existsSync(roadmapPath)) {
-    const roadmapContent = fs.readFileSync(roadmapPath, 'utf-8');
+    const roadmapContent = cachedReadFile(roadmapPath);
     fs.writeFileSync(path.join(archiveDir, `${version}-ROADMAP.md`), roadmapContent, 'utf-8');
   }
 
   // Archive REQUIREMENTS.md
   if (fs.existsSync(reqPath)) {
-    const reqContent = fs.readFileSync(reqPath, 'utf-8');
+    const reqContent = cachedReadFile(reqPath);
     const archiveHeader = `# Requirements Archive: ${version} ${milestoneName}\n\n**Archived:** ${today}\n**Status:** SHIPPED\n\nFor current requirements, see \`.planning/REQUIREMENTS.md\`.\n\n---\n\n`;
     fs.writeFileSync(path.join(archiveDir, `${version}-REQUIREMENTS.md`), archiveHeader + reqContent, 'utf-8');
   }
@@ -911,7 +911,7 @@ function cmdMilestoneComplete(cwd, version, options, raw) {
   const milestoneEntry = `## ${version} ${milestoneName} (Shipped: ${today})\n\n**Phases completed:** ${phaseCount} phases, ${totalPlans} plans, ${totalTasks} tasks\n\n**Key accomplishments:**\n${accomplishmentsList || '- (none recorded)'}\n\n---\n\n`;
 
   if (fs.existsSync(milestonesPath)) {
-    const existing = fs.readFileSync(milestonesPath, 'utf-8');
+    const existing = cachedReadFile(milestonesPath);
     fs.writeFileSync(milestonesPath, existing + '\n' + milestoneEntry, 'utf-8');
     invalidateFileCache(milestonesPath);
   } else {
@@ -921,7 +921,7 @@ function cmdMilestoneComplete(cwd, version, options, raw) {
 
   // Update STATE.md
   if (fs.existsSync(statePath)) {
-    let stateContent = fs.readFileSync(statePath, 'utf-8');
+    let stateContent = cachedReadFile(statePath);
     stateContent = stateContent.replace(
       /(\*\*Status:\*\*\s*).*/,
       `$1${version} milestone complete`
