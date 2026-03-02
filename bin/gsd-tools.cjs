@@ -1247,7 +1247,7 @@ var require_output = __commonJS({
         process.stdout.write(json);
       }
     }
-    function output(result, options) {
+    function output2(result, options) {
       if (typeof options === "boolean") {
         outputJSON(result, arguments[2]);
         process.exit(process.exitCode || 0);
@@ -1280,7 +1280,7 @@ var require_output = __commonJS({
       if (err) line += ` | ${err.message || err}`;
       process.stderr.write(line + "\n");
     }
-    module2.exports = { _tmpFiles, filterFields, output, outputMode, status, error, debugLog };
+    module2.exports = { _tmpFiles, filterFields, output: output2, outputMode, status, error, debugLog };
   }
 });
 
@@ -1397,6 +1397,348 @@ var require_regex_cache = __commonJS({
       COMMIT_SHA,
       UNCHECKED_PHASE
     };
+  }
+});
+
+// src/lib/cache.js
+var require_cache = __commonJS({
+  "src/lib/cache.js"(exports2, module2) {
+    "use strict";
+    var fs = require("fs");
+    var path = require("path");
+    var stats = { hits: 0, misses: 0 };
+    var SQLiteBackend = class {
+      constructor(options = {}) {
+        this.maxSize = options.maxSize || 1e3;
+        this.ttl = options.ttl || 36e5;
+        const configHome = process.env.XDG_CONFIG_HOME || path.join(process.env.HOME || "/root", ".config");
+        const gsdConfigDir = path.join(configHome, "oc", "get-shit-done");
+        this.dbPath = path.join(gsdConfigDir, "cache.db");
+        if (!fs.existsSync(gsdConfigDir)) {
+          fs.mkdirSync(gsdConfigDir, { recursive: true });
+        }
+        const { DatabaseSync } = require("node:sqlite");
+        this.db = new DatabaseSync(this.dbPath);
+        this._initSchema();
+      }
+      _initSchema() {
+        this.db.exec(`
+      CREATE TABLE IF NOT EXISTS file_cache (
+        key TEXT PRIMARY KEY,
+        value TEXT NOT NULL,
+        mtime REAL NOT NULL,
+        created REAL NOT NULL,
+        accessed REAL NOT NULL
+      )
+    `);
+      }
+      /**
+       * Get value from cache with staleness check.
+       * Returns null if not found or stale.
+       */
+      get(key) {
+        try {
+          const stmt = this.db.prepare("SELECT * FROM file_cache WHERE key = ?");
+          const row = stmt.get(key);
+          if (!row) {
+            stats.misses++;
+            return null;
+          }
+          try {
+            const fileStats = fs.statSync(key);
+            if (fileStats.mtimeMs > row.mtime) {
+              this.invalidate(key);
+              stats.misses++;
+              return null;
+            }
+          } catch (e) {
+            this.invalidate(key);
+            stats.misses++;
+            return null;
+          }
+          this.db.prepare("UPDATE file_cache SET accessed = ? WHERE key = ?").run(Date.now(), key);
+          stats.hits++;
+          return row.value;
+        } catch (e) {
+          stats.misses++;
+          return null;
+        }
+      }
+      /**
+       * Set value in cache with LRU eviction.
+       */
+      set(key, value) {
+        try {
+          let mtime = Date.now();
+          try {
+            const fileStats = fs.statSync(key);
+            mtime = fileStats.mtimeMs;
+          } catch (e) {
+          }
+          const now = Date.now();
+          const countStmt = this.db.prepare("SELECT COUNT(*) as cnt FROM file_cache");
+          const countResult = countStmt.get();
+          if (countResult.cnt >= this.maxSize) {
+            const oldestStmt = this.db.prepare(
+              "SELECT key FROM file_cache ORDER BY accessed ASC LIMIT 1"
+            );
+            const oldest = oldestStmt.get();
+            if (oldest) {
+              this.db.prepare("DELETE FROM file_cache WHERE key = ?").run(oldest.key);
+            }
+          }
+          this.db.prepare(`
+        INSERT OR REPLACE INTO file_cache (key, value, mtime, created, accessed)
+        VALUES (?, ?, ?, ?, ?)
+      `).run(key, value, mtime, now, now);
+        } catch (e) {
+        }
+      }
+      /**
+       * Invalidate a specific cache entry.
+       */
+      invalidate(key) {
+        try {
+          this.db.prepare("DELETE FROM file_cache WHERE key = ?").run(key);
+        } catch (e) {
+        }
+      }
+      /**
+       * Clear all cache entries.
+       */
+      clear() {
+        try {
+          this.db.prepare("DELETE FROM file_cache").run();
+        } catch (e) {
+        }
+      }
+      /**
+       * Get cache status.
+       */
+      status() {
+        try {
+          const countStmt = this.db.prepare("SELECT COUNT(*) as cnt FROM file_cache");
+          const countResult = countStmt.get();
+          return {
+            backend: "SQLite",
+            count: countResult.cnt,
+            hits: stats.hits,
+            misses: stats.misses,
+            dbPath: this.dbPath
+          };
+        } catch (e) {
+          return {
+            backend: "SQLite",
+            count: 0,
+            hits: stats.hits,
+            misses: stats.misses,
+            error: e.message
+          };
+        }
+      }
+      /**
+       * Warm cache with files.
+       */
+      warm(files) {
+        let warmed = 0;
+        for (const filePath of files) {
+          try {
+            if (fs.existsSync(filePath)) {
+              const content = fs.readFileSync(filePath, "utf-8");
+              this.set(filePath, content);
+              warmed++;
+            }
+          } catch (e) {
+          }
+        }
+        return warmed;
+      }
+    };
+    var MapBackend = class {
+      constructor(options = {}) {
+        this.maxSize = options.maxSize || 1e3;
+        this.ttl = options.ttl || 36e5;
+        this.cache = /* @__PURE__ */ new Map();
+      }
+      /**
+       * Get value from cache with staleness check.
+       * Returns null if not found or stale.
+       */
+      get(key) {
+        const entry = this.cache.get(key);
+        if (!entry) {
+          stats.misses++;
+          return null;
+        }
+        try {
+          const fileStats = fs.statSync(key);
+          if (fileStats.mtimeMs > entry.mtime) {
+            this.cache.delete(key);
+            stats.misses++;
+            return null;
+          }
+        } catch (e) {
+          this.cache.delete(key);
+          stats.misses++;
+          return null;
+        }
+        const value = entry.value;
+        this.cache.delete(key);
+        this.cache.set(key, {
+          value,
+          mtime: entry.mtime,
+          created: entry.created,
+          accessed: Date.now()
+        });
+        stats.hits++;
+        return value;
+      }
+      /**
+       * Set value in cache with LRU eviction.
+       */
+      set(key, value) {
+        let mtime = Date.now();
+        try {
+          const fileStats = fs.statSync(key);
+          mtime = fileStats.mtimeMs;
+        } catch (e) {
+        }
+        const now = Date.now();
+        if (this.cache.has(key)) {
+          this.cache.delete(key);
+        }
+        if (this.cache.size >= this.maxSize) {
+          const oldestKey = this.cache.keys().next().value;
+          if (oldestKey) {
+            this.cache.delete(oldestKey);
+          }
+        }
+        this.cache.set(key, {
+          value,
+          mtime,
+          created: now,
+          accessed: now
+        });
+      }
+      /**
+       * Invalidate a specific cache entry.
+       */
+      invalidate(key) {
+        this.cache.delete(key);
+      }
+      /**
+       * Clear all cache entries.
+       */
+      clear() {
+        this.cache.clear();
+      }
+      /**
+       * Get cache status.
+       */
+      status() {
+        return {
+          backend: "Map",
+          count: this.cache.size,
+          hits: stats.hits,
+          misses: stats.misses,
+          maxSize: this.maxSize
+        };
+      }
+      /**
+       * Warm cache with files.
+       */
+      warm(files) {
+        let warmed = 0;
+        for (const filePath of files) {
+          try {
+            if (fs.existsSync(filePath)) {
+              const content = fs.readFileSync(filePath, "utf-8");
+              this.set(filePath, content);
+              warmed++;
+            }
+          } catch (e) {
+          }
+        }
+        return warmed;
+      }
+    };
+    var CacheEngine = class {
+      /**
+       * Create a new CacheEngine instance.
+       * @param {Object} options - Configuration options
+       * @param {number} options.maxSize - Maximum cache entries (default: 1000)
+       * @param {number} options.ttl - Time to live in ms (default: 3600000 = 1 hour)
+       */
+      constructor(options = {}) {
+        this.maxSize = options.maxSize || 1e3;
+        this.ttl = options.ttl || 36e5;
+        this.backend = this._selectBackend();
+      }
+      /**
+       * Select the appropriate backend based on Node version and environment.
+       */
+      _selectBackend() {
+        if (process.env.GSD_CACHE_FORCE_MAP === "1") {
+          return new MapBackend({ maxSize: this.maxSize, ttl: this.ttl });
+        }
+        const nodeVersion = parseInt(process.version.slice(1).split(".")[0], 10);
+        const nodeMinor = parseInt(process.version.split(".")[1], 10);
+        const supportsSQLite = nodeVersion > 22 || nodeVersion === 22 && nodeMinor >= 5;
+        if (supportsSQLite) {
+          try {
+            return new SQLiteBackend({ maxSize: this.maxSize, ttl: this.ttl });
+          } catch (e) {
+            return new MapBackend({ maxSize: this.maxSize, ttl: this.ttl });
+          }
+        }
+        return new MapBackend({ maxSize: this.maxSize, ttl: this.ttl });
+      }
+      /**
+       * Get value from cache.
+       * @param {string} key - Cache key (typically file path)
+       * @returns {string|null} Cached value or null if not found/stale
+       */
+      get(key) {
+        return this.backend.get(key);
+      }
+      /**
+       * Set value in cache.
+       * @param {string} key - Cache key (typically file path)
+       * @param {string} value - Value to cache
+       */
+      set(key, value) {
+        this.backend.set(key, value);
+      }
+      /**
+       * Invalidate a specific cache entry.
+       * @param {string} key - Cache key to invalidate
+       */
+      invalidate(key) {
+        this.backend.invalidate(key);
+      }
+      /**
+       * Clear all cache entries.
+       */
+      clear() {
+        this.backend.clear();
+      }
+      /**
+       * Get cache status information.
+       * @returns {Object} Status object with backend type, count, and stats
+       */
+      status() {
+        return this.backend.status();
+      }
+      /**
+       * Warm cache with files.
+       * @param {string[]} files - Array of file paths to cache
+       * @returns {number} Number of files warmed
+       */
+      warm(files) {
+        return this.backend.warm(files);
+      }
+    };
+    module2.exports = { CacheEngine };
   }
 });
 
@@ -1559,7 +1901,29 @@ var require_helpers = __commonJS({
     var { loadConfig } = require_config();
     var { MODEL_PROFILES } = require_constants();
     var { cachedRegex, PHASE_DIR_NUMBER } = require_regex_cache();
-    var fileCache = /* @__PURE__ */ new Map();
+    var _cacheEngine = null;
+    function getCacheEngine() {
+      if (!_cacheEngine) {
+        try {
+          const { CacheEngine } = require_cache();
+          _cacheEngine = new CacheEngine();
+        } catch (e) {
+          debugLog("cache", "failed to load CacheEngine, using in-memory fallback", e);
+          _cacheEngine = {
+            get: () => null,
+            set: () => {
+            },
+            invalidate: () => {
+            },
+            clear: () => {
+            },
+            status: () => ({ backend: "fallback", count: 0, hits: 0, misses: 0 }),
+            warm: () => 0
+          };
+        }
+      }
+      return _cacheEngine;
+    }
     var dirCache = /* @__PURE__ */ new Map();
     function safeReadFile(filePath) {
       try {
@@ -1570,21 +1934,24 @@ var require_helpers = __commonJS({
       }
     }
     function cachedReadFile(filePath) {
-      if (fileCache.has(filePath)) {
+      const cacheEngine = getCacheEngine();
+      const cached = cacheEngine.get(filePath);
+      if (cached !== null) {
         debugLog("file.cache", `cache hit: ${filePath}`);
-        return fileCache.get(filePath);
+        return cached;
       }
       const content = safeReadFile(filePath);
       if (content !== null) {
-        fileCache.set(filePath, content);
+        cacheEngine.set(filePath, content);
       }
       return content;
     }
     function invalidateFileCache(filePath) {
+      const cacheEngine = getCacheEngine();
       if (filePath) {
-        fileCache.delete(filePath);
+        cacheEngine.invalidate(filePath);
       } else {
-        fileCache.clear();
+        cacheEngine.clear();
       }
     }
     function cachedReaddirSync(dirPath, options) {
@@ -2864,7 +3231,7 @@ var require_state = __commonJS({
   "src/commands/state.js"(exports2, module2) {
     var fs = require("fs");
     var path = require("path");
-    var { output, error, debugLog } = require_output();
+    var { output: output2, error, debugLog } = require_output();
     var { loadConfig } = require_config();
     var { safeReadFile, cachedReadFile, invalidateFileCache, normalizePhaseName, findPhaseInternal, getPhaseTree } = require_helpers();
     var { execGit } = require_git();
@@ -2967,7 +3334,7 @@ var require_state = __commonJS({
         `roadmap_exists=${roadmapExists}`,
         `state_exists=${stateExists}`
       ].join("\n");
-      output(result, { formatter: formatStateShow, rawValue: rawLines });
+      output2(result, { formatter: formatStateShow, rawValue: rawLines });
     }
     function cmdStateGet(cwd, section, raw) {
       const statePath = path.join(cwd, ".planning", "STATE.md");
@@ -2976,13 +3343,13 @@ var require_state = __commonJS({
         error("STATE.md not found");
       }
       if (!section) {
-        output({ content }, raw, content);
+        output2({ content }, raw, content);
         return;
       }
       const fieldMatch = content.match(getFieldReplaceRegex(section));
       if (fieldMatch) {
         const val = fieldMatch[2].trim();
-        output({ [section]: val }, raw, val);
+        output2({ [section]: val }, raw, val);
         return;
       }
       const fieldEscaped = section.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -2990,10 +3357,10 @@ var require_state = __commonJS({
 ([\\s\\S]*?)(?=\\n##|$)`, "i");
       const sectionMatch = content.match(sectionPattern);
       if (sectionMatch) {
-        output({ [section]: sectionMatch[1].trim() }, raw, sectionMatch[1].trim());
+        output2({ [section]: sectionMatch[1].trim() }, raw, sectionMatch[1].trim());
         return;
       }
-      output({ error: `Section or field "${section}" not found` }, raw, "");
+      output2({ error: `Section or field "${section}" not found` }, raw, "");
     }
     function cmdStatePatch(cwd, patches, raw) {
       const statePath = path.join(cwd, ".planning", "STATE.md");
@@ -3015,7 +3382,7 @@ var require_state = __commonJS({
         fs.writeFileSync(statePath, content, "utf-8");
         invalidateFileCache(statePath);
       }
-      output(results, raw, results.updated.length > 0 ? "true" : "false");
+      output2(results, raw, results.updated.length > 0 ? "true" : "false");
     }
     function cmdStateUpdate(cwd, field, value) {
       if (!field || value === void 0) {
@@ -3024,7 +3391,7 @@ var require_state = __commonJS({
       const statePath = path.join(cwd, ".planning", "STATE.md");
       let content = cachedReadFile(statePath);
       if (!content) {
-        output({ updated: false, reason: "STATE.md not found" });
+        output2({ updated: false, reason: "STATE.md not found" });
         return;
       }
       const pattern = getFieldReplaceRegex(field);
@@ -3032,9 +3399,9 @@ var require_state = __commonJS({
         content = content.replace(pattern, `$1${value}`);
         fs.writeFileSync(statePath, content, "utf-8");
         invalidateFileCache(statePath);
-        output({ updated: true });
+        output2({ updated: true });
       } else {
-        output({ updated: false, reason: `Field "${field}" not found in STATE.md` });
+        output2({ updated: false, reason: `Field "${field}" not found in STATE.md` });
       }
     }
     function stateExtractField(content, fieldName) {
@@ -3053,14 +3420,14 @@ var require_state = __commonJS({
       const statePath = path.join(cwd, ".planning", "STATE.md");
       let content = cachedReadFile(statePath);
       if (!content) {
-        output({ error: "STATE.md not found" }, raw);
+        output2({ error: "STATE.md not found" }, raw);
         return;
       }
       const currentPlan = parseInt(stateExtractField(content, "Current Plan"), 10);
       const totalPlans = parseInt(stateExtractField(content, "Total Plans in Phase"), 10);
       const today = (/* @__PURE__ */ new Date()).toISOString().split("T")[0];
       if (isNaN(currentPlan) || isNaN(totalPlans)) {
-        output({ error: "Cannot parse Current Plan or Total Plans in Phase from STATE.md" }, raw);
+        output2({ error: "Cannot parse Current Plan or Total Plans in Phase from STATE.md" }, raw);
         return;
       }
       if (currentPlan >= totalPlans) {
@@ -3068,7 +3435,7 @@ var require_state = __commonJS({
         content = stateReplaceField(content, "Last Activity", today) || content;
         fs.writeFileSync(statePath, content, "utf-8");
         invalidateFileCache(statePath);
-        output({ advanced: false, reason: "last_plan", current_plan: currentPlan, total_plans: totalPlans, status: "ready_for_verification" }, raw, "false");
+        output2({ advanced: false, reason: "last_plan", current_plan: currentPlan, total_plans: totalPlans, status: "ready_for_verification" }, raw, "false");
       } else {
         const newPlan = currentPlan + 1;
         content = stateReplaceField(content, "Current Plan", String(newPlan)) || content;
@@ -3076,19 +3443,19 @@ var require_state = __commonJS({
         content = stateReplaceField(content, "Last Activity", today) || content;
         fs.writeFileSync(statePath, content, "utf-8");
         invalidateFileCache(statePath);
-        output({ advanced: true, previous_plan: currentPlan, current_plan: newPlan, total_plans: totalPlans }, raw, "true");
+        output2({ advanced: true, previous_plan: currentPlan, current_plan: newPlan, total_plans: totalPlans }, raw, "true");
       }
     }
     function cmdStateRecordMetric(cwd, options, raw) {
       const statePath = path.join(cwd, ".planning", "STATE.md");
       let content = cachedReadFile(statePath);
       if (!content) {
-        output({ error: "STATE.md not found" }, raw);
+        output2({ error: "STATE.md not found" }, raw);
         return;
       }
       const { phase, plan, duration, tasks, files } = options;
       if (!phase || !plan || !duration) {
-        output({ error: "phase, plan, and duration required" }, raw);
+        output2({ error: "phase, plan, and duration required" }, raw);
         return;
       }
       const metricsPattern = /(##\s*Performance Metrics[\s\S]*?\n\|[^\n]+\n\|[-|\s]+\n)([\s\S]*?)(?=\n##|\n$|$)/i;
@@ -3106,16 +3473,16 @@ var require_state = __commonJS({
 `);
         fs.writeFileSync(statePath, content, "utf-8");
         invalidateFileCache(statePath);
-        output({ recorded: true, phase, plan, duration }, raw, "true");
+        output2({ recorded: true, phase, plan, duration }, raw, "true");
       } else {
-        output({ recorded: false, reason: "Performance Metrics section not found in STATE.md" }, raw, "false");
+        output2({ recorded: false, reason: "Performance Metrics section not found in STATE.md" }, raw, "false");
       }
     }
     function cmdStateUpdateProgress(cwd, raw) {
       const statePath = path.join(cwd, ".planning", "STATE.md");
       let content = cachedReadFile(statePath);
       if (!content) {
-        output({ error: "STATE.md not found" }, raw);
+        output2({ error: "STATE.md not found" }, raw);
         return;
       }
       let totalPlans = 0;
@@ -3135,21 +3502,21 @@ var require_state = __commonJS({
         content = content.replace(progressPattern, `$1${progressStr}`);
         fs.writeFileSync(statePath, content, "utf-8");
         invalidateFileCache(statePath);
-        output({ updated: true, percent, completed: totalSummaries, total: totalPlans, bar: progressStr }, { formatter: formatStateUpdateProgress, rawValue: progressStr });
+        output2({ updated: true, percent, completed: totalSummaries, total: totalPlans, bar: progressStr }, { formatter: formatStateUpdateProgress, rawValue: progressStr });
       } else {
-        output({ updated: false, reason: "Progress field not found in STATE.md" }, { formatter: formatStateUpdateProgress, rawValue: "false" });
+        output2({ updated: false, reason: "Progress field not found in STATE.md" }, { formatter: formatStateUpdateProgress, rawValue: "false" });
       }
     }
     function cmdStateAddDecision(cwd, options, raw) {
       const statePath = path.join(cwd, ".planning", "STATE.md");
       let content = cachedReadFile(statePath);
       if (!content) {
-        output({ error: "STATE.md not found" }, raw);
+        output2({ error: "STATE.md not found" }, raw);
         return;
       }
       const { phase, summary, rationale } = options;
       if (!summary) {
-        output({ error: "summary required" }, raw);
+        output2({ error: "summary required" }, raw);
         return;
       }
       const entry = `- [Phase ${phase || "?"}]: ${summary}${rationale ? ` \u2014 ${rationale}` : ""}`;
@@ -3162,20 +3529,20 @@ var require_state = __commonJS({
         content = content.replace(sectionPattern, `${match[1]}${sectionBody}`);
         fs.writeFileSync(statePath, content, "utf-8");
         invalidateFileCache(statePath);
-        output({ added: true, decision: entry }, raw, "true");
+        output2({ added: true, decision: entry }, raw, "true");
       } else {
-        output({ added: false, reason: "Decisions section not found in STATE.md" }, raw, "false");
+        output2({ added: false, reason: "Decisions section not found in STATE.md" }, raw, "false");
       }
     }
     function cmdStateAddBlocker(cwd, text, raw) {
       const statePath = path.join(cwd, ".planning", "STATE.md");
       let content = cachedReadFile(statePath);
       if (!content) {
-        output({ error: "STATE.md not found" }, raw);
+        output2({ error: "STATE.md not found" }, raw);
         return;
       }
       if (!text) {
-        output({ error: "text required" }, raw);
+        output2({ error: "text required" }, raw);
         return;
       }
       const entry = `- ${text}`;
@@ -3188,20 +3555,20 @@ var require_state = __commonJS({
         content = content.replace(sectionPattern, `${match[1]}${sectionBody}`);
         fs.writeFileSync(statePath, content, "utf-8");
         invalidateFileCache(statePath);
-        output({ added: true, blocker: text }, raw, "true");
+        output2({ added: true, blocker: text }, raw, "true");
       } else {
-        output({ added: false, reason: "Blockers section not found in STATE.md" }, raw, "false");
+        output2({ added: false, reason: "Blockers section not found in STATE.md" }, raw, "false");
       }
     }
     function cmdStateResolveBlocker(cwd, text, raw) {
       const statePath = path.join(cwd, ".planning", "STATE.md");
       let content = cachedReadFile(statePath);
       if (!content) {
-        output({ error: "STATE.md not found" }, raw);
+        output2({ error: "STATE.md not found" }, raw);
         return;
       }
       if (!text) {
-        output({ error: "text required" }, raw);
+        output2({ error: "text required" }, raw);
         return;
       }
       const sectionPattern = /(###?\s*(?:Blockers|Blockers\/Concerns|Concerns)\s*\n)([\s\S]*?)(?=\n###?|\n##[^#]|$)/i;
@@ -3220,16 +3587,16 @@ var require_state = __commonJS({
         content = content.replace(sectionPattern, `${match[1]}${newBody}`);
         fs.writeFileSync(statePath, content, "utf-8");
         invalidateFileCache(statePath);
-        output({ resolved: true, blocker: text }, raw, "true");
+        output2({ resolved: true, blocker: text }, raw, "true");
       } else {
-        output({ resolved: false, reason: "Blockers section not found in STATE.md" }, raw, "false");
+        output2({ resolved: false, reason: "Blockers section not found in STATE.md" }, raw, "false");
       }
     }
     function cmdStateRecordSession(cwd, options, raw) {
       const statePath = path.join(cwd, ".planning", "STATE.md");
       let content = cachedReadFile(statePath);
       if (!content) {
-        output({ error: "STATE.md not found" }, raw);
+        output2({ error: "STATE.md not found" }, raw);
         return;
       }
       const now = (/* @__PURE__ */ new Date()).toISOString();
@@ -3262,9 +3629,9 @@ var require_state = __commonJS({
       if (updated.length > 0) {
         fs.writeFileSync(statePath, content, "utf-8");
         invalidateFileCache(statePath);
-        output({ recorded: true, updated }, raw, "true");
+        output2({ recorded: true, updated }, raw, "true");
       } else {
-        output({ recorded: false, reason: "No session fields found in STATE.md" }, raw, "false");
+        output2({ recorded: false, reason: "No session fields found in STATE.md" }, raw, "false");
       }
     }
     function cmdStateValidate(cwd, options, raw) {
@@ -3277,7 +3644,7 @@ var require_state = __commonJS({
       const roadmapContent = safeReadFile(roadmapPath);
       const stateContent = safeReadFile(statePath);
       if (!roadmapContent && !stateContent) {
-        output({
+        output2({
           status: "errors",
           issues: [{ type: "missing_files", location: ".planning/", expected: "ROADMAP.md and STATE.md", actual: "Neither found", severity: "error" }],
           fixes_applied: [],
@@ -3456,7 +3823,7 @@ var require_state = __commonJS({
       if (errorCount > 0) status = "errors";
       else if (warnCount > 0) status = "warnings";
       const summary = status === "clean" ? "State validation passed \u2014 no issues found" : `Found ${errorCount} error${errorCount !== 1 ? "s" : ""} and ${warnCount} warning${warnCount !== 1 ? "s" : ""}`;
-      output({
+      output2({
         status,
         issues,
         fixes_applied: fixesApplied,
@@ -3487,7 +3854,7 @@ var require_roadmap = __commonJS({
   "src/commands/roadmap.js"(exports2, module2) {
     var fs = require("fs");
     var path = require("path");
-    var { output, error, debugLog } = require_output();
+    var { output: output2, error, debugLog } = require_output();
     var { normalizePhaseName, cachedReadFile, findPhaseInternal, getPhaseTree } = require_helpers();
     var { extractFrontmatter } = require_frontmatter();
     function cmdRoadmapGetPhase(cwd, phaseNum, raw) {
@@ -3495,7 +3862,7 @@ var require_roadmap = __commonJS({
       try {
         const content = cachedReadFile(roadmapPath);
         if (!content) {
-          output({ found: false, error: "ROADMAP.md not found" }, raw, "");
+          output2({ found: false, error: "ROADMAP.md not found" }, raw, "");
           return;
         }
         const escapedPhase = phaseNum.replace(/\./g, "\\.");
@@ -3511,7 +3878,7 @@ var require_roadmap = __commonJS({
           );
           const checklistMatch = content.match(checklistPattern);
           if (checklistMatch) {
-            output({
+            output2({
               found: false,
               phase_number: phaseNum,
               phase_name: checklistMatch[1].trim(),
@@ -3520,7 +3887,7 @@ var require_roadmap = __commonJS({
             }, raw, "");
             return;
           }
-          output({ found: false, phase_number: phaseNum }, raw, "");
+          output2({ found: false, phase_number: phaseNum }, raw, "");
           return;
         }
         const phaseName = headerMatch[1].trim();
@@ -3533,7 +3900,7 @@ var require_roadmap = __commonJS({
         const goal = goalMatch ? goalMatch[1].trim() : null;
         const criteriaMatch = section.match(/\*\*Success Criteria\*\*[^\n]*:\s*\n((?:\s*\d+\.\s*[^\n]+\n?)+)/i);
         const success_criteria = criteriaMatch ? criteriaMatch[1].trim().split("\n").map((line) => line.replace(/^\s*\d+\.\s*/, "").trim()).filter(Boolean) : [];
-        output(
+        output2(
           {
             found: true,
             phase_number: phaseNum,
@@ -3554,7 +3921,7 @@ var require_roadmap = __commonJS({
       const roadmapPath = path.join(cwd, ".planning", "ROADMAP.md");
       const content = cachedReadFile(roadmapPath);
       if (!content) {
-        output({ error: "ROADMAP.md not found", milestones: [], phases: [], current_phase: null }, raw);
+        output2({ error: "ROADMAP.md not found", milestones: [], phases: [], current_phase: null }, raw);
         return;
       }
       const phasesDir = path.join(cwd, ".planning", "phases");
@@ -3648,7 +4015,7 @@ var require_roadmap = __commonJS({
         missing_phase_details: missingDetails.length > 0 ? missingDetails : null,
         missing_checklist_entries: missingChecklist.length > 0 ? missingChecklist : null
       };
-      output(result, raw);
+      output2(result, raw);
     }
     function cmdRoadmapUpdatePlanProgress(cwd, phaseNum, raw) {
       if (!phaseNum) {
@@ -3662,14 +4029,14 @@ var require_roadmap = __commonJS({
       const planCount = phaseInfo.plans.length;
       const summaryCount = phaseInfo.summaries.length;
       if (planCount === 0) {
-        output({ updated: false, reason: "No plans found", plan_count: 0, summary_count: 0 }, raw, "no plans");
+        output2({ updated: false, reason: "No plans found", plan_count: 0, summary_count: 0 }, raw, "no plans");
         return;
       }
       const isComplete = summaryCount >= planCount;
       const status = isComplete ? "Complete" : summaryCount > 0 ? "In Progress" : "Planned";
       const today = (/* @__PURE__ */ new Date()).toISOString().split("T")[0];
       if (!fs.existsSync(roadmapPath)) {
-        output({ updated: false, reason: "ROADMAP.md not found", plan_count: planCount, summary_count: summaryCount }, raw, "no roadmap");
+        output2({ updated: false, reason: "ROADMAP.md not found", plan_count: planCount, summary_count: summaryCount }, raw, "no roadmap");
         return;
       }
       let roadmapContent = fs.readFileSync(roadmapPath, "utf-8");
@@ -3697,7 +4064,7 @@ var require_roadmap = __commonJS({
         roadmapContent = roadmapContent.replace(checkboxPattern, `$1x$2 (completed ${today})`);
       }
       fs.writeFileSync(roadmapPath, roadmapContent, "utf-8");
-      output({
+      output2({
         updated: true,
         phase: phaseNum,
         plan_count: planCount,
@@ -3719,7 +4086,7 @@ var require_phase = __commonJS({
   "src/commands/phase.js"(exports2, module2) {
     var fs = require("fs");
     var path = require("path");
-    var { output, error, debugLog } = require_output();
+    var { output: output2, error, debugLog } = require_output();
     var { normalizePhaseName, getArchivedPhaseDirs, findPhaseInternal, generateSlugInternal, getMilestoneInfo } = require_helpers();
     var { extractFrontmatter } = require_frontmatter();
     var { execGit } = require_git();
@@ -3738,9 +4105,9 @@ var require_phase = __commonJS({
       const { type, phase, includeArchived } = options;
       if (!fs.existsSync(phasesDir)) {
         if (type) {
-          output({ files: [], count: 0 }, raw, "");
+          output2({ files: [], count: 0 }, raw, "");
         } else {
-          output({ directories: [], count: 0 }, raw, "");
+          output2({ directories: [], count: 0 }, raw, "");
         }
         return;
       }
@@ -3762,7 +4129,7 @@ var require_phase = __commonJS({
           const normalized = normalizePhaseName(phase);
           const match = dirs.find((d) => d.startsWith(normalized));
           if (!match) {
-            output({ files: [], count: 0, phase_dir: null, error: "Phase not found" }, raw, "");
+            output2({ files: [], count: 0, phase_dir: null, error: "Phase not found" }, raw, "");
             return;
           }
           dirs = [match];
@@ -3787,10 +4154,10 @@ var require_phase = __commonJS({
             count: files.length,
             phase_dir: phase ? dirs[0].replace(/^\d+(?:\.\d+)?-?/, "") : null
           };
-          output(result, raw, files.join("\n"));
+          output2(result, raw, files.join("\n"));
           return;
         }
-        output({ directories: dirs, count: dirs.length }, raw, dirs.join("\n"));
+        output2({ directories: dirs, count: dirs.length }, raw, dirs.join("\n"));
       } catch (e) {
         debugLog("phase.list", "list phases failed", e);
         error("Failed to list phases: " + e.message);
@@ -3800,7 +4167,7 @@ var require_phase = __commonJS({
       const phasesDir = path.join(cwd, ".planning", "phases");
       const normalized = normalizePhaseName(basePhase);
       if (!fs.existsSync(phasesDir)) {
-        output(
+        output2(
           {
             found: false,
             base_phase: normalized,
@@ -3837,7 +4204,7 @@ var require_phase = __commonJS({
           const lastNum = parseInt(lastDecimal.split(".")[1], 10);
           nextDecimal = `${normalized}.${lastNum + 1}`;
         }
-        output(
+        output2(
           {
             found: baseExists,
             base_phase: normalized,
@@ -3901,7 +4268,7 @@ Plans:
         slug,
         directory: `.planning/phases/${dirName}`
       };
-      output(result, raw, paddedNum);
+      output2(result, raw, paddedNum);
     }
     function cmdPhaseInsert(cwd, afterPhase, description, raw) {
       if (!afterPhase || !description) {
@@ -3975,7 +4342,7 @@ Plans:
         slug,
         directory: `.planning/phases/${dirName}`
       };
-      output(result, raw, decimalPhase);
+      output2(result, raw, decimalPhase);
     }
     function cmdPhaseRemove(cwd, targetPhase, options, raw) {
       if (!targetPhase) {
@@ -4165,7 +4532,7 @@ Plans:
         roadmap_updated: true,
         state_updated: fs.existsSync(statePath)
       };
-      output(result, raw);
+      output2(result, raw);
     }
     function cmdRequirementsMarkComplete(cwd, reqIdsRaw, raw) {
       if (!reqIdsRaw || reqIdsRaw.length === 0) {
@@ -4177,7 +4544,7 @@ Plans:
       }
       const reqPath = path.join(cwd, ".planning", "REQUIREMENTS.md");
       if (!fs.existsSync(reqPath)) {
-        output({ updated: false, reason: "REQUIREMENTS.md not found", ids: reqIds }, raw, "no requirements file");
+        output2({ updated: false, reason: "REQUIREMENTS.md not found", ids: reqIds }, raw, "no requirements file");
         return;
       }
       let reqContent = fs.readFileSync(reqPath, "utf-8");
@@ -4207,7 +4574,7 @@ Plans:
       if (updated.length > 0) {
         fs.writeFileSync(reqPath, reqContent, "utf-8");
       }
-      output({
+      output2({
         updated: updated.length > 0,
         marked_complete: updated,
         not_found: notFound,
@@ -4394,7 +4761,7 @@ Plans:
       if (uncheckedRoadmapPhases.length > 0) {
         result.unchecked_roadmap_phases = uncheckedRoadmapPhases;
       }
-      output(result, raw);
+      output2(result, raw);
     }
     function cmdMilestoneComplete(cwd, version, options, raw) {
       if (!version) {
@@ -4538,7 +4905,7 @@ ${milestoneEntry}`, "utf-8");
         milestones_updated: true,
         state_updated: fs.existsSync(statePath)
       };
-      output(result, raw);
+      output2(result, raw);
     }
     module2.exports = {
       cmdPhasesList,
@@ -4559,7 +4926,7 @@ var require_verify = __commonJS({
     "use strict";
     var fs = require("fs");
     var path = require("path");
-    var { output, error, debugLog } = require_output();
+    var { output: output2, error, debugLog } = require_output();
     var { safeReadFile, cachedReadFile, findPhaseInternal, normalizePhaseName, parseMustHavesBlock, getArchivedPhaseDirs, getMilestoneInfo, getPhaseTree } = require_helpers();
     var { extractFrontmatter } = require_frontmatter();
     var { execGit } = require_git();
@@ -4571,7 +4938,7 @@ var require_verify = __commonJS({
       const fullPath = path.isAbsolute(filePath) ? filePath : path.join(cwd, filePath);
       const content = safeReadFile(fullPath);
       if (!content) {
-        output({ error: "File not found", path: filePath }, raw);
+        output2({ error: "File not found", path: filePath }, raw);
         return;
       }
       const fm = extractFrontmatter(content);
@@ -4638,7 +5005,7 @@ var require_verify = __commonJS({
       if (templateCompliance.missing_fields.length > 0 || templateCompliance.type_issues.length > 0) {
         templateCompliance.valid = false;
       }
-      output({
+      output2({
         valid: errors.length === 0,
         errors,
         warnings,
@@ -4654,7 +5021,7 @@ var require_verify = __commonJS({
       }
       const phaseInfo = findPhaseInternal(cwd, phase);
       if (!phaseInfo || !phaseInfo.found) {
-        output({ error: "Phase not found", phase }, raw);
+        output2({ error: "Phase not found", phase }, raw);
         return;
       }
       const errors = [];
@@ -4665,7 +5032,7 @@ var require_verify = __commonJS({
         files = fs.readdirSync(phaseDir);
       } catch (e) {
         debugLog("verify.phaseComplete", "readdir phase failed", e);
-        output({ error: "Cannot read phase directory" }, raw);
+        output2({ error: "Cannot read phase directory" }, raw);
         return;
       }
       const plans = files.filter((f) => f.match(/-PLAN\.md$/i));
@@ -4680,7 +5047,7 @@ var require_verify = __commonJS({
       if (orphanSummaries.length > 0) {
         warnings.push(`Summaries without plans: ${orphanSummaries.join(", ")}`);
       }
-      output({
+      output2({
         complete: errors.length === 0,
         phase: phaseInfo.phase_number,
         plan_count: plans.length,
@@ -4698,7 +5065,7 @@ var require_verify = __commonJS({
       const fullPath = path.isAbsolute(filePath) ? filePath : path.join(cwd, filePath);
       const content = safeReadFile(fullPath);
       if (!content) {
-        output({ error: "File not found", path: filePath }, raw);
+        output2({ error: "File not found", path: filePath }, raw);
         return;
       }
       const found = [];
@@ -4725,7 +5092,7 @@ var require_verify = __commonJS({
           missing.push(cleanRef);
         }
       }
-      output({
+      output2({
         valid: missing.length === 0,
         found: found.length,
         missing,
@@ -4746,7 +5113,7 @@ var require_verify = __commonJS({
           invalid.push(hash);
         }
       }
-      output({
+      output2({
         all_valid: invalid.length === 0,
         valid,
         invalid,
@@ -4760,12 +5127,12 @@ var require_verify = __commonJS({
       const fullPath = path.isAbsolute(planFilePath) ? planFilePath : path.join(cwd, planFilePath);
       const content = safeReadFile(fullPath);
       if (!content) {
-        output({ error: "File not found", path: planFilePath }, raw);
+        output2({ error: "File not found", path: planFilePath }, raw);
         return;
       }
       const artifacts = parseMustHavesBlock(content, "artifacts");
       if (artifacts.length === 0) {
-        output({ error: "No must_haves.artifacts found in frontmatter", path: planFilePath }, raw);
+        output2({ error: "No must_haves.artifacts found in frontmatter", path: planFilePath }, raw);
         return;
       }
       const results = [];
@@ -4798,7 +5165,7 @@ var require_verify = __commonJS({
         results.push(check);
       }
       const passed = results.filter((r) => r.passed).length;
-      output({
+      output2({
         all_passed: passed === results.length,
         passed,
         total: results.length,
@@ -4812,12 +5179,12 @@ var require_verify = __commonJS({
       const fullPath = path.isAbsolute(planFilePath) ? planFilePath : path.join(cwd, planFilePath);
       const content = safeReadFile(fullPath);
       if (!content) {
-        output({ error: "File not found", path: planFilePath }, raw);
+        output2({ error: "File not found", path: planFilePath }, raw);
         return;
       }
       const keyLinks = parseMustHavesBlock(content, "key_links");
       if (keyLinks.length === 0) {
-        output({ error: "No must_haves.key_links found in frontmatter", path: planFilePath }, raw);
+        output2({ error: "No must_haves.key_links found in frontmatter", path: planFilePath }, raw);
         return;
       }
       const results = [];
@@ -4857,7 +5224,7 @@ var require_verify = __commonJS({
         results.push(check);
       }
       const verified = results.filter((r) => r.verified).length;
-      output({
+      output2({
         all_verified: verified === results.length,
         verified,
         total: results.length,
@@ -4871,7 +5238,7 @@ var require_verify = __commonJS({
       const roadmapContent = cachedReadFile(roadmapPath);
       if (!roadmapContent) {
         errors.push("ROADMAP.md not found");
-        output({ passed: false, errors, warnings }, raw, "failed");
+        output2({ passed: false, errors, warnings }, raw, "failed");
         return;
       }
       const roadmapPhases = /* @__PURE__ */ new Set();
@@ -4931,7 +5298,7 @@ var require_verify = __commonJS({
         }
       }
       const passed = errors.length === 0;
-      output({ passed, errors, warnings, warning_count: warnings.length }, raw, passed ? "passed" : "failed");
+      output2({ passed, errors, warnings, warning_count: warnings.length }, raw, passed ? "passed" : "failed");
     }
     function cmdValidateHealth(cwd, options, raw) {
       const planningDir = path.join(cwd, ".planning");
@@ -4952,7 +5319,7 @@ var require_verify = __commonJS({
       };
       if (!fs.existsSync(planningDir)) {
         addIssue("error", "E001", ".planning/ directory not found", "Run /gsd:new-project to initialize");
-        output({
+        output2({
           status: "broken",
           errors,
           warnings,
@@ -5145,7 +5512,7 @@ var require_verify = __commonJS({
         status = "healthy";
       }
       const repairableCount = errors.filter((e) => e.repairable).length + warnings.filter((w) => w.repairable).length;
-      output({
+      output2({
         status,
         errors,
         warnings,
@@ -5161,7 +5528,7 @@ var require_verify = __commonJS({
       const fullPath = path.isAbsolute(planPath) ? planPath : path.join(cwd, planPath);
       const content = safeReadFile(fullPath);
       if (!content) {
-        output({ error: "File not found", path: planPath }, raw);
+        output2({ error: "File not found", path: planPath }, raw);
         return;
       }
       const fm = extractFrontmatter(content);
@@ -5263,7 +5630,7 @@ var require_verify = __commonJS({
       if (taskCount === 0) flags.push("no_tasks_found");
       if (dirCount > 5) flags.push("high_directory_spread");
       if (concernCount > 3) flags.push("many_concerns");
-      output({
+      output2({
         plan: planId,
         sr_score: srScore,
         sr_label: srLabel,
@@ -5302,7 +5669,7 @@ var require_verify = __commonJS({
         }
       }
       if (!testCommand) {
-        output({
+        output2({
           test_result: "skip",
           tests_passed: 0,
           tests_failed: 0,
@@ -5371,7 +5738,7 @@ var require_verify = __commonJS({
         }
       }
       const verdict = testResult === "pass" && artifactsOk && keyLinksOk ? "pass" : "fail";
-      output({
+      output2({
         test_result: testResult,
         tests_passed: testsPassed,
         tests_failed: testsFailed,
@@ -5426,7 +5793,7 @@ var require_verify = __commonJS({
       const reqPath = path.join(cwd, ".planning", "REQUIREMENTS.md");
       const content = safeReadFile(reqPath);
       if (!content) {
-        output({
+        output2({
           total: 0,
           addressed: 0,
           unaddressed: 0,
@@ -5638,7 +6005,7 @@ var require_verify = __commonJS({
       } else {
         rawValue = unaddressedList.length === 0 ? "pass" : "fail";
       }
-      output(result, { formatter: formatVerifyRequirements, rawValue });
+      output2(result, { formatter: formatVerifyRequirements, rawValue });
     }
     function cmdVerifyRegression(cwd, options, raw) {
       const memoryDir = path.join(cwd, ".planning", "memory");
@@ -5651,11 +6018,11 @@ var require_verify = __commonJS({
         const beforeContent = safeReadFile(beforePath);
         const afterContent = safeReadFile(afterPath);
         if (!beforeContent) {
-          output({ error: "Before file not found", path: options.before }, raw, "error");
+          output2({ error: "Before file not found", path: options.before }, raw, "error");
           return;
         }
         if (!afterContent) {
-          output({ error: "After file not found", path: options.after }, raw, "error");
+          output2({ error: "After file not found", path: options.after }, raw, "error");
           return;
         }
         try {
@@ -5663,13 +6030,13 @@ var require_verify = __commonJS({
           afterData = JSON.parse(afterContent);
         } catch (e) {
           debugLog("verify.regression", "JSON parse failed", e);
-          output({ error: "Invalid JSON in before/after files" }, raw, "error");
+          output2({ error: "Invalid JSON in before/after files" }, raw, "error");
           return;
         }
       } else {
         const baselineContent = safeReadFile(baselinePath);
         if (!baselineContent) {
-          output({
+          output2({
             regressions: [],
             regression_count: 0,
             verdict: "pass",
@@ -5681,11 +6048,11 @@ var require_verify = __commonJS({
           beforeData = JSON.parse(baselineContent);
         } catch (e) {
           debugLog("verify.regression", "baseline parse failed", e);
-          output({ error: "Invalid JSON in test-baseline.json" }, raw, "error");
+          output2({ error: "Invalid JSON in test-baseline.json" }, raw, "error");
           return;
         }
         if (!afterData) {
-          output({
+          output2({
             regressions: [],
             regression_count: 0,
             verdict: "pass",
@@ -5713,7 +6080,7 @@ var require_verify = __commonJS({
           }
         }
       }
-      output({
+      output2({
         regressions,
         regression_count: regressions.length,
         verdict: regressions.length === 0 ? "pass" : "fail"
@@ -5729,7 +6096,7 @@ var require_verify = __commonJS({
         files = fs.readdirSync(fullPath);
       } catch (e) {
         debugLog("verify.planWave", "readdir failed", e);
-        output({ error: "Cannot read phase directory", path: phasePath }, raw);
+        output2({ error: "Cannot read phase directory", path: phasePath }, raw);
         return;
       }
       const planFiles = files.filter((f) => f.match(/-PLAN\.md$/i)).sort();
@@ -5772,7 +6139,7 @@ var require_verify = __commonJS({
         }
       }
       const verdict = conflicts.length > 0 ? "conflicts_found" : "clean";
-      output({
+      output2({
         phase: phaseNum,
         waves,
         conflicts,
@@ -5789,7 +6156,7 @@ var require_verify = __commonJS({
         files = fs.readdirSync(fullPath);
       } catch (e) {
         debugLog("verify.planDeps", "readdir failed", e);
-        output({ error: "Cannot read phase directory", path: phasePath }, raw);
+        output2({ error: "Cannot read phase directory", path: phasePath }, raw);
         return;
       }
       const planFiles = files.filter((f) => f.match(/-PLAN\.md$/i)).sort();
@@ -5872,7 +6239,7 @@ var require_verify = __commonJS({
         }
       }
       const verdict = issues.length > 0 ? "issues_found" : "clean";
-      output({
+      output2({
         phase: phaseNum,
         plan_count: planIds.size,
         dependency_graph: dependencyGraph,
@@ -6142,7 +6509,7 @@ var require_verify = __commonJS({
         if (s[0] < s[1] && s[1] < s[2]) trend = "improving";
         else if (s[0] > s[1] && s[1] > s[2]) trend = "declining";
       }
-      output({
+      output2({
         score,
         grade,
         dimensions,
@@ -6155,7 +6522,7 @@ var require_verify = __commonJS({
       const assertionsPath = path.join(cwd, ".planning", "ASSERTIONS.md");
       const content = safeReadFile(assertionsPath);
       if (!content) {
-        output({ error: "ASSERTIONS.md not found", path: ".planning/ASSERTIONS.md" }, raw, "ASSERTIONS.md not found");
+        output2({ error: "ASSERTIONS.md not found", path: ".planning/ASSERTIONS.md" }, raw, "ASSERTIONS.md not found");
         return;
       }
       const parsed = parseAssertionsMd(content);
@@ -6180,7 +6547,7 @@ var require_verify = __commonJS({
       }
       const totalRequirements = Object.keys(requirements).length;
       const rawValue = `${totalRequirements} requirements, ${totalAssertions} assertions (${mustHaveCount} must-have, ${niceToHaveCount} nice-to-have)`;
-      output({
+      output2({
         total_requirements: totalRequirements,
         total_assertions: totalAssertions,
         must_have_count: mustHaveCount,
@@ -6192,7 +6559,7 @@ var require_verify = __commonJS({
       const assertionsPath = path.join(cwd, ".planning", "ASSERTIONS.md");
       const content = safeReadFile(assertionsPath);
       if (!content) {
-        output({ error: "ASSERTIONS.md not found", path: ".planning/ASSERTIONS.md" }, raw, "ASSERTIONS.md not found");
+        output2({ error: "ASSERTIONS.md not found", path: ".planning/ASSERTIONS.md" }, raw, "ASSERTIONS.md not found");
         return;
       }
       const parsed = parseAssertionsMd(content);
@@ -6239,7 +6606,7 @@ var require_verify = __commonJS({
       const coveragePercent = totalReqs > 0 ? Math.round(assertionReqCount / totalReqs * 100) : 0;
       const valid = issues.filter((i) => i.severity === "error").length === 0;
       const rawValue = valid ? "valid" : `${issues.length} issues found`;
-      output({
+      output2({
         valid,
         issues,
         stats: {
@@ -6299,7 +6666,7 @@ var require_verify = __commonJS({
       const roadmapPath = path.join(cwd, ".planning", "ROADMAP.md");
       const rc = cachedReadFile(roadmapPath);
       if (!rc) {
-        output({ passed: false, errors: ["ROADMAP.md not found"], warnings: [] }, raw, "failed");
+        output2({ passed: false, errors: ["ROADMAP.md not found"], warnings: [] }, raw, "failed");
         return;
       }
       const errs = [], warns = [], repairs = [];
@@ -6366,7 +6733,7 @@ var require_verify = __commonJS({
         result.repairs = repairs;
         result.repair_count = repairs.length;
       }
-      output(result, raw, passed ? "passed" : errs.length > 0 ? "failed" : "warnings");
+      output2(result, raw, passed ? "passed" : errs.length > 0 ? "failed" : "warnings");
     }
     module2.exports = {
       cmdVerifyPlanStructure,
@@ -6397,7 +6764,7 @@ var require_intent = __commonJS({
   "src/commands/intent.js"(exports2, module2) {
     var fs = require("fs");
     var path = require("path");
-    var { output, error, debugLog } = require_output();
+    var { output: output2, error, debugLog } = require_output();
     var { loadConfig } = require_config();
     var { execGit } = require_git();
     var { parseIntentMd, generateIntentMd, parsePlanIntent, getMilestoneInfo, normalizePhaseName } = require_helpers();
@@ -6485,7 +6852,7 @@ var require_intent = __commonJS({
         sections,
         commit: commitHash
       };
-      output(result, raw, commitHash || "created");
+      output2(result, raw, commitHash || "created");
     }
     var SECTION_ALIASES = ["objective", "users", "outcomes", "criteria", "constraints", "health", "history"];
     function makeFormatIntentShow(args, rawContent) {
@@ -6514,18 +6881,18 @@ var require_intent = __commonJS({
         if (sectionFilter) {
           const sectionData = {};
           sectionData[sectionFilter] = data[sectionFilter];
-          output(sectionData, false);
+          output2(sectionData, false);
         } else {
-          output(data, false);
+          output2(data, false);
         }
         return;
       }
       if (sectionFilter) {
         const sectionData = {};
         sectionData[sectionFilter] = data[sectionFilter];
-        output(sectionData, { formatter: makeFormatIntentShow(args, content) });
+        output2(sectionData, { formatter: makeFormatIntentShow(args, content) });
       } else {
-        output(data, { formatter: makeFormatIntentShow(args, content) });
+        output2(data, { formatter: makeFormatIntentShow(args, content) });
       }
     }
     function renderCompactSummary(data) {
@@ -6970,7 +7337,7 @@ var require_intent = __commonJS({
         revision: data.revision,
         commit: commitHash
       };
-      output(result, raw);
+      output2(result, raw);
     }
     function getNextId(items, prefix) {
       let maxNum = 0;
@@ -7257,7 +7624,7 @@ var require_intent = __commonJS({
         revision: revision || null
       };
       if (!valid) process.exitCode = 1;
-      output(result, { formatter: formatIntentValidate });
+      output2(result, { formatter: formatIntentValidate });
     }
     function cmdIntentTrace(cwd, args, raw) {
       const planningDir = path.join(cwd, ".planning");
@@ -7356,7 +7723,7 @@ var require_intent = __commonJS({
         }))
       };
       if (raw) {
-        output(result, false);
+        output2(result, false);
         return;
       }
       const lines = [];
@@ -7389,7 +7756,7 @@ var require_intent = __commonJS({
         const gapParts = Object.entries(gapCounts).sort(([a], [b]) => a.localeCompare(b)).map(([p, c]) => `${c}\xD7${p}`);
         lines.push(`Gaps: ${gaps.length} outcomes uncovered (${gapParts.join(", ")})`);
       }
-      output(null, true, lines.join("\n") + "\n");
+      output2(null, true, lines.join("\n") + "\n");
     }
     function calculateDriftScore(data) {
       const { outcomes, plans, signalData } = data;
@@ -7625,7 +7992,7 @@ var require_intent = __commonJS({
       if (!data) {
         error("INTENT.md has no desired outcomes defined.");
       }
-      output(data, { formatter: formatIntentDrift });
+      output2(data, { formatter: formatIntentDrift });
     }
     function getIntentSummary(cwd) {
       const intentPath = path.join(cwd, ".planning", "INTENT.md");
@@ -7661,7 +8028,7 @@ var require_env = __commonJS({
     var fs = require("fs");
     var path = require("path");
     var { execFileSync } = require("child_process");
-    var { output, error, debugLog } = require_output();
+    var { output: output2, error, debugLog } = require_output();
     var LANG_MANIFESTS = [
       { file: "package.json", language: "node", binary: "node", versionFlag: "--version" },
       { file: "go.mod", language: "go", binary: "go", versionFlag: "version" },
@@ -8380,7 +8747,7 @@ var require_env = __commonJS({
             process.stderr.write("Environment manifest is current\n");
           }
           if (raw) {
-            output(existing, raw);
+            output2(existing, raw);
           }
           process.exit(0);
         }
@@ -8401,7 +8768,7 @@ var require_env = __commonJS({
 `);
       }
       if (raw) {
-        output(result, raw);
+        output2(result, raw);
       }
       process.exit(0);
     }
@@ -8425,7 +8792,7 @@ var require_env = __commonJS({
         languages_count: manifest ? (manifest.languages || []).length : 0,
         changed_files: staleness.changed_files || []
       };
-      output(result, raw);
+      output2(result, raw);
     }
     function readEnvManifest(cwd) {
       const manifestPath = path.join(cwd, ".planning", "env-manifest.json");
@@ -17275,7 +17642,7 @@ var require_codebase = __commonJS({
     "use strict";
     var fs = require("fs");
     var path = require("path");
-    var { output, error, debugLog } = require_output();
+    var { output: output2, error, debugLog } = require_output();
     var {
       checkStaleness,
       performAnalysis,
@@ -17325,7 +17692,7 @@ var require_codebase = __commonJS({
             debugLog("codebase.analyze", `incremental mode: ${changedFiles.length} changed files`);
           } else if (!staleness.stale) {
             const durationMs2 = Date.now() - startMs;
-            output({
+            output2({
               success: true,
               mode: "cached",
               files_analyzed: 0,
@@ -17356,7 +17723,7 @@ var require_codebase = __commonJS({
         fs.unlinkSync(path.join(cwd, ".planning", ".cache", ".analyzing"));
       } catch {
       }
-      output({
+      output2({
         success: true,
         mode,
         files_analyzed: filesAnalyzed,
@@ -17408,7 +17775,7 @@ var require_codebase = __commonJS({
     function cmdCodebaseStatus(cwd, args, raw) {
       const intel = readIntel(cwd);
       if (!intel) {
-        output({
+        output2({
           exists: false,
           message: "No codebase intel. Run: codebase analyze"
         }, { formatter: formatCodebaseStatus });
@@ -17421,7 +17788,7 @@ var require_codebase = __commonJS({
         if (staleness.changed_files && staleness.changed_files.length > 0 && intel.git_commit_hash) {
           changedGroups = groupChangedFiles(cwd, intel.git_commit_hash, staleness.changed_files);
         }
-        output({
+        output2({
           exists: true,
           stale: true,
           reason: staleness.reason,
@@ -17432,7 +17799,7 @@ var require_codebase = __commonJS({
           generated_at: intel.generated_at
         }, { formatter: formatCodebaseStatus });
       } else {
-        output({
+        output2({
           exists: true,
           stale: false,
           generated_at: intel.generated_at,
@@ -17594,7 +17961,7 @@ var require_codebase = __commonJS({
         });
       }
       const frameworkPatterns = conventions.frameworks || [];
-      output({
+      output2({
         success: true,
         naming_patterns: namingPatterns,
         file_organization: conventions.file_organization,
@@ -17624,7 +17991,7 @@ var require_codebase = __commonJS({
       const maxIdx = args.indexOf("--max");
       const maxRules = maxIdx !== -1 ? parseInt(args[maxIdx + 1], 10) : 15;
       const result = generateRules(conventions, { threshold, maxRules });
-      output({
+      output2({
         success: true,
         rules: result.rules,
         rules_text: result.rules_text,
@@ -17654,7 +18021,7 @@ var require_codebase = __commonJS({
       if (wantCycles) {
         result.cycles = findCycles(graph);
       }
-      output(result, raw);
+      output2(result, raw);
     }
     function cmdCodebaseImpact(cwd, args, raw) {
       const filePaths = args.filter((a) => !a.startsWith("-"));
@@ -17680,7 +18047,7 @@ var require_codebase = __commonJS({
         const result = getTransitiveDependents(graph, filePath);
         files.push(result);
       }
-      output({
+      output2({
         success: true,
         files
       }, raw);
@@ -17734,7 +18101,7 @@ var require_codebase = __commonJS({
         }
         process.stderr.write(lines.join("\n") + "\n");
       }
-      output({
+      output2({
         success: true,
         nodes: lifecycle.nodes.length,
         edges: lifecycle.stats.edge_count,
@@ -17926,7 +18293,7 @@ var require_codebase = __commonJS({
         const planFiles2 = getPlanFiles(cwd, planPath2);
         const { buildTaskContext } = require_context();
         const result2 = buildTaskContext(cwd, taskFiles, { planFiles: planFiles2, tokenBudget });
-        output({ success: true, ...result2 }, raw);
+        output2({ success: true, ...result2 }, raw);
         return;
       }
       const filesIdx = args.indexOf("--files");
@@ -18022,7 +18389,7 @@ var require_codebase = __commonJS({
         omitted_files: budgetResult.omitted_files
       };
       if (raw) {
-        output(result, raw);
+        output2(result, raw);
       } else {
         const lines = [];
         lines.push("");
@@ -18056,7 +18423,7 @@ var require_codebase = __commonJS({
           lines.push("");
         }
         process.stderr.write(lines.join("\n") + "\n");
-        output(result, false);
+        output2(result, false);
       }
     }
     function formatCodebaseAst(result) {
@@ -18095,7 +18462,7 @@ var require_codebase = __commonJS({
       const { extractSignatures } = require_ast();
       const resolved = path.resolve(cwd, filePath);
       const result = extractSignatures(resolved);
-      output({
+      output2({
         file: filePath,
         language: result.language,
         signatures: result.signatures,
@@ -18153,7 +18520,7 @@ var require_codebase = __commonJS({
       const { extractExports } = require_ast();
       const resolved = path.resolve(cwd, filePath);
       const result = extractExports(resolved);
-      output({
+      output2({
         file: filePath,
         type: result.type,
         named: result.named,
@@ -18205,7 +18572,7 @@ var require_codebase = __commonJS({
       const { computeComplexity } = require_ast();
       const resolved = path.resolve(cwd, filePath);
       const result = computeComplexity(resolved);
-      output({
+      output2({
         file: filePath,
         module_complexity: result.module_complexity,
         functions: result.functions,
@@ -18217,7 +18584,7 @@ var require_codebase = __commonJS({
       const tokenBudget = budgetIdx !== -1 ? parseInt(args[budgetIdx + 1], 10) : 1e3;
       const { generateRepoMap } = require_ast();
       const result = generateRepoMap(cwd, { tokenBudget });
-      output({
+      output2({
         summary: result.summary,
         files_included: result.files_included,
         total_signatures: result.total_signatures,
@@ -18260,7 +18627,7 @@ var require_worktree = __commonJS({
     var path = require("path");
     var os = require("os");
     var { execSync, execFileSync } = require("child_process");
-    var { output, error, debugLog } = require_output();
+    var { output: output2, error, debugLog } = require_output();
     var { execGit } = require_git();
     var { loadConfig } = require_config();
     var { extractFrontmatter } = require_frontmatter();
@@ -18470,7 +18837,7 @@ var require_worktree = __commonJS({
       };
       if (setupError) result.setup_error = setupError;
       if (resourceWarnings.length > 0) result.resource_warnings = resourceWarnings;
-      output(result, raw);
+      output2(result, raw);
     }
     function cmdWorktreeList(cwd, raw) {
       const config = getWorktreeConfig(cwd);
@@ -18497,7 +18864,7 @@ var require_worktree = __commonJS({
       });
       const result = { worktrees };
       if (worktrees.length === 0) {
-        output(result, raw, "No active worktrees for this project.\n");
+        output2(result, raw, "No active worktrees for this project.\n");
       } else {
         const lines = [
           "Plan ID   | Branch                     | Path                                    | Disk Usage",
@@ -18506,7 +18873,7 @@ var require_worktree = __commonJS({
         for (const wt of worktrees) {
           lines.push(`${(wt.plan_id || "").padEnd(9)} | ${(wt.branch || "").padEnd(26)} | ${(wt.path || "").padEnd(39)} | ${wt.disk_usage}`);
         }
-        output(result, raw, lines.join("\n") + "\n");
+        output2(result, raw, lines.join("\n") + "\n");
       }
     }
     function cmdWorktreeRemove(cwd, planId, raw) {
@@ -18536,7 +18903,7 @@ var require_worktree = __commonJS({
           debugLog("worktree.remove", `Failed to delete branch ${branchName}: ${branchResult.stderr}`);
         }
       }
-      output({ removed: true, plan_id: planId, path: worktreePath }, raw);
+      output2({ removed: true, plan_id: planId, path: worktreePath }, raw);
     }
     function cmdWorktreeCleanup(cwd, raw) {
       const config = getWorktreeConfig(cwd);
@@ -18575,7 +18942,7 @@ var require_worktree = __commonJS({
       } catch {
         debugLog("worktree.cleanup", "Failed to remove empty project directory");
       }
-      output({ cleaned: removed.length, worktrees: removed }, raw);
+      output2({ cleaned: removed.length, worktrees: removed }, raw);
     }
     var AUTO_RESOLVE_PATTERNS = [
       "package-lock.json",
@@ -18592,9 +18959,9 @@ var require_worktree = __commonJS({
         return filePath === pattern || filePath.endsWith("/" + pattern);
       });
     }
-    function parseMergeTreeConflicts(output2) {
+    function parseMergeTreeConflicts(output3) {
       const conflicts = [];
-      const lines = output2.split("\n");
+      const lines = output3.split("\n");
       for (const line of lines) {
         const match = line.match(/^CONFLICT\s+\(([^)]+)\):\s+.*?(?:in\s+)?(\S+)\s*$/);
         if (match) {
@@ -18702,7 +19069,7 @@ var require_worktree = __commonJS({
       const autoResolvable = conflicts.filter((c) => isAutoResolvable(c.file));
       const realConflicts = conflicts.filter((c) => !isAutoResolvable(c.file));
       if (realConflicts.length > 0) {
-        output({
+        output2({
           merged: false,
           plan_id: planId,
           branch: worktreeBranch,
@@ -18737,7 +19104,7 @@ var require_worktree = __commonJS({
       } else if (mergeResult.exitCode !== 0) {
         error(`Merge execution failed: ${mergeResult.stderr}`);
       }
-      output({
+      output2({
         merged: true,
         plan_id: planId,
         branch: worktreeBranch,
@@ -18772,7 +19139,7 @@ var require_worktree = __commonJS({
           }
         }
       }
-      output({
+      output2({
         phase: phaseNumber,
         plans_analyzed: phasePlans.length,
         overlaps,
@@ -18805,7 +19172,7 @@ var require_trajectory = __commonJS({
     var path = require("path");
     var crypto = require("crypto");
     var { execFileSync } = require("child_process");
-    var { output, error, debugLog } = require_output();
+    var { output: output2, error, debugLog } = require_output();
     var { execGit, diffSummary } = require_git();
     var { banner, formatTable, summaryLine, actionHint, color, SYMBOLS, relativeTime } = require_format();
     var { VALID_TRAJECTORY_SCOPES } = require_constants();
@@ -18943,7 +19310,7 @@ var require_trajectory = __commonJS({
       entries.push(entry);
       fs.mkdirSync(memDir, { recursive: true });
       fs.writeFileSync(trajPath, JSON.stringify(entries, null, 2), "utf-8");
-      output({
+      output2({
         created: true,
         checkpoint: name,
         branch: branchName,
@@ -19014,7 +19381,7 @@ var require_trajectory = __commonJS({
         count: checkpoints.length,
         scopes: scopes.size
       };
-      output(result, { formatter: formatTrajectoryList });
+      output2(result, { formatter: formatTrajectoryList });
     }
     function formatTrajectoryList(result) {
       const lines = [];
@@ -19186,7 +19553,7 @@ var require_trajectory = __commonJS({
       }
       fs.mkdirSync(memDir, { recursive: true });
       fs.writeFileSync(trajPath, JSON.stringify(entries, null, 2), "utf-8");
-      output({
+      output2({
         pivoted: true,
         checkpoint: name,
         target_ref: targetEntry.git_ref,
@@ -19296,7 +19663,7 @@ var require_trajectory = __commonJS({
         best_per_metric: bestPerMetric,
         worst_per_metric: worstPerMetric
       };
-      output(result, { formatter: formatCompareResult });
+      output2(result, { formatter: formatCompareResult });
     }
     function formatCompareResult(result) {
       const lines = [];
@@ -19431,7 +19798,7 @@ var require_trajectory = __commonJS({
       entries.push(journalEntry);
       fs.mkdirSync(memDir, { recursive: true });
       fs.writeFileSync(trajPath, JSON.stringify(entries, null, 2), "utf-8");
-      output({
+      output2({
         chosen: true,
         checkpoint: name,
         scope,
@@ -19557,7 +19924,7 @@ var require_trajectory = __commonJS({
         name_filter: name || null,
         context
       };
-      output(result, { formatter: formatDeadEndResult });
+      output2(result, { formatter: formatDeadEndResult });
     }
     function formatDeadEndResult(result) {
       const lines = [];
@@ -19592,7 +19959,7 @@ var require_orchestration = __commonJS({
     "use strict";
     var fs = require("fs");
     var path = require("path");
-    var { debugLog, output, error } = require_output();
+    var { debugLog, output: output2, error } = require_output();
     var { extractFrontmatter } = require_frontmatter();
     var { banner, sectionHeader, formatTable, summaryLine, color, SYMBOLS } = require_format();
     function parseTasksFromPlan(content) {
@@ -19880,7 +20247,7 @@ var require_orchestration = __commonJS({
       if (!classification) {
         error("Failed to classify plan: " + planPath);
       }
-      output(classification, {
+      output2(classification, {
         formatter: (result) => {
           const lines = [];
           lines.push(banner("Classify Plan"));
@@ -19929,7 +20296,7 @@ var require_orchestration = __commonJS({
         plans: classifications,
         execution_mode: executionMode
       };
-      output(result, {
+      output2(result, {
         formatter: (res) => {
           const lines = [];
           lines.push(banner(`Classify Phase ${res.phase}`));
@@ -19980,7 +20347,7 @@ var require_init = __commonJS({
     "use strict";
     var fs = require("fs");
     var path = require("path");
-    var { output, error, debugLog } = require_output();
+    var { output: output2, error, debugLog } = require_output();
     var { banner, sectionHeader, progressBar, formatTable, summaryLine, actionHint, color, SYMBOLS, colorByPercent } = require_format();
     var { loadConfig } = require_config();
     var { safeReadFile, cachedReadFile, findPhaseInternal, resolveModelInternal, getRoadmapPhaseInternal, getMilestoneInfo, getArchivedPhaseDirs, normalizePhaseName, isValidDateString, sanitizeShellArg, pathExistsInternal, generateSlugInternal, getPhaseTree } = require_helpers();
@@ -20291,7 +20658,7 @@ var require_init = __commonJS({
         const agentType = agentArg.split("=")[1];
         if (agentType) {
           const { scopeContextForAgent } = require_context();
-          return output(scopeContextForAgent(result, agentType), raw);
+          return output2(scopeContextForAgent(result, agentType), raw);
         }
       }
       if (global._gsdCompactMode) {
@@ -20335,7 +20702,7 @@ var require_init = __commonJS({
             ]
           };
         }
-        return output(compactResult, raw);
+        return output2(compactResult, raw);
       }
       if (!result.worktree_enabled) {
         delete result.worktree_config;
@@ -20354,7 +20721,7 @@ var require_init = __commonJS({
       if (result.codebase_dependencies === null) delete result.codebase_dependencies;
       if (result.codebase_freshness === null) delete result.codebase_freshness;
       if (result.previous_attempts === null) delete result.previous_attempts;
-      output(result, raw);
+      output2(result, raw);
     }
     function cmdInitPlanPhase(cwd, phase, raw) {
       if (!phase) {
@@ -20453,7 +20820,7 @@ var require_init = __commonJS({
         const agentType = agentArg.split("=")[1];
         if (agentType) {
           const { scopeContextForAgent } = require_context();
-          return output(scopeContextForAgent(result, agentType), raw);
+          return output2(scopeContextForAgent(result, agentType), raw);
         }
       }
       if (global._gsdCompactMode) {
@@ -20492,7 +20859,7 @@ var require_init = __commonJS({
           if (result.verification_path) manifestFiles.push({ path: result.verification_path, required: false });
           compactResult._manifest = { files: manifestFiles };
         }
-        return output(compactResult, raw);
+        return output2(compactResult, raw);
       }
       if (result.intent_summary === null) delete result.intent_summary;
       if (result.intent_path === null) delete result.intent_path;
@@ -20500,7 +20867,7 @@ var require_init = __commonJS({
       if (result.codebase_conventions === null) delete result.codebase_conventions;
       if (result.codebase_dependencies === null) delete result.codebase_dependencies;
       if (result.codebase_freshness === null) delete result.codebase_freshness;
-      output(result, raw);
+      output2(result, raw);
     }
     function cmdInitNewProject(cwd, raw) {
       const config = loadConfig(cwd);
@@ -20570,9 +20937,9 @@ var require_init = __commonJS({
         if (global._gsdManifestMode) {
           compactResult._manifest = { files: manifestFiles };
         }
-        return output(compactResult, raw);
+        return output2(compactResult, raw);
       }
-      output(result, raw);
+      output2(result, raw);
     }
     function cmdInitNewMilestone(cwd, raw) {
       const config = loadConfig(cwd);
@@ -20613,9 +20980,9 @@ var require_init = __commonJS({
         if (global._gsdManifestMode) {
           compactResult._manifest = { files: manifestFiles };
         }
-        return output(compactResult, raw);
+        return output2(compactResult, raw);
       }
-      output(result, raw);
+      output2(result, raw);
     }
     function cmdInitQuick(cwd, description, raw) {
       const config = loadConfig(cwd);
@@ -20675,9 +21042,9 @@ var require_init = __commonJS({
         if (global._gsdManifestMode) {
           compactResult._manifest = { files: manifestFiles };
         }
-        return output(compactResult, raw);
+        return output2(compactResult, raw);
       }
-      output(result, raw);
+      output2(result, raw);
     }
     function cmdInitResume(cwd, raw) {
       const config = loadConfig(cwd);
@@ -20724,9 +21091,9 @@ var require_init = __commonJS({
         if (global._gsdManifestMode) {
           compactResult._manifest = { files: manifestFiles };
         }
-        return output(compactResult, raw);
+        return output2(compactResult, raw);
       }
-      output(result, raw);
+      output2(result, raw);
     }
     function cmdInitVerifyWork(cwd, phase, raw) {
       if (!phase) {
@@ -20776,9 +21143,9 @@ var require_init = __commonJS({
         if (global._gsdManifestMode) {
           compactResult._manifest = { files: manifestFiles };
         }
-        return output(compactResult, raw);
+        return output2(compactResult, raw);
       }
-      output(result, raw);
+      output2(result, raw);
     }
     function cmdInitPhaseOp(cwd, phase, raw) {
       const config = loadConfig(cwd);
@@ -20904,9 +21271,9 @@ var require_init = __commonJS({
           if (result.research_path) manifestFiles.push({ path: result.research_path, required: false });
           compactResult._manifest = { files: manifestFiles };
         }
-        return output(compactResult, raw);
+        return output2(compactResult, raw);
       }
-      output(result, raw);
+      output2(result, raw);
     }
     function cmdInitTodos(cwd, area, raw) {
       const config = loadConfig(cwd);
@@ -20969,9 +21336,9 @@ var require_init = __commonJS({
         if (global._gsdManifestMode) {
           compactResult._manifest = { files: manifestFiles };
         }
-        return output(compactResult, raw);
+        return output2(compactResult, raw);
       }
-      output(result, raw);
+      output2(result, raw);
     }
     function cmdInitMilestoneOp(cwd, raw) {
       const config = loadConfig(cwd);
@@ -21027,9 +21394,9 @@ var require_init = __commonJS({
         if (global._gsdManifestMode) {
           compactResult._manifest = { files: manifestFiles };
         }
-        return output(compactResult, raw);
+        return output2(compactResult, raw);
       }
-      output(result, raw);
+      output2(result, raw);
     }
     function cmdInitMapCodebase(cwd, raw) {
       const config = loadConfig(cwd);
@@ -21069,9 +21436,9 @@ var require_init = __commonJS({
         if (global._gsdManifestMode) {
           compactResult._manifest = { files: manifestFiles };
         }
-        return output(compactResult, raw);
+        return output2(compactResult, raw);
       }
-      output(result, raw);
+      output2(result, raw);
     }
     function formatInitProgress(result) {
       const lines = [];
@@ -21265,7 +21632,7 @@ var require_init = __commonJS({
         if (global._gsdManifestMode) {
           compactResult._manifest = { files: manifestFiles };
         }
-        return output(compactResult, { formatter: formatInitProgress });
+        return output2(compactResult, { formatter: formatInitProgress });
       }
       if (result.intent_summary === null) delete result.intent_summary;
       if (result.env_summary === null) {
@@ -21282,7 +21649,7 @@ var require_init = __commonJS({
       if (result.codebase_freshness === null) delete result.codebase_freshness;
       if (result.paused_at === null) delete result.paused_at;
       if (result.session_diff === null) delete result.session_diff;
-      output(result, { formatter: formatInitProgress });
+      output2(result, { formatter: formatInitProgress });
     }
     function cmdInitMemory(cwd, args, raw) {
       const workflowIdx = args.indexOf("--workflow");
@@ -21466,7 +21833,7 @@ var require_init = __commonJS({
         jsonStr = JSON.stringify(result);
       }
       result.digest_lines = result.decisions.length + result.blockers.length + result.todos.length + result.lessons.length;
-      output(result, raw);
+      output2(result, raw);
     }
     function getSessionDiffSummary(cwd) {
       try {
@@ -21516,7 +21883,7 @@ var require_misc = __commonJS({
     var fs = require("fs");
     var path = require("path");
     var { execSync } = require("child_process");
-    var { output, error, debugLog } = require_output();
+    var { output: output2, error, debugLog } = require_output();
     var { loadConfig, isGitIgnored } = require_config();
     var { MODEL_PROFILES, CONFIG_SCHEMA } = require_constants();
     var { safeReadFile, cachedReadFile, normalizePhaseName, findPhaseInternal, generateSlugInternal, getArchivedPhaseDirs, getMilestoneInfo, getPhaseTree, cachedReaddirSync } = require_helpers();
@@ -21528,7 +21895,7 @@ var require_misc = __commonJS({
       }
       const slug = text.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
       const result = { slug };
-      output(result, raw, slug);
+      output2(result, raw, slug);
     }
     function cmdCurrentTimestamp(format, raw) {
       const now = /* @__PURE__ */ new Date();
@@ -21545,7 +21912,7 @@ var require_misc = __commonJS({
           result = now.toISOString();
           break;
       }
-      output({ timestamp: result }, raw, result);
+      output2({ timestamp: result }, raw, result);
     }
     function cmdListTodos(cwd, area, raw) {
       const pendingDir = path.join(cwd, ".planning", "todos", "pending");
@@ -21577,7 +21944,7 @@ var require_misc = __commonJS({
         debugLog("feature.listTodos", "read pending dir failed", e);
       }
       const result = { count, todos };
-      output(result, raw, count.toString());
+      output2(result, raw, count.toString());
     }
     function cmdVerifyPathExists(cwd, targetPath, raw) {
       if (!targetPath) {
@@ -21588,11 +21955,11 @@ var require_misc = __commonJS({
         const stats = fs.statSync(fullPath);
         const type = stats.isDirectory() ? "directory" : stats.isFile() ? "file" : "other";
         const result = { exists: true, type };
-        output(result, raw, "true");
+        output2(result, raw, "true");
       } catch (e) {
         debugLog("file.stat", "stat failed", e);
         const result = { exists: false, type: null };
-        output(result, raw, "false");
+        output2(result, raw, "false");
       }
     }
     function cmdConfigEnsureSection(cwd, raw) {
@@ -21608,7 +21975,7 @@ var require_misc = __commonJS({
       }
       if (fs.existsSync(configPath)) {
         const result = { created: false, reason: "already_exists" };
-        output(result, raw, "exists");
+        output2(result, raw, "exists");
         return;
       }
       const homedir = require("os").homedir();
@@ -21641,7 +22008,7 @@ var require_misc = __commonJS({
       try {
         fs.writeFileSync(configPath, JSON.stringify(defaults, null, 2), "utf-8");
         const result = { created: true, path: ".planning/config.json" };
-        output(result, raw, "created");
+        output2(result, raw, "created");
       } catch (err) {
         debugLog("config.ensure", "write failed", err);
         error("Failed to create config.json: " + err.message);
@@ -21678,7 +22045,7 @@ var require_misc = __commonJS({
       try {
         fs.writeFileSync(configPath, JSON.stringify(config, null, 2), "utf-8");
         const result = { updated: true, key: keyPath, value: parsedValue };
-        output(result, raw, `${keyPath}=${parsedValue}`);
+        output2(result, raw, `${keyPath}=${parsedValue}`);
       } catch (err) {
         debugLog("config.set", "write failed", err);
         error("Failed to write config.json: " + err.message);
@@ -21712,7 +22079,7 @@ var require_misc = __commonJS({
       if (current === void 0) {
         error(`Key not found: ${keyPath}`);
       }
-      output(current, raw, String(current));
+      output2(current, raw, String(current));
     }
     function cmdConfigMigrate(cwd, raw) {
       const configPath = path.join(cwd, ".planning", "config.json");
@@ -21773,7 +22140,7 @@ var require_misc = __commonJS({
         config_path: ".planning/config.json",
         backup_path: migratedKeys.length > 0 ? ".planning/config.json.bak" : null
       };
-      output(result, raw);
+      output2(result, raw);
     }
     function cmdHistoryDigest(cwd, options, raw) {
       const limit = options.limit || null;
@@ -21798,7 +22165,7 @@ var require_misc = __commonJS({
       }
       if (allPhaseDirs.length === 0) {
         digest.tech_stack = [];
-        output(digest, raw);
+        output2(digest, raw);
         return;
       }
       try {
@@ -21862,7 +22229,7 @@ var require_misc = __commonJS({
           delete digest.decisions;
           delete digest.tech_stack;
         }
-        output(digest, raw);
+        output2(digest, raw);
       } catch (e) {
         debugLog("feature.historyDigest", "digest generation failed", e);
         error("Failed to generate history digest: " + e.message);
@@ -21877,13 +22244,13 @@ var require_misc = __commonJS({
       const agentModels = MODEL_PROFILES[agentType];
       if (!agentModels) {
         const result2 = { model: "sonnet", profile, unknown_agent: true };
-        output(result2, raw, "sonnet");
+        output2(result2, raw, "sonnet");
         return;
       }
       const resolved = agentModels[profile] || agentModels["balanced"] || "sonnet";
       const model = resolved === "opus" ? "inherit" : resolved;
       const result = { model, profile };
-      output(result, raw, model);
+      output2(result, raw, model);
     }
     function cmdFindPhase(cwd, phase, raw) {
       if (!phase) {
@@ -21897,7 +22264,7 @@ var require_misc = __commonJS({
         const dirs = entries.filter((e) => e.isDirectory()).map((e) => e.name).sort();
         const match = dirs.find((d) => d.startsWith(normalized));
         if (!match) {
-          output(notFound, raw, "");
+          output2(notFound, raw, "");
           return;
         }
         const dirMatch = match.match(/^(\d+(?:\.\d+)?)-?(.*)/);
@@ -21915,10 +22282,10 @@ var require_misc = __commonJS({
           plans,
           summaries
         };
-        output(result, raw, result.directory);
+        output2(result, raw, result.directory);
       } catch (e) {
         debugLog("phase.find", "readdir failed", e);
-        output(notFound, raw, "");
+        output2(notFound, raw, "");
       }
     }
     function preCommitChecks(cwd, force) {
@@ -21981,19 +22348,19 @@ var require_misc = __commonJS({
       const config = loadConfig(cwd);
       if (!config.commit_docs) {
         const result2 = { committed: false, hash: null, reason: "skipped_commit_docs_false" };
-        output(result2, raw, "skipped");
+        output2(result2, raw, "skipped");
         return;
       }
       if (isGitIgnored(cwd, ".planning")) {
         const result2 = { committed: false, hash: null, reason: "skipped_gitignored" };
-        output(result2, raw, "skipped");
+        output2(result2, raw, "skipped");
         return;
       }
       const checks = preCommitChecks(cwd, force);
       if (!checks.passed) {
         process.exitCode = 2;
         const result2 = { committed: false, hash: null, reason: "pre_commit_blocked", failures: checks.failures };
-        output(result2, raw, "blocked");
+        output2(result2, raw, "blocked");
         return;
       }
       const filesToStage = files && files.length > 0 ? files : [".planning/"];
@@ -22011,17 +22378,17 @@ var require_misc = __commonJS({
       if (commitResult.exitCode !== 0) {
         if (commitResult.stdout.includes("nothing to commit") || commitResult.stderr.includes("nothing to commit")) {
           const result3 = { committed: false, hash: null, reason: "nothing_to_commit" };
-          output(result3, raw, "nothing");
+          output2(result3, raw, "nothing");
           return;
         }
         const result2 = { committed: false, hash: null, reason: "nothing_to_commit", error: commitResult.stderr };
-        output(result2, raw, "nothing");
+        output2(result2, raw, "nothing");
         return;
       }
       const hashResult = execGit(cwd, ["rev-parse", "--short", "HEAD"]);
       const hash = hashResult.exitCode === 0 ? hashResult.stdout : null;
       const result = { committed: true, hash, reason: "committed", agent_type: agentType || null, tdd_phase: tddPhase || null };
-      output(result, raw, hash || "committed");
+      output2(result, raw, hash || "committed");
     }
     function cmdVerifySummary(cwd, summaryPath, checkFileCount, raw) {
       if (!summaryPath) {
@@ -22040,7 +22407,7 @@ var require_misc = __commonJS({
           },
           errors: ["SUMMARY.md not found"]
         };
-        output(result2, raw, "failed");
+        output2(result2, raw, "failed");
         return;
       }
       const content = fs.readFileSync(fullPath, "utf-8");
@@ -22101,7 +22468,7 @@ var require_misc = __commonJS({
       };
       const passed = missing.length === 0 && selfCheck !== "failed";
       const result = { passed, checks, errors };
-      output(result, raw, passed ? "passed" : "failed");
+      output2(result, raw, passed ? "passed" : "failed");
     }
     function cmdTemplateSelect(cwd, planPath, raw) {
       if (!planPath) {
@@ -22133,10 +22500,10 @@ var require_misc = __commonJS({
           type = "complex";
         }
         const result = { template, type, taskCount, fileCount, hasDecisions };
-        output(result, raw, template);
+        output2(result, raw, template);
       } catch (e) {
         debugLog("template.pick", "template selection failed", e);
-        output({ template: "templates/summary-standard.md", type: "standard", error: e.message }, raw, "templates/summary-standard.md");
+        output2({ template: "templates/summary-standard.md", type: "standard", error: e.message }, raw, "templates/summary-standard.md");
       }
     }
     function cmdTemplateFill(cwd, templateType, options, raw) {
@@ -22148,7 +22515,7 @@ var require_misc = __commonJS({
       }
       const phaseInfo = findPhaseInternal(cwd, options.phase);
       if (!phaseInfo || !phaseInfo.found) {
-        output({ error: "Phase not found", phase: options.phase }, raw);
+        output2({ error: "Phase not found", phase: options.phase }, raw);
         return;
       }
       const padded = normalizePhaseName(options.phase);
@@ -22302,12 +22669,12 @@ ${body}
 `;
       const outPath = path.join(cwd, phaseInfo.directory, fileName);
       if (fs.existsSync(outPath)) {
-        output({ error: "File already exists", path: path.relative(cwd, outPath) }, raw);
+        output2({ error: "File already exists", path: path.relative(cwd, outPath) }, raw);
         return;
       }
       fs.writeFileSync(outPath, fullContent, "utf-8");
       const relPath = path.relative(cwd, outPath);
-      output({ created: true, path: relPath, template: templateType }, raw, relPath);
+      output2({ created: true, path: relPath, template: templateType }, raw, relPath);
     }
     function cmdPhasePlanIndex(cwd, phase, raw) {
       if (!phase) {
@@ -22329,7 +22696,7 @@ ${body}
         debugLog("phase.planIndex", "readdir failed", e);
       }
       if (!phaseDir) {
-        output({ phase: normalized, error: "Phase not found", plans: [], waves: {}, incomplete: [], has_checkpoints: false }, raw);
+        output2({ phase: normalized, error: "Phase not found", plans: [], waves: {}, incomplete: [], has_checkpoints: false }, raw);
         return;
       }
       const phaseFiles = fs.readdirSync(phaseDir);
@@ -22388,12 +22755,12 @@ ${body}
         incomplete,
         has_checkpoints: hasCheckpoints
       };
-      output(result, raw);
+      output2(result, raw);
     }
     function cmdStateSnapshot(cwd, raw) {
       const statePath = path.join(cwd, ".planning", "STATE.md");
       if (!fs.existsSync(statePath)) {
-        output({ error: "STATE.md not found" }, raw);
+        output2({ error: "STATE.md not found" }, raw);
         return;
       }
       const content = fs.readFileSync(statePath, "utf-8");
@@ -22470,7 +22837,7 @@ ${body}
         paused_at: pausedAt,
         session
       };
-      output(result, raw);
+      output2(result, raw);
     }
     function cmdSummaryExtract(cwd, summaryPath, fields, raw) {
       if (!summaryPath) {
@@ -22478,7 +22845,7 @@ ${body}
       }
       const fullPath = path.join(cwd, summaryPath);
       if (!fs.existsSync(fullPath)) {
-        output({ error: "File not found", path: summaryPath }, raw);
+        output2({ error: "File not found", path: summaryPath }, raw);
         return;
       }
       const content = fs.readFileSync(fullPath, "utf-8");
@@ -22511,19 +22878,19 @@ ${body}
             filtered[field] = fullResult[field];
           }
         }
-        output(filtered, raw);
+        output2(filtered, raw);
         return;
       }
-      output(fullResult, raw);
+      output2(fullResult, raw);
     }
     async function cmdWebsearch(query, options, raw) {
       const apiKey = process.env.BRAVE_API_KEY;
       if (!apiKey) {
-        output({ available: false, reason: "BRAVE_API_KEY not set" }, raw, "");
+        output2({ available: false, reason: "BRAVE_API_KEY not set" }, raw, "");
         return;
       }
       if (!query) {
-        output({ available: false, error: "Query required" }, raw, "");
+        output2({ available: false, error: "Query required" }, raw, "");
         return;
       }
       const params = new URLSearchParams({
@@ -22547,7 +22914,7 @@ ${body}
           }
         );
         if (!response.ok) {
-          output({ available: false, error: `API error: ${response.status}` }, raw, "");
+          output2({ available: false, error: `API error: ${response.status}` }, raw, "");
           return;
         }
         const data = await response.json();
@@ -22557,7 +22924,7 @@ ${body}
           description: r.description,
           age: r.age || null
         }));
-        output({
+        output2({
           available: true,
           query,
           count: results.length,
@@ -22567,7 +22934,7 @@ ${r.url}
 ${r.description}`).join("\n\n"));
       } catch (err) {
         debugLog("feature.webSearch", "search request failed", err);
-        output({ available: false, error: err.message }, raw, "");
+        output2({ available: false, error: err.message }, raw, "");
       }
     }
     function cmdFrontmatterGet(cwd, filePath, field, raw) {
@@ -22577,19 +22944,19 @@ ${r.description}`).join("\n\n"));
       const fullPath = path.isAbsolute(filePath) ? filePath : path.join(cwd, filePath);
       const content = safeReadFile(fullPath);
       if (!content) {
-        output({ error: "File not found", path: filePath }, raw);
+        output2({ error: "File not found", path: filePath }, raw);
         return;
       }
       const fm = extractFrontmatter(content);
       if (field) {
         const value = fm[field];
         if (value === void 0) {
-          output({ error: "Field not found", field }, raw);
+          output2({ error: "Field not found", field }, raw);
           return;
         }
-        output({ [field]: value }, raw, JSON.stringify(value));
+        output2({ [field]: value }, raw, JSON.stringify(value));
       } else {
-        output(fm, raw);
+        output2(fm, raw);
       }
     }
     function cmdFrontmatterSet(cwd, filePath, field, value, raw) {
@@ -22598,7 +22965,7 @@ ${r.description}`).join("\n\n"));
       }
       const fullPath = path.isAbsolute(filePath) ? filePath : path.join(cwd, filePath);
       if (!fs.existsSync(fullPath)) {
-        output({ error: "File not found", path: filePath }, raw);
+        output2({ error: "File not found", path: filePath }, raw);
         return;
       }
       const content = fs.readFileSync(fullPath, "utf-8");
@@ -22613,7 +22980,7 @@ ${r.description}`).join("\n\n"));
       fm[field] = parsedValue;
       const newContent = spliceFrontmatter(content, fm);
       fs.writeFileSync(fullPath, newContent, "utf-8");
-      output({ updated: true, field, value: parsedValue }, raw, "true");
+      output2({ updated: true, field, value: parsedValue }, raw, "true");
     }
     function cmdFrontmatterMerge(cwd, filePath, data, raw) {
       if (!filePath || !data) {
@@ -22621,7 +22988,7 @@ ${r.description}`).join("\n\n"));
       }
       const fullPath = path.isAbsolute(filePath) ? filePath : path.join(cwd, filePath);
       if (!fs.existsSync(fullPath)) {
-        output({ error: "File not found", path: filePath }, raw);
+        output2({ error: "File not found", path: filePath }, raw);
         return;
       }
       const content = fs.readFileSync(fullPath, "utf-8");
@@ -22637,7 +23004,7 @@ ${r.description}`).join("\n\n"));
       Object.assign(fm, mergeData);
       const newContent = spliceFrontmatter(content, fm);
       fs.writeFileSync(fullPath, newContent, "utf-8");
-      output({ merged: true, fields: Object.keys(mergeData) }, raw, "true");
+      output2({ merged: true, fields: Object.keys(mergeData) }, raw, "true");
     }
     var FRONTMATTER_SCHEMAS = {
       plan: { required: ["phase", "plan", "type", "wave", "depends_on", "files_modified", "autonomous", "must_haves"] },
@@ -22655,13 +23022,13 @@ ${r.description}`).join("\n\n"));
       const fullPath = path.isAbsolute(filePath) ? filePath : path.join(cwd, filePath);
       const content = safeReadFile(fullPath);
       if (!content) {
-        output({ error: "File not found", path: filePath }, raw);
+        output2({ error: "File not found", path: filePath }, raw);
         return;
       }
       const fm = extractFrontmatter(content);
       const missing = schema.required.filter((f) => fm[f] === void 0);
       const present = schema.required.filter((f) => fm[f] !== void 0);
-      output({ valid: missing.length === 0, missing, present, schema: schemaName }, raw, missing.length === 0 ? "valid" : "invalid");
+      output2({ valid: missing.length === 0, missing, present, schema: schemaName }, raw, missing.length === 0 ? "valid" : "invalid");
     }
     function cmdProgressRender(cwd, format, raw) {
       const milestone = getMilestoneInfo(cwd);
@@ -22701,15 +23068,15 @@ ${r.description}`).join("\n\n"));
           out += `| ${p.number} | ${p.name} | ${p.summaries}/${p.plans} | ${p.status} |
 `;
         }
-        output({ rendered: out }, raw, out);
+        output2({ rendered: out }, raw, out);
       } else if (format === "bar") {
         const barWidth = 20;
         const filled = Math.round(percent / 100 * barWidth);
         const bar = "\u2588".repeat(filled) + "\u2591".repeat(barWidth - filled);
         const text = `[${bar}] ${totalSummaries}/${totalPlans} plans (${percent}%)`;
-        output({ bar: text, percent, completed: totalSummaries, total: totalPlans }, raw, text);
+        output2({ bar: text, percent, completed: totalSummaries, total: totalPlans }, raw, text);
       } else {
-        output({
+        output2({
           milestone_version: milestone.version,
           milestone_name: milestone.name,
           phases,
@@ -22736,7 +23103,7 @@ ${r.description}`).join("\n\n"));
 ` + content;
       fs.writeFileSync(path.join(completedDir, filename), content, "utf-8");
       fs.unlinkSync(sourcePath);
-      output({ completed: true, file: filename, date: today }, raw, "completed");
+      output2({ completed: true, file: filename, date: today }, raw, "completed");
     }
     function cmdScaffold(cwd, type, options, raw) {
       const { phase, name } = options;
@@ -22831,19 +23198,19 @@ _Pending verification_
           fs.mkdirSync(phasesParent, { recursive: true });
           const dirPath = path.join(phasesParent, dirName);
           fs.mkdirSync(dirPath, { recursive: true });
-          output({ created: true, directory: `.planning/phases/${dirName}`, path: dirPath }, raw, dirPath);
+          output2({ created: true, directory: `.planning/phases/${dirName}`, path: dirPath }, raw, dirPath);
           return;
         }
         default:
           error(`Unknown scaffold type: ${type}. Available: context, uat, verification, phase-dir`);
       }
       if (fs.existsSync(filePath)) {
-        output({ created: false, reason: "already_exists", path: filePath }, raw, "exists");
+        output2({ created: false, reason: "already_exists", path: filePath }, raw, "exists");
         return;
       }
       fs.writeFileSync(filePath, content, "utf-8");
       const relPath = path.relative(cwd, filePath);
-      output({ created: true, path: relPath }, raw, relPath);
+      output2({ created: true, path: relPath }, raw, relPath);
     }
     function cmdTdd(cwd, subcommand, parsedArgs, raw) {
       const testCmd = parsedArgs["test-cmd"];
@@ -22863,7 +23230,7 @@ _Pending verification_
         }
         const valid = expectFail ? exitCode !== 0 : exitCode === 0;
         if (!valid) process.exitCode = 1;
-        output({ phase, valid, test_exit_code: exitCode, output_snippet: snip(out) }, raw);
+        output2({ phase, valid, test_exit_code: exitCode, output_snippet: snip(out) }, raw);
       } else if (subcommand === "auto-test") {
         if (!testCmd) {
           error("--test-cmd required");
@@ -22875,7 +23242,7 @@ _Pending verification_
           exitCode = e.status || 1;
           out = (e.stdout || "") + (e.stderr || "");
         }
-        output({ passed: exitCode === 0, exit_code: exitCode, output_snippet: snip(out) }, raw);
+        output2({ passed: exitCode === 0, exit_code: exitCode, output_snippet: snip(out) }, raw);
       } else if (subcommand === "detect-antipattern") {
         const phase = parsedArgs.phase;
         const files = (parsedArgs.files || "").split(",").map((f) => f.trim()).filter(Boolean);
@@ -22904,7 +23271,7 @@ _Pending verification_
             }
           }
         }
-        output({ phase, warnings }, raw);
+        output2({ phase, warnings }, raw);
       } else {
         error("Unknown tdd subcommand: " + subcommand + ". Available: validate-red, validate-green, validate-refactor, auto-test, detect-antipattern");
       }
@@ -22949,7 +23316,7 @@ _Pending verification_
         conventionsDoc = fs.readFileSync(path.join(cwd, ".planning", "codebase", "CONVENTIONS.md"), "utf-8");
       } catch (e) {
       }
-      output({
+      output2({
         phase: `${phaseInfo.phase_number}-${phaseInfo.phase_name}`,
         plan: padPlan,
         commits: commits.map((c) => ({ hash: c.hash, message: c.message, files: c.files.map((f) => f.path) })),
@@ -23001,7 +23368,7 @@ var require_features = __commonJS({
     var fs = require("fs");
     var path = require("path");
     var { execSync, execFileSync } = require("child_process");
-    var { output, error, debugLog } = require_output();
+    var { output: output2, error, debugLog } = require_output();
     var { loadConfig } = require_config();
     var { CONFIG_SCHEMA } = require_constants();
     var { parseAssertionsMd } = require_verify();
@@ -23025,11 +23392,11 @@ var require_features = __commonJS({
         debugLog("feature.sessionDiff", "read failed", e);
       }
       if (!since) {
-        output({ error: "No last activity found in STATE.md", changes: [] }, raw);
+        output2({ error: "No last activity found in STATE.md", changes: [] }, raw);
         return;
       }
       if (!isValidDateString(since)) {
-        output({ error: "Invalid date format in STATE.md", changes: [] }, raw);
+        output2({ error: "Invalid date format in STATE.md", changes: [] }, raw);
         return;
       }
       const sanitizedSince = sanitizeShellArg(since);
@@ -23051,7 +23418,7 @@ var require_features = __commonJS({
       const plans = filesChanged.filter((f) => f.includes("PLAN"));
       const state = filesChanged.filter((f) => f.includes("STATE"));
       const roadmap = filesChanged.filter((f) => f.includes("ROADMAP"));
-      output({
+      output2({
         since,
         commit_count: changes.length,
         commits: changes.slice(0, 20),
@@ -23126,7 +23493,7 @@ var require_features = __commonJS({
       if (totalLines > 1e3) {
         recommendations.push(`${totalLines} existing lines to read \u2014 large codebase context`);
       }
-      output({
+      output2({
         plan: planPath,
         files: {
           total: filesModified.length,
@@ -23156,7 +23523,7 @@ var require_features = __commonJS({
       const testCommands = config.test_commands || {};
       const testGate = config.test_gate !== false;
       if (Object.keys(testCommands).length === 0) {
-        output({
+        output2({
           configured: false,
           message: "No test_commands configured in .planning/config.json",
           example: {
@@ -23207,7 +23574,7 @@ var require_features = __commonJS({
           };
         }
       }
-      output({
+      output2({
         configured: true,
         test_gate: testGate,
         all_passed: allPassed,
@@ -23270,7 +23637,7 @@ var require_features = __commonJS({
         debugLog("feature.searchDecisions", "read failed", e);
       }
       results.sort((a, b) => b.score - a.score);
-      output({
+      output2({
         query,
         match_count: results.length,
         decisions: results.slice(0, 20)
@@ -23356,7 +23723,7 @@ var require_features = __commonJS({
         } catch (e) {
           debugLog("validate.dependencies", "read roadmap deps failed", e);
         }
-        output({ phase, valid: issues.length === 0, issue_count: issues.length, issues, checked, note: "Phase has no plans yet \u2014 checked ROADMAP-level dependencies only" }, raw);
+        output2({ phase, valid: issues.length === 0, issue_count: issues.length, issues, checked, note: "Phase has no plans yet \u2014 checked ROADMAP-level dependencies only" }, raw);
         return;
       }
       for (const planFile of planFiles) {
@@ -23417,7 +23784,7 @@ var require_features = __commonJS({
       } catch (e) {
         debugLog("validate.dependencies", "read failed", e);
       }
-      output({
+      output2({
         phase,
         valid: issues.length === 0,
         issue_count: issues.length,
@@ -23445,7 +23812,7 @@ var require_features = __commonJS({
         }
       });
       if (searchPaths.length === 0) {
-        output({ query, match_count: 0, lessons: [], message: "No lessons file found (checked tasks/lessons.md and .planning/lessons.md)" }, raw);
+        output2({ query, match_count: 0, lessons: [], message: "No lessons file found (checked tasks/lessons.md and .planning/lessons.md)" }, raw);
         return;
       }
       for (const searchPath of searchPaths) {
@@ -23473,7 +23840,7 @@ var require_features = __commonJS({
         }
       }
       results.sort((a, b) => b.score - a.score);
-      output({
+      output2({
         query,
         match_count: results.length,
         lessons: results.slice(0, 15)
@@ -23508,7 +23875,7 @@ var require_features = __commonJS({
             });
           }
           const totalDependents2 = graphResults.reduce((sum, r) => sum + r.dependent_count, 0);
-          output({
+          output2({
             files_analyzed: graphResults.length,
             total_dependents: totalDependents2,
             overall_risk: totalDependents2 > 20 ? "high" : totalDependents2 > 10 ? "medium" : "low",
@@ -23600,7 +23967,7 @@ var require_features = __commonJS({
         });
       }
       const totalDependents = results.reduce((sum, r) => sum + r.dependent_count, 0);
-      output({
+      output2({
         files_analyzed: results.length,
         total_dependents: totalDependents,
         overall_risk: totalDependents > 20 ? "high" : totalDependents > 10 ? "medium" : "low",
@@ -23634,7 +24001,7 @@ var require_features = __commonJS({
         debugLog("feature.rollbackInfo", "read failed", e);
       }
       if (!summaryContent) {
-        output({ found: false, plan_id: planId, message: "No SUMMARY found for this plan" }, raw);
+        output2({ found: false, plan_id: planId, message: "No SUMMARY found for this plan" }, raw);
         return;
       }
       const commitPattern = /\b([a-f0-9]{7,40})\b/g;
@@ -23678,7 +24045,7 @@ var require_features = __commonJS({
           }
         }
       }
-      output({
+      output2({
         found: true,
         plan_id: planId,
         summary_path: summaryPath,
@@ -23768,7 +24135,7 @@ var require_features = __commonJS({
       const avgPlansPerPhase = metrics.length > 0 ? Math.ceil(metrics.length / Math.max(1, metrics.length / 4)) : 4;
       const estimatedRemainingPlans = remainingPhases * avgPlansPerPhase;
       const estimatedDaysRemaining = totalCompletedPlans > 0 ? Math.ceil(estimatedRemainingPlans / (totalCompletedPlans / totalDays)) : null;
-      output({
+      output2({
         milestone: milestone.version,
         metrics: {
           plans_completed: totalCompletedPlans,
@@ -23805,7 +24172,7 @@ var require_features = __commonJS({
         debugLog("feature.traceRequirement", "read failed", e);
       }
       if (!trace.phase) {
-        output({ ...trace, status: "unmapped", message: `${reqUpper} not found in ROADMAP.md coverage map` }, raw);
+        output2({ ...trace, status: "unmapped", message: `${reqUpper} not found in ROADMAP.md coverage map` }, raw);
         return;
       }
       const phaseTree = getPhaseTree(cwd);
@@ -23887,12 +24254,12 @@ var require_features = __commonJS({
           trace.chain = `${reqUpper} \u2192 ${assertionEntries.length} assertions (${trace.must_have_count} must-have) \u2192 ${planRef} \u2192 VERIFICATION: ${verificationStatus}`;
         }
       }
-      output(trace, raw);
+      output2(trace, raw);
     }
     function cmdValidateConfig(cwd, raw) {
       const configPath = path.join(cwd, ".planning", "config.json");
       if (!fs.existsSync(configPath)) {
-        output({ exists: false, message: "No config.json found" }, raw);
+        output2({ exists: false, message: "No config.json found" }, raw);
         return;
       }
       let config;
@@ -23900,7 +24267,7 @@ var require_features = __commonJS({
         config = JSON.parse(fs.readFileSync(configPath, "utf-8"));
       } catch (e) {
         debugLog("feature.validateConfig", "read failed", e);
-        output({ exists: true, valid_json: false, error: e.message }, raw);
+        output2({ exists: true, valid_json: false, error: e.message }, raw);
         return;
       }
       const knownKeys = {};
@@ -23941,7 +24308,7 @@ var require_features = __commonJS({
         }
         effective[key] = { value, source: hasExplicit ? "explicit" : "default", description: schema.description };
       }
-      output({
+      output2({
         exists: true,
         valid_json: true,
         warning_count: warnings.length,
@@ -23992,7 +24359,7 @@ var require_features = __commonJS({
       } catch (e) {
         debugLog("feature.quickSummary", "parse STATE.md quick tasks failed", e);
       }
-      output({
+      output2({
         milestone: milestone.version,
         total_quick_tasks: quickTasks.length,
         tasks: quickTasks
@@ -24088,7 +24455,7 @@ var require_features = __commonJS({
       if (result.error) {
         error(`File not found: ${filePath}`);
       }
-      output(result, raw);
+      output2(result, raw);
     }
     var { extractAtReferences } = require_helpers();
     function measureAllWorkflows(cwd) {
@@ -24192,7 +24559,7 @@ Baseline saved: ${path.relative(cwd, baselinePath)}
 
 `);
       measurement.baseline_file = path.relative(cwd, baselinePath);
-      output(measurement, raw);
+      output2(measurement, raw);
     }
     function cmdContextBudgetCompare(cwd, baselinePath, raw) {
       let baseline;
@@ -24309,7 +24676,7 @@ Baseline saved: ${path.relative(cwd, baselinePath)}
 Improved: ${improved} | Unchanged: ${unchanged} | Worsened: ${worsened}
 
 `);
-      output(result, raw);
+      output2(result, raw);
     }
     function cmdContextBudgetMeasure(cwd, raw) {
       const measurements = [];
@@ -24436,7 +24803,7 @@ Improved: ${improved} | Unchanged: ${unchanged} | Worsened: ${worsened}
       const totalSlimTokens = measurements.reduce((sum, m) => sum + m.slim_tokens, 0);
       const totalSavedTokens = totalFullTokens - totalSlimTokens;
       const totalSavedPercent = totalFullTokens > 0 ? Math.round(totalSavedTokens / totalFullTokens * 100) : 0;
-      output({
+      output2({
         measurements,
         total_full_tokens: totalFullTokens,
         total_slim_tokens: totalSlimTokens,
@@ -24500,7 +24867,7 @@ Improved: ${improved} | Unchanged: ${unchanged} | Worsened: ${worsened}
         if (overBudget) overBudgetCount++;
         workflows.push({ name, actual_tokens: actualTokens, budget_tokens: budgetTokens, over_budget: overBudget, percent_of_budget: percentOfBudget });
       }
-      output({ workflows, over_budget_count: overBudgetCount, total_workflows: workflows.length }, raw);
+      output2({ workflows, over_budget_count: overBudgetCount, total_workflows: workflows.length }, raw);
     }
     function cmdTestCoverage(cwd, raw) {
       const config = loadConfig(cwd);
@@ -24576,7 +24943,7 @@ Improved: ${improved} | Unchanged: ${unchanged} | Worsened: ${worsened}
       const totalCommands = allCommands.length;
       const commandsWithTests = covered.length;
       const coveragePercent = totalCommands > 0 ? Math.round(commandsWithTests / totalCommands * 100) : 0;
-      output({
+      output2({
         total_commands: totalCommands,
         commands_with_tests: commandsWithTests,
         coverage_percent: coveragePercent,
@@ -24589,7 +24956,7 @@ Improved: ${improved} | Unchanged: ${unchanged} | Worsened: ${worsened}
       const pd = path.join(cwd, ".planning");
       const sc = safeReadFile(path.join(pd, "STATE.md"));
       if (!sc) {
-        output({ error: "STATE.md not found" }, raw);
+        output2({ error: "STATE.md not found" }, raw);
         return;
       }
       const xf = (f) => {
@@ -24654,7 +25021,7 @@ Improved: ${improved} | Unchanged: ${unchanged} | Worsened: ${worsened}
       }
       const sa = sc.match(/Stopped at:\s*(.+)/);
       const rf = sc.match(/Resume file:\s*(.+)/);
-      output({
+      output2({
         current_position: { phase: pm ? `${pm[1]} of ${pm[2]}` : phaseNum || "Unknown", phase_name: phaseName || "Unknown", plan, status },
         session_activity: { plans_completed: completed, decisions_made: decisions.slice(-5), blockers_resolved: [], last_activity: lastAct || "Unknown" },
         next_action: next,
@@ -24692,7 +25059,7 @@ var require_memory = __commonJS({
     var fs = require("fs");
     var path = require("path");
     var crypto = require("crypto");
-    var { output, error, debugLog } = require_output();
+    var { output: output2, error, debugLog } = require_output();
     var VALID_STORES = ["decisions", "bookmarks", "lessons", "todos", "trajectories"];
     var SACRED_STORES = ["decisions", "lessons", "trajectories"];
     var BOOKMARKS_MAX = 20;
@@ -24707,7 +25074,7 @@ var require_memory = __commonJS({
     function cmdMemoryEnsureDir(cwd) {
       const dir = path.join(cwd, ".planning", "memory");
       fs.mkdirSync(dir, { recursive: true });
-      output({ ensured: true, memory_dir: dir });
+      output2({ ensured: true, memory_dir: dir });
     }
     function cmdMemoryWrite(cwd, options, raw) {
       const { store, entry: entryJson } = options;
@@ -24782,7 +25149,7 @@ var require_memory = __commonJS({
         result.compact_needed = true;
         result.threshold = COMPACT_THRESHOLD;
       }
-      output(result);
+      output2(result);
     }
     function cmdMemoryRead(cwd, options, raw) {
       const { store, limit, query, phase, category, tags, from, to, asc } = options;
@@ -24836,7 +25203,7 @@ var require_memory = __commonJS({
       if (limit && parseInt(limit, 10) > 0) {
         entries = entries.slice(0, parseInt(limit, 10));
       }
-      output({ entries, count: entries.length, store, total });
+      output2({ entries, count: entries.length, store, total });
     }
     function cmdMemoryList(cwd, options, raw) {
       const memDir = path.join(cwd, ".planning", "memory");
@@ -24864,7 +25231,7 @@ var require_memory = __commonJS({
       } catch (e) {
         debugLog("memory.list", "readdir failed", e);
       }
-      output({ stores, memory_dir: memDir });
+      output2({ stores, memory_dir: memDir });
     }
     function cmdMemoryCompact(cwd, options, raw) {
       const { store, threshold: thresholdStr, dryRun } = options;
@@ -24960,13 +25327,13 @@ var require_memory = __commonJS({
         }
       }
       if (store && SACRED_STORES.includes(store)) {
-        output({ compacted: false, reason: "sacred_data" });
+        output2({ compacted: false, reason: "sacred_data" });
         return;
       }
       if (dryRun) {
         result.dry_run = true;
       }
-      output(result);
+      output2(result);
     }
     module2.exports = { cmdMemoryWrite, cmdMemoryRead, cmdMemoryList, cmdMemoryEnsureDir, cmdMemoryCompact };
   }
@@ -24978,7 +25345,7 @@ var require_mcp = __commonJS({
     "use strict";
     var fs = require("fs");
     var path = require("path");
-    var { output, error, debugLog } = require_output();
+    var { output: output2, error, debugLog } = require_output();
     var MCP_KNOWN_SERVERS = [
       { name: "postgres", patterns: [/postgres/i, /toolbox.*postgres/i], tool_count: 12, base_tokens: 700, total_estimate: 4500 },
       { name: "github", patterns: [/github/i], tool_count: 30, base_tokens: 1500, total_estimate: 46e3 },
@@ -25257,7 +25624,7 @@ var require_mcp = __commonJS({
       const hasDryRun = args.includes("--dry-run");
       if (hasRestore) {
         const result2 = restoreBackup(cwd);
-        output(result2, raw);
+        output2(result2, raw);
         return;
       }
       let contextWindow = DEFAULT_CONTEXT_WINDOW;
@@ -25312,7 +25679,7 @@ var require_mcp = __commonJS({
         const wd = recommendations.servers.filter((s) => s.recommendation === "disable" && s.source === "opencode.json");
         result.dry_run = { would_disable: wd.map((s) => s.name), would_disable_count: wd.length, tokens_would_save: wd.reduce((sum, s) => sum + (s.token_estimate || 0), 0), skipped_mcp_json: recommendations.servers.filter((s) => s.recommendation === "disable" && s.source === ".mcp.json").map((s) => s.name) };
       }
-      output(result, raw);
+      output2(result, raw);
     }
     module2.exports = {
       cmdMcpProfile,
@@ -25334,6 +25701,80 @@ var require_mcp = __commonJS({
       safeReadJson,
       matchIndicatorKey,
       checkEnvHints
+    };
+  }
+});
+
+// src/commands/cache.js
+var require_cache2 = __commonJS({
+  "src/commands/cache.js"(exports2, module2) {
+    "use strict";
+    var fs = require("fs");
+    var path = require("path");
+    var { output: output2, debugLog } = require_output();
+    var _cacheEngine = null;
+    function getCacheEngine() {
+      if (!_cacheEngine) {
+        try {
+          const { CacheEngine } = require_cache();
+          _cacheEngine = new CacheEngine();
+        } catch (e) {
+          debugLog("cache", "failed to load CacheEngine", e);
+          return null;
+        }
+      }
+      return _cacheEngine;
+    }
+    function cmdCacheStatus(cwd, args, raw) {
+      const cacheEngine = getCacheEngine();
+      if (!cacheEngine) {
+        output2({
+          backend: "unavailable",
+          count: 0,
+          hits: 0,
+          misses: 0,
+          error: "CacheEngine failed to load"
+        }, raw, "Cache unavailable");
+        return;
+      }
+      const status = cacheEngine.status();
+      output2(status, raw, `${status.backend}: ${status.count} entries`);
+    }
+    function cmdCacheClear(cwd, args, raw) {
+      const cacheEngine = getCacheEngine();
+      if (!cacheEngine) {
+        output2({ cleared: false, error: "CacheEngine failed to load" }, raw, "Failed to clear cache");
+        return;
+      }
+      cacheEngine.clear();
+      output2({ cleared: true }, raw, "Cache cleared");
+    }
+    function cmdCacheWarm(cwd, args, raw) {
+      const cacheEngine = getCacheEngine();
+      if (!cacheEngine) {
+        output2({ warmed: 0, error: "CacheEngine failed to load" }, raw, "Failed to warm cache");
+        return;
+      }
+      const filePaths = args.slice(1);
+      if (filePaths.length === 0) {
+        output2({ warmed: 0, error: "No files specified" }, raw, "No files to warm");
+        return;
+      }
+      const resolvedPaths = filePaths.map((p) => {
+        if (path.isAbsolute(p)) return p;
+        return path.join(cwd, p);
+      });
+      const warmed = cacheEngine.warm(resolvedPaths);
+      output2({ warmed }, raw, `Warmed ${warmed} file(s)`);
+    }
+    function registerCacheCommand(router) {
+      return router;
+    }
+    module2.exports = {
+      cmdCacheStatus,
+      cmdCacheClear,
+      cmdCacheWarm,
+      registerCacheCommand
     };
   }
 });
@@ -25461,6 +25902,9 @@ var require_router = __commonJS({
     }
     function lazyOrchestration() {
       return _modules.orchestration || (_modules.orchestration = require_orchestration());
+    }
+    function lazyCache() {
+      return _modules.cache || (_modules.cache = require_cache2());
     }
     async function main2() {
       const args = process.argv.slice(2);
@@ -26296,6 +26740,22 @@ Available: execute-phase, plan-phase, new-project, new-milestone, quick, resume,
               break;
             default:
               error("Unknown trajectory subcommand: " + trajSub + ". Available: checkpoint, list, pivot, compare, choose, dead-ends");
+          }
+          break;
+        }
+        case "cache": {
+          const subcommand = args[1];
+          if (subcommand === "status") {
+            lazyCache().cmdCacheStatus(cwd, args, raw);
+          } else if (subcommand === "clear") {
+            lazyCache().cmdCacheClear(cwd, args, raw);
+          } else if (subcommand === "warm") {
+            lazyCache().cmdCacheWarm(cwd, args, raw);
+          } else {
+            output({
+              commands: ["status", "clear", "warm"],
+              help: "gsd-tools cache <status|clear|warm> [files...]"
+            }, raw, "cache");
           }
           break;
         }
