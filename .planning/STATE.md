@@ -10,9 +10,9 @@ See: .planning/PROJECT.md (updated 2026-03-01)
 ## Current Position
 
 Phase: 52 of 55 (Cache Integration Warm-up)
-Plan: 1 of 1 in current phase
-Status: Completed plan 52-01
-Last activity: 2026-03-02 — Completed 52-01: Cache Warm-up with Auto-discovery
+Plan: 2 of 2 in current phase
+Status: Completed plan 52-02
+Last activity: 2026-03-02 — Completed 52-02: Cache Integration Warm-up
 
 Progress: [░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░] 0% (v8.0)
 
@@ -39,6 +39,8 @@ Progress: [░░░░░░░░░░░░░░░░░░░░░░░
 | v8.0 | 5 | TBD | — |
 | Phase 51-cache-foundation P02 | 5min | 3 tasks | 4 files |
 | Phase 51-cache-foundation P03 | 10min | 3 tasks | 3 files |
+| Phase 52-cache-integration P02 | 5min | 4 tasks | 3 files |
+| Phase 52 P02 | 5min | 4 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -54,6 +56,8 @@ All v1.0-v7.1 decisions recorded in PROJECT.md Key Decisions table with outcomes
 - [v8.0 Execution 51-01]: XDG_CONFIG_HOME convention for cache database path, transparent Map fallback
 - [v8.0 Execution 51-03]: Explicit cache invalidation on all gsd-tools file writes for immediate consistency
 - [v8.0 Execution 52-01]: Cache warm with auto-discovery, --no-cache flag for test parity, auto-warm message
+- [v8.0 Execution 52-02]: Hot-path commands wired to cachedReadFile, test parity verified
+- [Phase 52]: Hot-path commands wired to cachedReadFile — Performance optimization: Use cachedReadFile instead of fs.readFileSync for .planning files in phase.js, verify.js, misc.js
 
 ### Pending Todos
 
@@ -68,6 +72,6 @@ None — milestone starting fresh.
 ## Session Continuity
 
 Last session: 2026-03-02
-Stopped at: Completed 52-01-PLAN.md (Cache Warm-up with Auto-discovery)
+Stopped at: Completed 52-02-PLAN.md (Cache Integration Warm-up)
 Resume file: None
 Next step: Phase 52 complete, ready for Phase 53
