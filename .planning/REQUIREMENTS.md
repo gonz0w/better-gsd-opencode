@@ -10,8 +10,8 @@ Requirements for v8.0 Performance & Agent Architecture milestone. Each maps to r
 ### Cache Layer
 
 - [x] **CACHE-01**: SQLite read cache module persists parsed data across CLI invocations using `node:sqlite` (DatabaseSync)
-- [ ] **CACHE-02**: Cache validates freshness via mtime on every read, re-parses on stale
-- [ ] **CACHE-03**: Any file write through gsd-tools invalidates the corresponding cache entry
+- [x] **CACHE-02**: Cache validates freshness via mtime on every read, re-parses on stale
+- [x] **CACHE-03**: Any file write through gsd-tools invalidates the corresponding cache entry
 - [x] **CACHE-04**: Cache gracefully degrades to in-memory Map on Node <22.5 (no crashes, no warnings)
 - [ ] **CACHE-05**: User can pre-populate cache via `cache warm` command after checkout or pull
 - [ ] **CACHE-06**: User can compare performance baselines via `profiler compare` command
@@ -70,8 +70,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | Requirement | Phase | Status | Test Command |
 |-------------|-------|--------|--------------|
 | CACHE-01 | Phase 51 | Complete | npm test |
-| CACHE-02 | Phase 51 | Pending | npm test |
-| CACHE-03 | Phase 51 | Pending | npm test |
+| CACHE-02 | Phase 51 | Complete | npm test |
+| CACHE-03 | Phase 51 | Complete | npm test |
 | CACHE-04 | Phase 51 | Complete | npm test |
 | CACHE-05 | Phase 52 | Pending | npm test |
 | CACHE-06 | Phase 55 | Pending | npm test |

@@ -141,7 +141,7 @@ Full details: `.planning/milestones/v7.1-ROADMAP.md`
 
 **Milestone Goal:** Make every agent do one thing well, eliminate overlap and gaps across the product lifecycle, and dramatically reduce execution time through caching, context optimization, and command consolidation.
 
-- [ ] **Phase 51: Cache Foundation** - SQLite cache module with staleness detection, write invalidation, and graceful degradation
+- [x] **Phase 51: Cache Foundation** - SQLite cache module with staleness detection, write invalidation, and graceful degradation (completed 2026-03-02)
 - [ ] **Phase 52: Cache Integration & Warm-up** - Wire cache into hot paths, add warm command, prove test parity
 - [ ] **Phase 53: Agent Consolidation** - RACI matrix, agent merges, manifest-driven context, token budgets, lifecycle audit
 - [ ] **Phase 54: Command Consolidation** - Namespace grouping, reference updates, milestone docs generation
@@ -158,7 +158,7 @@ Full details: `.planning/milestones/v7.1-ROADMAP.md`
   2. Cached reads return identical content to direct filesystem reads for every file in `.planning/`
   3. Editing a `.planning/` file and immediately reading it via gsd-tools returns the updated content (never stale)
   4. Running on Node <22.5 produces identical behavior to Node ≥22.5 — no crashes, no warnings, Map fallback transparent
-**Plans:** 2/2 plans executed ✅
+**Plans:** 2/2 plans complete
 
 Plans:
 - [x] 51-01-PLAN.md — Create CacheEngine class with SQLite/Map backend
@@ -223,7 +223,7 @@ Note: Phases 53 and 54 are independent of 51-52 and could execute in parallel if
 | 30-36 | v6.0 | 11/11 | Complete | 2026-02-27 |
 | 37-44 | v7.0 | 15/15 | Complete | 2026-02-27 |
 | 45-50 | v7.1 | 12/12 | Complete | 2026-03-02 |
-| 51. Cache Foundation | 2/2 | Complete | 2026-03-02 |
+| 51. Cache Foundation | 2/2 | Complete    | 2026-03-02 |
 | 52. Cache Integration | v8.0 | 0/TBD | Not started | - |
 | 53. Agent Consolidation | v8.0 | 0/TBD | Not started | - |
 | 54. Command Consolidation | v8.0 | 0/TBD | Not started | - |
