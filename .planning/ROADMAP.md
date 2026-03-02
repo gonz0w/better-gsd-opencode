@@ -144,7 +144,7 @@ Full details: `.planning/milestones/v7.1-ROADMAP.md`
 - [x] **Phase 51: Cache Foundation** - SQLite cache module with staleness detection, write invalidation, and graceful degradation (3/3 plans, completed 2026-03-02)
 - [x] **Phase 52: Cache Integration & Warm-up** - Wire cache into hot paths, add warm command, prove test parity (2/2 plans, ready to execute)
 - [x] **Phase 53: Agent Consolidation** - RACI matrix, agent merges, manifest-driven context, token budgets, lifecycle audit (completed 2026-03-02)
-- [ ] **Phase 54: Command Consolidation** - Namespace grouping, reference updates, milestone docs generation
+- [x] **Phase 54: Command Consolidation** - Namespace grouping, reference updates, milestone docs generation (completed 2026-03-02)
 - [ ] **Phase 55: Profiler & Performance Validation** - Hot-path instrumentation, baseline comparison, prove speedup
 
 ## Phase Details
@@ -204,7 +204,7 @@ Plans:
   1. Top-level command count reduced — orphan commands grouped under namespaced parents (e.g., `cache status`, `session summary`)
   2. All tests, workflows, and agent prompts reference new command names — no references to old names remain
    3. Milestone wrapup workflow generates a documentation artifact automatically (changelog from git log + STATE.md)
-**Plans**: 4/4 plans
+**Plans**: 4/4 plans complete
 
 Plans:
 - [ ] 54-01-PLAN.md — Router.js namespace routing implementation
@@ -242,5 +242,5 @@ Note: Phases 53 and 54 are independent of 51-52 and could execute in parallel if
 | 51. Cache Foundation | v8.0 | 3/3 | Complete | 2026-03-02 |
 | 52. Cache Integration | v8.0 | 2/2 | Complete | 2026-03-02 |
 | 53. Agent Consolidation | v8.0 | Complete    | 2026-03-02 | - |
-| 54. Command Consolidation | v8.0 | 1/4 | In progress | - |
+| 54. Command Consolidation | v8.0 | Complete    | 2026-03-02 | - |
 | 55. Profiler & Performance | v8.0 | 0/TBD | Not started | - |
