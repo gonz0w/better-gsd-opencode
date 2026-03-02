@@ -16387,13 +16387,13 @@ describe('trajectory checkpoint', () => {
 
   test('branch naming follows convention exactly', () => {
     initGitForCheckpoint(tmpDir);
-    const result = runGsdTools('trajectory checkpoint naming-test --scope milestone', tmpDir);
+    const result = runGsdTools('trajectory checkpoint naming-test --scope task', tmpDir);
     assert.ok(result.success, `Command failed: ${result.error}`);
     const output = JSON.parse(result.output);
 
     const branchPattern = /^trajectory\/[a-zA-Z0-9_-]+\/[a-zA-Z0-9_-]+\/attempt-\d+$/;
     assert.match(output.branch, branchPattern, 'Branch should match trajectory/<scope>/<name>/attempt-N');
-    assert.strictEqual(output.branch, 'trajectory/milestone/naming-test/attempt-1');
+    assert.strictEqual(output.branch, 'trajectory/task/naming-test/attempt-1');
   });
 
   test('description flag stores in journal entry', () => {

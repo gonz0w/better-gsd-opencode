@@ -1,3 +1,7 @@
+// ─── Trajectory Scopes ───────────────────────────────────────────────────────
+
+const VALID_TRAJECTORY_SCOPES = ['task', 'plan', 'phase'];
+
 // ─── Model Profile Table ─────────────────────────────────────────────────────
 
 const MODEL_PROFILES = {
@@ -1124,6 +1128,23 @@ Examples:
   gsd-tools trajectory pivot try-redis --scope task --reason "Redis overkill for this cache size"
   gsd-tools trajectory pivot my-feature --attempt 2 --reason "Attempt 2 had better foundation"`,
 
+  'trajectory dead-ends': `Usage: gsd-tools trajectory dead-ends [--scope <scope>] [--name <name>] [--limit <N>] [--token-cap <N>]
+
+Query journal for failed approaches (pivot/abandon entries).
+Shows "what NOT to do" context with reasons from pivot entries.
+
+Options:
+  --scope <scope>   Filter by scope (task, plan, phase)
+  --name <name>     Filter by checkpoint name
+  --limit <N>       Max results (default: 10)
+  --token-cap <N>   Token cap for context output (default: 500)
+
+Output: { dead_ends, count, scope_filter, name_filter, context }
+
+Examples:
+  gsd-tools trajectory dead-ends
+  gsd-tools trajectory dead-ends --scope task --limit 5`,
+
   'classify': `Usage: gsd-tools classify <plan|phase> <path-or-number>
 
 Classify task complexity and recommend execution strategy.
@@ -1218,4 +1239,4 @@ Examples:
   gsd-tools git trajectory-branch --phase 45 --slug decision-journal`,
 };
 
-module.exports = { MODEL_PROFILES, CONFIG_SCHEMA, COMMAND_HELP };
+module.exports = { MODEL_PROFILES, CONFIG_SCHEMA, COMMAND_HELP, VALID_TRAJECTORY_SCOPES };

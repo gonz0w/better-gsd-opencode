@@ -5,6 +5,15 @@ const { execFileSync } = require('child_process');
 const { output, error, debugLog } = require('../lib/output');
 const { execGit, diffSummary } = require('../lib/git');
 const { banner, formatTable, summaryLine, actionHint, color, SYMBOLS, relativeTime } = require('../lib/format');
+const { VALID_TRAJECTORY_SCOPES } = require('../lib/constants');
+
+// ─── Scope Validation ────────────────────────────────────────────────────────
+
+function validateScope(scope) {
+  if (!VALID_TRAJECTORY_SCOPES.includes(scope)) {
+    error('Invalid scope: "' + scope + '". Valid scopes: ' + VALID_TRAJECTORY_SCOPES.join(', '));
+  }
+}
 
 // ─── Trajectory Checkpoint ───────────────────────────────────────────────────
 
@@ -25,6 +34,8 @@ function cmdTrajectoryCheckpoint(cwd, args, raw) {
     if (args[i] === '--description' && args[i + 1]) { description = args[++i]; continue; }
     if (!args[i].startsWith('-')) posArgs.push(args[i]);
   }
+
+  validateScope(scope);
 
   const name = posArgs[0];
   if (!name) error('Missing checkpoint name. Usage: trajectory checkpoint <name>');
@@ -207,6 +218,8 @@ function cmdTrajectoryList(cwd, args, raw) {
     if (args[i] === '--limit' && args[i + 1]) { limit = parseInt(args[++i], 10); continue; }
   }
 
+  if (scopeFilter) validateScope(scopeFilter);
+
   // Read trajectory journal
   const trajPath = path.join(cwd, '.planning', 'memory', 'trajectory.json');
   let entries = [];
@@ -334,6 +347,8 @@ function cmdTrajectoryPivot(cwd, args, raw) {
     if (args[i] === '--stash') { stashFlag = true; continue; }
     if (!args[i].startsWith('-')) posArgs.push(args[i]);
   }
+
+  validateScope(scope);
 
   const name = posArgs[0];
   if (!name) error('Missing checkpoint name. Usage: trajectory pivot <checkpoint> --reason "what failed and why"');
@@ -514,6 +529,8 @@ function cmdTrajectoryCompare(cwd, args, raw) {
     if (!args[i].startsWith('-')) posArgs.push(args[i]);
   }
 
+  validateScope(scope);
+
   const name = posArgs[0];
   if (!name) error('Missing checkpoint name. Usage: trajectory compare <name> [--scope <scope>]');
 
@@ -669,6 +686,8 @@ function cmdTrajectoryChoose(cwd, args, raw) {
     if (args[i] === '--attempt' && args[i + 1]) { attemptNum = parseInt(args[++i], 10); continue; }
     if (!args[i].startsWith('-')) posArgs.push(args[i]);
   }
+
+  validateScope(scope);
 
   const name = posArgs[0];
   if (!name) error('Missing checkpoint name. Usage: trajectory choose <name> --attempt <N>');
@@ -829,4 +848,149 @@ function formatChooseResult(result) {
   return lines.join('\n');
 }
 
-module.exports = { cmdTrajectoryCheckpoint, cmdTrajectoryList, cmdTrajectoryPivot, cmdTrajectoryCompare, cmdTrajectoryChoose };
+// ─── Trajectory Dead Ends ────────────────────────────────────────────────────
+
+/**
+ * Query trajectory journal for failed approaches (pivot/abandon entries).
+ * Returns array of dead-end objects for integration or formatting.
+ */
+function queryDeadEnds(cwd, { scope, name, limit } = {}) {
+  const trajPath = path.join(cwd, '.planning', 'memory', 'trajectory.json');
+  let entries = [];
+  try {
+    const data = fs.readFileSync(trajPath, 'utf-8');
+    entries = JSON.parse(data);
+    if (!Array.isArray(entries)) entries = [];
+  } catch (e) {
+    debugLog('trajectory.deadEnds', 'no trajectory.json found', e);
+    entries = [];
+  }
+
+  // Filter to pivot entries (abandoned approaches)
+  let deadEnds = entries.filter(e => e.category === 'pivot' || (e.tags && e.tags.includes('abandoned')));
+
+  if (scope) {
+    deadEnds = deadEnds.filter(e => e.scope === scope);
+  }
+  if (name) {
+    deadEnds = deadEnds.filter(e => e.checkpoint_name === name);
+  }
+
+  // Sort by timestamp descending (most recent first)
+  deadEnds.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+  // Apply limit
+  const effectiveLimit = (limit && limit > 0) ? limit : 10;
+  deadEnds = deadEnds.slice(0, effectiveLimit);
+
+  return deadEnds.map(e => ({
+    checkpoint_name: e.checkpoint_name || null,
+    scope: e.scope || null,
+    reason: (e.reason && e.reason.text) ? e.reason.text : null,
+    attempt: e.attempt || null,
+    timestamp: e.timestamp || null,
+    branch: e.branch || null,
+  }));
+}
+
+/**
+ * Format dead-end entries as "what NOT to do" context string.
+ * Token cap limits output size (estimated as chars/4).
+ */
+function formatDeadEndContext(deadEnds, tokenCap) {
+  if (!deadEnds || deadEnds.length === 0) return '';
+
+  const cap = (tokenCap && tokenCap > 0) ? tokenCap : 500;
+  const lines = [];
+  let totalChars = 0;
+  let truncatedCount = 0;
+
+  for (let i = 0; i < deadEnds.length; i++) {
+    const de = deadEnds[i];
+    const scopeName = de.scope && de.checkpoint_name ? `${de.scope}/${de.checkpoint_name}` : (de.checkpoint_name || 'unknown');
+    const attemptStr = de.attempt ? `attempt-${de.attempt}` : 'unknown';
+    const reason = de.reason || 'no reason recorded';
+    const line = `- [${scopeName}] ${attemptStr}: ${reason}`;
+
+    // Check token estimate (chars / 4)
+    if ((totalChars + line.length) / 4 > cap) {
+      truncatedCount = deadEnds.length - i;
+      break;
+    }
+
+    lines.push(line);
+    totalChars += line.length + 1; // +1 for newline
+  }
+
+  if (truncatedCount > 0) {
+    lines.push(`... and ${truncatedCount} more dead end${truncatedCount !== 1 ? 's' : ''}`);
+  }
+
+  return lines.join('\n');
+}
+
+/**
+ * CLI command: trajectory dead-ends
+ * Query journal for failed approaches and surface warnings.
+ */
+function cmdTrajectoryDeadEnds(cwd, args, raw) {
+  let scope = null;
+  let name = null;
+  let limit = null;
+  let tokenCap = null;
+
+  for (let i = 0; i < args.length; i++) {
+    if (args[i] === '--scope' && args[i + 1]) { scope = args[++i]; continue; }
+    if (args[i] === '--name' && args[i + 1]) { name = args[++i]; continue; }
+    if (args[i] === '--limit' && args[i + 1]) { limit = parseInt(args[++i], 10); continue; }
+    if (args[i] === '--token-cap' && args[i + 1]) { tokenCap = parseInt(args[++i], 10); continue; }
+  }
+
+  if (scope) validateScope(scope);
+
+  const deadEnds = queryDeadEnds(cwd, { scope, name, limit });
+  const context = formatDeadEndContext(deadEnds, tokenCap);
+
+  const result = {
+    dead_ends: deadEnds,
+    count: deadEnds.length,
+    scope_filter: scope || null,
+    name_filter: name || null,
+    context,
+  };
+
+  output(result, { formatter: formatDeadEndResult });
+}
+
+/**
+ * Format dead-end result for TTY output.
+ */
+function formatDeadEndResult(result) {
+  const lines = [];
+  lines.push(banner('DEAD ENDS'));
+
+  if (result.count === 0) {
+    lines.push('');
+    lines.push('  No dead ends found.');
+    lines.push('');
+    lines.push(actionHint('trajectory pivot <checkpoint> --reason "..."'));
+    return lines.join('\n');
+  }
+
+  const headers = ['Name', 'Scope', 'Attempt', 'Reason'];
+  const rows = result.dead_ends.map(de => [
+    de.checkpoint_name || '-',
+    de.scope || '-',
+    de.attempt ? String(de.attempt) : '-',
+    de.reason || '-',
+  ]);
+
+  lines.push(formatTable(headers, rows, { showAll: true, maxRows: 50 }));
+  lines.push('');
+  lines.push(summaryLine(`${result.count} dead end${result.count !== 1 ? 's' : ''} found`));
+  lines.push(actionHint('Review these before starting new approaches'));
+
+  return lines.join('\n');
+}
+
+module.exports = { cmdTrajectoryCheckpoint, cmdTrajectoryList, cmdTrajectoryPivot, cmdTrajectoryCompare, cmdTrajectoryChoose, cmdTrajectoryDeadEnds, queryDeadEnds };
