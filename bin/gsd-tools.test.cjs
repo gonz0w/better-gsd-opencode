@@ -17670,3 +17670,296 @@ describe('stuck-detector trajectory suggestion (PIVOT-04)', () => {
     assert.ok(pivotSuggestion.description.includes('checkpoint'), 'Should mention checkpoint in description');
   });
 });
+
+// ─── Trajectory Integration Tests ────────────────────────────────────────────
+
+describe('trajectory dead-ends (INTEG-01)', () => {
+  let tmpDir;
+
+  function writeTrajectoryEntries(dir, entries) {
+    const memDir = path.join(dir, '.planning', 'memory');
+    fs.mkdirSync(memDir, { recursive: true });
+    fs.writeFileSync(path.join(memDir, 'trajectory.json'), JSON.stringify(entries, null, 2), 'utf-8');
+  }
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('INTEG-01a: dead-ends returns empty when no journal exists', () => {
+    const result = runGsdTools('trajectory dead-ends', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.count, 0);
+    assert.ok(Array.isArray(output.dead_ends));
+    assert.strictEqual(output.dead_ends.length, 0);
+  });
+
+  test('INTEG-01b: dead-ends returns pivot entries as dead ends', () => {
+    writeTrajectoryEntries(tmpDir, [
+      {
+        id: 'tj-p01', category: 'checkpoint', checkpoint_name: 'feat-x',
+        scope: 'phase', attempt: 1, branch: 'archived/trajectory/phase/feat-x/attempt-1',
+        git_ref: 'aaa1111', timestamp: '2026-03-01T01:00:00Z',
+        reason: { text: 'Build failed with X approach' },
+        tags: ['checkpoint', 'abandoned']
+      },
+      {
+        id: 'tj-p02', category: 'checkpoint', checkpoint_name: 'feat-x',
+        scope: 'phase', attempt: 2, branch: 'trajectory/phase/feat-x/attempt-2',
+        git_ref: 'bbb2222', timestamp: '2026-03-01T02:00:00Z',
+        tags: ['checkpoint']
+      },
+      {
+        id: 'tj-p03', category: 'checkpoint', checkpoint_name: 'feat-y',
+        scope: 'phase', attempt: 1, branch: 'archived/trajectory/phase/feat-y/attempt-1',
+        git_ref: 'ccc3333', timestamp: '2026-03-01T03:00:00Z',
+        reason: { text: 'Performance regression' },
+        tags: ['checkpoint', 'abandoned']
+      }
+    ]);
+
+    const result = runGsdTools('trajectory dead-ends', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.count, 2, 'Should find 2 abandoned entries');
+    // Only entries with abandoned tag should be returned
+    const names = output.dead_ends.map(de => de.checkpoint_name);
+    assert.ok(names.includes('feat-x'), 'Should include feat-x');
+    assert.ok(names.includes('feat-y'), 'Should include feat-y');
+  });
+
+  test('INTEG-01c: dead-ends filters by scope', () => {
+    writeTrajectoryEntries(tmpDir, [
+      {
+        id: 'tj-s01', category: 'checkpoint', checkpoint_name: 'scoped-feat',
+        scope: 'phase', attempt: 1, branch: 'archived/x', git_ref: 'aaa',
+        timestamp: '2026-03-01T01:00:00Z',
+        reason: { text: 'phase-scoped failure' },
+        tags: ['checkpoint', 'abandoned']
+      },
+      {
+        id: 'tj-s02', category: 'checkpoint', checkpoint_name: 'scoped-feat',
+        scope: 'task', attempt: 1, branch: 'archived/y', git_ref: 'bbb',
+        timestamp: '2026-03-01T02:00:00Z',
+        reason: { text: 'task-scoped failure' },
+        tags: ['checkpoint', 'abandoned']
+      }
+    ]);
+
+    const result = runGsdTools('trajectory dead-ends --scope phase', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.count, 1, 'Should find only phase-scoped dead ends');
+    assert.strictEqual(output.dead_ends[0].scope, 'phase');
+  });
+
+  test('INTEG-01d: dead-ends filters by name', () => {
+    writeTrajectoryEntries(tmpDir, [
+      {
+        id: 'tj-n01', category: 'checkpoint', checkpoint_name: 'alpha',
+        scope: 'phase', attempt: 1, branch: 'archived/a', git_ref: 'aaa',
+        timestamp: '2026-03-01T01:00:00Z',
+        reason: { text: 'alpha failed' },
+        tags: ['checkpoint', 'abandoned']
+      },
+      {
+        id: 'tj-n02', category: 'checkpoint', checkpoint_name: 'beta',
+        scope: 'phase', attempt: 1, branch: 'archived/b', git_ref: 'bbb',
+        timestamp: '2026-03-01T02:00:00Z',
+        reason: { text: 'beta failed' },
+        tags: ['checkpoint', 'abandoned']
+      }
+    ]);
+
+    const result = runGsdTools('trajectory dead-ends --name alpha', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.count, 1, 'Should find only alpha dead ends');
+    assert.strictEqual(output.dead_ends[0].checkpoint_name, 'alpha');
+  });
+});
+
+describe('trajectory init integration (INTEG-02)', () => {
+  let tmpDir;
+
+  function writeTrajectoryEntries(dir, entries) {
+    const memDir = path.join(dir, '.planning', 'memory');
+    fs.mkdirSync(memDir, { recursive: true });
+    fs.writeFileSync(path.join(memDir, 'trajectory.json'), JSON.stringify(entries, null, 2), 'utf-8');
+  }
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('INTEG-02a: init execute-phase includes previous_attempts when pivots exist', () => {
+    // Create minimal phase structure
+    const phaseDir = path.join(tmpDir, '.planning', 'phases', '10-test-phase');
+    fs.mkdirSync(phaseDir, { recursive: true });
+    fs.writeFileSync(path.join(phaseDir, '10-01-PLAN.md'), '---\nphase: 10-test-phase\nplan: 01\n---\n# Plan');
+
+    // Write trajectory entries with abandoned pivots
+    writeTrajectoryEntries(tmpDir, [
+      {
+        id: 'tj-init01', category: 'checkpoint', checkpoint_name: 'approach-a',
+        scope: 'phase', attempt: 1, branch: 'archived/trajectory/phase/approach-a/attempt-1',
+        git_ref: 'aaa1111', timestamp: '2026-03-01T01:00:00Z',
+        reason: { text: 'Circular dependency with existing module' },
+        tags: ['checkpoint', 'abandoned']
+      },
+      {
+        id: 'tj-init02', category: 'checkpoint', checkpoint_name: 'approach-b',
+        scope: 'phase', attempt: 1, branch: 'archived/trajectory/phase/approach-b/attempt-1',
+        git_ref: 'bbb2222', timestamp: '2026-03-01T02:00:00Z',
+        reason: { text: 'Test suite regression on pivot' },
+        tags: ['checkpoint', 'abandoned']
+      }
+    ]);
+
+    const result = runGsdTools('init execute-phase 10', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+    const output = JSON.parse(result.output);
+    assert.ok(output.previous_attempts !== null && output.previous_attempts !== undefined, 'previous_attempts should be present');
+    assert.ok(output.previous_attempts.count > 0, 'count should be > 0');
+    assert.ok(typeof output.previous_attempts.context === 'string', 'context should be a string');
+    assert.ok(output.previous_attempts.context.length > 0, 'context should be non-empty');
+    assert.ok(Array.isArray(output.previous_attempts.entries), 'entries should be an array');
+  });
+
+  test('INTEG-02b: init execute-phase omits previous_attempts when no pivots', () => {
+    // Create minimal phase structure with no trajectory
+    const phaseDir = path.join(tmpDir, '.planning', 'phases', '10-test-phase');
+    fs.mkdirSync(phaseDir, { recursive: true });
+    fs.writeFileSync(path.join(phaseDir, '10-01-PLAN.md'), '---\nphase: 10-test-phase\nplan: 01\n---\n# Plan');
+
+    const result = runGsdTools('init execute-phase 10', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+    const output = JSON.parse(result.output);
+    // previous_attempts should be null or absent (trimmed from verbose output)
+    assert.ok(output.previous_attempts === null || output.previous_attempts === undefined, 'previous_attempts should be null or absent');
+  });
+});
+
+describe('trajectory context formatting (INTEG-03)', () => {
+  let tmpDir;
+
+  function writeTrajectoryEntries(dir, entries) {
+    const memDir = path.join(dir, '.planning', 'memory');
+    fs.mkdirSync(memDir, { recursive: true });
+    fs.writeFileSync(path.join(memDir, 'trajectory.json'), JSON.stringify(entries, null, 2), 'utf-8');
+  }
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('INTEG-03a: dead-end context formatted as what-NOT-to-do', () => {
+    writeTrajectoryEntries(tmpDir, [
+      {
+        id: 'tj-f01', category: 'checkpoint', checkpoint_name: 'method-a',
+        scope: 'phase', attempt: 1, branch: 'archived/a', git_ref: 'aaa',
+        timestamp: '2026-03-01T01:00:00Z',
+        reason: { text: 'Recursive approach caused stack overflow' },
+        tags: ['checkpoint', 'abandoned']
+      },
+      {
+        id: 'tj-f02', category: 'checkpoint', checkpoint_name: 'method-b',
+        scope: 'phase', attempt: 1, branch: 'archived/b', git_ref: 'bbb',
+        timestamp: '2026-03-01T02:00:00Z',
+        reason: { text: 'Synchronous I/O bottleneck' },
+        tags: ['checkpoint', 'abandoned']
+      },
+      {
+        id: 'tj-f03', category: 'checkpoint', checkpoint_name: 'method-c',
+        scope: 'phase', attempt: 1, branch: 'archived/c', git_ref: 'ccc',
+        timestamp: '2026-03-01T03:00:00Z',
+        reason: { text: 'Memory leak in event listener' },
+        tags: ['checkpoint', 'abandoned']
+      }
+    ]);
+
+    const result = runGsdTools('trajectory dead-ends', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+    const output = JSON.parse(result.output);
+    assert.ok(output.context.includes('Recursive approach caused stack overflow'), 'Context should include first reason');
+    assert.ok(output.context.includes('Synchronous I/O bottleneck'), 'Context should include second reason');
+    assert.ok(output.context.includes('Memory leak in event listener'), 'Context should include third reason');
+  });
+
+  test('INTEG-03b: dead-end context respects token cap', () => {
+    // Create 20 pivots with long reasons
+    const entries = [];
+    for (let i = 0; i < 20; i++) {
+      entries.push({
+        id: `tj-cap${String(i).padStart(2, '0')}`, category: 'checkpoint',
+        checkpoint_name: `method-${i}`, scope: 'phase', attempt: 1,
+        branch: `archived/${i}`, git_ref: `ref${i}`,
+        timestamp: new Date(Date.now() - i * 60000).toISOString(),
+        reason: { text: `This is a long explanation of why method ${i} failed because of a complex technical issue that requires detailed description to understand fully` },
+        tags: ['checkpoint', 'abandoned']
+      });
+    }
+    writeTrajectoryEntries(tmpDir, entries);
+
+    const result = runGsdTools('trajectory dead-ends --token-cap 100', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+    const output = JSON.parse(result.output);
+    // Context should be truncated with "and N more" message
+    assert.ok(output.context.includes('... and'), 'Context should include truncation message when over token cap');
+    assert.ok(output.context.includes('more'), 'Should indicate remaining dead ends');
+  });
+});
+
+describe('trajectory scope validation (INTEG-04)', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('INTEG-04a: trajectory checkpoint rejects invalid scope', () => {
+    // Need a git repo for checkpoint
+    fs.mkdirSync(path.join(tmpDir, '.planning', 'memory'), { recursive: true });
+    fs.writeFileSync(path.join(tmpDir, 'dummy.txt'), 'hello');
+    execSync('git init && git config user.email "test@test.com" && git config user.name "Test" && git add . && git commit -m "init"', { cwd: tmpDir, stdio: 'pipe' });
+
+    const result = runGsdTools('trajectory checkpoint test-cp --scope banana', tmpDir);
+    assert.strictEqual(result.success, false, 'Should fail with invalid scope');
+    assert.ok(result.error.includes('Invalid scope'), 'Error should mention invalid scope');
+  });
+
+  test('INTEG-04b: trajectory pivot rejects invalid scope', () => {
+    fs.mkdirSync(path.join(tmpDir, '.planning', 'memory'), { recursive: true });
+
+    const result = runGsdTools('trajectory pivot test-cp --scope foo --reason "test"', tmpDir);
+    assert.strictEqual(result.success, false, 'Should fail with invalid scope');
+    assert.ok(result.error.includes('Invalid scope'), 'Error should mention invalid scope');
+  });
+
+  test('INTEG-04c: trajectory dead-ends accepts all valid scopes', () => {
+    const validScopes = ['task', 'plan', 'phase'];
+    for (const scope of validScopes) {
+      const result = runGsdTools(`trajectory dead-ends --scope ${scope}`, tmpDir);
+      assert.ok(result.success, `dead-ends should accept scope "${scope}": ${result.error}`);
+      const output = JSON.parse(result.output);
+      assert.strictEqual(output.scope_filter, scope, `scope_filter should be "${scope}"`);
+    }
+  });
+});
