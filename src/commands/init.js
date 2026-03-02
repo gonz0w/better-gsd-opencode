@@ -223,6 +223,9 @@ function cmdInitExecutePhase(cwd, phase, raw) {
 
     // Intent summary (null if no INTENT.md)
     intent_summary: null,
+
+    // Trajectory dead-end context (null if no failed approaches)
+    previous_attempts: null,
   };
 
   // Advisory intent summary — never crash, never block
@@ -296,6 +299,29 @@ function cmdInitExecutePhase(cwd, phase, raw) {
     result.codebase_conventions = null;
     result.codebase_dependencies = null;
     result.codebase_freshness = null;
+  }
+
+  // Trajectory dead-end context — previous attempts for this phase
+  try {
+    const { queryDeadEnds, formatDeadEndContext } = require('./trajectory');
+    const deadEnds = queryDeadEnds(cwd, { scope: 'phase' });
+    if (deadEnds.length > 0) {
+      result.previous_attempts = {
+        count: deadEnds.length,
+        context: formatDeadEndContext(deadEnds, 500),
+        entries: deadEnds.slice(0, 5).map(de => ({
+          name: de.checkpoint_name,
+          attempt: de.attempt,
+          reason: de.reason,
+          timestamp: de.timestamp,
+        })),
+      };
+    } else {
+      result.previous_attempts = null;
+    }
+  } catch (e) {
+    debugLog('init.executePhase', 'trajectory dead-end context failed (non-blocking)', e);
+    result.previous_attempts = null;
   }
 
   // Orchestration intelligence — classify tasks and recommend routing
@@ -407,6 +433,7 @@ function cmdInitExecutePhase(cwd, phase, raw) {
       worktree_active: result.worktree_active,
       file_overlaps: result.file_overlaps,
       task_routing: result.task_routing || null,
+      previous_attempts: result.previous_attempts || null,
     };
     if (global._gsdManifestMode) {
       compactResult._manifest = {
@@ -429,6 +456,7 @@ function cmdInitExecutePhase(cwd, phase, raw) {
   if (result.codebase_conventions === null) delete result.codebase_conventions;
   if (result.codebase_dependencies === null) delete result.codebase_dependencies;
   if (result.codebase_freshness === null) delete result.codebase_freshness;
+  if (result.previous_attempts === null) delete result.previous_attempts;
 
   output(result, raw);
 }

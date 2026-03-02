@@ -993,4 +993,4 @@ function formatDeadEndResult(result) {
   return lines.join('\n');
 }
 
-module.exports = { cmdTrajectoryCheckpoint, cmdTrajectoryList, cmdTrajectoryPivot, cmdTrajectoryCompare, cmdTrajectoryChoose, cmdTrajectoryDeadEnds, queryDeadEnds };
+module.exports = { cmdTrajectoryCheckpoint, cmdTrajectoryList, cmdTrajectoryPivot, cmdTrajectoryCompare, cmdTrajectoryChoose, cmdTrajectoryDeadEnds, queryDeadEnds, formatDeadEndContext };

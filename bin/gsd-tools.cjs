@@ -18798,6 +18798,794 @@ var require_worktree = __commonJS({
   }
 });
 
+// src/commands/trajectory.js
+var require_trajectory = __commonJS({
+  "src/commands/trajectory.js"(exports2, module2) {
+    var fs = require("fs");
+    var path = require("path");
+    var crypto = require("crypto");
+    var { execFileSync } = require("child_process");
+    var { output, error, debugLog } = require_output();
+    var { execGit, diffSummary } = require_git();
+    var { banner, formatTable, summaryLine, actionHint, color, SYMBOLS, relativeTime } = require_format();
+    var { VALID_TRAJECTORY_SCOPES } = require_constants();
+    function validateScope(scope) {
+      if (!VALID_TRAJECTORY_SCOPES.includes(scope)) {
+        error('Invalid scope: "' + scope + '". Valid scopes: ' + VALID_TRAJECTORY_SCOPES.join(", "));
+      }
+    }
+    var NAME_RE = /^[a-zA-Z0-9_-]+$/;
+    function cmdTrajectoryCheckpoint(cwd, args, raw) {
+      const posArgs = [];
+      let scope = "phase";
+      let description = null;
+      for (let i = 1; i < args.length; i++) {
+        if (args[i] === "--scope" && args[i + 1]) {
+          scope = args[++i];
+          continue;
+        }
+        if (args[i] === "--description" && args[i + 1]) {
+          description = args[++i];
+          continue;
+        }
+        if (!args[i].startsWith("-")) posArgs.push(args[i]);
+      }
+      validateScope(scope);
+      const name = posArgs[0];
+      if (!name) error("Missing checkpoint name. Usage: trajectory checkpoint <name>");
+      if (!NAME_RE.test(name)) error(`Invalid checkpoint name "${name}". Use alphanumeric, hyphens, underscores only.`);
+      const statusResult = execGit(cwd, ["status", "--porcelain"]);
+      if (statusResult.exitCode === 0 && statusResult.stdout) {
+        const dirtyNonPlanning = statusResult.stdout.split("\n").filter((line) => line.trim() && !line.slice(3).startsWith(".planning/"));
+        if (dirtyNonPlanning.length > 0) {
+          error("Uncommitted changes detected. Commit or stash before checkpointing.");
+        }
+      }
+      const memDir = path.join(cwd, ".planning", "memory");
+      const trajPath = path.join(memDir, "trajectory.json");
+      let entries = [];
+      try {
+        const raw2 = fs.readFileSync(trajPath, "utf-8");
+        entries = JSON.parse(raw2);
+        if (!Array.isArray(entries)) entries = [];
+      } catch (e) {
+        debugLog("trajectory.checkpoint", "no existing trajectory.json", e);
+        entries = [];
+      }
+      const existing = entries.filter(
+        (e) => e.category === "checkpoint" && e.scope === scope && e.checkpoint_name === name
+      );
+      const attempt = existing.length + 1;
+      const branchName = `trajectory/${scope}/${name}/attempt-${attempt}`;
+      const brResult = execGit(cwd, ["branch", branchName]);
+      if (brResult.exitCode !== 0) {
+        error(`Failed to create branch "${branchName}": ${brResult.stderr}`);
+      }
+      const verifyResult = execGit(cwd, ["rev-parse", "--verify", branchName]);
+      if (verifyResult.exitCode !== 0) {
+        error(`Branch "${branchName}" was not created successfully.`);
+      }
+      const headResult = execGit(cwd, ["rev-parse", "HEAD"]);
+      const gitRef = headResult.exitCode === 0 ? headResult.stdout : "unknown";
+      const metrics = { tests: null, loc_delta: null, complexity: null };
+      try {
+        const testOutput = execFileSync("node", ["--test", path.join(cwd, "bin", "gsd-tools.test.cjs")], {
+          cwd,
+          encoding: "utf-8",
+          stdio: "pipe",
+          timeout: 12e4
+        });
+        metrics.tests = parseTestOutput(testOutput);
+      } catch (e) {
+        const combined = (e.stdout || "") + "\n" + (e.stderr || "");
+        metrics.tests = parseTestOutput(combined);
+      }
+      try {
+        let diff = diffSummary(cwd, { from: "HEAD~5", to: "HEAD" });
+        if (diff.error) diff = diffSummary(cwd, { from: "HEAD~1", to: "HEAD" });
+        if (!diff.error) {
+          metrics.loc_delta = {
+            insertions: diff.total_insertions,
+            deletions: diff.total_deletions,
+            files_changed: diff.file_count
+          };
+        }
+      } catch (e) {
+        debugLog("trajectory.checkpoint", "LOC delta failed", e);
+      }
+      try {
+        const changedFiles = getRecentChangedFiles(cwd);
+        let totalComplexity = 0;
+        let filesAnalyzed = 0;
+        for (const file of changedFiles) {
+          if (!file.endsWith(".js")) continue;
+          const fullPath = path.join(cwd, file);
+          if (!fs.existsSync(fullPath)) continue;
+          try {
+            const astOut = execFileSync("node", [path.join(cwd, "bin", "gsd-tools.cjs"), "codebase", "complexity", file], {
+              cwd,
+              encoding: "utf-8",
+              stdio: "pipe",
+              timeout: 15e3
+            });
+            const parsed = JSON.parse(astOut);
+            if (parsed.module_complexity !== void 0) {
+              totalComplexity += parsed.module_complexity;
+              filesAnalyzed++;
+            }
+          } catch (e) {
+            debugLog("trajectory.checkpoint", `complexity failed for ${file}`, e);
+          }
+        }
+        metrics.complexity = { total: totalComplexity, files_analyzed: filesAnalyzed };
+      } catch (e) {
+        debugLog("trajectory.checkpoint", "complexity collection failed", e);
+      }
+      let id;
+      const existingIds = new Set(entries.map((e) => e.id));
+      do {
+        id = "tj-" + crypto.randomBytes(3).toString("hex");
+      } while (existingIds.has(id));
+      const entry = {
+        id,
+        timestamp: (/* @__PURE__ */ new Date()).toISOString(),
+        category: "checkpoint",
+        text: `Checkpoint: ${name} (attempt ${attempt})`,
+        scope,
+        checkpoint_name: name,
+        attempt,
+        branch: branchName,
+        git_ref: gitRef,
+        description: description || null,
+        metrics,
+        tags: ["checkpoint"]
+      };
+      entries.push(entry);
+      fs.mkdirSync(memDir, { recursive: true });
+      fs.writeFileSync(trajPath, JSON.stringify(entries, null, 2), "utf-8");
+      output({
+        created: true,
+        checkpoint: name,
+        branch: branchName,
+        attempt,
+        git_ref: gitRef,
+        metrics
+      });
+    }
+    function parseTestOutput(text) {
+      const result = { total: 0, pass: 0, fail: 0 };
+      if (!text) return result;
+      const totalMatch = text.match(/# tests (\d+)/);
+      const passMatch = text.match(/# pass (\d+)/);
+      const failMatch = text.match(/# fail (\d+)/);
+      if (totalMatch) result.total = parseInt(totalMatch[1], 10);
+      if (passMatch) result.pass = parseInt(passMatch[1], 10);
+      if (failMatch) result.fail = parseInt(failMatch[1], 10);
+      return result;
+    }
+    function getRecentChangedFiles(cwd) {
+      const diff = diffSummary(cwd, { from: "HEAD~5", to: "HEAD" });
+      if (diff.error || !diff.files) return [];
+      return diff.files.map((f) => f.path).filter(Boolean);
+    }
+    function cmdTrajectoryList(cwd, args, raw) {
+      let scopeFilter = null;
+      let nameFilter = null;
+      let limit = null;
+      for (let i = 0; i < args.length; i++) {
+        if (args[i] === "--scope" && args[i + 1]) {
+          scopeFilter = args[++i];
+          continue;
+        }
+        if (args[i] === "--name" && args[i + 1]) {
+          nameFilter = args[++i];
+          continue;
+        }
+        if (args[i] === "--limit" && args[i + 1]) {
+          limit = parseInt(args[++i], 10);
+          continue;
+        }
+      }
+      if (scopeFilter) validateScope(scopeFilter);
+      const trajPath = path.join(cwd, ".planning", "memory", "trajectory.json");
+      let entries = [];
+      try {
+        const data = fs.readFileSync(trajPath, "utf-8");
+        entries = JSON.parse(data);
+        if (!Array.isArray(entries)) entries = [];
+      } catch (e) {
+        debugLog("trajectory.list", "no trajectory.json found", e);
+        entries = [];
+      }
+      let checkpoints = entries.filter((e) => e.category === "checkpoint");
+      if (scopeFilter) {
+        checkpoints = checkpoints.filter((e) => e.scope === scopeFilter);
+      }
+      if (nameFilter) {
+        checkpoints = checkpoints.filter((e) => e.checkpoint_name === nameFilter);
+      }
+      checkpoints.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+      if (limit && limit > 0) {
+        checkpoints = checkpoints.slice(0, limit);
+      }
+      const scopes = new Set(checkpoints.map((e) => e.scope));
+      const result = {
+        checkpoints,
+        count: checkpoints.length,
+        scopes: scopes.size
+      };
+      output(result, { formatter: formatTrajectoryList });
+    }
+    function formatTrajectoryList(result) {
+      const lines = [];
+      lines.push(banner("TRAJECTORY CHECKPOINTS"));
+      if (result.count === 0) {
+        lines.push("");
+        lines.push("  No checkpoints found.");
+        lines.push("");
+        lines.push(actionHint("trajectory checkpoint <name>"));
+        return lines.join("\n");
+      }
+      const headers = ["Name", "Scope", "Attempt", "Ref", "Tests", "LOC \u0394", "Age"];
+      const rows = result.checkpoints.map((cp) => {
+        const ref = cp.git_ref ? cp.git_ref.slice(0, 7) : "-";
+        let testsStr = "-";
+        if (cp.metrics && cp.metrics.tests) {
+          const t = cp.metrics.tests;
+          if (t.fail > 0) {
+            testsStr = color.red(`${t.pass}/${t.total} ${SYMBOLS.cross}`);
+          } else if (t.total > 0) {
+            testsStr = color.green(`${t.pass}/${t.total} ${SYMBOLS.check}`);
+          }
+        }
+        let locStr = "-";
+        if (cp.metrics && cp.metrics.loc_delta) {
+          const d = cp.metrics.loc_delta;
+          locStr = `+${d.insertions || 0}/-${d.deletions || 0}`;
+        }
+        const age = cp.timestamp ? relativeTime(cp.timestamp) : "-";
+        return [
+          cp.checkpoint_name || "-",
+          cp.scope || "-",
+          String(cp.attempt || "-"),
+          ref,
+          testsStr,
+          locStr,
+          age
+        ];
+      });
+      lines.push(formatTable(headers, rows, { showAll: true, maxRows: 50 }));
+      lines.push("");
+      lines.push(summaryLine(`${result.count} checkpoint${result.count !== 1 ? "s" : ""} (${result.scopes} scope${result.scopes !== 1 ? "s" : ""})`));
+      lines.push(actionHint("trajectory compare <name>"));
+      return lines.join("\n");
+    }
+    function cmdTrajectoryPivot(cwd, args, raw) {
+      const { selectiveRewind } = require_git();
+      const posArgs = [];
+      let scope = "phase";
+      let reasonText = null;
+      let attemptNum = null;
+      let stashFlag = false;
+      for (let i = 1; i < args.length; i++) {
+        if (args[i] === "--scope" && args[i + 1]) {
+          scope = args[++i];
+          continue;
+        }
+        if (args[i] === "--reason" && args[i + 1]) {
+          reasonText = args[++i];
+          continue;
+        }
+        if (args[i] === "--attempt" && args[i + 1]) {
+          attemptNum = parseInt(args[++i], 10);
+          continue;
+        }
+        if (args[i] === "--stash") {
+          stashFlag = true;
+          continue;
+        }
+        if (!args[i].startsWith("-")) posArgs.push(args[i]);
+      }
+      validateScope(scope);
+      const name = posArgs[0];
+      if (!name) error('Missing checkpoint name. Usage: trajectory pivot <checkpoint> --reason "what failed and why"');
+      if (!NAME_RE.test(name)) error(`Invalid checkpoint name "${name}". Use alphanumeric, hyphens, underscores only.`);
+      let stashUsed = false;
+      const statusResult = execGit(cwd, ["status", "--porcelain"]);
+      if (statusResult.exitCode === 0 && statusResult.stdout) {
+        const dirtyNonPlanning = statusResult.stdout.split("\n").filter((line) => line.trim() && !line.slice(3).startsWith(".planning/"));
+        if (dirtyNonPlanning.length > 0) {
+          if (stashFlag) {
+            const stashResult = execGit(cwd, ["stash", "push", "-m", "gsd-pivot-auto-stash"]);
+            if (stashResult.exitCode !== 0) error("Failed to auto-stash: " + stashResult.stderr);
+            stashUsed = true;
+          } else {
+            error("Uncommitted changes detected. Commit or stash before pivoting.\nTo auto-stash: trajectory pivot <checkpoint> --stash");
+          }
+        }
+      }
+      const memDir = path.join(cwd, ".planning", "memory");
+      const trajPath = path.join(memDir, "trajectory.json");
+      let entries = [];
+      try {
+        const data = fs.readFileSync(trajPath, "utf-8");
+        entries = JSON.parse(data);
+        if (!Array.isArray(entries)) entries = [];
+      } catch (e) {
+        debugLog("trajectory.pivot", "no trajectory.json found", e);
+        entries = [];
+      }
+      const matching = entries.filter(
+        (e) => e.category === "checkpoint" && e.checkpoint_name === name && e.scope === scope && !(e.tags && e.tags.includes("abandoned"))
+      );
+      if (matching.length === 0) {
+        const allCheckpoints = entries.filter((e) => e.category === "checkpoint" && !(e.tags && e.tags.includes("abandoned")));
+        const byName = {};
+        for (const cp of allCheckpoints) {
+          const key = `${cp.checkpoint_name} (scope: ${cp.scope})`;
+          if (!byName[key]) byName[key] = [];
+          byName[key].push(cp.attempt);
+        }
+        const availableList = Object.keys(byName).length > 0 ? Object.entries(byName).map(([k, v]) => `  ${k} \u2014 attempt${v.length > 1 ? "s" : ""} ${v.join(", ")}`).join("\n") : "  (none)";
+        if (stashUsed) execGit(cwd, ["stash", "pop"]);
+        error('Checkpoint "' + name + '" not found (scope: ' + scope + ").\nAvailable checkpoints:\n" + availableList);
+      }
+      let targetEntry;
+      if (attemptNum !== null) {
+        targetEntry = matching.find((e) => e.attempt === attemptNum);
+        if (!targetEntry) {
+          if (stashUsed) execGit(cwd, ["stash", "pop"]);
+          error("Attempt " + attemptNum + ' not found for checkpoint "' + name + '" (scope: ' + scope + ").");
+        }
+      } else {
+        targetEntry = matching.reduce((best, e) => !best || e.attempt > best.attempt ? e : best, null);
+      }
+      if (!reasonText) {
+        if (stashUsed) execGit(cwd, ["stash", "pop"]);
+        error('Reason required. Use --reason "what failed, why, what signals" to record why this approach is being abandoned.');
+      }
+      const headResult = execGit(cwd, ["rev-parse", "HEAD"]);
+      const currentHeadSha = headResult.exitCode === 0 ? headResult.stdout : "unknown";
+      const allForName = entries.filter(
+        (e) => e.category === "checkpoint" && e.scope === scope && e.checkpoint_name === name
+      );
+      const abandonedAttempt = allForName.length + 1;
+      const abandonedBranchName = `archived/trajectory/${scope}/${name}/attempt-${abandonedAttempt}`;
+      const brResult = execGit(cwd, ["branch", abandonedBranchName]);
+      if (brResult.exitCode !== 0) {
+        debugLog("trajectory.pivot", "branch creation warning", brResult.stderr);
+      }
+      let id;
+      const existingIds = new Set(entries.map((e) => e.id));
+      do {
+        id = "tj-" + crypto.randomBytes(3).toString("hex");
+      } while (existingIds.has(id));
+      const abandonedEntry = {
+        id,
+        timestamp: (/* @__PURE__ */ new Date()).toISOString(),
+        category: "checkpoint",
+        text: `Abandoned: ${name} (attempt ${abandonedAttempt})`,
+        scope,
+        checkpoint_name: name,
+        attempt: abandonedAttempt,
+        branch: abandonedBranchName,
+        git_ref: currentHeadSha,
+        description: null,
+        metrics: null,
+        reason: { text: reasonText },
+        tags: ["checkpoint", "abandoned"]
+      };
+      entries.push(abandonedEntry);
+      const result = selectiveRewind(cwd, { ref: targetEntry.git_ref, confirm: true });
+      if (result.error) {
+        if (stashUsed) execGit(cwd, ["stash", "pop"]);
+        error("Rewind failed: " + result.error);
+      }
+      if (stashUsed) {
+        execGit(cwd, ["stash", "pop"]);
+      }
+      fs.mkdirSync(memDir, { recursive: true });
+      fs.writeFileSync(trajPath, JSON.stringify(entries, null, 2), "utf-8");
+      output({
+        pivoted: true,
+        checkpoint: name,
+        target_ref: targetEntry.git_ref,
+        abandoned_branch: abandonedBranchName,
+        files_rewound: result.files_changed,
+        stash_used: stashUsed
+      }, { formatter: formatPivotResult });
+    }
+    function formatPivotResult(result) {
+      const lines = [];
+      lines.push(banner("TRAJECTORY PIVOT"));
+      lines.push("");
+      lines.push(summaryLine(`Pivoted to ${color.bold(result.checkpoint)}. Abandoned attempt archived as ${color.cyan(result.abandoned_branch)}.`));
+      lines.push("");
+      lines.push(`  ${SYMBOLS.check} Target ref: ${color.dim(result.target_ref.slice(0, 7))}`);
+      lines.push(`  ${SYMBOLS.check} Files rewound: ${result.files_rewound}`);
+      if (result.stash_used) {
+        lines.push(`  ${SYMBOLS.warning} Working tree auto-stashed and restored`);
+      }
+      lines.push("");
+      lines.push(actionHint("trajectory list"));
+      return lines.join("\n");
+    }
+    function cmdTrajectoryCompare(cwd, args, raw) {
+      const posArgs = [];
+      let scope = "phase";
+      for (let i = 1; i < args.length; i++) {
+        if (args[i] === "--scope" && args[i + 1]) {
+          scope = args[++i];
+          continue;
+        }
+        if (!args[i].startsWith("-")) posArgs.push(args[i]);
+      }
+      validateScope(scope);
+      const name = posArgs[0];
+      if (!name) error("Missing checkpoint name. Usage: trajectory compare <name> [--scope <scope>]");
+      const trajPath = path.join(cwd, ".planning", "memory", "trajectory.json");
+      let entries = [];
+      try {
+        const data = fs.readFileSync(trajPath, "utf-8");
+        entries = JSON.parse(data);
+        if (!Array.isArray(entries)) entries = [];
+      } catch (e) {
+        debugLog("trajectory.compare", "no trajectory.json found", e);
+        entries = [];
+      }
+      const attempts = entries.filter(
+        (e) => e.category === "checkpoint" && e.checkpoint_name === name && e.scope === scope && !(e.tags && e.tags.includes("abandoned"))
+      ).sort((a, b) => a.attempt - b.attempt);
+      if (attempts.length === 0) {
+        const allCheckpoints = entries.filter((e) => e.category === "checkpoint" && !(e.tags && e.tags.includes("abandoned")));
+        const byName = {};
+        for (const cp of allCheckpoints) {
+          const key = `${cp.checkpoint_name} (scope: ${cp.scope})`;
+          if (!byName[key]) byName[key] = [];
+          byName[key].push(cp.attempt);
+        }
+        const availableList = Object.keys(byName).length > 0 ? Object.entries(byName).map(([k, v]) => `  ${k} \u2014 attempt${v.length > 1 ? "s" : ""} ${v.join(", ")}`).join("\n") : "  (none)";
+        error('Checkpoint "' + name + '" not found (scope: ' + scope + ").\nAvailable checkpoints:\n" + availableList);
+      }
+      const metrics = attempts.map((a) => ({
+        attempt: a.attempt,
+        branch: a.branch,
+        git_ref: a.git_ref,
+        timestamp: a.timestamp,
+        tests_pass: a.metrics?.tests?.pass ?? null,
+        tests_fail: a.metrics?.tests?.fail ?? null,
+        tests_total: a.metrics?.tests?.total ?? null,
+        loc_insertions: a.metrics?.loc_delta?.insertions ?? null,
+        loc_deletions: a.metrics?.loc_delta?.deletions ?? null,
+        complexity: a.metrics?.complexity?.total ?? null
+      }));
+      const bestPerMetric = {};
+      const worstPerMetric = {};
+      const metricKeys = ["tests_pass", "tests_fail", "loc_insertions", "loc_deletions", "complexity"];
+      const direction = {
+        tests_pass: "higher",
+        tests_fail: "lower",
+        loc_insertions: "lower",
+        loc_deletions: "lower",
+        complexity: "lower"
+      };
+      for (const key of metricKeys) {
+        let bestIdx = -1, worstIdx = -1, bestVal = null, worstVal = null;
+        for (let i = 0; i < metrics.length; i++) {
+          const val = metrics[i][key];
+          if (val === null) continue;
+          if (bestVal === null || (direction[key] === "higher" ? val > bestVal : val < bestVal)) {
+            bestVal = val;
+            bestIdx = i;
+          }
+          if (worstVal === null || (direction[key] === "higher" ? val < worstVal : val > worstVal)) {
+            worstVal = val;
+            worstIdx = i;
+          }
+        }
+        if (bestIdx !== -1 && bestIdx !== worstIdx) {
+          bestPerMetric[key] = bestIdx;
+          worstPerMetric[key] = worstIdx;
+        }
+      }
+      const result = {
+        checkpoint: name,
+        scope,
+        attempt_count: metrics.length,
+        attempts: metrics,
+        best_per_metric: bestPerMetric,
+        worst_per_metric: worstPerMetric
+      };
+      output(result, { formatter: formatCompareResult });
+    }
+    function formatCompareResult(result) {
+      const lines = [];
+      lines.push(banner("TRAJECTORY COMPARE"));
+      lines.push("");
+      lines.push(`  Checkpoint: ${color.bold(result.checkpoint)} (scope: ${result.scope})`);
+      lines.push(`  Attempts: ${result.attempt_count}`);
+      lines.push("");
+      const headers = ["Attempt", "Tests Pass", "Tests Fail", "LOC +/-", "Complexity"];
+      const rows = result.attempts.map((a) => [
+        `#${a.attempt}`,
+        a.tests_pass !== null ? String(a.tests_pass) : "-",
+        a.tests_fail !== null ? String(a.tests_fail) : "-",
+        a.loc_insertions !== null ? `+${a.loc_insertions}/-${a.loc_deletions || 0}` : "-",
+        a.complexity !== null ? String(a.complexity) : "-"
+      ]);
+      const colToMetric = [null, "tests_pass", "tests_fail", "loc_insertions", "complexity"];
+      lines.push(formatTable(headers, rows, {
+        showAll: true,
+        colorFn: (value, colIdx, rowIdx) => {
+          if (colIdx === 0) return String(value != null ? value : "");
+          const metric = colToMetric[colIdx];
+          if (!metric) return String(value != null ? value : "");
+          if (result.best_per_metric[metric] === rowIdx) return color.green(String(value != null ? value : ""));
+          if (result.worst_per_metric[metric] === rowIdx) return color.red(String(value != null ? value : ""));
+          return String(value != null ? value : "");
+        }
+      }));
+      lines.push("");
+      lines.push(summaryLine("Best attempt per metric highlighted in green"));
+      lines.push(actionHint("trajectory choose <attempt-N>"));
+      return lines.join("\n");
+    }
+    function cmdTrajectoryChoose(cwd, args, raw) {
+      const posArgs = [];
+      let scope = "phase";
+      let reasonText = null;
+      let attemptNum = null;
+      for (let i = 1; i < args.length; i++) {
+        if (args[i] === "--scope" && args[i + 1]) {
+          scope = args[++i];
+          continue;
+        }
+        if (args[i] === "--reason" && args[i + 1]) {
+          reasonText = args[++i];
+          continue;
+        }
+        if (args[i] === "--attempt" && args[i + 1]) {
+          attemptNum = parseInt(args[++i], 10);
+          continue;
+        }
+        if (!args[i].startsWith("-")) posArgs.push(args[i]);
+      }
+      validateScope(scope);
+      const name = posArgs[0];
+      if (!name) error("Missing checkpoint name. Usage: trajectory choose <name> --attempt <N>");
+      if (!NAME_RE.test(name)) error(`Invalid checkpoint name "${name}". Use alphanumeric, hyphens, underscores only.`);
+      if (attemptNum === null || isNaN(attemptNum)) error("Must specify winning attempt: trajectory choose <name> --attempt <N>");
+      const memDir = path.join(cwd, ".planning", "memory");
+      const trajPath = path.join(memDir, "trajectory.json");
+      let entries = [];
+      try {
+        const data = fs.readFileSync(trajPath, "utf-8");
+        entries = JSON.parse(data);
+        if (!Array.isArray(entries)) entries = [];
+      } catch (e) {
+        debugLog("trajectory.choose", "no trajectory.json found", e);
+        entries = [];
+      }
+      const allCheckpoints = entries.filter(
+        (e) => e.category === "checkpoint" && e.checkpoint_name === name && e.scope === scope
+      );
+      if (allCheckpoints.length === 0) {
+        error('No checkpoints found for "' + name + '" (scope: ' + scope + ").");
+      }
+      const winningEntry = allCheckpoints.find(
+        (e) => e.attempt === attemptNum && !(e.tags && e.tags.includes("abandoned"))
+      );
+      if (!winningEntry) {
+        const available = allCheckpoints.filter((e) => !(e.tags && e.tags.includes("abandoned"))).map((e) => e.attempt);
+        error("Attempt " + attemptNum + ' not found (or is abandoned) for checkpoint "' + name + '" (scope: ' + scope + ").\nAvailable non-abandoned attempts: " + (available.length > 0 ? available.join(", ") : "(none)"));
+      }
+      const verifyResult = execGit(cwd, ["rev-parse", "--verify", winningEntry.branch]);
+      if (verifyResult.exitCode !== 0) {
+        error("Branch not found: " + winningEntry.branch + ". Was it already cleaned up?");
+      }
+      const mergeResult = execGit(cwd, ["merge", "--no-ff", winningEntry.branch, "-m", "trajectory: choose attempt-" + attemptNum + " for " + name]);
+      if (mergeResult.exitCode !== 0) {
+        error("Merge conflict. Resolve manually, then commit.\n" + (mergeResult.stderr || ""));
+      }
+      const headResult = execGit(cwd, ["rev-parse", "HEAD"]);
+      const mergeRef = headResult.exitCode === 0 ? headResult.stdout : "unknown";
+      const archivedTags = [];
+      const deletedBranches = [];
+      for (const entry of allCheckpoints) {
+        if (!entry.branch) continue;
+        if (entry.attempt !== attemptNum) {
+          const tagResult = execGit(cwd, ["tag", entry.branch, entry.git_ref]);
+          if (tagResult.exitCode === 0) {
+            archivedTags.push(entry.branch);
+          } else {
+            debugLog("trajectory.choose", "tag creation warning for " + entry.branch, tagResult.stderr);
+          }
+        }
+        const delResult = execGit(cwd, ["branch", "-D", entry.branch]);
+        if (delResult.exitCode === 0) {
+          deletedBranches.push(entry.branch);
+        } else {
+          debugLog("trajectory.choose", "branch deletion warning for " + entry.branch, delResult.stderr);
+        }
+      }
+      let id;
+      const existingIds = new Set(entries.map((e) => e.id));
+      do {
+        id = "tj-" + crypto.randomBytes(3).toString("hex");
+      } while (existingIds.has(id));
+      const journalEntry = {
+        id,
+        timestamp: (/* @__PURE__ */ new Date()).toISOString(),
+        category: "choose",
+        text: `Chosen: ${name} attempt ${attemptNum}`,
+        scope,
+        checkpoint_name: name,
+        chosen_attempt: attemptNum,
+        chosen_branch: winningEntry.branch,
+        chosen_ref: winningEntry.git_ref,
+        reason: reasonText ? { text: reasonText } : null,
+        archived_tags: archivedTags,
+        deleted_branches: deletedBranches,
+        tags: ["choose", "lifecycle-complete"]
+      };
+      entries.push(journalEntry);
+      fs.mkdirSync(memDir, { recursive: true });
+      fs.writeFileSync(trajPath, JSON.stringify(entries, null, 2), "utf-8");
+      output({
+        chosen: true,
+        checkpoint: name,
+        scope,
+        chosen_attempt: attemptNum,
+        chosen_branch: winningEntry.branch,
+        merge_ref: mergeRef,
+        archived_tags: archivedTags,
+        deleted_branches: deletedBranches,
+        reason: reasonText || null
+      }, { formatter: formatChooseResult });
+    }
+    function formatChooseResult(result) {
+      const lines = [];
+      lines.push(banner("TRAJECTORY CHOOSE"));
+      lines.push("");
+      lines.push(summaryLine(`Chose attempt ${color.bold("#" + result.chosen_attempt)} for ${color.bold(result.checkpoint)}. Merged and cleaned up.`));
+      lines.push("");
+      if (result.archived_tags.length > 0) {
+        lines.push("  Archived tags:");
+        for (const tag of result.archived_tags) {
+          lines.push(`    ${SYMBOLS.check} ${color.cyan(tag)}`);
+        }
+        lines.push("");
+      }
+      if (result.deleted_branches.length > 0) {
+        lines.push("  Deleted branches:");
+        for (const br of result.deleted_branches) {
+          lines.push(`    ${SYMBOLS.check} ${color.dim(br)}`);
+        }
+        lines.push("");
+      }
+      if (result.reason) {
+        lines.push(`  ${color.dim("Reason: " + result.reason)}`);
+        lines.push("");
+      }
+      lines.push(actionHint("trajectory list"));
+      return lines.join("\n");
+    }
+    function queryDeadEnds(cwd, { scope, name, limit } = {}) {
+      const trajPath = path.join(cwd, ".planning", "memory", "trajectory.json");
+      let entries = [];
+      try {
+        const data = fs.readFileSync(trajPath, "utf-8");
+        entries = JSON.parse(data);
+        if (!Array.isArray(entries)) entries = [];
+      } catch (e) {
+        debugLog("trajectory.deadEnds", "no trajectory.json found", e);
+        entries = [];
+      }
+      let deadEnds = entries.filter((e) => e.category === "pivot" || e.tags && e.tags.includes("abandoned"));
+      if (scope) {
+        deadEnds = deadEnds.filter((e) => e.scope === scope);
+      }
+      if (name) {
+        deadEnds = deadEnds.filter((e) => e.checkpoint_name === name);
+      }
+      deadEnds.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+      const effectiveLimit = limit && limit > 0 ? limit : 10;
+      deadEnds = deadEnds.slice(0, effectiveLimit);
+      return deadEnds.map((e) => ({
+        checkpoint_name: e.checkpoint_name || null,
+        scope: e.scope || null,
+        reason: e.reason && e.reason.text ? e.reason.text : null,
+        attempt: e.attempt || null,
+        timestamp: e.timestamp || null,
+        branch: e.branch || null
+      }));
+    }
+    function formatDeadEndContext(deadEnds, tokenCap) {
+      if (!deadEnds || deadEnds.length === 0) return "";
+      const cap = tokenCap && tokenCap > 0 ? tokenCap : 500;
+      const lines = [];
+      let totalChars = 0;
+      let truncatedCount = 0;
+      for (let i = 0; i < deadEnds.length; i++) {
+        const de = deadEnds[i];
+        const scopeName = de.scope && de.checkpoint_name ? `${de.scope}/${de.checkpoint_name}` : de.checkpoint_name || "unknown";
+        const attemptStr = de.attempt ? `attempt-${de.attempt}` : "unknown";
+        const reason = de.reason || "no reason recorded";
+        const line = `- [${scopeName}] ${attemptStr}: ${reason}`;
+        if ((totalChars + line.length) / 4 > cap) {
+          truncatedCount = deadEnds.length - i;
+          break;
+        }
+        lines.push(line);
+        totalChars += line.length + 1;
+      }
+      if (truncatedCount > 0) {
+        lines.push(`... and ${truncatedCount} more dead end${truncatedCount !== 1 ? "s" : ""}`);
+      }
+      return lines.join("\n");
+    }
+    function cmdTrajectoryDeadEnds(cwd, args, raw) {
+      let scope = null;
+      let name = null;
+      let limit = null;
+      let tokenCap = null;
+      for (let i = 0; i < args.length; i++) {
+        if (args[i] === "--scope" && args[i + 1]) {
+          scope = args[++i];
+          continue;
+        }
+        if (args[i] === "--name" && args[i + 1]) {
+          name = args[++i];
+          continue;
+        }
+        if (args[i] === "--limit" && args[i + 1]) {
+          limit = parseInt(args[++i], 10);
+          continue;
+        }
+        if (args[i] === "--token-cap" && args[i + 1]) {
+          tokenCap = parseInt(args[++i], 10);
+          continue;
+        }
+      }
+      if (scope) validateScope(scope);
+      const deadEnds = queryDeadEnds(cwd, { scope, name, limit });
+      const context = formatDeadEndContext(deadEnds, tokenCap);
+      const result = {
+        dead_ends: deadEnds,
+        count: deadEnds.length,
+        scope_filter: scope || null,
+        name_filter: name || null,
+        context
+      };
+      output(result, { formatter: formatDeadEndResult });
+    }
+    function formatDeadEndResult(result) {
+      const lines = [];
+      lines.push(banner("DEAD ENDS"));
+      if (result.count === 0) {
+        lines.push("");
+        lines.push("  No dead ends found.");
+        lines.push("");
+        lines.push(actionHint('trajectory pivot <checkpoint> --reason "..."'));
+        return lines.join("\n");
+      }
+      const headers = ["Name", "Scope", "Attempt", "Reason"];
+      const rows = result.dead_ends.map((de) => [
+        de.checkpoint_name || "-",
+        de.scope || "-",
+        de.attempt ? String(de.attempt) : "-",
+        de.reason || "-"
+      ]);
+      lines.push(formatTable(headers, rows, { showAll: true, maxRows: 50 }));
+      lines.push("");
+      lines.push(summaryLine(`${result.count} dead end${result.count !== 1 ? "s" : ""} found`));
+      lines.push(actionHint("Review these before starting new approaches"));
+      return lines.join("\n");
+    }
+    module2.exports = { cmdTrajectoryCheckpoint, cmdTrajectoryList, cmdTrajectoryPivot, cmdTrajectoryCompare, cmdTrajectoryChoose, cmdTrajectoryDeadEnds, queryDeadEnds, formatDeadEndContext };
+  }
+});
+
 // src/lib/orchestration.js
 var require_orchestration = __commonJS({
   "src/lib/orchestration.js"(exports2, module2) {
@@ -19351,7 +20139,9 @@ var require_init = __commonJS({
         // Intent drift advisory (null if no INTENT.md)
         intent_drift: null,
         // Intent summary (null if no INTENT.md)
-        intent_summary: null
+        intent_summary: null,
+        // Trajectory dead-end context (null if no failed approaches)
+        previous_attempts: null
       };
       try {
         result.intent_summary = getIntentSummary(cwd);
@@ -19415,6 +20205,27 @@ var require_init = __commonJS({
         result.codebase_conventions = null;
         result.codebase_dependencies = null;
         result.codebase_freshness = null;
+      }
+      try {
+        const { queryDeadEnds, formatDeadEndContext } = require_trajectory();
+        const deadEnds = queryDeadEnds(cwd, { scope: "phase" });
+        if (deadEnds.length > 0) {
+          result.previous_attempts = {
+            count: deadEnds.length,
+            context: formatDeadEndContext(deadEnds, 500),
+            entries: deadEnds.slice(0, 5).map((de) => ({
+              name: de.checkpoint_name,
+              attempt: de.attempt,
+              reason: de.reason,
+              timestamp: de.timestamp
+            }))
+          };
+        } else {
+          result.previous_attempts = null;
+        }
+      } catch (e) {
+        debugLog("init.executePhase", "trajectory dead-end context failed (non-blocking)", e);
+        result.previous_attempts = null;
       }
       try {
         const { classifyPlan, selectExecutionMode } = require_orchestration();
@@ -19512,7 +20323,8 @@ var require_init = __commonJS({
           worktree_config: result.worktree_config,
           worktree_active: result.worktree_active,
           file_overlaps: result.file_overlaps,
-          task_routing: result.task_routing || null
+          task_routing: result.task_routing || null,
+          previous_attempts: result.previous_attempts || null
         };
         if (global._gsdManifestMode) {
           compactResult._manifest = {
@@ -19541,6 +20353,7 @@ var require_init = __commonJS({
       if (result.codebase_conventions === null) delete result.codebase_conventions;
       if (result.codebase_dependencies === null) delete result.codebase_dependencies;
       if (result.codebase_freshness === null) delete result.codebase_freshness;
+      if (result.previous_attempts === null) delete result.previous_attempts;
       output(result, raw);
     }
     function cmdInitPlanPhase(cwd, phase, raw) {
@@ -24522,794 +25335,6 @@ var require_mcp = __commonJS({
       matchIndicatorKey,
       checkEnvHints
     };
-  }
-});
-
-// src/commands/trajectory.js
-var require_trajectory = __commonJS({
-  "src/commands/trajectory.js"(exports2, module2) {
-    var fs = require("fs");
-    var path = require("path");
-    var crypto = require("crypto");
-    var { execFileSync } = require("child_process");
-    var { output, error, debugLog } = require_output();
-    var { execGit, diffSummary } = require_git();
-    var { banner, formatTable, summaryLine, actionHint, color, SYMBOLS, relativeTime } = require_format();
-    var { VALID_TRAJECTORY_SCOPES } = require_constants();
-    function validateScope(scope) {
-      if (!VALID_TRAJECTORY_SCOPES.includes(scope)) {
-        error('Invalid scope: "' + scope + '". Valid scopes: ' + VALID_TRAJECTORY_SCOPES.join(", "));
-      }
-    }
-    var NAME_RE = /^[a-zA-Z0-9_-]+$/;
-    function cmdTrajectoryCheckpoint(cwd, args, raw) {
-      const posArgs = [];
-      let scope = "phase";
-      let description = null;
-      for (let i = 1; i < args.length; i++) {
-        if (args[i] === "--scope" && args[i + 1]) {
-          scope = args[++i];
-          continue;
-        }
-        if (args[i] === "--description" && args[i + 1]) {
-          description = args[++i];
-          continue;
-        }
-        if (!args[i].startsWith("-")) posArgs.push(args[i]);
-      }
-      validateScope(scope);
-      const name = posArgs[0];
-      if (!name) error("Missing checkpoint name. Usage: trajectory checkpoint <name>");
-      if (!NAME_RE.test(name)) error(`Invalid checkpoint name "${name}". Use alphanumeric, hyphens, underscores only.`);
-      const statusResult = execGit(cwd, ["status", "--porcelain"]);
-      if (statusResult.exitCode === 0 && statusResult.stdout) {
-        const dirtyNonPlanning = statusResult.stdout.split("\n").filter((line) => line.trim() && !line.slice(3).startsWith(".planning/"));
-        if (dirtyNonPlanning.length > 0) {
-          error("Uncommitted changes detected. Commit or stash before checkpointing.");
-        }
-      }
-      const memDir = path.join(cwd, ".planning", "memory");
-      const trajPath = path.join(memDir, "trajectory.json");
-      let entries = [];
-      try {
-        const raw2 = fs.readFileSync(trajPath, "utf-8");
-        entries = JSON.parse(raw2);
-        if (!Array.isArray(entries)) entries = [];
-      } catch (e) {
-        debugLog("trajectory.checkpoint", "no existing trajectory.json", e);
-        entries = [];
-      }
-      const existing = entries.filter(
-        (e) => e.category === "checkpoint" && e.scope === scope && e.checkpoint_name === name
-      );
-      const attempt = existing.length + 1;
-      const branchName = `trajectory/${scope}/${name}/attempt-${attempt}`;
-      const brResult = execGit(cwd, ["branch", branchName]);
-      if (brResult.exitCode !== 0) {
-        error(`Failed to create branch "${branchName}": ${brResult.stderr}`);
-      }
-      const verifyResult = execGit(cwd, ["rev-parse", "--verify", branchName]);
-      if (verifyResult.exitCode !== 0) {
-        error(`Branch "${branchName}" was not created successfully.`);
-      }
-      const headResult = execGit(cwd, ["rev-parse", "HEAD"]);
-      const gitRef = headResult.exitCode === 0 ? headResult.stdout : "unknown";
-      const metrics = { tests: null, loc_delta: null, complexity: null };
-      try {
-        const testOutput = execFileSync("node", ["--test", path.join(cwd, "bin", "gsd-tools.test.cjs")], {
-          cwd,
-          encoding: "utf-8",
-          stdio: "pipe",
-          timeout: 12e4
-        });
-        metrics.tests = parseTestOutput(testOutput);
-      } catch (e) {
-        const combined = (e.stdout || "") + "\n" + (e.stderr || "");
-        metrics.tests = parseTestOutput(combined);
-      }
-      try {
-        let diff = diffSummary(cwd, { from: "HEAD~5", to: "HEAD" });
-        if (diff.error) diff = diffSummary(cwd, { from: "HEAD~1", to: "HEAD" });
-        if (!diff.error) {
-          metrics.loc_delta = {
-            insertions: diff.total_insertions,
-            deletions: diff.total_deletions,
-            files_changed: diff.file_count
-          };
-        }
-      } catch (e) {
-        debugLog("trajectory.checkpoint", "LOC delta failed", e);
-      }
-      try {
-        const changedFiles = getRecentChangedFiles(cwd);
-        let totalComplexity = 0;
-        let filesAnalyzed = 0;
-        for (const file of changedFiles) {
-          if (!file.endsWith(".js")) continue;
-          const fullPath = path.join(cwd, file);
-          if (!fs.existsSync(fullPath)) continue;
-          try {
-            const astOut = execFileSync("node", [path.join(cwd, "bin", "gsd-tools.cjs"), "codebase", "complexity", file], {
-              cwd,
-              encoding: "utf-8",
-              stdio: "pipe",
-              timeout: 15e3
-            });
-            const parsed = JSON.parse(astOut);
-            if (parsed.module_complexity !== void 0) {
-              totalComplexity += parsed.module_complexity;
-              filesAnalyzed++;
-            }
-          } catch (e) {
-            debugLog("trajectory.checkpoint", `complexity failed for ${file}`, e);
-          }
-        }
-        metrics.complexity = { total: totalComplexity, files_analyzed: filesAnalyzed };
-      } catch (e) {
-        debugLog("trajectory.checkpoint", "complexity collection failed", e);
-      }
-      let id;
-      const existingIds = new Set(entries.map((e) => e.id));
-      do {
-        id = "tj-" + crypto.randomBytes(3).toString("hex");
-      } while (existingIds.has(id));
-      const entry = {
-        id,
-        timestamp: (/* @__PURE__ */ new Date()).toISOString(),
-        category: "checkpoint",
-        text: `Checkpoint: ${name} (attempt ${attempt})`,
-        scope,
-        checkpoint_name: name,
-        attempt,
-        branch: branchName,
-        git_ref: gitRef,
-        description: description || null,
-        metrics,
-        tags: ["checkpoint"]
-      };
-      entries.push(entry);
-      fs.mkdirSync(memDir, { recursive: true });
-      fs.writeFileSync(trajPath, JSON.stringify(entries, null, 2), "utf-8");
-      output({
-        created: true,
-        checkpoint: name,
-        branch: branchName,
-        attempt,
-        git_ref: gitRef,
-        metrics
-      });
-    }
-    function parseTestOutput(text) {
-      const result = { total: 0, pass: 0, fail: 0 };
-      if (!text) return result;
-      const totalMatch = text.match(/# tests (\d+)/);
-      const passMatch = text.match(/# pass (\d+)/);
-      const failMatch = text.match(/# fail (\d+)/);
-      if (totalMatch) result.total = parseInt(totalMatch[1], 10);
-      if (passMatch) result.pass = parseInt(passMatch[1], 10);
-      if (failMatch) result.fail = parseInt(failMatch[1], 10);
-      return result;
-    }
-    function getRecentChangedFiles(cwd) {
-      const diff = diffSummary(cwd, { from: "HEAD~5", to: "HEAD" });
-      if (diff.error || !diff.files) return [];
-      return diff.files.map((f) => f.path).filter(Boolean);
-    }
-    function cmdTrajectoryList(cwd, args, raw) {
-      let scopeFilter = null;
-      let nameFilter = null;
-      let limit = null;
-      for (let i = 0; i < args.length; i++) {
-        if (args[i] === "--scope" && args[i + 1]) {
-          scopeFilter = args[++i];
-          continue;
-        }
-        if (args[i] === "--name" && args[i + 1]) {
-          nameFilter = args[++i];
-          continue;
-        }
-        if (args[i] === "--limit" && args[i + 1]) {
-          limit = parseInt(args[++i], 10);
-          continue;
-        }
-      }
-      if (scopeFilter) validateScope(scopeFilter);
-      const trajPath = path.join(cwd, ".planning", "memory", "trajectory.json");
-      let entries = [];
-      try {
-        const data = fs.readFileSync(trajPath, "utf-8");
-        entries = JSON.parse(data);
-        if (!Array.isArray(entries)) entries = [];
-      } catch (e) {
-        debugLog("trajectory.list", "no trajectory.json found", e);
-        entries = [];
-      }
-      let checkpoints = entries.filter((e) => e.category === "checkpoint");
-      if (scopeFilter) {
-        checkpoints = checkpoints.filter((e) => e.scope === scopeFilter);
-      }
-      if (nameFilter) {
-        checkpoints = checkpoints.filter((e) => e.checkpoint_name === nameFilter);
-      }
-      checkpoints.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-      if (limit && limit > 0) {
-        checkpoints = checkpoints.slice(0, limit);
-      }
-      const scopes = new Set(checkpoints.map((e) => e.scope));
-      const result = {
-        checkpoints,
-        count: checkpoints.length,
-        scopes: scopes.size
-      };
-      output(result, { formatter: formatTrajectoryList });
-    }
-    function formatTrajectoryList(result) {
-      const lines = [];
-      lines.push(banner("TRAJECTORY CHECKPOINTS"));
-      if (result.count === 0) {
-        lines.push("");
-        lines.push("  No checkpoints found.");
-        lines.push("");
-        lines.push(actionHint("trajectory checkpoint <name>"));
-        return lines.join("\n");
-      }
-      const headers = ["Name", "Scope", "Attempt", "Ref", "Tests", "LOC \u0394", "Age"];
-      const rows = result.checkpoints.map((cp) => {
-        const ref = cp.git_ref ? cp.git_ref.slice(0, 7) : "-";
-        let testsStr = "-";
-        if (cp.metrics && cp.metrics.tests) {
-          const t = cp.metrics.tests;
-          if (t.fail > 0) {
-            testsStr = color.red(`${t.pass}/${t.total} ${SYMBOLS.cross}`);
-          } else if (t.total > 0) {
-            testsStr = color.green(`${t.pass}/${t.total} ${SYMBOLS.check}`);
-          }
-        }
-        let locStr = "-";
-        if (cp.metrics && cp.metrics.loc_delta) {
-          const d = cp.metrics.loc_delta;
-          locStr = `+${d.insertions || 0}/-${d.deletions || 0}`;
-        }
-        const age = cp.timestamp ? relativeTime(cp.timestamp) : "-";
-        return [
-          cp.checkpoint_name || "-",
-          cp.scope || "-",
-          String(cp.attempt || "-"),
-          ref,
-          testsStr,
-          locStr,
-          age
-        ];
-      });
-      lines.push(formatTable(headers, rows, { showAll: true, maxRows: 50 }));
-      lines.push("");
-      lines.push(summaryLine(`${result.count} checkpoint${result.count !== 1 ? "s" : ""} (${result.scopes} scope${result.scopes !== 1 ? "s" : ""})`));
-      lines.push(actionHint("trajectory compare <name>"));
-      return lines.join("\n");
-    }
-    function cmdTrajectoryPivot(cwd, args, raw) {
-      const { selectiveRewind } = require_git();
-      const posArgs = [];
-      let scope = "phase";
-      let reasonText = null;
-      let attemptNum = null;
-      let stashFlag = false;
-      for (let i = 1; i < args.length; i++) {
-        if (args[i] === "--scope" && args[i + 1]) {
-          scope = args[++i];
-          continue;
-        }
-        if (args[i] === "--reason" && args[i + 1]) {
-          reasonText = args[++i];
-          continue;
-        }
-        if (args[i] === "--attempt" && args[i + 1]) {
-          attemptNum = parseInt(args[++i], 10);
-          continue;
-        }
-        if (args[i] === "--stash") {
-          stashFlag = true;
-          continue;
-        }
-        if (!args[i].startsWith("-")) posArgs.push(args[i]);
-      }
-      validateScope(scope);
-      const name = posArgs[0];
-      if (!name) error('Missing checkpoint name. Usage: trajectory pivot <checkpoint> --reason "what failed and why"');
-      if (!NAME_RE.test(name)) error(`Invalid checkpoint name "${name}". Use alphanumeric, hyphens, underscores only.`);
-      let stashUsed = false;
-      const statusResult = execGit(cwd, ["status", "--porcelain"]);
-      if (statusResult.exitCode === 0 && statusResult.stdout) {
-        const dirtyNonPlanning = statusResult.stdout.split("\n").filter((line) => line.trim() && !line.slice(3).startsWith(".planning/"));
-        if (dirtyNonPlanning.length > 0) {
-          if (stashFlag) {
-            const stashResult = execGit(cwd, ["stash", "push", "-m", "gsd-pivot-auto-stash"]);
-            if (stashResult.exitCode !== 0) error("Failed to auto-stash: " + stashResult.stderr);
-            stashUsed = true;
-          } else {
-            error("Uncommitted changes detected. Commit or stash before pivoting.\nTo auto-stash: trajectory pivot <checkpoint> --stash");
-          }
-        }
-      }
-      const memDir = path.join(cwd, ".planning", "memory");
-      const trajPath = path.join(memDir, "trajectory.json");
-      let entries = [];
-      try {
-        const data = fs.readFileSync(trajPath, "utf-8");
-        entries = JSON.parse(data);
-        if (!Array.isArray(entries)) entries = [];
-      } catch (e) {
-        debugLog("trajectory.pivot", "no trajectory.json found", e);
-        entries = [];
-      }
-      const matching = entries.filter(
-        (e) => e.category === "checkpoint" && e.checkpoint_name === name && e.scope === scope && !(e.tags && e.tags.includes("abandoned"))
-      );
-      if (matching.length === 0) {
-        const allCheckpoints = entries.filter((e) => e.category === "checkpoint" && !(e.tags && e.tags.includes("abandoned")));
-        const byName = {};
-        for (const cp of allCheckpoints) {
-          const key = `${cp.checkpoint_name} (scope: ${cp.scope})`;
-          if (!byName[key]) byName[key] = [];
-          byName[key].push(cp.attempt);
-        }
-        const availableList = Object.keys(byName).length > 0 ? Object.entries(byName).map(([k, v]) => `  ${k} \u2014 attempt${v.length > 1 ? "s" : ""} ${v.join(", ")}`).join("\n") : "  (none)";
-        if (stashUsed) execGit(cwd, ["stash", "pop"]);
-        error('Checkpoint "' + name + '" not found (scope: ' + scope + ").\nAvailable checkpoints:\n" + availableList);
-      }
-      let targetEntry;
-      if (attemptNum !== null) {
-        targetEntry = matching.find((e) => e.attempt === attemptNum);
-        if (!targetEntry) {
-          if (stashUsed) execGit(cwd, ["stash", "pop"]);
-          error("Attempt " + attemptNum + ' not found for checkpoint "' + name + '" (scope: ' + scope + ").");
-        }
-      } else {
-        targetEntry = matching.reduce((best, e) => !best || e.attempt > best.attempt ? e : best, null);
-      }
-      if (!reasonText) {
-        if (stashUsed) execGit(cwd, ["stash", "pop"]);
-        error('Reason required. Use --reason "what failed, why, what signals" to record why this approach is being abandoned.');
-      }
-      const headResult = execGit(cwd, ["rev-parse", "HEAD"]);
-      const currentHeadSha = headResult.exitCode === 0 ? headResult.stdout : "unknown";
-      const allForName = entries.filter(
-        (e) => e.category === "checkpoint" && e.scope === scope && e.checkpoint_name === name
-      );
-      const abandonedAttempt = allForName.length + 1;
-      const abandonedBranchName = `archived/trajectory/${scope}/${name}/attempt-${abandonedAttempt}`;
-      const brResult = execGit(cwd, ["branch", abandonedBranchName]);
-      if (brResult.exitCode !== 0) {
-        debugLog("trajectory.pivot", "branch creation warning", brResult.stderr);
-      }
-      let id;
-      const existingIds = new Set(entries.map((e) => e.id));
-      do {
-        id = "tj-" + crypto.randomBytes(3).toString("hex");
-      } while (existingIds.has(id));
-      const abandonedEntry = {
-        id,
-        timestamp: (/* @__PURE__ */ new Date()).toISOString(),
-        category: "checkpoint",
-        text: `Abandoned: ${name} (attempt ${abandonedAttempt})`,
-        scope,
-        checkpoint_name: name,
-        attempt: abandonedAttempt,
-        branch: abandonedBranchName,
-        git_ref: currentHeadSha,
-        description: null,
-        metrics: null,
-        reason: { text: reasonText },
-        tags: ["checkpoint", "abandoned"]
-      };
-      entries.push(abandonedEntry);
-      const result = selectiveRewind(cwd, { ref: targetEntry.git_ref, confirm: true });
-      if (result.error) {
-        if (stashUsed) execGit(cwd, ["stash", "pop"]);
-        error("Rewind failed: " + result.error);
-      }
-      if (stashUsed) {
-        execGit(cwd, ["stash", "pop"]);
-      }
-      fs.mkdirSync(memDir, { recursive: true });
-      fs.writeFileSync(trajPath, JSON.stringify(entries, null, 2), "utf-8");
-      output({
-        pivoted: true,
-        checkpoint: name,
-        target_ref: targetEntry.git_ref,
-        abandoned_branch: abandonedBranchName,
-        files_rewound: result.files_changed,
-        stash_used: stashUsed
-      }, { formatter: formatPivotResult });
-    }
-    function formatPivotResult(result) {
-      const lines = [];
-      lines.push(banner("TRAJECTORY PIVOT"));
-      lines.push("");
-      lines.push(summaryLine(`Pivoted to ${color.bold(result.checkpoint)}. Abandoned attempt archived as ${color.cyan(result.abandoned_branch)}.`));
-      lines.push("");
-      lines.push(`  ${SYMBOLS.check} Target ref: ${color.dim(result.target_ref.slice(0, 7))}`);
-      lines.push(`  ${SYMBOLS.check} Files rewound: ${result.files_rewound}`);
-      if (result.stash_used) {
-        lines.push(`  ${SYMBOLS.warning} Working tree auto-stashed and restored`);
-      }
-      lines.push("");
-      lines.push(actionHint("trajectory list"));
-      return lines.join("\n");
-    }
-    function cmdTrajectoryCompare(cwd, args, raw) {
-      const posArgs = [];
-      let scope = "phase";
-      for (let i = 1; i < args.length; i++) {
-        if (args[i] === "--scope" && args[i + 1]) {
-          scope = args[++i];
-          continue;
-        }
-        if (!args[i].startsWith("-")) posArgs.push(args[i]);
-      }
-      validateScope(scope);
-      const name = posArgs[0];
-      if (!name) error("Missing checkpoint name. Usage: trajectory compare <name> [--scope <scope>]");
-      const trajPath = path.join(cwd, ".planning", "memory", "trajectory.json");
-      let entries = [];
-      try {
-        const data = fs.readFileSync(trajPath, "utf-8");
-        entries = JSON.parse(data);
-        if (!Array.isArray(entries)) entries = [];
-      } catch (e) {
-        debugLog("trajectory.compare", "no trajectory.json found", e);
-        entries = [];
-      }
-      const attempts = entries.filter(
-        (e) => e.category === "checkpoint" && e.checkpoint_name === name && e.scope === scope && !(e.tags && e.tags.includes("abandoned"))
-      ).sort((a, b) => a.attempt - b.attempt);
-      if (attempts.length === 0) {
-        const allCheckpoints = entries.filter((e) => e.category === "checkpoint" && !(e.tags && e.tags.includes("abandoned")));
-        const byName = {};
-        for (const cp of allCheckpoints) {
-          const key = `${cp.checkpoint_name} (scope: ${cp.scope})`;
-          if (!byName[key]) byName[key] = [];
-          byName[key].push(cp.attempt);
-        }
-        const availableList = Object.keys(byName).length > 0 ? Object.entries(byName).map(([k, v]) => `  ${k} \u2014 attempt${v.length > 1 ? "s" : ""} ${v.join(", ")}`).join("\n") : "  (none)";
-        error('Checkpoint "' + name + '" not found (scope: ' + scope + ").\nAvailable checkpoints:\n" + availableList);
-      }
-      const metrics = attempts.map((a) => ({
-        attempt: a.attempt,
-        branch: a.branch,
-        git_ref: a.git_ref,
-        timestamp: a.timestamp,
-        tests_pass: a.metrics?.tests?.pass ?? null,
-        tests_fail: a.metrics?.tests?.fail ?? null,
-        tests_total: a.metrics?.tests?.total ?? null,
-        loc_insertions: a.metrics?.loc_delta?.insertions ?? null,
-        loc_deletions: a.metrics?.loc_delta?.deletions ?? null,
-        complexity: a.metrics?.complexity?.total ?? null
-      }));
-      const bestPerMetric = {};
-      const worstPerMetric = {};
-      const metricKeys = ["tests_pass", "tests_fail", "loc_insertions", "loc_deletions", "complexity"];
-      const direction = {
-        tests_pass: "higher",
-        tests_fail: "lower",
-        loc_insertions: "lower",
-        loc_deletions: "lower",
-        complexity: "lower"
-      };
-      for (const key of metricKeys) {
-        let bestIdx = -1, worstIdx = -1, bestVal = null, worstVal = null;
-        for (let i = 0; i < metrics.length; i++) {
-          const val = metrics[i][key];
-          if (val === null) continue;
-          if (bestVal === null || (direction[key] === "higher" ? val > bestVal : val < bestVal)) {
-            bestVal = val;
-            bestIdx = i;
-          }
-          if (worstVal === null || (direction[key] === "higher" ? val < worstVal : val > worstVal)) {
-            worstVal = val;
-            worstIdx = i;
-          }
-        }
-        if (bestIdx !== -1 && bestIdx !== worstIdx) {
-          bestPerMetric[key] = bestIdx;
-          worstPerMetric[key] = worstIdx;
-        }
-      }
-      const result = {
-        checkpoint: name,
-        scope,
-        attempt_count: metrics.length,
-        attempts: metrics,
-        best_per_metric: bestPerMetric,
-        worst_per_metric: worstPerMetric
-      };
-      output(result, { formatter: formatCompareResult });
-    }
-    function formatCompareResult(result) {
-      const lines = [];
-      lines.push(banner("TRAJECTORY COMPARE"));
-      lines.push("");
-      lines.push(`  Checkpoint: ${color.bold(result.checkpoint)} (scope: ${result.scope})`);
-      lines.push(`  Attempts: ${result.attempt_count}`);
-      lines.push("");
-      const headers = ["Attempt", "Tests Pass", "Tests Fail", "LOC +/-", "Complexity"];
-      const rows = result.attempts.map((a) => [
-        `#${a.attempt}`,
-        a.tests_pass !== null ? String(a.tests_pass) : "-",
-        a.tests_fail !== null ? String(a.tests_fail) : "-",
-        a.loc_insertions !== null ? `+${a.loc_insertions}/-${a.loc_deletions || 0}` : "-",
-        a.complexity !== null ? String(a.complexity) : "-"
-      ]);
-      const colToMetric = [null, "tests_pass", "tests_fail", "loc_insertions", "complexity"];
-      lines.push(formatTable(headers, rows, {
-        showAll: true,
-        colorFn: (value, colIdx, rowIdx) => {
-          if (colIdx === 0) return String(value != null ? value : "");
-          const metric = colToMetric[colIdx];
-          if (!metric) return String(value != null ? value : "");
-          if (result.best_per_metric[metric] === rowIdx) return color.green(String(value != null ? value : ""));
-          if (result.worst_per_metric[metric] === rowIdx) return color.red(String(value != null ? value : ""));
-          return String(value != null ? value : "");
-        }
-      }));
-      lines.push("");
-      lines.push(summaryLine("Best attempt per metric highlighted in green"));
-      lines.push(actionHint("trajectory choose <attempt-N>"));
-      return lines.join("\n");
-    }
-    function cmdTrajectoryChoose(cwd, args, raw) {
-      const posArgs = [];
-      let scope = "phase";
-      let reasonText = null;
-      let attemptNum = null;
-      for (let i = 1; i < args.length; i++) {
-        if (args[i] === "--scope" && args[i + 1]) {
-          scope = args[++i];
-          continue;
-        }
-        if (args[i] === "--reason" && args[i + 1]) {
-          reasonText = args[++i];
-          continue;
-        }
-        if (args[i] === "--attempt" && args[i + 1]) {
-          attemptNum = parseInt(args[++i], 10);
-          continue;
-        }
-        if (!args[i].startsWith("-")) posArgs.push(args[i]);
-      }
-      validateScope(scope);
-      const name = posArgs[0];
-      if (!name) error("Missing checkpoint name. Usage: trajectory choose <name> --attempt <N>");
-      if (!NAME_RE.test(name)) error(`Invalid checkpoint name "${name}". Use alphanumeric, hyphens, underscores only.`);
-      if (attemptNum === null || isNaN(attemptNum)) error("Must specify winning attempt: trajectory choose <name> --attempt <N>");
-      const memDir = path.join(cwd, ".planning", "memory");
-      const trajPath = path.join(memDir, "trajectory.json");
-      let entries = [];
-      try {
-        const data = fs.readFileSync(trajPath, "utf-8");
-        entries = JSON.parse(data);
-        if (!Array.isArray(entries)) entries = [];
-      } catch (e) {
-        debugLog("trajectory.choose", "no trajectory.json found", e);
-        entries = [];
-      }
-      const allCheckpoints = entries.filter(
-        (e) => e.category === "checkpoint" && e.checkpoint_name === name && e.scope === scope
-      );
-      if (allCheckpoints.length === 0) {
-        error('No checkpoints found for "' + name + '" (scope: ' + scope + ").");
-      }
-      const winningEntry = allCheckpoints.find(
-        (e) => e.attempt === attemptNum && !(e.tags && e.tags.includes("abandoned"))
-      );
-      if (!winningEntry) {
-        const available = allCheckpoints.filter((e) => !(e.tags && e.tags.includes("abandoned"))).map((e) => e.attempt);
-        error("Attempt " + attemptNum + ' not found (or is abandoned) for checkpoint "' + name + '" (scope: ' + scope + ").\nAvailable non-abandoned attempts: " + (available.length > 0 ? available.join(", ") : "(none)"));
-      }
-      const verifyResult = execGit(cwd, ["rev-parse", "--verify", winningEntry.branch]);
-      if (verifyResult.exitCode !== 0) {
-        error("Branch not found: " + winningEntry.branch + ". Was it already cleaned up?");
-      }
-      const mergeResult = execGit(cwd, ["merge", "--no-ff", winningEntry.branch, "-m", "trajectory: choose attempt-" + attemptNum + " for " + name]);
-      if (mergeResult.exitCode !== 0) {
-        error("Merge conflict. Resolve manually, then commit.\n" + (mergeResult.stderr || ""));
-      }
-      const headResult = execGit(cwd, ["rev-parse", "HEAD"]);
-      const mergeRef = headResult.exitCode === 0 ? headResult.stdout : "unknown";
-      const archivedTags = [];
-      const deletedBranches = [];
-      for (const entry of allCheckpoints) {
-        if (!entry.branch) continue;
-        if (entry.attempt !== attemptNum) {
-          const tagResult = execGit(cwd, ["tag", entry.branch, entry.git_ref]);
-          if (tagResult.exitCode === 0) {
-            archivedTags.push(entry.branch);
-          } else {
-            debugLog("trajectory.choose", "tag creation warning for " + entry.branch, tagResult.stderr);
-          }
-        }
-        const delResult = execGit(cwd, ["branch", "-D", entry.branch]);
-        if (delResult.exitCode === 0) {
-          deletedBranches.push(entry.branch);
-        } else {
-          debugLog("trajectory.choose", "branch deletion warning for " + entry.branch, delResult.stderr);
-        }
-      }
-      let id;
-      const existingIds = new Set(entries.map((e) => e.id));
-      do {
-        id = "tj-" + crypto.randomBytes(3).toString("hex");
-      } while (existingIds.has(id));
-      const journalEntry = {
-        id,
-        timestamp: (/* @__PURE__ */ new Date()).toISOString(),
-        category: "choose",
-        text: `Chosen: ${name} attempt ${attemptNum}`,
-        scope,
-        checkpoint_name: name,
-        chosen_attempt: attemptNum,
-        chosen_branch: winningEntry.branch,
-        chosen_ref: winningEntry.git_ref,
-        reason: reasonText ? { text: reasonText } : null,
-        archived_tags: archivedTags,
-        deleted_branches: deletedBranches,
-        tags: ["choose", "lifecycle-complete"]
-      };
-      entries.push(journalEntry);
-      fs.mkdirSync(memDir, { recursive: true });
-      fs.writeFileSync(trajPath, JSON.stringify(entries, null, 2), "utf-8");
-      output({
-        chosen: true,
-        checkpoint: name,
-        scope,
-        chosen_attempt: attemptNum,
-        chosen_branch: winningEntry.branch,
-        merge_ref: mergeRef,
-        archived_tags: archivedTags,
-        deleted_branches: deletedBranches,
-        reason: reasonText || null
-      }, { formatter: formatChooseResult });
-    }
-    function formatChooseResult(result) {
-      const lines = [];
-      lines.push(banner("TRAJECTORY CHOOSE"));
-      lines.push("");
-      lines.push(summaryLine(`Chose attempt ${color.bold("#" + result.chosen_attempt)} for ${color.bold(result.checkpoint)}. Merged and cleaned up.`));
-      lines.push("");
-      if (result.archived_tags.length > 0) {
-        lines.push("  Archived tags:");
-        for (const tag of result.archived_tags) {
-          lines.push(`    ${SYMBOLS.check} ${color.cyan(tag)}`);
-        }
-        lines.push("");
-      }
-      if (result.deleted_branches.length > 0) {
-        lines.push("  Deleted branches:");
-        for (const br of result.deleted_branches) {
-          lines.push(`    ${SYMBOLS.check} ${color.dim(br)}`);
-        }
-        lines.push("");
-      }
-      if (result.reason) {
-        lines.push(`  ${color.dim("Reason: " + result.reason)}`);
-        lines.push("");
-      }
-      lines.push(actionHint("trajectory list"));
-      return lines.join("\n");
-    }
-    function queryDeadEnds(cwd, { scope, name, limit } = {}) {
-      const trajPath = path.join(cwd, ".planning", "memory", "trajectory.json");
-      let entries = [];
-      try {
-        const data = fs.readFileSync(trajPath, "utf-8");
-        entries = JSON.parse(data);
-        if (!Array.isArray(entries)) entries = [];
-      } catch (e) {
-        debugLog("trajectory.deadEnds", "no trajectory.json found", e);
-        entries = [];
-      }
-      let deadEnds = entries.filter((e) => e.category === "pivot" || e.tags && e.tags.includes("abandoned"));
-      if (scope) {
-        deadEnds = deadEnds.filter((e) => e.scope === scope);
-      }
-      if (name) {
-        deadEnds = deadEnds.filter((e) => e.checkpoint_name === name);
-      }
-      deadEnds.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-      const effectiveLimit = limit && limit > 0 ? limit : 10;
-      deadEnds = deadEnds.slice(0, effectiveLimit);
-      return deadEnds.map((e) => ({
-        checkpoint_name: e.checkpoint_name || null,
-        scope: e.scope || null,
-        reason: e.reason && e.reason.text ? e.reason.text : null,
-        attempt: e.attempt || null,
-        timestamp: e.timestamp || null,
-        branch: e.branch || null
-      }));
-    }
-    function formatDeadEndContext(deadEnds, tokenCap) {
-      if (!deadEnds || deadEnds.length === 0) return "";
-      const cap = tokenCap && tokenCap > 0 ? tokenCap : 500;
-      const lines = [];
-      let totalChars = 0;
-      let truncatedCount = 0;
-      for (let i = 0; i < deadEnds.length; i++) {
-        const de = deadEnds[i];
-        const scopeName = de.scope && de.checkpoint_name ? `${de.scope}/${de.checkpoint_name}` : de.checkpoint_name || "unknown";
-        const attemptStr = de.attempt ? `attempt-${de.attempt}` : "unknown";
-        const reason = de.reason || "no reason recorded";
-        const line = `- [${scopeName}] ${attemptStr}: ${reason}`;
-        if ((totalChars + line.length) / 4 > cap) {
-          truncatedCount = deadEnds.length - i;
-          break;
-        }
-        lines.push(line);
-        totalChars += line.length + 1;
-      }
-      if (truncatedCount > 0) {
-        lines.push(`... and ${truncatedCount} more dead end${truncatedCount !== 1 ? "s" : ""}`);
-      }
-      return lines.join("\n");
-    }
-    function cmdTrajectoryDeadEnds(cwd, args, raw) {
-      let scope = null;
-      let name = null;
-      let limit = null;
-      let tokenCap = null;
-      for (let i = 0; i < args.length; i++) {
-        if (args[i] === "--scope" && args[i + 1]) {
-          scope = args[++i];
-          continue;
-        }
-        if (args[i] === "--name" && args[i + 1]) {
-          name = args[++i];
-          continue;
-        }
-        if (args[i] === "--limit" && args[i + 1]) {
-          limit = parseInt(args[++i], 10);
-          continue;
-        }
-        if (args[i] === "--token-cap" && args[i + 1]) {
-          tokenCap = parseInt(args[++i], 10);
-          continue;
-        }
-      }
-      if (scope) validateScope(scope);
-      const deadEnds = queryDeadEnds(cwd, { scope, name, limit });
-      const context = formatDeadEndContext(deadEnds, tokenCap);
-      const result = {
-        dead_ends: deadEnds,
-        count: deadEnds.length,
-        scope_filter: scope || null,
-        name_filter: name || null,
-        context
-      };
-      output(result, { formatter: formatDeadEndResult });
-    }
-    function formatDeadEndResult(result) {
-      const lines = [];
-      lines.push(banner("DEAD ENDS"));
-      if (result.count === 0) {
-        lines.push("");
-        lines.push("  No dead ends found.");
-        lines.push("");
-        lines.push(actionHint('trajectory pivot <checkpoint> --reason "..."'));
-        return lines.join("\n");
-      }
-      const headers = ["Name", "Scope", "Attempt", "Reason"];
-      const rows = result.dead_ends.map((de) => [
-        de.checkpoint_name || "-",
-        de.scope || "-",
-        de.attempt ? String(de.attempt) : "-",
-        de.reason || "-"
-      ]);
-      lines.push(formatTable(headers, rows, { showAll: true, maxRows: 50 }));
-      lines.push("");
-      lines.push(summaryLine(`${result.count} dead end${result.count !== 1 ? "s" : ""} found`));
-      lines.push(actionHint("Review these before starting new approaches"));
-      return lines.join("\n");
-    }
-    module2.exports = { cmdTrajectoryCheckpoint, cmdTrajectoryList, cmdTrajectoryPivot, cmdTrajectoryCompare, cmdTrajectoryChoose, cmdTrajectoryDeadEnds, queryDeadEnds };
   }
 });
 
