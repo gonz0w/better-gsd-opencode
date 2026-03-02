@@ -85,6 +85,13 @@ async function main() {
     args.splice(manifestIdx, 1);
   }
 
+  // Parse --no-cache flag: force Map fallback for test parity verification
+  const noCacheIdx = args.indexOf('--no-cache');
+  if (noCacheIdx !== -1) {
+    process.env.GSD_CACHE_FORCE_MAP = '1';
+    args.splice(noCacheIdx, 1);
+  }
+
   const command = args[0];
   const cwd = process.cwd();
 
