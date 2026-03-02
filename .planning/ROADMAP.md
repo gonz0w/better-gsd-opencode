@@ -143,7 +143,7 @@ Full details: `.planning/milestones/v7.1-ROADMAP.md`
 
 - [x] **Phase 51: Cache Foundation** - SQLite cache module with staleness detection, write invalidation, and graceful degradation (3/3 plans, completed 2026-03-02)
 - [x] **Phase 52: Cache Integration & Warm-up** - Wire cache into hot paths, add warm command, prove test parity (2/2 plans, ready to execute)
-- [ ] **Phase 53: Agent Consolidation** - RACI matrix, agent merges, manifest-driven context, token budgets, lifecycle audit
+- [x] **Phase 53: Agent Consolidation** - RACI matrix, agent merges, manifest-driven context, token budgets, lifecycle audit (completed 2026-03-02)
 - [ ] **Phase 54: Command Consolidation** - Namespace grouping, reference updates, milestone docs generation
 - [ ] **Phase 55: Profiler & Performance Validation** - Hot-path instrumentation, baseline comparison, prove speedup
 
@@ -189,7 +189,7 @@ Plans:
   3. Agent count is 9 (down from 11) — integration-checker merged into verifier, synthesizer merged into roadmapper
   4. Agent manifests declare max token budgets and context builder refuses to exceed them (logged warning on truncation)
   5. All workflows and command wrappers reference correct agent names — no broken spawn chains
-**Plans:** 3/3 plans
+**Plans:** 3/3 plans complete
 
 Plans:
 - [x] 53-01-PLAN.md — RACI matrix document and agent audit command
@@ -235,6 +235,6 @@ Note: Phases 53 and 54 are independent of 51-52 and could execute in parallel if
 | 45-50 | v7.1 | 12/12 | Complete | 2026-03-02 |
 | 51. Cache Foundation | v8.0 | 3/3 | Complete | 2026-03-02 |
 | 52. Cache Integration | v8.0 | 2/2 | Complete | 2026-03-02 |
-| 53. Agent Consolidation | v8.0 | 3/3 | Ready to execute | - |
+| 53. Agent Consolidation | v8.0 | Complete    | 2026-03-02 | - |
 | 54. Command Consolidation | v8.0 | 0/TBD | Not started | - |
 | 55. Profiler & Performance | v8.0 | 0/TBD | Not started | - |
