@@ -10,9 +10,9 @@ See: .planning/PROJECT.md (updated 2026-03-01)
 ## Current Position
 
 Phase: 51 of 55 (Cache Foundation)
-Plan: 2 of 2 in current phase
-Status: Completed plan 51-02
-Last activity: 2026-03-02 — Completed 51-02: Cache CLI and Integration
+Plan: 3 of 3 in current phase
+Status: Completed plan 51-03
+Last activity: 2026-03-02 — Completed 51-03: Cache Write Invalidation
 
 Progress: [░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░] 0% (v8.0)
 
@@ -38,6 +38,7 @@ Progress: [░░░░░░░░░░░░░░░░░░░░░░░
 | v7.1 | 6 | 12 | 3 days |
 | v8.0 | 5 | TBD | — |
 | Phase 51-cache-foundation P02 | 5min | 3 tasks | 4 files |
+| Phase 51-cache-foundation P03 | 10min | 3 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -51,6 +52,7 @@ All v1.0-v7.1 decisions recorded in PROJECT.md Key Decisions table with outcomes
 - [v8.0 Research]: Two-layer cache: in-memory Map (L1) + SQLite (L2) behind existing `cachedReadFile()` interface
 - [v8.0 Research]: Graceful degradation to Map-only on Node <22.5 — zero crashes, zero warnings
 - [v8.0 Execution 51-01]: XDG_CONFIG_HOME convention for cache database path, transparent Map fallback
+- [v8.0 Execution 51-03]: Explicit cache invalidation on all gsd-tools file writes for immediate consistency
 
 ### Pending Todos
 
@@ -65,6 +67,6 @@ None — milestone starting fresh.
 ## Session Continuity
 
 Last session: 2026-03-02
-Stopped at: Completed 51-01-PLAN.md (CacheEngine implementation)
+Stopped at: Completed 51-03-PLAN.md (Cache Write Invalidation)
 Resume file: None
-Next step: Execute 51-02-PLAN.md (cache CLI commands)
+Next step: Phase 51 complete, ready for Phase 52
