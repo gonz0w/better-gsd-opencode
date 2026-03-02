@@ -5,14 +5,14 @@
 See: .planning/PROJECT.md (updated 2026-03-01)
 
 **Core value:** Manage and deliver high-quality software with high-quality documentation, while continuously reducing token usage and improving performance
-**Current focus:** Phase 52 — Cache Integration Warm-up
+**Current focus:** Phase 54 — Command Consolidation
 
 ## Current Position
 
-Phase: 53 of 55 (Agent Consolidation)
-Plan: 3 of 3 in current phase
-Status: Completed plan 53-03
-Last activity: 2026-03-02 — Completed 53-03: Token budgets and workflow updates
+Phase: 54 of 55 (Command Consolidation)
+Plan: 1 of 4 in current phase
+Status: Completed plan 54-01
+Last activity: 2026-03-02 — Completed 54-01: Namespace routing implementation
 
 Progress: [░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░] 0% (v8.0)
 
@@ -64,6 +64,7 @@ All v1.0-v7.1 decisions recorded in PROJECT.md Key Decisions table with outcomes
 - [Phase 53]: Created RACI matrix, implemented agent audit command — Each lifecycle step now has exactly one responsible agent
 - [Phase 53-02]: Merged gsd-integration-checker into verifier, gsd-research-synthesizer into roadmapper — 11→9 agents
 - [Phase 53-03]: Added token budgets to all 9 agent manifests (80k/60k), context builder warns on budget exceedance
+- [Phase 54-01]: Implemented namespace routing in router.js — Supports init:, plan:, execute:, verify:, util: command prefixes with colon syntax
 
 ### Pending Todos
 
