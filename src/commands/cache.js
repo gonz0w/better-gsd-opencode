@@ -21,6 +21,38 @@ function getCacheEngine() {
 }
 
 /**
+ * Discover all .planning/ files recursively.
+ * Walks .planning/ directory and returns all .md files.
+ */
+function discoverPlanningFiles(cwd) {
+  const planningDir = path.join(cwd, '.planning');
+  const files = [];
+  
+  if (!fs.existsSync(planningDir)) {
+    return files;
+  }
+  
+  function walk(dir) {
+    try {
+      const entries = fs.readdirSync(dir, { withFileTypes: true });
+      for (const entry of entries) {
+        const fullPath = path.join(dir, entry.name);
+        if (entry.isDirectory()) {
+          walk(fullPath); // recurse
+        } else if (entry.isFile() && entry.name.endsWith('.md')) {
+          files.push(fullPath);
+        }
+      }
+    } catch (e) {
+      debugLog('cache', 'failed to walk directory', e);
+    }
+  }
+  
+  walk(planningDir);
+  return files;
+}
+
+/**
  * Cache status command - reports backend type, entry count, hit/miss stats
  */
 function cmdCacheStatus(cwd, args, raw) {
@@ -67,22 +99,33 @@ function cmdCacheWarm(cwd, args, raw) {
     return;
   }
   
-  // Get file paths from args (skip 'warm' subcommand)
-  const filePaths = args.slice(1);
+  // Get file paths from args (skip 'cache' and 'warm' subcommands)
+  const filePaths = args.slice(2);
   
+  let resolvedPaths;
+  
+  // Auto-discovery: if no file paths provided, discover all .planning/ files
   if (filePaths.length === 0) {
-    output({ warmed: 0, error: 'No files specified' }, raw, 'No files to warm');
-    return;
+    resolvedPaths = discoverPlanningFiles(cwd);
+    
+    if (resolvedPaths.length === 0) {
+      output({ warmed: 0, error: 'No .planning/ files found' }, raw, 'No files to warm');
+      return;
+    }
+  } else {
+    // Resolve relative paths to absolute
+    resolvedPaths = filePaths.map(p => {
+      if (path.isAbsolute(p)) return p;
+      return path.join(cwd, p);
+    });
   }
   
-  // Resolve relative paths to absolute
-  const resolvedPaths = filePaths.map(p => {
-    if (path.isAbsolute(p)) return p;
-    return path.join(cwd, p);
-  });
-  
+  // Time the warming operation
+  const start = Date.now();
   const warmed = cacheEngine.warm(resolvedPaths);
-  output({ warmed }, raw, `Warmed ${warmed} file(s)`);
+  const elapsed = Date.now() - start;
+  
+  output({ warmed, elapsed_ms: elapsed }, raw, `Warmed ${warmed} files in ${elapsed}ms`);
 }
 
 /**
