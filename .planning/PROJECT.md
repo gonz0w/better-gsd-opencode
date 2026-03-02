@@ -2,30 +2,29 @@
 
 ## What This Is
 
-A single-file Node.js CLI built from 34 organized `src/` modules via esbuild, producing `bin/gsd-tools.cjs`. It provides structured data operations for AI-driven project planning workflows running in the host editor. Seven major versions shipped: v1.0 (test suite, module split, observability), v1.1 (context reduction — 46.7% CLI, 54.6% workflow, 67% reference compression), v2.0 (state validation, cross-session memory, quality scoring), v3.0 (intent engineering — INTENT.md, drift validation, workflow injection), v4.0 (environment awareness, MCP profiling, worktree parallelism), v5.0 (codebase intelligence — convention extraction, dependency graphs, lifecycle awareness), v6.0 (UX overhaul — shared formatting engine, TTY-aware smart output, branded CLI), and v7.0 (agent orchestration — AST intelligence, task routing, context efficiency, TDD execution, review gates).
+A single-file Node.js CLI built from 34 organized `src/` modules via esbuild, producing `bin/gsd-tools.cjs`. It provides structured data operations for AI-driven project planning workflows running in the host editor. Eight versions shipped: v1.0 (test suite, module split, observability), v1.1 (context reduction — 46.7% CLI, 54.6% workflow, 67% reference compression), v2.0 (state validation, cross-session memory, quality scoring), v3.0 (intent engineering — INTENT.md, drift validation, workflow injection), v4.0 (environment awareness, MCP profiling, worktree parallelism), v5.0 (codebase intelligence — convention extraction, dependency graphs, lifecycle awareness), v6.0 (UX overhaul — shared formatting engine, TTY-aware smart output, branded CLI), v7.0 (agent orchestration — AST intelligence, task routing, context efficiency, TDD execution, review gates), and v7.1 (trajectory engineering — checkpoint, pivot, compare, choose, decision journal, dead-end detection).
 
 ## Core Value
 
 Manage and deliver high-quality software with high-quality documentation, while continuously reducing token usage and improving performance.
 
-## Current Milestone: v7.1 Trajectory Engineering
-
-**Goal:** Structured exploration system — checkpoint, pivot, compare, and choose between multiple approaches at any workflow level, with a decision journal consumable by both agents and humans.
-
-**Target features:**
-- Checkpoint command — snapshot code state (git) + reasoning/decision context at a named point
-- Pivot command — record why current approach is being abandoned, rewind to checkpoint, start fresh
-- Compare command — outcome metrics (tests, complexity, LOC) across unbounded attempts
-- Choose command — merge winning attempt back, archive the rest as named branches
-- Decision journal — structured log of all trajectories, attempts, signals, and outcomes
-- Agent-consumable decision trail — prevents re-exploring dead ends in future sessions
-- Multi-level support — works at task, plan, and phase level
-
 ## Current State
 
-**Last shipped:** v7.0 Agent Orchestration & Efficiency (2026-02-27)
+**Last shipped:** v7.1 Trajectory Engineering (2026-03-02)
 
-**Shipped in v7.0:**
+**Shipped in v7.1:**
+- Decision journal foundation with trajectories sacred memory store, crypto-generated IDs, cross-session persistence
+- Selective git rewind preserving `.planning/` state via protected-path denylist
+- Checkpoint system with named snapshots, auto-collected metrics (tests, LOC delta, complexity), branch-based tracking
+- Pivot engine with structured reason capture, auto-checkpoint of abandoned work, stuck-detector integration
+- Multi-attempt comparison with side-by-side metrics matrix, color-coded TTY output, JSON fallback
+- Choose & cleanup lifecycle — merge winner via `--no-ff`, archive alternatives as tags, branch cleanup
+- Agent context integration — dead-end detection, `previous_attempts` in init execute-phase, scope validation
+- Commit attribution via git trailers, anti-pattern detection, stuck/loop recovery
+
+<details>
+<summary>Previous: v7.0 Agent Orchestration & Efficiency (shipped 2026-02-27)</summary>
+
 - Contract test safety net with snapshot-based consumer tests for all init/state JSON output
 - Enhanced git.js with structured log, diff, blame, branch info, pre-commit safety checks
 - AST intelligence via acorn parser — function signatures, export analysis, complexity metrics, ~1k token repo map
@@ -33,7 +32,8 @@ Manage and deliver high-quality software with high-quality documentation, while 
 - Context efficiency — agent manifests (40-60% token reduction), compact serialization, task-scoped file injection
 - gsd-reviewer agent with two-stage review (spec compliance + code quality), severity classification (BLOCKER/WARNING/INFO)
 - TDD execution engine — RED→GREEN→REFACTOR state machine with orchestrator gates, auto test-after-edit
-- Commit attribution via git trailers, anti-pattern detection, stuck/loop recovery
+
+</details>
 
 <details>
 <summary>Previous: v6.0 UX & Developer Experience (shipped 2026-02-27)</summary>
@@ -126,15 +126,17 @@ Manage and deliver high-quality software with high-quality documentation, while 
 - ✓ Commit attribution via git trailers — v7.0
 - ✓ Auto test-after-edit and anti-pattern detection — v7.0
 - ✓ Stuck/loop detection with recovery — v7.0
+- ✓ Trajectory decision journal with sacred memory store — v7.1
+- ✓ Checkpoint command with auto-metrics and branch tracking — v7.1
+- ✓ Pivot command with reason capture, auto-checkpoint, selective rewind — v7.1
+- ✓ Compare command with multi-attempt metrics matrix — v7.1
+- ✓ Choose command with merge, tag archival, branch cleanup — v7.1
+- ✓ Dead-end detection and agent context integration — v7.1
+- ✓ Multi-level trajectory support (task, plan, phase) — v7.1
 
 ### Active
 
-- [ ] Checkpoint command — snapshot code + decision state at named points
-- [ ] Pivot command — abandon approach with recorded reasoning, rewind to checkpoint
-- [ ] Compare command — outcome metrics across multiple attempts
-- [ ] Choose command — merge winner, archive alternatives
-- [ ] Decision journal — structured trajectory log for agents and humans
-- [ ] Multi-level trajectory support (task, plan, phase)
+(No active requirements — next milestone not yet started)
 
 ### Out of Scope
 
@@ -152,13 +154,13 @@ Manage and deliver high-quality software with high-quality documentation, while 
 
 ## Context
 
-Shipped v1.0 through v7.0. 669 tests passing, 34 src/ modules, 1000KB bundle, esbuild bundler.
+Shipped v1.0 through v7.1. 751 tests passing, 34 src/ modules, 1058KB bundle, esbuild bundler.
 Platform: OC (host editor).
 Tech stack: Node.js 18+, node:test, esbuild, tokenx (bundled), acorn (bundled).
 Source: 34 modules — `src/lib/` (18 modules) and `src/commands/` (14 modules) + router + index.
 Deploy pipeline: `npm run build` → esbuild bundle → `deploy.sh` with smoke test and rollback.
 
-Known tech debt: 3 pre-existing test failures in context-budget (plan path validation).
+Known tech debt: Bundle at 1058KB (slightly over 1050KB budget).
 
 ## Constraints
 
@@ -193,6 +195,14 @@ Known tech debt: 3 pre-existing test failures in context-budget (plan path valid
 | TDD as opt-in plan type | Not all work benefits from test-first | Good — discipline when wanted, no overhead when not |
 | Stuck/loop detection at 3 failures | Prevents token waste from repeated failed patterns | Good — automatic recovery |
 | Graduated review enforcement | Start advisory, graduate to blocking for BLOCKERs | Good — builds trust before gating |
+| Sacred trajectory store | Reuse memory.js dual-store with compaction protection | Good — no new storage mechanism |
+| Protected-path denylist for rewind | Everything except listed paths gets rewound | Good — safer default than allowlist |
+| Reason capture via --reason flag | gsd-tools runs via execFileSync, no interactive prompts | Good — CLI-compatible |
+| Advisory dead-end context | Never crash, null when absent, matching existing patterns | Good — zero-risk integration |
+
+| Trajectory exploration over worktrees | Sequential exploration sufficient; worktrees disk-expensive |
+| Automatic pivot without human signal | Human-in-the-loop is a core GSD principle |
+| Trajectory analytics | Deferred to future milestone |
 
 ---
-*Last updated: 2026-02-28 after v7.1 milestone start*
+*Last updated: 2026-03-02 after v7.1 milestone completion*

@@ -1,5 +1,31 @@
 # Milestones
 
+## ✅ v7.1 Trajectory Engineering (Shipped: 2026-03-02)
+
+**Delivered:** Structured exploration system with checkpoint, pivot, compare, and choose commands for managing multiple approaches, plus a decision journal and dead-end detection for agent context
+
+**Phases completed:** 6 phases (45-50), 12 plans
+**Commits:** 64 | **Files changed:** 363 | **Lines:** +22,352 / -10,367
+**Timeline:** 3 days (2026-02-28 → 2026-03-01)
+**Tests:** 751 passing
+**Bundle:** 1,058KB
+
+**Key accomplishments:**
+- Built decision journal foundation with trajectories sacred memory store, crypto-generated IDs, cross-session persistence, and selective git rewind preserving `.planning/` state
+- Created checkpoint system with named snapshots, auto-collected metrics (tests, LOC delta, complexity), branch-based tracking (`trajectory/<scope>/<name>/attempt-N`), and formatted list command
+- Implemented pivot engine with structured reason capture, auto-checkpoint of abandoned work, selective code rewind, and stuck-detector integration suggesting pivots after 3 failures
+- Added multi-attempt comparison with side-by-side metrics matrix, color-coded TTY output (green=best, red=worst), best/worst identification per metric, and JSON fallback
+- Built choose & cleanup lifecycle — merge winning attempt via `--no-ff`, archive alternatives as lightweight tags, clean up trajectory branches, and record final choice in journal
+- Wired agent context integration — dead-end detection queries journal before new work, `previous_attempts` injected into init execute-phase output, scope validation across all trajectory commands
+
+**What's next:** Ready for next milestone — `/gsd-new-milestone`
+
+**Archives:**
+- `.planning/milestones/v7.1-ROADMAP.md`
+- `.planning/milestones/v7.1-REQUIREMENTS.md`
+
+---
+
 ## ✅ v7.0 Agent Orchestration & Efficiency (Shipped: 2026-02-27)
 
 **Delivered:** Intelligent agent orchestration with AST intelligence, task routing, context efficiency, TDD execution engine, code review gates, and stuck/loop detection
