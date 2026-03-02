@@ -189,7 +189,12 @@ Plans:
   3. Agent count is 9 (down from 11) — integration-checker merged into verifier, synthesizer merged into roadmapper
   4. Agent manifests declare max token budgets and context builder refuses to exceed them (logged warning on truncation)
   5. All workflows and command wrappers reference correct agent names — no broken spawn chains
-**Plans**: TBD
+**Plans:** 3/3 plans
+
+Plans:
+- [ ] 53-01-PLAN.md — RACI matrix document and agent audit command
+- [ ] 53-02-PLAN.md — Merge integration-checker into verifier, synthesizer into roadmapper
+- [ ] 53-03-PLAN.md — Token budgets in manifests and workflow reference updates
 
 ### Phase 54: Command Consolidation
 **Goal**: CLI commands are organized under logical namespaces with zero orphan commands
@@ -228,8 +233,8 @@ Note: Phases 53 and 54 are independent of 51-52 and could execute in parallel if
 | 30-36 | v6.0 | 11/11 | Complete | 2026-02-27 |
 | 37-44 | v7.0 | 15/15 | Complete | 2026-02-27 |
 | 45-50 | v7.1 | 12/12 | Complete | 2026-03-02 |
-| 51. Cache Foundation | 2/3 | Complete    | 2026-03-02 |
-| 52. Cache Integration | 2/2 | Complete    | 2026-03-02 | - |
-| 53. Agent Consolidation | v8.0 | 0/TBD | Not started | - |
+| 51. Cache Foundation | v8.0 | 3/3 | Complete | 2026-03-02 |
+| 52. Cache Integration | v8.0 | 2/2 | Complete | 2026-03-02 |
+| 53. Agent Consolidation | v8.0 | 3/3 | Ready to execute | - |
 | 54. Command Consolidation | v8.0 | 0/TBD | Not started | - |
 | 55. Profiler & Performance | v8.0 | 0/TBD | Not started | - |
