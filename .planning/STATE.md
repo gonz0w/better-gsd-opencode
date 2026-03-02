@@ -5,21 +5,21 @@
 See: .planning/PROJECT.md (updated 2026-02-28)
 
 **Core value:** Manage and deliver high-quality software with high-quality documentation, while continuously reducing token usage and improving performance
-**Current focus:** v7.1 Trajectory Engineering — Phase 49 Choose — Merge Winner & Cleanup
+**Current focus:** v7.1 Trajectory Engineering — Phase 50 Integration — Agent Context & Dead-End Detection
 
 ## Current Position
 
-Phase: 49 of 50 (Choose — Merge Winner & Cleanup)
+Phase: 50 of 50 (Integration — Agent Context & Dead-End Detection)
 Plan: 2 of 2
-Status: Complete
-Last activity: 2026-03-01 - Completed 49-02-PLAN.md: trajectory choose test suite
+Status: In Progress
+Last activity: 2026-03-02 - Completed 50-01-PLAN.md: dead-end detection & scope validation
 
-Progress: [████████████████████░░░░░░░░░░] 100/100 plans complete (v1.0-v7.0) | v7.1: 10/10 plans (Phase 49 complete)
+Progress: [████████████████████░░░░░░░░░░] 100/100 plans complete (v1.0-v7.0) | v7.1: 11/12 plans (Phase 50 in progress)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 100 (85 across v1.0-v6.0 + 15 in v7.0)
+- Total plans completed: 101 (85 across v1.0-v6.0 + 15 in v7.0 + 1 in v7.1)
 - Average duration: ~15 min/plan
 - Total execution time: ~25 hours
 
@@ -49,6 +49,7 @@ Progress: [████████████████████░░░
 | 48 | 02 | 12 min | 2 | 1 |
 | Phase 49 P01 | 6 min | 2 tasks | 4 files |
 | Phase 49 P02 | 6 min | 2 tasks | 1 files |
+| Phase 50 P01 | 9 min | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -76,6 +77,8 @@ All v1.0-v7.0 decisions recorded in PROJECT.md Key Decisions table with outcomes
 - [Phase 49]: Archive non-chosen attempts as lightweight tags matching branch name, delete ALL branches after merge
 - [Phase 49]: Used createBranchWithFile helper for choose tests (real git branches needed for merge/delete operations)
 - [Phase 49]: Replaced TTY banner test with JSON schema validation for CI-reliable assertions
+- [Phase 50]: Scope validation restricts trajectory scopes to task/plan/phase via VALID_TRAJECTORY_SCOPES
+- [Phase 50]: queryDeadEnds filters by both 'pivot' category and 'abandoned' tag for comprehensive dead-end detection
 
 ### Pending Todos
 
@@ -95,7 +98,7 @@ None — milestone starting fresh.
 
 ## Session Continuity
 
-Last session: 2026-03-01
-Stopped at: Completed 49-02-PLAN.md — trajectory choose test suite (Phase 49 complete)
+Last session: 2026-03-02
+Stopped at: Completed 50-01-PLAN.md — dead-end detection & scope validation
 Resume file: None
-Next step: Phase 50 (Integration) or milestone wrap-up
+Next step: Phase 50 Plan 02 (init integration with previous_attempts)

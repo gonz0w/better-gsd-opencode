@@ -212,7 +212,7 @@ Plans:
   2. Init execute-phase and execute-plan commands include a "previous attempts" section (capped at ~500 tokens) drawn from the trajectory journal
   3. Failed attempt lessons are formatted as "what NOT to do" context — agents receive specific signals about why prior approaches failed
   4. All trajectory commands accept a `--scope` parameter supporting task, plan, and phase levels
-**Plans**: 2 plans
+**Plans**: 1/2 plans executed
 Plans:
 - [ ] 50-01-PLAN.md — Dead-end detection library, scope validation, trajectory dead-ends command
 - [ ] 50-02-PLAN.md — Init execute-phase integration and comprehensive test suite
@@ -234,4 +234,4 @@ Plans:
 | 47. Pivot | 2/2 | Complete    | 2026-03-01 | - |
 | 48. Compare | 2/2 | Complete    | 2026-03-01 | - |
 | 49. Choose | 2/2 | Complete    | 2026-03-01 | - |
-| 50. Integration | v7.1 | 0/TBD | Not started | - |
+| 50. Integration | 1/2 | In Progress|  | - |
