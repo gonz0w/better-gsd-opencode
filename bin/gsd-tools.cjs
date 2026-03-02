@@ -3855,7 +3855,7 @@ var require_roadmap = __commonJS({
     var fs = require("fs");
     var path = require("path");
     var { output: output2, error, debugLog } = require_output();
-    var { normalizePhaseName, cachedReadFile, findPhaseInternal, getPhaseTree } = require_helpers();
+    var { normalizePhaseName, cachedReadFile, findPhaseInternal, getPhaseTree, invalidateFileCache } = require_helpers();
     var { extractFrontmatter } = require_frontmatter();
     function cmdRoadmapGetPhase(cwd, phaseNum, raw) {
       const roadmapPath = path.join(cwd, ".planning", "ROADMAP.md");
@@ -4064,6 +4064,7 @@ var require_roadmap = __commonJS({
         roadmapContent = roadmapContent.replace(checkboxPattern, `$1x$2 (completed ${today})`);
       }
       fs.writeFileSync(roadmapPath, roadmapContent, "utf-8");
+      invalidateFileCache(roadmapPath);
       output2({
         updated: true,
         phase: phaseNum,
@@ -4087,7 +4088,7 @@ var require_phase = __commonJS({
     var fs = require("fs");
     var path = require("path");
     var { output: output2, error, debugLog } = require_output();
-    var { normalizePhaseName, getArchivedPhaseDirs, findPhaseInternal, generateSlugInternal, getMilestoneInfo } = require_helpers();
+    var { normalizePhaseName, getArchivedPhaseDirs, findPhaseInternal, generateSlugInternal, getMilestoneInfo, invalidateFileCache } = require_helpers();
     var { extractFrontmatter } = require_frontmatter();
     var { execGit } = require_git();
     function ensureChecklistEntry(content, phaseNum, name, afterPhasePattern) {
@@ -4261,6 +4262,7 @@ Plans:
       }
       updatedContent = ensureChecklistEntry(updatedContent, newPhaseNum, description);
       fs.writeFileSync(roadmapPath, updatedContent, "utf-8");
+      invalidateFileCache(roadmapPath);
       const result = {
         phase_number: newPhaseNum,
         padded: paddedNum,
@@ -4335,6 +4337,7 @@ Plans:
       const parentPat = new RegExp(`(- \\[[ x]\\] \\*\\*Phase\\s+0*${afterPhaseEscaped}:[^\\n]+\\n)`);
       updatedContent = ensureChecklistEntry(updatedContent, decimalPhase, `${description} (INSERTED)`, parentPat);
       fs.writeFileSync(roadmapPath, updatedContent, "utf-8");
+      invalidateFileCache(roadmapPath);
       const result = {
         phase_number: decimalPhase,
         after_phase: afterPhase,
@@ -4507,6 +4510,7 @@ Plans:
         }
       }
       fs.writeFileSync(roadmapPath, roadmapContent, "utf-8");
+      invalidateFileCache(roadmapPath);
       const statePath = path.join(cwd, ".planning", "STATE.md");
       if (fs.existsSync(statePath)) {
         let stateContent = fs.readFileSync(statePath, "utf-8");
@@ -4523,6 +4527,7 @@ Plans:
           stateContent = stateContent.replace(ofPattern, `$1${oldTotal - 1}$3`);
         }
         fs.writeFileSync(statePath, stateContent, "utf-8");
+        invalidateFileCache(statePath);
       }
       const result = {
         removed: targetPhase,
@@ -4573,6 +4578,7 @@ Plans:
       }
       if (updated.length > 0) {
         fs.writeFileSync(reqPath, reqContent, "utf-8");
+        invalidateFileCache(reqPath);
       }
       output2({
         updated: updated.length > 0,
@@ -4621,6 +4627,7 @@ Plans:
           `$1${summaryCount}/${planCount} plans complete`
         );
         fs.writeFileSync(roadmapPath, roadmapContent, "utf-8");
+        invalidateFileCache(roadmapPath);
         const reqPath = path.join(cwd, ".planning", "REQUIREMENTS.md");
         if (fs.existsSync(reqPath)) {
           const reqMatch = roadmapContent.match(
@@ -4640,6 +4647,7 @@ Plans:
               );
             }
             fs.writeFileSync(reqPath, reqContent, "utf-8");
+            invalidateFileCache(reqPath);
           }
         }
       }
@@ -4746,6 +4754,7 @@ Plans:
           `$1Phase ${phaseNum} complete${nextPhaseNum ? `, transitioned to Phase ${nextPhaseNum}` : ""}`
         );
         fs.writeFileSync(statePath, stateContent, "utf-8");
+        invalidateFileCache(statePath);
       }
       const result = {
         completed_phase: phaseNum,
@@ -4842,10 +4851,12 @@ ${accomplishmentsList || "- (none recorded)"}
       if (fs.existsSync(milestonesPath)) {
         const existing = fs.readFileSync(milestonesPath, "utf-8");
         fs.writeFileSync(milestonesPath, existing + "\n" + milestoneEntry, "utf-8");
+        invalidateFileCache(milestonesPath);
       } else {
         fs.writeFileSync(milestonesPath, `# Milestones
 
 ${milestoneEntry}`, "utf-8");
+        invalidateFileCache(milestonesPath);
       }
       if (fs.existsSync(statePath)) {
         let stateContent = fs.readFileSync(statePath, "utf-8");
@@ -4862,6 +4873,7 @@ ${milestoneEntry}`, "utf-8");
           `$1${version} milestone completed and archived`
         );
         fs.writeFileSync(statePath, stateContent, "utf-8");
+        invalidateFileCache(statePath);
       }
       let phasesArchived = false;
       try {
