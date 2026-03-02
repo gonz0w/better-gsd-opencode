@@ -25854,6 +25854,145 @@ var require_cache2 = __commonJS({
   }
 });
 
+// src/commands/agent.js
+var require_agent = __commonJS({
+  "src/commands/agent.js"(exports2, module2) {
+    "use strict";
+    var fs = require("fs");
+    var path = require("path");
+    var { output: output2, error, debugLog } = require_output();
+    var { loadConfig } = require_config();
+    var { safeReadFile } = require_helpers();
+    var { extractFrontmatter } = require_frontmatter();
+    function scanAgents(agentsDir) {
+      const agents = [];
+      if (!fs.existsSync(agentsDir)) {
+        return agents;
+      }
+      const files = fs.readdirSync(agentsDir).filter((f) => f.endsWith(".md") && f !== "RACI.md");
+      for (const file of files) {
+        const filePath = path.join(agentsDir, file);
+        const content = safeReadFile(filePath);
+        if (!content) continue;
+        const frontmatter = extractFrontmatter(content);
+        if (frontmatter && frontmatter.description) {
+          agents.push({
+            name: file.replace(".md", ""),
+            description: frontmatter.description,
+            color: frontmatter.color || null,
+            tools: frontmatter.tools || {}
+          });
+        }
+      }
+      return agents;
+    }
+    function parseRaciMatrix(raciPath) {
+      const content = safeReadFile(raciPath);
+      if (!content) return {};
+      const lines = content.split("\n");
+      const stepMapping = {};
+      let inRaciTable = false;
+      for (const line of lines) {
+        if (line.includes("| Step |") && line.includes("Responsible")) {
+          inRaciTable = true;
+          continue;
+        }
+        if (inRaciTable && (line.startsWith("## ") || line.startsWith("# "))) {
+          inRaciTable = false;
+        }
+        if (!inRaciTable) continue;
+        if (line.match(/^\|[\s\-]+\|/)) continue;
+        const match = line.match(/^\|\s*(\w+)\s*\|\s*([^|]+?)\s*\|/);
+        if (match) {
+          const step = match[1];
+          const responsible = match[2].trim();
+          if (step === "Step") continue;
+          if (responsible && responsible !== "Responsible (R)") {
+            stepMapping[step] = [responsible];
+          }
+        }
+      }
+      return stepMapping;
+    }
+    function cmdAgentAudit(cwd, raw) {
+      const GSD_HOME = process.env.GSD_HOME || (process.env.HOME ? path.join(process.env.HOME, ".config", "oc", "get-shit-done") : "/home/cam/.config/oc/get-shit-done");
+      const agentsDir = path.join(path.dirname(GSD_HOME), "agents");
+      const raciPath = path.join(agentsDir, "RACI.md");
+      if (!fs.existsSync(raciPath)) {
+        error("RACI.md not found at " + raciPath);
+        process.exit(1);
+      }
+      const agents = scanAgents(agentsDir);
+      if (agents.length === 0) {
+        error("No agent files found in " + agentsDir);
+        process.exit(1);
+      }
+      const stepMapping = parseRaciMatrix(raciPath);
+      const lifecycleSteps = ["Init", "Discuss", "Research", "Plan", "Execute", "Verify", "Complete"];
+      const agentNames = new Set(agents.map((a) => a.name));
+      const gaps = [];
+      const overlaps = [];
+      const validAgentNames = /* @__PURE__ */ new Set([
+        "gsd-executor",
+        "gsd-planner",
+        "gsd-verifier",
+        "gsd-roadmapper",
+        "gsd-phase-researcher",
+        "gsd-project-researcher",
+        "gsd-codebase-mapper",
+        "gsd-debugger",
+        "gsd-plan-checker",
+        "gsd-integration-checker",
+        "gsd-research-synthesizer"
+      ]);
+      for (const step of lifecycleSteps) {
+        const responsible = stepMapping[step] || [];
+        if (responsible.length === 0) {
+          gaps.push(step);
+        } else if (responsible.length > 1) {
+          overlaps.push({ step, agents: responsible });
+        }
+      }
+      const invalidRefs = [];
+      for (const step of Object.keys(stepMapping)) {
+        for (const agent of stepMapping[step]) {
+          if (!agentNames.has(agent) && agent !== "User") {
+            invalidRefs.push({ step, agent });
+          }
+        }
+      }
+      const result = {
+        agents_found: agents.length,
+        lifecycle_steps: lifecycleSteps,
+        step_mapping: stepMapping,
+        gaps,
+        overlaps,
+        invalid_references: invalidRefs,
+        status: gaps.length === 0 && overlaps.length === 0 && invalidRefs.length === 0 ? "pass" : "fail"
+      };
+      output2(result, raw, null, {
+        pass: "All lifecycle steps have exactly one responsible agent",
+        fail: `Found ${gaps.length} gap(s), ${overlaps.length} overlap(s), ${invalidRefs.length} invalid reference(s)`
+      });
+      if (result.status === "fail") {
+        process.exit(1);
+      }
+    }
+    function cmdAgentList(cwd, raw) {
+      const GSD_HOME = process.env.GSD_HOME || (process.env.HOME ? path.join(process.env.HOME, ".config", "oc", "get-shit-done") : "/home/cam/.config/oc/get-shit-done");
+      const agentsDir = path.join(path.dirname(GSD_HOME), "agents");
+      const agents = scanAgents(agentsDir);
+      output2({ agents }, raw);
+    }
+    module2.exports = {
+      cmdAgentAudit,
+      cmdAgentList,
+      scanAgents,
+      parseRaciMatrix
+    };
+  }
+});
+
 // src/lib/profiler.js
 var require_profiler = __commonJS({
   "src/lib/profiler.js"(exports2, module2) {
@@ -25980,6 +26119,9 @@ var require_router = __commonJS({
     }
     function lazyCache() {
       return _modules.cache || (_modules.cache = require_cache2());
+    }
+    function lazyAgent() {
+      return _modules.agent || (_modules.agent = require_agent());
     }
     async function main2() {
       const args = process.argv.slice(2);
@@ -26697,6 +26839,17 @@ Available: execute-phase, plan-phase, new-project, new-milestone, quick, resume,
             lazyWorktree().cmdWorktreeCheckOverlap(cwd, args[2], raw);
           } else {
             error("Unknown worktree subcommand. Available: create, list, remove, cleanup, merge, check-overlap");
+          }
+          break;
+        }
+        case "agent": {
+          const subcommand = args[1];
+          if (subcommand === "audit") {
+            lazyAgent().cmdAgentAudit(cwd, raw);
+          } else if (subcommand === "list") {
+            lazyAgent().cmdAgentList(cwd, raw);
+          } else {
+            error("Unknown agent subcommand. Available: audit, list");
           }
           break;
         }

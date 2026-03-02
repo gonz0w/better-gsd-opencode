@@ -26,6 +26,7 @@ function lazyTrajectory() { return _modules.trajectory || (_modules.trajectory =
 function lazyGit() { return _modules.git || (_modules.git = require('./lib/git')); }
 function lazyOrchestration() { return _modules.orchestration || (_modules.orchestration = require('./lib/orchestration')); }
 function lazyCache() { return _modules.cache || (_modules.cache = require('./commands/cache')); }
+function lazyAgent() { return _modules.agent || (_modules.agent = require('./commands/agent')); }
 
 
 async function main() {
@@ -828,6 +829,18 @@ async function main() {
         lazyWorktree().cmdWorktreeCheckOverlap(cwd, args[2], raw);
       } else {
         error('Unknown worktree subcommand. Available: create, list, remove, cleanup, merge, check-overlap');
+      }
+      break;
+    }
+
+    case 'agent': {
+      const subcommand = args[1];
+      if (subcommand === 'audit') {
+        lazyAgent().cmdAgentAudit(cwd, raw);
+      } else if (subcommand === 'list') {
+        lazyAgent().cmdAgentList(cwd, raw);
+      } else {
+        error('Unknown agent subcommand. Available: audit, list');
       }
       break;
     }
