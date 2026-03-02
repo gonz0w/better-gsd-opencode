@@ -1242,6 +1242,291 @@ Examples:
   gsd-tools git rewind --ref HEAD~3 --dry-run
   gsd-tools git rewind --ref abc123 --confirm
   gsd-tools git trajectory-branch --phase 45 --slug decision-journal`,
+
+  // ─── Namespaced Command Help ─────────────────────────────────────────────────
+
+  // init namespace
+  'init:execute-phase': `Usage: gsd-tools init execute-phase <phase> [--compact]
+
+Initialize context for execute-phase workflow.`,
+  'init:plan-phase': `Usage: gsd-tools init plan-phase <phase> [--compact]
+
+Initialize context for plan-phase workflow.`,
+  'init:new-project': `Usage: gsd-tools init new-project [--compact]
+
+Initialize context for new-project workflow.`,
+  'init:new-milestone': `Usage: gsd-tools init new-milestone [--compact]
+
+Initialize context for new-milestone workflow.`,
+  'init:quick': `Usage: gsd-tools init quick <description> [--compact]
+
+Initialize context for quick workflow.`,
+  'init:resume': `Usage: gsd-tools init resume [--compact]
+
+Initialize context for resume workflow.`,
+  'init:verify-work': `Usage: gsd-tools init verify-work <phase> [--compact]
+
+Initialize context for verify-work workflow.`,
+  'init:phase-op': `Usage: gsd-tools init phase-op <phase> [--compact]
+
+Initialize context for phase-op workflow.`,
+  'init:todos': `Usage: gsd-tools init todos [area] [--compact]
+
+Initialize context for todo workflows.`,
+  'init:milestone-op': `Usage: gsd-tools init milestone-op [--compact]
+
+Initialize context for milestone-op workflow.`,
+  'init:map-codebase': `Usage: gsd-tools init map-codebase [--compact]
+
+Initialize context for map-codebase workflow.`,
+  'init:progress': `Usage: gsd-tools init progress [--compact]
+
+Initialize context for progress workflow.`,
+  'init:memory': `Usage: gsd-tools init memory [--workflow <name>] [--phase <N>] [--compact]
+
+Initialize context for memory workflow.`,
+
+  // plan namespace
+  'plan:intent': `Usage: gsd-tools plan:intent <subcommand> [options]
+
+Manage project intent in INTENT.md.
+
+Subcommands:
+  create      Create a new INTENT.md
+  show        Display intent summary
+  read        Read intent as JSON
+  update      Update INTENT.md sections
+  validate    Validate INTENT.md structure
+  trace       Traceability matrix
+  drift       Drift analysis`,
+  'plan:intent show': `Usage: gsd-tools plan:intent show [section] [--full]
+
+Display intent summary from INTENT.md.`,
+  'plan:requirements': `Usage: gsd-tools plan:requirements mark-complete <ids>
+
+Mark requirement IDs as complete.`,
+  'plan:roadmap': `Usage: gsd-tools plan:roadmap <subcommand> [args]
+
+Roadmap operations.
+
+Subcommands:
+  get-phase <phase>   Extract phase section from ROADMAP.md
+  analyze             Full roadmap parse with disk status
+  update-plan-progress <N>  Update progress table row from disk`,
+  'plan:phases': `Usage: gsd-tools plan:phases list [options]
+
+List phase directories with metadata.`,
+  'plan:find-phase': `Usage: gsd-tools plan:find-phase <phase>
+
+Find a phase directory by number.`,
+  'plan:milestone': `Usage: gsd-tools plan:milestone complete <version> [options]
+
+Complete a milestone.`,
+  'plan:phase': `Usage: gsd-tools plan:phase <subcommand> [args]
+
+Phase lifecycle operations.
+
+Subcommands:
+  next-decimal <phase>   Calculate next decimal phase
+  add <description>       Append new phase
+  insert <after> <desc>  Insert decimal phase
+  remove <phase> [--force]  Remove phase
+  complete <phase>       Mark phase done`,
+
+  // execute namespace
+  'execute:commit': `Usage: gsd-tools execute:commit <message> [--files f1 f2 ...] [--amend] [--agent <type>]
+
+Commit planning documents to git.`,
+  'execute:rollback-info': `Usage: gsd-tools execute:rollback-info <plan-id>
+
+Show commits and revert command for a plan.`,
+  'execute:session-diff': `Usage: gsd-tools execute:session-diff
+
+Show git commits since last session activity.`,
+  'execute:session-summary': `Usage: gsd-tools execute:session-summary
+
+Session handoff summary.`,
+  'execute:velocity': `Usage: gsd-tools execute:velocity
+
+Calculate planning velocity and completion forecast.`,
+  'execute:worktree': `Usage: gsd-tools execute:worktree <subcommand> [options]
+
+Manage git worktrees for parallel execution.
+
+Subcommands:
+  create <plan-id>    Create isolated worktree
+  list                List active worktrees
+  remove <plan-id>    Remove a worktree
+  cleanup             Remove all worktrees
+  merge <plan-id>     Merge worktree back
+  check-overlap       Check for file overlaps`,
+  'execute:tdd': `Usage: gsd-tools execute:tdd <subcommand> [options]
+
+TDD validation gates.
+
+Subcommands:
+  validate-red --test-cmd "cmd"       Verify test fails
+  validate-green --test-cmd "cmd"     Verify test passes
+  validate-refactor --test-cmd "cmd" Same as validate-green
+  auto-test --test-cmd "cmd"         Run test, report result`,
+  'execute:test-run': `Usage: gsd-tools execute:test-run
+
+Run project tests and parse output.`,
+
+  // verify namespace
+  'verify:state': `Usage: gsd-tools verify:state <subcommand> [options]
+
+Manage project state in STATE.md.
+
+Subcommands:
+  load | get <field> | update <field> <value> | patch --key value ...
+  advance-plan | update-progress
+  record-metric --phase P --plan N --duration D [--tasks T] [--files F]
+  add-decision --phase P --summary S [--rationale R]
+  add-blocker --text "..." | resolve-blocker --text "..."
+  record-session --stopped-at "..." [--resume-file path]
+  validate [--fix]`,
+  'verify:verify': `Usage: gsd-tools verify:verify <subcommand> [args]
+
+Verification suite for planning documents.
+
+Subcommands:
+  plan-structure <file>        Check PLAN.md structure
+  phase-completeness <phase>   Check all plans have summaries
+  references <file>            Check @-refs and paths resolve
+  commits <h1> [h2] ...       Batch verify commit hashes
+  artifacts <plan-file>        Check must_haves.artifacts
+  key-links <plan-file>        Check must_haves.key_links
+  analyze-plan <plan-file>     Analyze plan complexity
+  deliverables [--plan file]   Run tests + verify deliverables
+  requirements                 Check REQUIREMENTS.md coverage
+  regression [--before f] [--after f]  Detect regressions
+  plan-wave <phase-dir>        Check file conflicts
+  plan-deps <phase-dir>        Check dependency cycles
+  quality [--plan f] [--phase N]  Composite quality score`,
+  'verify:assertions': `Usage: gsd-tools verify:assertions <subcommand> [options]
+
+Manage structured acceptance criteria.
+
+Subcommands:
+  list [--req SREQ-01]    List assertions by requirement
+  validate                Check assertion format and coverage`,
+  'verify:search-decisions': `Usage: gsd-tools verify:search-decisions <query>
+
+Search decisions in STATE.md and archives.`,
+  'verify:search-lessons': `Usage: gsd-tools verify:search-lessons <query>
+
+Search tasks/lessons.md for patterns.`,
+  'verify:review': `Usage: gsd-tools verify:review <phase> <plan>
+
+Review context for reviewer agent.`,
+  'verify:context-budget': `Usage: gsd-tools verify:context-budget <subcommand|path> [options]
+
+Measure token consumption across workflows.
+
+Subcommands:
+  <path>                    Estimate tokens for a file
+  baseline                  Measure all workflows, save baseline
+  compare [baseline-path]   Compare current vs baseline`,
+  'verify:token-budget': `Usage: gsd-tools verify:token-budget
+
+Show token counts for workflow files vs budgets.`,
+
+  // util namespace
+  'util:config-get': `Usage: gsd-tools util:config-get <key.path>
+
+Get configuration value from .planning/config.json.`,
+  'util:config-set': `Usage: gsd-tools util:config-set <key.path> <value>
+
+Set configuration value in .planning/config.json.`,
+  'util:env': `Usage: gsd-tools util:env <subcommand> [options]
+
+Detect project languages, tools, and runtimes.
+
+Subcommands:
+  scan [--force] [--verbose]  Detect and write manifest
+  status                      Check manifest freshness`,
+  'util:current-timestamp': `Usage: gsd-tools util:current-timestamp [format]
+
+Return current UTC timestamp.`,
+  'util:list-todos': `Usage: gsd-tools util:list-todos [area]
+
+Count and enumerate pending todos.`,
+  'util:todo': `Usage: gsd-tools util:todo complete <filename>
+
+Mark todo as complete.`,
+  'util:memory': `Usage: gsd-tools util:memory <subcommand> [options]
+
+Persistent memory store.
+
+Subcommands:
+  write --store <name> --entry '{json}'   Write entry
+  read --store <name> [options]           Read entries
+  list                                    List stores
+  ensure-dir                              Create directory
+  compact [--store <name>] [--threshold N]  Compact old entries`,
+  'util:mcp': `Usage: gsd-tools util:mcp <subcommand> [options]
+
+MCP server management.
+
+Subcommands:
+  profile [--window N] [--apply] [--restore]  Manage profiles`,
+  'util:classify': `Usage: gsd-tools util:classify <plan|phase> <path-or-number>
+
+Classify complexity and recommend execution strategy.`,
+  'util:frontmatter': `Usage: gsd-tools util:frontmatter <subcommand> <file> [options]
+
+CRUD operations on YAML frontmatter.
+
+Subcommands:
+  get <file> [--field key]        Extract frontmatter as JSON
+  set <file> --field k --value v  Update single field
+  merge <file> --data '{json}'    Merge JSON into frontmatter
+  validate <file> --schema type   Validate format`,
+  'util:progress': `Usage: gsd-tools util:progress [format]
+
+Render progress in various formats.`,
+  'util:websearch': `Usage: gsd-tools util:websearch <query> [--limit N] [--freshness day|week|month]
+
+Search web via Brave Search API.`,
+  'util:history-digest': `Usage: gsd-tools util:history-digest [--limit N] [--phases N1,N2] [--slim]
+
+Aggregate all SUMMARY.md data into digest.`,
+  'util:trace-requirement': `Usage: gsd-tools util:trace-requirement <req-id>
+
+Trace requirement from spec to files on disk.`,
+  'util:codebase': `Usage: gsd-tools util:codebase <subcommand> [options]
+
+Codebase intelligence.
+
+Subcommands:
+  analyze                  Full codebase analysis
+  status                   Current codebase status
+  conventions              Extract code conventions
+  rules                    Extract linting rules
+  deps                     Dependency analysis
+  impact                   Module blast radius
+  context                  Architectural context
+  lifecycle                Lifecycle analysis
+  ast                      Function signatures
+  exports                  Export surface
+  complexity               Cyclomatic complexity
+  repo-map                 Repository map`,
+  'util:cache': `Usage: gsd-tools util:cache <subcommand> [options]
+
+Cache management.
+
+Subcommands:
+  status                   Show cache backend and entry count
+  clear                    Clear cache
+  warm [files...]          Pre-populate cache`,
+  'util:agent': `Usage: gsd-tools util:agent <subcommand> [options]
+
+Agent management.
+
+Subcommands:
+  audit                    Audit agent coverage
+  list                     List all agents`,
 };
 
 module.exports = { MODEL_PROFILES, CONFIG_SCHEMA, COMMAND_HELP, VALID_TRAJECTORY_SCOPES };
