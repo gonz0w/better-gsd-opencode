@@ -43,7 +43,7 @@ Requirements for trajectory engineering milestone. Each maps to roadmap phases.
 ### Integration
 
 - [x] **INTEG-01**: Dead-end detection queries journal for similar past approaches before new work begins
-- [ ] **INTEG-02**: Init execute-phase and execute-plan commands include "previous attempts" section from trajectory journal
+- [x] **INTEG-02**: Init execute-phase and execute-plan commands include "previous attempts" section from trajectory journal
 - [x] **INTEG-03**: Failed attempt lessons are carried forward as "what NOT to do" context in subsequent attempts
 - [x] **INTEG-04**: Trajectory commands work at task, plan, and phase levels with scope parameter
 
@@ -97,7 +97,7 @@ Requirements for trajectory engineering milestone. Each maps to roadmap phases.
 | CHOOSE-02 | Phase 49 | Complete | npm test -- --grep choose |
 | CHOOSE-03 | Phase 49 | Complete | npm test -- --grep choose |
 | INTEG-01 | Phase 50 | Complete | npm test -- --grep dead-end |
-| INTEG-02 | Phase 50 | Pending | npm test -- --grep init |
+| INTEG-02 | Phase 50 | Complete | npm test -- --grep init |
 | INTEG-03 | Phase 50 | Complete | npm test -- --grep context |
 | INTEG-04 | Phase 50 | Complete | npm test -- --grep scope |
 

@@ -11,15 +11,15 @@ See: .planning/PROJECT.md (updated 2026-02-28)
 
 Phase: 50 of 50 (Integration — Agent Context & Dead-End Detection)
 Plan: 2 of 2
-Status: In Progress
-Last activity: 2026-03-02 - Completed 50-01-PLAN.md: dead-end detection & scope validation
+Status: Complete
+Last activity: 2026-03-02 - Completed 50-02-PLAN.md: init integration & test suite
 
-Progress: [████████████████████░░░░░░░░░░] 100/100 plans complete (v1.0-v7.0) | v7.1: 11/12 plans (Phase 50 in progress)
+Progress: [██████████████████████████████] 100/100 plans complete (v1.0-v7.0) | v7.1: 12/12 plans (all phases complete)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 101 (85 across v1.0-v6.0 + 15 in v7.0 + 1 in v7.1)
+- Total plans completed: 112 (85 across v1.0-v6.0 + 15 in v7.0 + 12 in v7.1)
 - Average duration: ~15 min/plan
 - Total execution time: ~25 hours
 
@@ -50,6 +50,7 @@ Progress: [████████████████████░░░
 | Phase 49 P01 | 6 min | 2 tasks | 4 files |
 | Phase 49 P02 | 6 min | 2 tasks | 1 files |
 | Phase 50 P01 | 9 min | 2 tasks | 5 files |
+| Phase 50 P02 | 7 min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -79,6 +80,8 @@ All v1.0-v7.0 decisions recorded in PROJECT.md Key Decisions table with outcomes
 - [Phase 49]: Replaced TTY banner test with JSON schema validation for CI-reliable assertions
 - [Phase 50]: Scope validation restricts trajectory scopes to task/plan/phase via VALID_TRAJECTORY_SCOPES
 - [Phase 50]: queryDeadEnds filters by both 'pivot' category and 'abandoned' tag for comprehensive dead-end detection
+- [Phase 50]: previous_attempts follows advisory pattern (never crash, null when absent) matching intent_drift/env_summary
+- [Phase 50]: Exported formatDeadEndContext from trajectory.js for cross-module init integration
 
 ### Pending Todos
 
@@ -99,6 +102,6 @@ None — milestone starting fresh.
 ## Session Continuity
 
 Last session: 2026-03-02
-Stopped at: Completed 50-01-PLAN.md — dead-end detection & scope validation
+Stopped at: Completed 50-02-PLAN.md — init integration & test suite (Phase 50 complete)
 Resume file: None
-Next step: Phase 50 Plan 02 (init integration with previous_attempts)
+Next step: v7.1 milestone complete — all 12 plans across 6 phases done

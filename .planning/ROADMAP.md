@@ -131,7 +131,7 @@ Full details: `.planning/milestones/v7.0-ROADMAP.md`
 - [x] **Phase 47: Pivot — Selective Rewind & Attempt Archival** - Abandon approach with recorded reasoning, rewind to checkpoint safely (completed 2026-03-01)
 - [x] **Phase 48: Compare — Multi-Attempt Metrics Aggregation** - Outcome metrics comparison across attempts with signal detection (completed 2026-03-01)
 - [x] **Phase 49: Choose — Merge Winner & Cleanup** - Select winning attempt, archive alternatives, clean up branches (completed 2026-03-01)
-- [ ] **Phase 50: Integration — Agent Context & Dead-End Detection** - Journal-driven context injection and stuck-to-pivot wiring
+- [x] **Phase 50: Integration — Agent Context & Dead-End Detection** - Journal-driven context injection and stuck-to-pivot wiring (completed 2026-03-02)
 
 ## Phase Details
 
@@ -212,7 +212,7 @@ Plans:
   2. Init execute-phase and execute-plan commands include a "previous attempts" section (capped at ~500 tokens) drawn from the trajectory journal
   3. Failed attempt lessons are formatted as "what NOT to do" context — agents receive specific signals about why prior approaches failed
   4. All trajectory commands accept a `--scope` parameter supporting task, plan, and phase levels
-**Plans**: 1/2 plans executed
+**Plans**: 2/2 plans complete
 Plans:
 - [ ] 50-01-PLAN.md — Dead-end detection library, scope validation, trajectory dead-ends command
 - [ ] 50-02-PLAN.md — Init execute-phase integration and comprehensive test suite
@@ -234,4 +234,4 @@ Plans:
 | 47. Pivot | 2/2 | Complete    | 2026-03-01 | - |
 | 48. Compare | 2/2 | Complete    | 2026-03-01 | - |
 | 49. Choose | 2/2 | Complete    | 2026-03-01 | - |
-| 50. Integration | 1/2 | In Progress|  | - |
+| 50. Integration | 2/2 | Complete   | 2026-03-02 | - |
