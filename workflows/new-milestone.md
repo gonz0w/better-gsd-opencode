@@ -379,6 +379,12 @@ Success criteria:
 **If "Adjust":** Get notes, re-spawn roadmapper with revision context, loop until approved.
 **If "Review":** Display raw ROADMAP.md, re-ask.
 
+**Validate roadmap parity** (before commit):
+```bash
+ROADMAP_CHECK=$(node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs validate roadmap --repair 2>/dev/null)
+```
+If errors found: auto-repair adds missing checklist entries. If repair fails: warn user.
+
 **Commit roadmap** (after approval):
 ```bash
 node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs commit "docs: create milestone v[X.Y] roadmap ([N] phases)" --files .planning/ROADMAP.md .planning/STATE.md .planning/REQUIREMENTS.md

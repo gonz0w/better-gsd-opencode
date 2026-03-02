@@ -455,10 +455,12 @@ Validation commands.
 Subcommands:
   consistency            Check phase numbering, disk/roadmap sync
   health [--repair]      Check .planning/ integrity, optionally repair
+  roadmap [--repair]     Check checklist/section parity, stray plan lists
 
 Examples:
   gsd-tools validate consistency
-  gsd-tools validate health --repair`,
+  gsd-tools validate health --repair
+  gsd-tools validate roadmap --repair`,
 
   'progress': `Usage: gsd-tools progress [format]
 

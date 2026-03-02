@@ -5,6 +5,17 @@ const { normalizePhaseName, getArchivedPhaseDirs, findPhaseInternal, generateSlu
 const { extractFrontmatter } = require('../lib/frontmatter');
 const { execGit } = require('../lib/git');
 
+// Insert checklist entry if missing. Returns updated content.
+function ensureChecklistEntry(content, phaseNum, name, afterPhasePattern) {
+  const esc = String(phaseNum).replace('.', '\\.');
+  if (new RegExp(`-\\s*\\[[ x]\\]\\s*\\*\\*Phase\\s+${esc}[:\\s]`, 'i').test(content)) return content;
+  const pat = afterPhasePattern || /(- \[[ x]\] \*\*Phase\s+\d+(?:\.\d+)?:[^\n]+\n)(?!- \[[ x]\] \*\*Phase)/;
+  const m = content.match(pat);
+  if (!m) return content;
+  const pos = m.index + m[0].length;
+  return content.slice(0, pos) + `- [ ] **Phase ${phaseNum}: ${name}**\n` + content.slice(pos);
+}
+
 // ─── Phase Commands ──────────────────────────────────────────────────────────
 
 function cmdPhasesList(cwd, options, raw) {
@@ -189,7 +200,7 @@ function cmdPhaseAdd(cwd, description, raw) {
   fs.mkdirSync(dirPath, { recursive: true });
   fs.writeFileSync(path.join(dirPath, '.gitkeep'), '');
 
-  // Build phase entry
+  // Build phase detail section
   const phaseEntry = `\n### Phase ${newPhaseNum}: ${description}\n\n**Goal:** [To be planned]\n**Depends on:** Phase ${maxPhase}\n**Plans:** 0 plans\n\nPlans:\n- [ ] TBD (run /gsd:plan-phase ${newPhaseNum} to break down)\n`;
 
   // Find insertion point: before last "---" or at end
@@ -201,6 +212,7 @@ function cmdPhaseAdd(cwd, description, raw) {
     updatedContent = content + phaseEntry;
   }
 
+  updatedContent = ensureChecklistEntry(updatedContent, newPhaseNum, description);
   fs.writeFileSync(roadmapPath, updatedContent, 'utf-8');
 
   const result = {
@@ -281,7 +293,9 @@ function cmdPhaseInsert(cwd, afterPhase, description, raw) {
     insertIdx = content.length;
   }
 
-  const updatedContent = content.slice(0, insertIdx) + phaseEntry + content.slice(insertIdx);
+  let updatedContent = content.slice(0, insertIdx) + phaseEntry + content.slice(insertIdx);
+  const parentPat = new RegExp(`(- \\[[ x]\\] \\*\\*Phase\\s+0*${afterPhaseEscaped}:[^\\n]+\\n)`);
+  updatedContent = ensureChecklistEntry(updatedContent, decimalPhase, `${description} (INSERTED)`, parentPat);
   fs.writeFileSync(roadmapPath, updatedContent, 'utf-8');
 
   const result = {
@@ -669,15 +683,17 @@ function cmdPhaseComplete(cwd, phaseNum, raw) {
     }
   }
 
-  // Find next phase
+  // Find next phase — check both disk directories AND ROADMAP.md phase sections
   let nextPhaseNum = null;
   let nextPhaseName = null;
   let isLastPhase = true;
 
+  const currentFloat = parseFloat(phaseNum);
+
+  // 1. Check disk directories for next phase
   try {
     const entries = fs.readdirSync(phasesDir, { withFileTypes: true });
     const dirs = entries.filter(e => e.isDirectory()).map(e => e.name).sort();
-    const currentFloat = parseFloat(phaseNum);
 
     for (const dir of dirs) {
       const dm = dir.match(/^(\d+(?:\.\d+)?)-?(.*)/);
@@ -691,7 +707,72 @@ function cmdPhaseComplete(cwd, phaseNum, raw) {
         }
       }
     }
-  } catch (e) { debugLog('phase.complete', 'find next phase failed', e); }
+  } catch (e) { debugLog('phase.complete', 'find next phase from disk failed', e); }
+
+  // 2. Also check ROADMAP.md for phases beyond current (sections + checklist)
+  let uncheckedRoadmapPhases = [];
+  if (fs.existsSync(roadmapPath)) {
+    try {
+      const roadmapContent = fs.readFileSync(roadmapPath, 'utf-8');
+
+      // Collect all ### Phase N: sections
+      const sectionPhases = [];
+      const hp = /#{2,4}\s*Phase\s+(\d+(?:\.\d+)?)\s*:\s*([^\n]+)/gi;
+      let hm;
+      while ((hm = hp.exec(roadmapContent)) !== null) {
+        sectionPhases.push({ number: hm[1], name: hm[2].trim() });
+      }
+
+      // If still last phase, check roadmap sections for phases beyond current
+      if (isLastPhase) {
+        for (const rp of sectionPhases) {
+          if (parseFloat(rp.number) > currentFloat) {
+            nextPhaseNum = rp.number;
+            nextPhaseName = rp.name.replace(/\s+/g, '-').toLowerCase();
+            isLastPhase = false;
+            break;
+          }
+        }
+      }
+
+      // Also check checklist entries for phases beyond current
+      if (isLastPhase) {
+        const clp = /-\s*\[[ x]\]\s*\*\*Phase\s+(\d+(?:\.\d+)?)\s*:\s*([^*]+)\*\*/gi;
+        let clm;
+        while ((clm = clp.exec(roadmapContent)) !== null) {
+          if (parseFloat(clm[1]) > currentFloat) {
+            nextPhaseNum = clm[1];
+            nextPhaseName = clm[2].trim().replace(/\s+/g, '-').toLowerCase();
+            isLastPhase = false;
+            break;
+          }
+        }
+      }
+
+      // Cross-validate: find unchecked phases in roadmap
+      const checkedPhases = new Set();
+      const ckp = /-\s*\[x\]\s*.*Phase\s+(\d+(?:\.\d+)?)/gi;
+      let ckm;
+      while ((ckm = ckp.exec(roadmapContent)) !== null) checkedPhases.add(ckm[1]);
+
+      uncheckedRoadmapPhases = sectionPhases
+        .map(p => p.number)
+        .filter(p => parseFloat(p) !== currentFloat && !checkedPhases.has(p));
+
+      // If unchecked phases exist beyond current, definitely not last
+      const uncheckedBeyond = uncheckedRoadmapPhases.filter(p => parseFloat(p) > currentFloat);
+      if (uncheckedBeyond.length > 0 && isLastPhase) {
+        isLastPhase = false;
+        if (!nextPhaseNum) {
+          uncheckedBeyond.sort((a, b) => parseFloat(a) - parseFloat(b));
+          nextPhaseNum = uncheckedBeyond[0];
+          const np = new RegExp(`#{2,4}\\s*Phase\\s+${uncheckedBeyond[0].replace('.', '\\.')}\\s*:\\s*([^\\n]+)`, 'i');
+          const nm = roadmapContent.match(np);
+          nextPhaseName = nm ? nm[1].trim().replace(/\s+/g, '-').toLowerCase() : null;
+        }
+      }
+    } catch (e) { debugLog('phase.complete', 'roadmap phase validation failed', e); }
+  }
 
   // Update STATE.md
   if (fs.existsSync(statePath)) {
@@ -743,6 +824,11 @@ function cmdPhaseComplete(cwd, phaseNum, raw) {
     roadmap_updated: fs.existsSync(roadmapPath),
     state_updated: fs.existsSync(statePath),
   };
+
+  // Include warning if there are unchecked phases remaining in the roadmap
+  if (uncheckedRoadmapPhases.length > 0) {
+    result.unchecked_roadmap_phases = uncheckedRoadmapPhases;
+  }
 
   output(result, raw);
 }

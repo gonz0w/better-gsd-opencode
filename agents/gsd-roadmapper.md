@@ -328,7 +328,7 @@ After roadmap creation, REQUIREMENTS.md gets updated with phase mappings:
 ...
 ```
 
-**The `### Phase X:` headers are parsed by downstream tools.** If you only write the summary checklist, phase lookups will fail.
+**CRITICAL: Every `### Phase X:` detail section MUST have a matching `- [ ] **Phase X: ...**` checklist entry, and vice versa.** Mismatches cause `phase complete` to misidentify the last phase and prematurely declare milestone complete. The `### Phase X:` headers are also parsed by downstream tools — if you only write the summary checklist, phase lookups will fail.
 
 ### 3. Progress Table
 

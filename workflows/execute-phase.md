@@ -365,10 +365,12 @@ Read status from VERIFICATION.md:
 
 <step name="update_roadmap">
 ```bash
+node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs validate roadmap --repair 2>/dev/null
 COMPLETION=$(node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs phase complete "${PHASE_NUMBER}")
 ```
 
 CLI handles: phase checkbox, Progress table, plan count, STATE.md advance, REQUIREMENTS.md traceability.
+Note: `validate roadmap --repair` ensures checklist/section parity before phase completion, preventing false `is_last_phase` detection.
 
 ```bash
 node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs commit "docs(phase-{X}): complete phase execution" --files .planning/ROADMAP.md .planning/STATE.md .planning/REQUIREMENTS.md {phase_dir}/*-VERIFICATION.md

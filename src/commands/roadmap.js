@@ -197,6 +197,9 @@ function cmdRoadmapAnalyze(cwd, raw) {
   const detailPhases = new Set(phases.map(p => p.number));
   const missingDetails = [...checklistPhases].filter(p => !detailPhases.has(p));
 
+  // Also detect the reverse: detail sections without checklist entries
+  const missingChecklist = [...detailPhases].filter(p => !checklistPhases.has(p));
+
   const result = {
     milestones,
     phases,
@@ -209,6 +212,7 @@ function cmdRoadmapAnalyze(cwd, raw) {
     current_phase: currentPhase ? currentPhase.number : null,
     next_phase: nextPhase ? nextPhase.number : null,
     missing_phase_details: missingDetails.length > 0 ? missingDetails : null,
+    missing_checklist_entries: missingChecklist.length > 0 ? missingChecklist : null,
   };
 
   output(result, raw);

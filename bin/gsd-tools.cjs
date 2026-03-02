@@ -440,10 +440,12 @@ Validation commands.
 Subcommands:
   consistency            Check phase numbering, disk/roadmap sync
   health [--repair]      Check .planning/ integrity, optionally repair
+  roadmap [--repair]     Check checklist/section parity, stray plan lists
 
 Examples:
   gsd-tools validate consistency
-  gsd-tools validate health --repair`,
+  gsd-tools validate health --repair
+  gsd-tools validate roadmap --repair`,
       "progress": `Usage: gsd-tools progress [format]
 
 Render progress in various formats.
@@ -3607,6 +3609,7 @@ var require_roadmap = __commonJS({
       }
       const detailPhases = new Set(phases.map((p) => p.number));
       const missingDetails = [...checklistPhases].filter((p) => !detailPhases.has(p));
+      const missingChecklist = [...detailPhases].filter((p) => !checklistPhases.has(p));
       const result = {
         milestones,
         phases,
@@ -3618,7 +3621,8 @@ var require_roadmap = __commonJS({
         plan_progress_percent: totalPlans > 0 ? Math.round(totalSummaries / totalPlans * 100) : 0,
         current_phase: currentPhase ? currentPhase.number : null,
         next_phase: nextPhase ? nextPhase.number : null,
-        missing_phase_details: missingDetails.length > 0 ? missingDetails : null
+        missing_phase_details: missingDetails.length > 0 ? missingDetails : null,
+        missing_checklist_entries: missingChecklist.length > 0 ? missingChecklist : null
       };
       output(result, raw);
     }
@@ -3695,6 +3699,16 @@ var require_phase = __commonJS({
     var { normalizePhaseName, getArchivedPhaseDirs, findPhaseInternal, generateSlugInternal, getMilestoneInfo } = require_helpers();
     var { extractFrontmatter } = require_frontmatter();
     var { execGit } = require_git();
+    function ensureChecklistEntry(content, phaseNum, name, afterPhasePattern) {
+      const esc = String(phaseNum).replace(".", "\\.");
+      if (new RegExp(`-\\s*\\[[ x]\\]\\s*\\*\\*Phase\\s+${esc}[:\\s]`, "i").test(content)) return content;
+      const pat = afterPhasePattern || /(- \[[ x]\] \*\*Phase\s+\d+(?:\.\d+)?:[^\n]+\n)(?!- \[[ x]\] \*\*Phase)/;
+      const m = content.match(pat);
+      if (!m) return content;
+      const pos = m.index + m[0].length;
+      return content.slice(0, pos) + `- [ ] **Phase ${phaseNum}: ${name}**
+` + content.slice(pos);
+    }
     function cmdPhasesList(cwd, options, raw) {
       const phasesDir = path.join(cwd, ".planning", "phases");
       const { type, phase, includeArchived } = options;
@@ -3854,6 +3868,7 @@ Plans:
       } else {
         updatedContent = content + phaseEntry;
       }
+      updatedContent = ensureChecklistEntry(updatedContent, newPhaseNum, description);
       fs.writeFileSync(roadmapPath, updatedContent, "utf-8");
       const result = {
         phase_number: newPhaseNum,
@@ -3925,7 +3940,9 @@ Plans:
       } else {
         insertIdx = content.length;
       }
-      const updatedContent = content.slice(0, insertIdx) + phaseEntry + content.slice(insertIdx);
+      let updatedContent = content.slice(0, insertIdx) + phaseEntry + content.slice(insertIdx);
+      const parentPat = new RegExp(`(- \\[[ x]\\] \\*\\*Phase\\s+0*${afterPhaseEscaped}:[^\\n]+\\n)`);
+      updatedContent = ensureChecklistEntry(updatedContent, decimalPhase, `${description} (INSERTED)`, parentPat);
       fs.writeFileSync(roadmapPath, updatedContent, "utf-8");
       const result = {
         phase_number: decimalPhase,
@@ -4238,10 +4255,10 @@ Plans:
       let nextPhaseNum = null;
       let nextPhaseName = null;
       let isLastPhase = true;
+      const currentFloat = parseFloat(phaseNum);
       try {
         const entries = fs.readdirSync(phasesDir, { withFileTypes: true });
         const dirs = entries.filter((e) => e.isDirectory()).map((e) => e.name).sort();
-        const currentFloat = parseFloat(phaseNum);
         for (const dir of dirs) {
           const dm = dir.match(/^(\d+(?:\.\d+)?)-?(.*)/);
           if (dm) {
@@ -4255,7 +4272,59 @@ Plans:
           }
         }
       } catch (e) {
-        debugLog("phase.complete", "find next phase failed", e);
+        debugLog("phase.complete", "find next phase from disk failed", e);
+      }
+      let uncheckedRoadmapPhases = [];
+      if (fs.existsSync(roadmapPath)) {
+        try {
+          const roadmapContent = fs.readFileSync(roadmapPath, "utf-8");
+          const sectionPhases = [];
+          const hp = /#{2,4}\s*Phase\s+(\d+(?:\.\d+)?)\s*:\s*([^\n]+)/gi;
+          let hm;
+          while ((hm = hp.exec(roadmapContent)) !== null) {
+            sectionPhases.push({ number: hm[1], name: hm[2].trim() });
+          }
+          if (isLastPhase) {
+            for (const rp of sectionPhases) {
+              if (parseFloat(rp.number) > currentFloat) {
+                nextPhaseNum = rp.number;
+                nextPhaseName = rp.name.replace(/\s+/g, "-").toLowerCase();
+                isLastPhase = false;
+                break;
+              }
+            }
+          }
+          if (isLastPhase) {
+            const clp = /-\s*\[[ x]\]\s*\*\*Phase\s+(\d+(?:\.\d+)?)\s*:\s*([^*]+)\*\*/gi;
+            let clm;
+            while ((clm = clp.exec(roadmapContent)) !== null) {
+              if (parseFloat(clm[1]) > currentFloat) {
+                nextPhaseNum = clm[1];
+                nextPhaseName = clm[2].trim().replace(/\s+/g, "-").toLowerCase();
+                isLastPhase = false;
+                break;
+              }
+            }
+          }
+          const checkedPhases = /* @__PURE__ */ new Set();
+          const ckp = /-\s*\[x\]\s*.*Phase\s+(\d+(?:\.\d+)?)/gi;
+          let ckm;
+          while ((ckm = ckp.exec(roadmapContent)) !== null) checkedPhases.add(ckm[1]);
+          uncheckedRoadmapPhases = sectionPhases.map((p) => p.number).filter((p) => parseFloat(p) !== currentFloat && !checkedPhases.has(p));
+          const uncheckedBeyond = uncheckedRoadmapPhases.filter((p) => parseFloat(p) > currentFloat);
+          if (uncheckedBeyond.length > 0 && isLastPhase) {
+            isLastPhase = false;
+            if (!nextPhaseNum) {
+              uncheckedBeyond.sort((a, b) => parseFloat(a) - parseFloat(b));
+              nextPhaseNum = uncheckedBeyond[0];
+              const np = new RegExp(`#{2,4}\\s*Phase\\s+${uncheckedBeyond[0].replace(".", "\\.")}\\s*:\\s*([^\\n]+)`, "i");
+              const nm = roadmapContent.match(np);
+              nextPhaseName = nm ? nm[1].trim().replace(/\s+/g, "-").toLowerCase() : null;
+            }
+          }
+        } catch (e) {
+          debugLog("phase.complete", "roadmap phase validation failed", e);
+        }
       }
       if (fs.existsSync(statePath)) {
         let stateContent = fs.readFileSync(statePath, "utf-8");
@@ -4298,6 +4367,9 @@ Plans:
         roadmap_updated: fs.existsSync(roadmapPath),
         state_updated: fs.existsSync(statePath)
       };
+      if (uncheckedRoadmapPhases.length > 0) {
+        result.unchecked_roadmap_phases = uncheckedRoadmapPhases;
+      }
       output(result, raw);
     }
     function cmdMilestoneComplete(cwd, version, options, raw) {
@@ -4961,6 +5033,19 @@ var require_verify = __commonJS({
           if (!roadmapPhases.has(p) && !roadmapPhases.has(unpadded)) {
             addIssue("warning", "W007", `Phase ${p} exists on disk but not in ROADMAP.md`, "Add to roadmap or remove directory");
           }
+        }
+        const clPhases = /* @__PURE__ */ new Set();
+        const clPat = /-\s*\[[ x]\]\s*\*\*Phase\s+(\d+(?:\.\d+)?)/gi;
+        let clm;
+        while ((clm = clPat.exec(roadmapContent)) !== null) clPhases.add(clm[1]);
+        for (const p of roadmapPhases) {
+          if (!clPhases.has(p)) {
+            addIssue("error", "E005", `Phase ${p}: ### section but no checklist`, "Run validate roadmap --repair");
+            repairs.push("fixChecklistParity");
+          }
+        }
+        for (const p of clPhases) {
+          if (!roadmapPhases.has(p)) addIssue("warning", "W008", `Phase ${p}: checklist but no ### section`, "Add ### Phase section or remove checklist entry");
         }
       }
       const repairActions = [];
@@ -6186,6 +6271,79 @@ var require_verify = __commonJS({
       }
       return result;
     }
+    function cmdValidateRoadmap(cwd, options, raw) {
+      const roadmapPath = path.join(cwd, ".planning", "ROADMAP.md");
+      const rc = cachedReadFile(roadmapPath);
+      if (!rc) {
+        output({ passed: false, errors: ["ROADMAP.md not found"], warnings: [] }, raw, "failed");
+        return;
+      }
+      const errs = [], warns = [], repairs = [];
+      const sections = /* @__PURE__ */ new Map(), checklist = /* @__PURE__ */ new Map();
+      let m;
+      const sp = /#{2,4}\s*Phase\s+(\d+(?:\.\d+)?)\s*:\s*([^\n]+)/gi;
+      while ((m = sp.exec(rc)) !== null) sections.set(m[1], { name: m[2].trim(), idx: m.index });
+      const cp = /-\s*\[([ x])\]\s*\*\*Phase\s+(\d+(?:\.\d+)?)\s*:\s*([^*]+)\*\*/gi;
+      while ((m = cp.exec(rc)) !== null) checklist.set(m[2], { name: m[3].trim(), checked: m[1] === "x", idx: m.index });
+      for (const [n, info] of sections) {
+        if (!checklist.has(n)) errs.push({ code: "ROADMAP-001", message: `Phase ${n} has ### section but no checklist entry`, fix: `Add "- [ ] **Phase ${n}: ${info.name}**" to checklist` });
+      }
+      for (const [n, info] of checklist) {
+        if (!sections.has(n)) errs.push({ code: "ROADMAP-002", message: `Phase ${n} has checklist entry but no ### section`, fix: `Add "### Phase ${n}: ${info.name}" section` });
+      }
+      const pp = /\nPlans:\n(\s*- \[[ x]\] \d+-\d+-PLAN\.md[^\n]*\n?)+/gi;
+      while ((m = pp.exec(rc)) !== null) {
+        const pos = m.index;
+        let inside = false;
+        for (const [, info] of sections) {
+          if (info.idx < pos) {
+            const between = rc.slice(info.idx, pos);
+            if (!between.match(/\n#{2,4}\s*Phase\s+\d/i)) {
+              inside = true;
+              break;
+            }
+          }
+        }
+        if (!inside) {
+          const ctx = rc.slice(Math.max(0, pos - 200), pos);
+          const near = /-\s*\[[ x]\]\s*\*\*Phase\s+(\d+(?:\.\d+)?)/i.exec(ctx);
+          warns.push({ code: "ROADMAP-003", message: `Stray plan list outside ### Phase section${near ? ` (near Phase ${near[1]})` : ""}`, line: rc.slice(0, pos).split("\n").length, fix: "Move inside appropriate ### Phase section" });
+        }
+      }
+      const phaseTree = getPhaseTree(cwd);
+      for (const [n, cl] of checklist) {
+        if (cl.checked && sections.has(n)) {
+          const cached = phaseTree.get(normalizePhaseName(n));
+          if (cached && cached.plans.length > 0 && cached.summaries.length < cached.plans.length) {
+            warns.push({ code: "ROADMAP-004", message: `Phase ${n} checked but ${cached.summaries.length}/${cached.plans.length} summaries on disk`, fix: `Uncheck Phase ${n} or complete plans` });
+          }
+        }
+      }
+      if (options && options.repair) {
+        let content = fs.readFileSync(roadmapPath, "utf-8");
+        let fixed = false;
+        for (const [n, info] of sections) {
+          if (!checklist.has(n)) {
+            const lm = content.match(/(- \[[ x]\] \*\*Phase\s+\d+(?:\.\d+)?:[^\n]+\n)(?!- \[[ x]\] \*\*Phase)/);
+            if (lm) {
+              const pos = lm.index + lm[0].length;
+              content = content.slice(0, pos) + `- [ ] **Phase ${n}: ${info.name}**
+` + content.slice(pos);
+              repairs.push(`Added checklist for Phase ${n}`);
+              fixed = true;
+            }
+          }
+        }
+        if (fixed) fs.writeFileSync(roadmapPath, content, "utf-8");
+      }
+      const passed = errs.length === 0 && warns.length === 0;
+      const result = { passed, section_count: sections.size, checklist_count: checklist.size, errors: errs, warnings: warns, error_count: errs.length, warning_count: warns.length };
+      if (repairs.length > 0) {
+        result.repairs = repairs;
+        result.repair_count = repairs.length;
+      }
+      output(result, raw, passed ? "passed" : errs.length > 0 ? "failed" : "warnings");
+    }
     module2.exports = {
       cmdVerifyPlanStructure,
       cmdVerifyPhaseCompleteness,
@@ -6195,6 +6353,7 @@ var require_verify = __commonJS({
       cmdVerifyKeyLinks,
       cmdValidateConsistency,
       cmdValidateHealth,
+      cmdValidateRoadmap,
       cmdAnalyzePlan,
       cmdVerifyDeliverables,
       cmdVerifyRequirements,
@@ -25509,8 +25668,11 @@ var require_router = __commonJS({
           } else if (subcommand === "health") {
             const repairFlag = args.includes("--repair");
             lazyVerify().cmdValidateHealth(cwd, { repair: repairFlag }, raw);
+          } else if (subcommand === "roadmap") {
+            const repairFlag = args.includes("--repair");
+            lazyVerify().cmdValidateRoadmap(cwd, { repair: repairFlag }, raw);
           } else {
-            error("Unknown validate subcommand. Available: consistency, health");
+            error("Unknown validate subcommand. Available: consistency, health, roadmap");
           }
           break;
         }

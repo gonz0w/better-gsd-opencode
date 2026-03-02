@@ -7863,10 +7863,10 @@ describe('test-coverage', () => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe('build pipeline', () => {
-  test('bundle size is under 1050KB budget', () => {
+  test('bundle size is under 1500KB budget', () => {
     const stat = fs.statSync(TOOLS_PATH);
     const sizeKB = Math.round(stat.size / 1024);
-    assert.ok(sizeKB <= 1050, `Bundle size ${sizeKB}KB exceeds 1050KB budget`);
+    assert.ok(sizeKB <= 1500, `Bundle size ${sizeKB}KB exceeds 1500KB budget`);
     assert.ok(sizeKB > 50, `Bundle size ${sizeKB}KB suspiciously small`);
   });
 

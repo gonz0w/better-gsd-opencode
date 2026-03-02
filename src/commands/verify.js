@@ -588,6 +588,18 @@ function cmdValidateHealth(cwd, options, raw) {
         addIssue('warning', 'W007', `Phase ${p} exists on disk but not in ROADMAP.md`, 'Add to roadmap or remove directory');
       }
     }
+
+    // Check 9: Checklist/section parity
+    const clPhases = new Set();
+    const clPat = /-\s*\[[ x]\]\s*\*\*Phase\s+(\d+(?:\.\d+)?)/gi;
+    let clm;
+    while ((clm = clPat.exec(roadmapContent)) !== null) clPhases.add(clm[1]);
+    for (const p of roadmapPhases) {
+      if (!clPhases.has(p)) { addIssue('error', 'E005', `Phase ${p}: ### section but no checklist`, 'Run validate roadmap --repair'); repairs.push('fixChecklistParity'); }
+    }
+    for (const p of clPhases) {
+      if (!roadmapPhases.has(p)) addIssue('warning', 'W008', `Phase ${p}: checklist but no ### section`, 'Add ### Phase section or remove checklist entry');
+    }
   }
 
   // Perform repairs if requested
@@ -2067,6 +2079,83 @@ function parseAssertionsMd(content) {
   return result;
 }
 
+function cmdValidateRoadmap(cwd, options, raw) {
+  const roadmapPath = path.join(cwd, '.planning', 'ROADMAP.md');
+  const rc = cachedReadFile(roadmapPath);
+  if (!rc) { output({ passed: false, errors: ['ROADMAP.md not found'], warnings: [] }, raw, 'failed'); return; }
+
+  const errs = [], warns = [], repairs = [];
+
+  // Collect ### Phase N: sections and checklist entries
+  const sections = new Map(), checklist = new Map();
+  let m;
+  const sp = /#{2,4}\s*Phase\s+(\d+(?:\.\d+)?)\s*:\s*([^\n]+)/gi;
+  while ((m = sp.exec(rc)) !== null) sections.set(m[1], { name: m[2].trim(), idx: m.index });
+  const cp = /-\s*\[([ x])\]\s*\*\*Phase\s+(\d+(?:\.\d+)?)\s*:\s*([^*]+)\*\*/gi;
+  while ((m = cp.exec(rc)) !== null) checklist.set(m[2], { name: m[3].trim(), checked: m[1] === 'x', idx: m.index });
+
+  // Sections without checklist entries
+  for (const [n, info] of sections) {
+    if (!checklist.has(n)) errs.push({ code: 'ROADMAP-001', message: `Phase ${n} has ### section but no checklist entry`, fix: `Add "- [ ] **Phase ${n}: ${info.name}**" to checklist` });
+  }
+  // Checklist without sections
+  for (const [n, info] of checklist) {
+    if (!sections.has(n)) errs.push({ code: 'ROADMAP-002', message: `Phase ${n} has checklist entry but no ### section`, fix: `Add "### Phase ${n}: ${info.name}" section` });
+  }
+
+  // Stray plan lists outside ### Phase sections
+  const pp = /\nPlans:\n(\s*- \[[ x]\] \d+-\d+-PLAN\.md[^\n]*\n?)+/gi;
+  while ((m = pp.exec(rc)) !== null) {
+    const pos = m.index;
+    let inside = false;
+    for (const [, info] of sections) {
+      if (info.idx < pos) {
+        const between = rc.slice(info.idx, pos);
+        if (!between.match(/\n#{2,4}\s*Phase\s+\d/i)) { inside = true; break; }
+      }
+    }
+    if (!inside) {
+      const ctx = rc.slice(Math.max(0, pos - 200), pos);
+      const near = /-\s*\[[ x]\]\s*\*\*Phase\s+(\d+(?:\.\d+)?)/i.exec(ctx);
+      warns.push({ code: 'ROADMAP-003', message: `Stray plan list outside ### Phase section${near ? ` (near Phase ${near[1]})` : ''}`, line: rc.slice(0, pos).split('\n').length, fix: 'Move inside appropriate ### Phase section' });
+    }
+  }
+
+  // Checked phases with incomplete work on disk
+  const phaseTree = getPhaseTree(cwd);
+  for (const [n, cl] of checklist) {
+    if (cl.checked && sections.has(n)) {
+      const cached = phaseTree.get(normalizePhaseName(n));
+      if (cached && cached.plans.length > 0 && cached.summaries.length < cached.plans.length) {
+        warns.push({ code: 'ROADMAP-004', message: `Phase ${n} checked but ${cached.summaries.length}/${cached.plans.length} summaries on disk`, fix: `Uncheck Phase ${n} or complete plans` });
+      }
+    }
+  }
+
+  // Repair: add missing checklist entries
+  if (options && options.repair) {
+    let content = fs.readFileSync(roadmapPath, 'utf-8');
+    let fixed = false;
+    for (const [n, info] of sections) {
+      if (!checklist.has(n)) {
+        const lm = content.match(/(- \[[ x]\] \*\*Phase\s+\d+(?:\.\d+)?:[^\n]+\n)(?!- \[[ x]\] \*\*Phase)/);
+        if (lm) {
+          const pos = lm.index + lm[0].length;
+          content = content.slice(0, pos) + `- [ ] **Phase ${n}: ${info.name}**\n` + content.slice(pos);
+          repairs.push(`Added checklist for Phase ${n}`);
+          fixed = true;
+        }
+      }
+    }
+    if (fixed) fs.writeFileSync(roadmapPath, content, 'utf-8');
+  }
+
+  const passed = errs.length === 0 && warns.length === 0;
+  const result = { passed, section_count: sections.size, checklist_count: checklist.size, errors: errs, warnings: warns, error_count: errs.length, warning_count: warns.length };
+  if (repairs.length > 0) { result.repairs = repairs; result.repair_count = repairs.length; }
+  output(result, raw, passed ? 'passed' : (errs.length > 0 ? 'failed' : 'warnings'));
+}
+
 module.exports = {
   cmdVerifyPlanStructure,
   cmdVerifyPhaseCompleteness,
@@ -2076,6 +2165,7 @@ module.exports = {
   cmdVerifyKeyLinks,
   cmdValidateConsistency,
   cmdValidateHealth,
+  cmdValidateRoadmap,
   cmdAnalyzePlan,
   cmdVerifyDeliverables,
   cmdVerifyRequirements,

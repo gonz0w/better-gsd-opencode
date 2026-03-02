@@ -113,6 +113,12 @@ Phases execute in numeric order: 2 → 2.1 → 2.2 → 3 → 3.1 → 4
 - Progress table updated by execute workflow
 - Plan count can be "TBD" initially, refined during planning
 
+**CRITICAL — Checklist/section parity:**
+- Every `### Phase N:` detail section MUST have a matching `- [ ] **Phase N: ...**` checklist entry
+- Every checklist entry MUST have a matching `### Phase N:` detail section
+- Mismatches cause `phase complete` to misidentify the last phase and prematurely declare milestone complete
+- Run `validate roadmap` to detect and `validate roadmap --repair` to fix parity issues
+
 **Success criteria:**
 - 2-5 observable behaviors per phase (from user's perspective)
 - Cross-checked against requirements during roadmap creation

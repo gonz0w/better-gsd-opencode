@@ -454,8 +454,11 @@ async function main() {
       } else if (subcommand === 'health') {
         const repairFlag = args.includes('--repair');
         lazyVerify().cmdValidateHealth(cwd, { repair: repairFlag }, raw);
+      } else if (subcommand === 'roadmap') {
+        const repairFlag = args.includes('--repair');
+        lazyVerify().cmdValidateRoadmap(cwd, { repair: repairFlag }, raw);
       } else {
-        error('Unknown validate subcommand. Available: consistency, health');
+        error('Unknown validate subcommand. Available: consistency, health, roadmap');
       }
       break;
     }
