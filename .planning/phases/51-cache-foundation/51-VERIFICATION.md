@@ -1,11 +1,12 @@
 ---
 phase: 51-cache-foundation
 verified: 2026-03-02T14:30:00Z
-status: gaps_found
+status: gap_closure_in_progress
 score: 3/4 must-haves verified
 gaps:
   - truth: "File writes via gsd-tools invalidate cache entry"
-    status: partial
+    status: gap_closure_planned
+    plan: 51-03-PLAN.md
     reason: "state.js calls invalidateFileCache but phase.js and roadmap.js do not"
     artifacts:
       - path: "src/commands/phase.js"
