@@ -1677,6 +1677,75 @@ var require_regex_cache = __commonJS({
   }
 });
 
+// src/lib/profiler.js
+var require_profiler = __commonJS({
+  "src/lib/profiler.js"(exports2, module2) {
+    "use strict";
+    var fs = require("fs");
+    var path = require("path");
+    var enabled = process.env.GSD_PROFILE === "1";
+    var timings = [];
+    function isProfilingEnabled() {
+      return enabled;
+    }
+    function mark(label) {
+      if (!enabled) return;
+      const { performance } = require("node:perf_hooks");
+      performance.mark(label);
+    }
+    function measure(label, startMark, endMark) {
+      if (!enabled) return;
+      const { performance } = require("node:perf_hooks");
+      try {
+        const m = performance.measure(label, startMark, endMark);
+        timings.push({ label, duration_ms: Math.round(m.duration * 100) / 100 });
+      } catch (e) {
+      }
+    }
+    function startTimer(label) {
+      if (!enabled) return null;
+      const { performance } = require("node:perf_hooks");
+      return { label, start: performance.now() };
+    }
+    function endTimer(timer) {
+      if (!enabled || !timer) return null;
+      const { performance } = require("node:perf_hooks");
+      const duration_ms = Math.round((performance.now() - timer.start) * 100) / 100;
+      const entry = { label: timer.label, duration_ms };
+      timings.push(entry);
+      return entry;
+    }
+    function getTimings() {
+      return [...timings];
+    }
+    function writeBaseline(cwd, commandName) {
+      if (!enabled) return;
+      const totalMs = timings.reduce((sum, t) => sum + t.duration_ms, 0);
+      const timestamp = (/* @__PURE__ */ new Date()).toISOString();
+      const safeTimestamp = timestamp.replace(/[:.]/g, "-");
+      const baseline = {
+        command: commandName,
+        timestamp,
+        node_version: process.version,
+        timings: [...timings],
+        total_ms: Math.round(totalMs * 100) / 100
+      };
+      const baselinesDir = path.join(cwd, ".planning", "baselines");
+      try {
+        fs.mkdirSync(baselinesDir, { recursive: true });
+        const filename = `${commandName}-${safeTimestamp}.json`;
+        fs.writeFileSync(path.join(baselinesDir, filename), JSON.stringify(baseline, null, 2) + "\n", "utf-8");
+      } catch (e) {
+        if (process.env.GSD_DEBUG) {
+          process.stderr.write(`[GSD_DEBUG] profiler.writeBaseline: ${e.message}
+`);
+        }
+      }
+    }
+    module2.exports = { isProfilingEnabled, mark, measure, startTimer, endTimer, getTimings, writeBaseline };
+  }
+});
+
 // src/lib/cache.js
 var require_cache = __commonJS({
   "src/lib/cache.js"(exports2, module2) {
@@ -2178,6 +2247,7 @@ var require_helpers = __commonJS({
     var { loadConfig } = require_config();
     var { MODEL_PROFILES } = require_constants();
     var { cachedRegex, PHASE_DIR_NUMBER } = require_regex_cache();
+    var { startTimer, endTimer, isProfilingEnabled } = require_profiler();
     var _cacheEngine = null;
     function getCacheEngine() {
       if (!_cacheEngine) {
@@ -2203,17 +2273,23 @@ var require_helpers = __commonJS({
     }
     var dirCache = /* @__PURE__ */ new Map();
     function safeReadFile(filePath) {
+      const timer = startTimer("file:read-uncached:" + filePath.split("/").pop());
       try {
-        return fs.readFileSync(filePath, "utf-8");
+        const result = fs.readFileSync(filePath, "utf-8");
+        endTimer(timer);
+        return result;
       } catch (e) {
+        endTimer(timer);
         debugLog("file.read", "read failed", e);
         return null;
       }
     }
     function cachedReadFile(filePath) {
+      const timer = startTimer("file:read:" + filePath.split("/").pop());
       const cacheEngine = getCacheEngine();
       const cached = cacheEngine.get(filePath);
       if (cached !== null) {
+        endTimer(timer);
         debugLog("file.cache", `cache hit: ${filePath}`);
         return cached;
       }
@@ -2227,6 +2303,7 @@ var require_helpers = __commonJS({
         }
         cacheEngine.set(filePath, content);
       }
+      endTimer(timer);
       return content;
     }
     var _autoWarmMessageShown = false;
@@ -2976,15 +3053,19 @@ var require_git = __commonJS({
     var path = require("path");
     var { execFileSync } = require("child_process");
     var { debugLog } = require_output();
+    var { startTimer, endTimer } = require_profiler();
     function execGit(cwd, args) {
+      const timer = startTimer("git:" + (args[0] || "unknown"));
       try {
         const stdout = execFileSync("git", args, {
           cwd,
           stdio: "pipe",
           encoding: "utf-8"
         });
+        endTimer(timer);
         return { exitCode: 0, stdout: stdout.trim(), stderr: "" };
       } catch (err) {
+        endTimer(timer);
         debugLog("git.exec", "exec failed", err);
         return {
           exitCode: err.status ?? 1,
@@ -2994,6 +3075,7 @@ var require_git = __commonJS({
       }
     }
     function structuredLog(cwd, opts = {}) {
+      const timer = startTimer("git:log:structured");
       const count = opts.count || 20;
       const logArgs = ["log", `--format=%H|%an|%ae|%ai|%s`, `-${count}`];
       if (opts.since) logArgs.push(`--since=${opts.since}`);
@@ -3002,6 +3084,7 @@ var require_git = __commonJS({
       if (opts.path) logArgs.push("--", opts.path);
       const logResult = execGit(cwd, logArgs);
       if (logResult.exitCode !== 0 || !logResult.stdout) {
+        endTimer(timer);
         return { error: logResult.stderr || "No commits found" };
       }
       const lines = logResult.stdout.split("\n").filter(Boolean);
@@ -3014,7 +3097,9 @@ var require_git = __commonJS({
         const email = parts[2];
         const date = parts[3];
         const message = parts.slice(4).join("|");
+        const diffTimer = startTimer("git:diff-tree");
         const statResult = execGit(cwd, ["diff-tree", "--no-commit-id", "--numstat", "-r", hash]);
+        endTimer(diffTimer);
         const files = [];
         let totalInsertions = 0;
         let totalDeletions = 0;
@@ -3046,6 +3131,7 @@ var require_git = __commonJS({
           total_deletions: totalDeletions
         });
       }
+      endTimer(timer);
       return commits;
     }
     function diffSummary(cwd, opts = {}) {
@@ -16767,6 +16853,7 @@ var require_ast = __commonJS({
     var path = require("path");
     var acorn = require_acorn();
     var { LANGUAGE_MAP } = require_codebase_intel();
+    var { startTimer, endTimer } = require_profiler();
     function stripTypeScript(code) {
       code = code.replace(/^\s*import\s+type\s+\{[^}]*\}\s+from\s+['"][^'"]*['"];?\s*$/gm, "");
       code = code.replace(/\btype\s+(\w+)\s*,?\s*/g, "");
@@ -17182,15 +17269,18 @@ var require_ast = __commonJS({
       return ext === ".ts" || ext === ".tsx" || ext === ".jsx";
     }
     function extractSignatures(filePath, options) {
+      const timer = startTimer("ast:parse:" + path.basename(filePath));
       const opts = options || {};
       let code;
       try {
         code = opts.code || fs.readFileSync(filePath, "utf-8");
       } catch (e) {
+        endTimer(timer);
         return { signatures: [], language: null, error: "file_not_found" };
       }
       const language = detectLanguage(filePath);
       if (!language) {
+        endTimer(timer);
         return { signatures: [], language: null, error: "unknown_language" };
       }
       if (isJsFamily(language)) {
@@ -17201,9 +17291,11 @@ var require_ast = __commonJS({
         const ast = parseWithAcorn(parseCode);
         if (ast) {
           const signatures = walkAstForSignatures(ast, parseCode);
+          endTimer(timer);
           return { signatures, language };
         }
         const regexSigs = extractJsSignaturesRegex(code);
+        endTimer(timer);
         return {
           signatures: regexSigs,
           language,
@@ -17212,6 +17304,7 @@ var require_ast = __commonJS({
       }
       const detector = DETECTOR_REGISTRY[language];
       if (!detector) {
+        endTimer(timer);
         return { signatures: [], language, error: "no_detector" };
       }
       try {
@@ -17226,20 +17319,25 @@ var require_ast = __commonJS({
           }
           signatures.push(detector.extractSignature(match, lineNum));
         }
+        endTimer(timer);
         return { signatures, language };
       } catch {
+        endTimer(timer);
         return { signatures: [], language, error: "parse_failed" };
       }
     }
     function extractExports(filePath) {
+      const timer = startTimer("ast:exports:" + path.basename(filePath));
       let code;
       try {
         code = fs.readFileSync(filePath, "utf-8");
       } catch (e) {
+        endTimer(timer);
         return { named: [], default: null, reExports: [], cjsExports: [], type: "cjs", language: null, error: "file_not_found" };
       }
       const language = detectLanguage(filePath);
       if (!language || !isJsFamily(language)) {
+        endTimer(timer);
         return { named: [], default: null, reExports: [], cjsExports: [], type: "cjs", language, error: "unsupported_language" };
       }
       let parseCode = code;
@@ -17257,6 +17355,7 @@ var require_ast = __commonJS({
       let type = "cjs";
       if (hasEsm && hasCjs) type = "mixed";
       else if (hasEsm) type = "esm";
+      endTimer(timer);
       return {
         named: esmResult.named,
         default: esmResult.default,
@@ -17615,6 +17714,7 @@ var require_context = __commonJS({
   "src/lib/context.js"(exports2, module2) {
     "use strict";
     var { debugLog } = require_output();
+    var { startTimer, endTimer } = require_profiler();
     var _estimateTokenCount = null;
     function getTokenizer() {
       if (_estimateTokenCount !== null) return _estimateTokenCount;
@@ -17630,10 +17730,14 @@ var require_context = __commonJS({
     }
     function estimateTokens(text) {
       if (!text || typeof text !== "string") return 0;
+      const timer = startTimer("markdown:estimate-tokens");
       try {
         const fn = getTokenizer();
-        return fn(text);
+        const result = fn(text);
+        endTimer(timer);
+        return result;
       } catch (e) {
+        endTimer(timer);
         debugLog("context.estimateTokens", "estimation failed, using fallback", e);
         return Math.ceil(text.length / 4);
       }
@@ -17797,7 +17901,9 @@ var require_context = __commonJS({
       return scoped;
     }
     function compactPlanState(stateRaw) {
+      const timer = startTimer("markdown:compact-state");
       if (!stateRaw || typeof stateRaw !== "string") {
+        endTimer(timer);
         return { phase: null, progress: null, status: null, last_activity: null, decisions: [], blockers: [] };
       }
       let phase = null, progress = null, status = null, lastActivity = null;
@@ -17826,6 +17932,7 @@ var require_context = __commonJS({
           }
         }
       }
+      endTimer(timer);
       return {
         phase,
         progress,
@@ -26270,72 +26377,299 @@ var require_agent = __commonJS({
   }
 });
 
-// src/lib/profiler.js
-var require_profiler = __commonJS({
-  "src/lib/profiler.js"(exports2, module2) {
+// src/commands/profiler.js
+var require_profiler2 = __commonJS({
+  "src/commands/profiler.js"(exports2, module2) {
     "use strict";
     var fs = require("fs");
     var path = require("path");
-    var enabled = process.env.GSD_PROFILE === "1";
-    var timings = [];
-    function isProfilingEnabled() {
-      return enabled;
-    }
-    function mark(label) {
-      if (!enabled) return;
-      const { performance } = require("node:perf_hooks");
-      performance.mark(label);
-    }
-    function measure(label, startMark, endMark) {
-      if (!enabled) return;
-      const { performance } = require("node:perf_hooks");
-      try {
-        const m = performance.measure(label, startMark, endMark);
-        timings.push({ label, duration_ms: Math.round(m.duration * 100) / 100 });
-      } catch (e) {
-      }
-    }
-    function startTimer(label) {
-      if (!enabled) return null;
-      const { performance } = require("node:perf_hooks");
-      return { label, start: performance.now() };
-    }
-    function endTimer(timer) {
-      if (!enabled || !timer) return null;
-      const { performance } = require("node:perf_hooks");
-      const duration_ms = Math.round((performance.now() - timer.start) * 100) / 100;
-      const entry = { label: timer.label, duration_ms };
-      timings.push(entry);
-      return entry;
-    }
-    function getTimings() {
-      return [...timings];
-    }
-    function writeBaseline(cwd, commandName) {
-      if (!enabled) return;
-      const totalMs = timings.reduce((sum, t) => sum + t.duration_ms, 0);
-      const timestamp = (/* @__PURE__ */ new Date()).toISOString();
-      const safeTimestamp = timestamp.replace(/[:.]/g, "-");
-      const baseline = {
-        command: commandName,
-        timestamp,
-        node_version: process.version,
-        timings: [...timings],
-        total_ms: Math.round(totalMs * 100) / 100
+    var { spawn } = require("child_process");
+    var GREEN = "\x1B[32m";
+    var RED = "\x1B[31m";
+    var YELLOW = "\x1B[33m";
+    var RESET = "\x1B[0m";
+    var BOLD = "\x1B[1m";
+    function parseCompareArgs(args) {
+      const options = {
+        before: null,
+        after: null,
+        threshold: 10
       };
-      const baselinesDir = path.join(cwd, ".planning", "baselines");
-      try {
-        fs.mkdirSync(baselinesDir, { recursive: true });
-        const filename = `${commandName}-${safeTimestamp}.json`;
-        fs.writeFileSync(path.join(baselinesDir, filename), JSON.stringify(baseline, null, 2) + "\n", "utf-8");
-      } catch (e) {
-        if (process.env.GSD_DEBUG) {
-          process.stderr.write(`[GSD_DEBUG] profiler.writeBaseline: ${e.message}
-`);
+      for (let i = 0; i < args.length; i++) {
+        const arg = args[i];
+        if (arg === "--before" && args[i + 1]) {
+          options.before = args[++i];
+        } else if (arg === "--after" && args[i + 1]) {
+          options.after = args[++i];
+        } else if (arg === "--threshold" && args[i + 1]) {
+          options.threshold = parseInt(args[++i], 10) || 10;
+        } else if (arg === "--help" || arg === "-h") {
+          return { help: true };
         }
       }
+      return options;
     }
-    module2.exports = { isProfilingEnabled, mark, measure, startTimer, endTimer, getTimings, writeBaseline };
+    function loadBaseline(filePath) {
+      try {
+        const content = fs.readFileSync(filePath, "utf-8");
+        return JSON.parse(content);
+      } catch (e) {
+        throw new Error(`Failed to load baseline from ${filePath}: ${e.message}`);
+      }
+    }
+    function matchTimings(beforeTimings, afterTimings) {
+      const matched = [];
+      const beforeMap = new Map(beforeTimings.map((t) => [t.label, t]));
+      for (const after of afterTimings) {
+        const before = beforeMap.get(after.label);
+        if (before) {
+          matched.push({ label: after.label, before: before.duration_ms, after: after.duration_ms });
+          beforeMap.delete(after.label);
+        } else {
+          let bestMatch = null;
+          let bestScore = 0;
+          for (const [label, beforeTiming] of beforeMap) {
+            const score = fuzzyScore(after.label, label);
+            if (score > bestScore && score > 0.5) {
+              bestScore = score;
+              bestMatch = { label, timing: beforeTiming };
+            }
+          }
+          if (bestMatch) {
+            matched.push({ label: after.label, before: bestMatch.timing.duration_ms, after: after.duration_ms });
+            beforeMap.delete(bestMatch.label);
+          }
+        }
+      }
+      for (const [label, timing] of beforeMap) {
+        matched.push({ label, before: timing.duration_ms, after: 0, missing: true });
+      }
+      return matched;
+    }
+    function fuzzyScore(a, b) {
+      const aLower = a.toLowerCase();
+      const bLower = b.toLowerCase();
+      if (aLower === bLower) return 1;
+      if (aLower.includes(bLower) || bLower.includes(aLower)) return 0.8;
+      let matches = 0;
+      for (const char of bLower) {
+        if (aLower.includes(char)) matches++;
+      }
+      return matches / Math.max(aLower.length, bLower.length);
+    }
+    function formatNum(n, decimals = 2) {
+      return n.toFixed(decimals);
+    }
+    function cmdProfilerCompare(args) {
+      const options = parseCompareArgs(args);
+      if (options.help) {
+        process.stderr.write(`Usage: gsd-tools profiler compare --before <file> --after <file> [--threshold N]
+
+Compare two baseline profiles and show timing deltas.
+
+Options:
+  --before <file>   Baseline JSON file (before)
+  --after <file>    Current timing JSON file (after)
+  --threshold N     Regression threshold percentage (default: 10)
+
+Examples:
+  gsd-tools profiler compare --before baseline.json --after current.json
+  gsd-tools profiler compare --before b.json --after a.json --threshold 15
+`);
+        return;
+      }
+      if (!options.before || !options.after) {
+        process.stderr.write("Error: --before and --after are required\n");
+        process.exit(1);
+      }
+      const before = loadBaseline(options.before);
+      const after = loadBaseline(options.after);
+      const matched = matchTimings(before.timings, after.timings);
+      const results = matched.map((m) => {
+        const delta = m.after - m.before;
+        const percent = m.before > 0 ? delta / m.before * 100 : m.after > 0 ? 100 : 0;
+        return { ...m, delta, percent };
+      }).sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta));
+      process.stdout.write(`
+${BOLD}Profiler Compare${RESET}
+`);
+      process.stdout.write(`${BOLD}Before:${RESET} ${path.basename(options.before)} (${before.timestamp})
+`);
+      process.stdout.write(`${BOLD}After:${RESET}  ${path.basename(options.after)} (${after.timestamp})
+
+`);
+      const colOp = "Operation";
+      const colBefore = "Before (ms)";
+      const colAfter = "After (ms)";
+      const colDelta = "Delta (ms)";
+      const colChange = "Change%";
+      process.stdout.write(`${BOLD}${colOp.padEnd(30)}${colBefore.padEnd(14)}${colAfter.padEnd(14)}${colDelta.padEnd(14)}${colChange}${RESET}
+`);
+      process.stdout.write("-".repeat(92) + "\n");
+      let faster = 0, slower = 0, unchanged = 0;
+      for (const r of results) {
+        const label = r.label.length > 28 ? r.label.slice(0, 25) + "..." : r.label.padEnd(30);
+        let deltaStr = r.missing ? "(missing in after)" : formatNum(r.delta, 2).padEnd(14);
+        let changeStr = r.missing ? "N/A" : formatNum(r.percent, 1) + "%";
+        let color = RESET;
+        if (!r.missing) {
+          if (r.delta < 0) {
+            color = GREEN;
+            faster++;
+          } else if (r.delta > 0) {
+            color = r.percent > options.threshold ? RED : YELLOW;
+            slower++;
+          } else {
+            unchanged++;
+          }
+        }
+        process.stdout.write(`${label}${formatNum(r.before, 2).padEnd(14)}${formatNum(r.after, 2).padEnd(14)}${color}${deltaStr}${changeStr}${RESET}
+`);
+      }
+      process.stdout.write("\n");
+      if (faster > 0) process.stdout.write(`${GREEN}${faster} operation(s) faster${RESET}, `);
+      if (slower > 0) process.stdout.write(`${RED}${slower} operation(s) slower${RESET}, `);
+      if (unchanged > 0) process.stdout.write(`${unchanged} unchanged`);
+      process.stdout.write("\n");
+      const totalBefore = before.total_ms;
+      const totalAfter = after.total_ms;
+      const totalDelta = totalAfter - totalBefore;
+      const totalPercent = totalBefore > 0 ? totalDelta / totalBefore * 100 : 0;
+      process.stdout.write(`
+${BOLD}Total:${RESET} ${formatNum(totalBefore)}ms \u2192 ${formatNum(totalAfter)}ms `);
+      if (totalDelta < 0) {
+        process.stdout.write(`(${GREEN}${formatNum(totalDelta)}ms (${formatNum(totalPercent, 1)}%)${RESET} faster)
+`);
+      } else if (totalDelta > 0) {
+        process.stdout.write(`(${totalPercent > options.threshold ? RED : YELLOW}+${formatNum(totalDelta)}ms (+${formatNum(totalPercent, 1)}%)${RESET} ${totalPercent > options.threshold ? "slower" : "slightly slower"})
+`);
+      } else {
+        process.stdout.write("(unchanged)\n");
+      }
+    }
+    function parseCacheSpeedupArgs(args) {
+      const options = {
+        runs: 5,
+        command: null
+      };
+      for (let i = 0; i < args.length; i++) {
+        const arg = args[i];
+        if (arg === "--runs" && args[i + 1]) {
+          options.runs = parseInt(args[++i], 10) || 5;
+        } else if (arg === "--command" && args[i + 1]) {
+          options.command = args[++i];
+        } else if (arg === "--help" || arg === "-h") {
+          return { help: true };
+        }
+      }
+      return options;
+    }
+    function runCommandMeasure(cmd) {
+      return new Promise((resolve, reject) => {
+        const start = process.hrtime.bigint();
+        const child = spawn("node", ["bin/gsd-tools.cjs"].concat(cmd.split(" ")), {
+          cwd: process.cwd(),
+          env: { ...process.env },
+          stdio: "pipe"
+        });
+        let stderr = "";
+        child.stderr.on("data", (d) => {
+          stderr += d.toString();
+        });
+        child.on("close", (code) => {
+          const end = process.hrtime.bigint();
+          const durationMs = Number(end - start) / 1e6;
+          resolve({ durationMs, code, stderr });
+        });
+        child.on("error", (err) => {
+          reject(err);
+        });
+      });
+    }
+    async function cmdProfilerCacheSpeedup(args) {
+      const options = parseCacheSpeedupArgs(args);
+      if (options.help) {
+        process.stderr.write(`Usage: gsd-tools profiler cache-speedup --runs N --command "args"
+
+Run commands with and without cache to measure speedup.
+
+Options:
+  --runs N       Number of runs for each mode (default: 5)
+  --command "cmd"  Command to test (required)
+
+Examples:
+  gsd-tools profiler cache-speedup --runs 3 --command "state validate"
+  gsd-tools profiler cache-speedup --runs 5 --command "roadmap analyze"
+`);
+        return;
+      }
+      if (!options.command) {
+        process.stderr.write("Error: --command is required\n");
+        process.exit(1);
+      }
+      const runs = options.runs;
+      process.stdout.write(`
+${BOLD}Cache Speedup Test${RESET}
+`);
+      process.stdout.write(`Command: ${options.command}
+`);
+      process.stdout.write(`Runs per mode: ${runs}
+
+`);
+      process.stdout.write("Warming up...\n");
+      await runCommandMeasure(options.command);
+      await runCommandMeasure(options.command);
+      process.stdout.write("Running with cache enabled...\n");
+      const cachedTimes = [];
+      for (let i = 0; i < runs; i++) {
+        const result = await runCommandMeasure(options.command);
+        if (result.code !== 0) {
+          process.stderr.write(`Warning: Command exited with code ${result.code}
+`);
+        }
+        cachedTimes.push(result.durationMs);
+        process.stdout.write(`  Run ${i + 1}: ${formatNum(result.durationMs)}ms
+`);
+      }
+      process.stdout.write("Running with cache disabled...\n");
+      const uncachedTimes = [];
+      for (let i = 0; i < runs; i++) {
+        const result = await runCommandMeasure(options.command + " --no-cache");
+        if (result.code !== 0) {
+          process.stderr.write(`Warning: Command exited with code ${result.code}
+`);
+        }
+        uncachedTimes.push(result.durationMs);
+        process.stdout.write(`  Run ${i + 1}: ${formatNum(result.durationMs)}ms
+`);
+      }
+      const avgCached = cachedTimes.reduce((a, b) => a + b, 0) / cachedTimes.length;
+      const avgUncached = uncachedTimes.reduce((a, b) => a + b, 0) / uncachedTimes.length;
+      const speedupMs = avgUncached - avgCached;
+      const speedupPercent = avgUncached > 0 ? speedupMs / avgUncached * 100 : 0;
+      process.stdout.write(`
+${BOLD}Results:${RESET}
+`);
+      process.stdout.write(`  Cache enabled:  ${GREEN}${formatNum(avgCached)}ms${RESET} (avg of ${runs} runs)
+`);
+      process.stdout.write(`  Cache disabled: ${RED}${formatNum(avgUncached)}ms${RESET} (avg of ${runs} runs)
+`);
+      process.stdout.write("\n");
+      if (speedupMs > 0) {
+        process.stdout.write(`  ${GREEN}Speedup: ${formatNum(speedupMs)}ms (${formatNum(speedupPercent, 1)}%)${RESET}
+`);
+        process.stdout.write(`  Cache is ${formatNum(speedupPercent, 1)}% faster with caching enabled.
+`);
+      } else if (speedupMs < 0) {
+        process.stdout.write(`  ${RED}Slowdown: ${formatNum(Math.abs(speedupMs))}ms (${formatNum(Math.abs(speedupPercent), 1)}%)${RESET}
+`);
+        process.stdout.write(`  Cache is ${formatNum(Math.abs(speedupPercent), 1)}% slower. Check cache configuration.
+`);
+      } else {
+        process.stdout.write("  No measurable difference between cached and uncached runs.\n");
+      }
+    }
+    module2.exports = { cmdProfilerCompare, cmdProfilerCacheSpeedup };
   }
 });
 
@@ -26399,6 +26733,9 @@ var require_router = __commonJS({
     }
     function lazyAgent() {
       return _modules.agent || (_modules.agent = require_agent());
+    }
+    function lazyProfiler() {
+      return _modules.profiler || (_modules.profiler = require_profiler2());
     }
     async function main2() {
       const args = process.argv.slice(2);
@@ -27824,6 +28161,30 @@ Available: execute-phase, plan-phase, new-project, new-milestone, quick, resume,
               commands: ["status", "clear", "warm"],
               help: "gsd-tools cache <status|clear|warm> [files...]"
             }, raw, "cache");
+          }
+          break;
+        }
+        case "profiler": {
+          const subcommand = args[1];
+          if (subcommand === "compare") {
+            lazyProfiler().cmdProfilerCompare(args.slice(2));
+          } else if (subcommand === "cache-speedup") {
+            await lazyProfiler().cmdProfilerCacheSpeedup(args.slice(2));
+          } else if (!subcommand || subcommand === "--help" || subcommand === "-h") {
+            process.stderr.write(`Usage: gsd-tools profiler <subcommand> [options]
+
+Performance profiler commands.
+
+Subcommands:
+  compare            Compare two baseline profiles and show timing deltas
+  cache-speedup      Measure cache speedup by running commands with/without cache
+
+Examples:
+  gsd-tools profiler compare --before baseline.json --after current.json
+  gsd-tools profiler cache-speedup --runs 3 --command "state validate"
+`);
+          } else {
+            error(`Unknown profiler subcommand: ${subcommand}. Available: compare, cache-speedup`);
           }
           break;
         }

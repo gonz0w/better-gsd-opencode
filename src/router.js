@@ -27,6 +27,7 @@ function lazyGit() { return _modules.git || (_modules.git = require('./lib/git')
 function lazyOrchestration() { return _modules.orchestration || (_modules.orchestration = require('./lib/orchestration')); }
 function lazyCache() { return _modules.cache || (_modules.cache = require('./commands/cache')); }
 function lazyAgent() { return _modules.agent || (_modules.agent = require('./commands/agent')); }
+function lazyProfiler() { return _modules.profiler || (_modules.profiler = require('./commands/profiler')); }
 
 
 async function main() {
@@ -1547,6 +1548,31 @@ async function main() {
           commands: ['status', 'clear', 'warm'],
           help: 'gsd-tools cache <status|clear|warm> [files...]'
         }, raw, 'cache');
+      }
+      break;
+    }
+
+    case 'profiler': {
+      const subcommand = args[1];
+      if (subcommand === 'compare') {
+        lazyProfiler().cmdProfilerCompare(args.slice(2));
+      } else if (subcommand === 'cache-speedup') {
+        await lazyProfiler().cmdProfilerCacheSpeedup(args.slice(2));
+      } else if (!subcommand || subcommand === '--help' || subcommand === '-h') {
+        process.stderr.write(`Usage: gsd-tools profiler <subcommand> [options]
+
+Performance profiler commands.
+
+Subcommands:
+  compare            Compare two baseline profiles and show timing deltas
+  cache-speedup      Measure cache speedup by running commands with/without cache
+
+Examples:
+  gsd-tools profiler compare --before baseline.json --after current.json
+  gsd-tools profiler cache-speedup --runs 3 --command "state validate"
+`);
+      } else {
+        error(`Unknown profiler subcommand: ${subcommand}. Available: compare, cache-speedup`);
       }
       break;
     }
