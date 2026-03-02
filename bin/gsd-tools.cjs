@@ -987,6 +987,11 @@ Subcommands:
   choose <name> --attempt <N>   Select winner, archive rest, clean up
     --scope <scope>       Scope level (default: phase)
     --reason <text>       Why this attempt was chosen (recorded in journal)
+  dead-ends              Query journal for failed approaches
+    --scope <scope>       Filter by scope (task, plan, phase)
+    --name <name>         Filter by checkpoint name
+    --limit <N>           Max results (default: 10)
+    --token-cap <N>       Token cap for context output (default: 500)
 
 Creates a git branch at trajectory/<scope>/<name>/attempt-N and writes a
 journal entry to the trajectories memory store with test count, LOC delta,
@@ -999,7 +1004,9 @@ Examples:
   gsd-tools trajectory list --scope phase --limit 5
   gsd-tools trajectory compare my-feat
   gsd-tools trajectory pivot explore-auth --reason "JWT approach too complex"
-  gsd-tools trajectory choose my-feat --attempt 2 --reason "Better test coverage"`,
+  gsd-tools trajectory choose my-feat --attempt 2 --reason "Better test coverage"
+  gsd-tools trajectory dead-ends
+  gsd-tools trajectory dead-ends --scope task --limit 5`,
       "trajectory compare": `Usage: gsd-tools trajectory compare <name> [--scope <scope>]
 
 Compare metrics across all attempts for a named checkpoint.
@@ -26259,8 +26266,11 @@ Available: execute-phase, plan-phase, new-project, new-milestone, quick, resume,
             case "choose":
               lazyTrajectory().cmdTrajectoryChoose(cwd, args.slice(1), raw);
               break;
+            case "dead-ends":
+              lazyTrajectory().cmdTrajectoryDeadEnds(cwd, args.slice(2), raw);
+              break;
             default:
-              error("Unknown trajectory subcommand: " + trajSub + ". Available: checkpoint, list, pivot, compare, choose");
+              error("Unknown trajectory subcommand: " + trajSub + ". Available: checkpoint, list, pivot, compare, choose, dead-ends");
           }
           break;
         }
