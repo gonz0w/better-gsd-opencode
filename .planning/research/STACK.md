@@ -1,148 +1,316 @@
-# Technology Stack: v8.0 Performance & Agent Architecture
+# Technology Stack: v8.1 RAG-Powered Research Pipeline
 
 **Project:** bGSD Plugin
-**Researched:** 2026-03-01
-**Focus:** SQLite read cache, performance profiling, CLI command consolidation
-**Overall confidence:** HIGH
+**Researched:** 2026-03-02
+**Focus:** yt-dlp for YouTube, NotebookLM API for synthesis, additional MCP servers, fallback RAG strategies
+**Overall confidence:** MEDIUM-HIGH (NotebookLM integration has caveats; everything else is HIGH)
 
 ## Executive Summary
 
-The v8.0 stack question has three parts: (1) SQLite for caching parsed markdown, (2) performance profiling tooling, and (3) CLI subcommand consolidation. The critical finding: **better-sqlite3 is the right SQLite library**, despite requiring native addon management. The alternative `node:sqlite` built-in is only a Release Candidate (Stability 1.2) in Node.js 25.x and still experimental in the project's Node 18+ target. sql.js (WASM) adds ~1MB to the bundle and requires async initialization, violating the synchronous CLI design. better-sqlite3's native addon breaks single-file bundling, but the solution is **external declaration in esbuild + deploy-time copy** — a proven pattern used by Claude Code itself.
+The v8.1 stack adds three new capability layers: (1) YouTube content discovery via yt-dlp, (2) RAG-based synthesis via Google NotebookLM, and (3) expanded MCP server discovery. The critical design constraint is **no new bundled dependencies** — all external tools (yt-dlp, Python, NotebookLM CLI) are invoked via `child_process.execFileSync` subprocess calls, matching the existing pattern for git operations. The tool must degrade gracefully when any external dependency is absent.
 
-For performance profiling: **the existing `src/lib/profiler.js` is already the right foundation** — it uses `node:perf_hooks` which is available since Node.js 8. Enhancement means adding sub-command timing granularity, not new libraries.
+**Key finding: Two NotebookLM integration paths exist, and neither is ideal.** The official Google Cloud NotebookLM Enterprise API requires a Google Cloud project with Gemini Enterprise licensing (paid). The unofficial `notebooklm-py` (v0.3.2) uses reverse-engineered browser APIs — powerful but fragile and dependent on a personal Google account session. **Recommendation: Support both paths behind a unified interface**, with the unofficial library for personal/prototype use and the official API for enterprise deployments.
 
-For CLI consolidation: **no framework needed**. The existing hand-rolled router is already implementing a subcommand pattern. Consolidation is a refactoring task, not a dependency task.
+**yt-dlp is the clear winner for YouTube** — no separate YouTube search library needed. yt-dlp handles search (`ytsearch:` prefix), metadata extraction (`--dump-single-json --skip-download`), and subtitle/transcript extraction (`--write-sub --write-auto-sub --sub-format json3`) all in one tool. The Node.js wrapper `youtube-dl-exec` (v3.1.3) auto-installs the latest yt-dlp binary.
+
+**VTT parsing should be built-in, not an npm dependency.** VTT format is trivially parseable (~30 lines of code) — regex strip timestamps, deduplicate lines. No need to add a library to a project that already has 309+ regex patterns.
 
 ## Recommended Stack
 
-### SQLite: better-sqlite3
+### YouTube: yt-dlp via youtube-dl-exec
 
 | Technology | Version | Purpose | Why |
 |---|---|---|---|
-| better-sqlite3 | ^12.6.2 | Read cache for parsed markdown content | Synchronous API matches CLI design, fastest SQLite binding for Node.js, battle-tested (3,977 npm dependents), prepared statements for structured queries |
+| youtube-dl-exec | ^3.1.3 | Node.js wrapper for yt-dlp binary | Auto-installs latest yt-dlp, Promise interface, subprocess control with timeout/kill, 602 stars, 7.2K dependents, MIT license, actively maintained (last release Feb 25, 2026) |
+| yt-dlp (auto-installed) | latest (2025.x) | YouTube search, metadata, subtitle extraction | Feature-rich CLI, 100K+ GitHub stars, supports 1000+ sites, built-in YouTube search via `ytsearch:` prefix, JSON metadata output, subtitle extraction in multiple formats |
 
-**Why better-sqlite3 over alternatives:**
+**Why NOT a separate YouTube search library:**
 
-| Option | Verdict | Reason |
+| Alternative | Verdict | Reason |
 |---|---|---|
-| **better-sqlite3** | **USE THIS** | Synchronous API, fastest perf, 12.6.2 current, widely deployed |
-| `node:sqlite` | NOT YET | Only Stability 1.2 (Release Candidate) in Node 25.7.0. Still experimental in Node 22 LTS (requires `--experimental-sqlite` flag on 22.5-22.12, no flag needed 22.13+ but still experimental). Project targets Node 18+ — `node:sqlite` doesn't exist there. Would require bumping minimum to Node 22.13+ and accepting experimental status. |
-| sql.js (WASM) | NO | Async initialization (`initSqlJs()` returns a Promise), adds ~1MB WASM binary, requires two-file distribution (.js + .wasm), 2-5x slower than native binding for sequential operations. CLI runs synchronous, short-lived processes. |
-| sqlite3 (node-sqlite3) | NO | Async-only API, deprecated in favor of `node:sqlite`, callback-based. Wrong paradigm for synchronous CLI. |
+| **yt-dlp `ytsearch:`** | **USE THIS** | Built into yt-dlp — `ytsearch5:query` returns top 5 results with full metadata. No extra dependency. Already installed via youtube-dl-exec. |
+| youtube-sr | NO | Scrapes YouTube HTML — fragile, breaks when YouTube changes layout. Unmaintained (last publish 2+ years ago). |
+| ytsr | NO | Same HTML scraping approach. Deprecated, recommends yt-dlp instead. |
+| YouTube Data API v3 | NO | Requires API key, quota limits (10,000 units/day), OAuth complexity. Overkill for search+metadata extraction. |
 
-**Confidence: HIGH** — better-sqlite3 API verified via Context7 (v12.6.2 docs, 181 code snippets). `node:sqlite` status verified via official Node.js 25.7.0 docs (Stability 1.2 Release Candidate). sql.js async requirement verified via GitHub README.
+**Confidence: HIGH** — youtube-dl-exec API verified via Context7 (12 code snippets, High reputation). yt-dlp `ytsearch:` functionality confirmed via GitHub issues and documentation.
 
-### esbuild Integration: External + Deploy Copy
-
-| Technology | Version | Purpose | Why |
-|---|---|---|---|
-| esbuild (existing) | ^0.27.3 | Bundle with better-sqlite3 marked external | Native .node addons cannot be bundled into a single JS file — esbuild explicitly documents this limitation |
-
-**Critical: better-sqlite3 is a native addon.** It includes a compiled `.node` binary (C++ binding to SQLite). This **cannot** be bundled into the single-file `gsd-tools.cjs`. The solution:
+#### yt-dlp Key Commands for Research Pipeline
 
 ```javascript
-// build.js addition
-external: [
-  'node:*', 'child_process', 'fs', /* ...existing... */,
-  'better-sqlite3'  // NEW: native addon, cannot be bundled
-],
+const youtubedl = require('youtube-dl-exec');
+
+// 1. SEARCH: Find YouTube videos by query
+// Returns JSON array of video metadata (no download)
+const searchResults = await youtubedl('ytsearch5:React Server Components tutorial 2025', {
+  dumpSingleJson: true,
+  flatPlaylist: true,    // Don't extract each video's full info
+  noWarnings: true,
+  noCheckCertificates: true,
+});
+// searchResults.entries = [{id, title, url, duration, view_count, upload_date, ...}, ...]
+
+// 2. METADATA: Get full metadata for a specific video
+const metadata = await youtubedl('https://www.youtube.com/watch?v=VIDEO_ID', {
+  dumpSingleJson: true,
+  skipDownload: true,    // Don't download the video
+  noWarnings: true,
+});
+// metadata = {id, title, description, duration, view_count, like_count, 
+//             channel, upload_date, tags, categories, subtitles, automatic_captions, ...}
+
+// 3. TRANSCRIPT: Extract subtitles/transcript
+// Must use .exec() and write to temp dir since subs are written to files
+const subprocess = youtubedl.exec('https://www.youtube.com/watch?v=VIDEO_ID', {
+  skipDownload: true,
+  writeSub: true,        // Download manual subtitles
+  writeAutoSub: true,    // Download auto-generated subtitles if no manual
+  subLang: 'en',         // English subtitles
+  subFormat: 'json3',    // Structured JSON format (has word-level timestamps)
+  output: '/tmp/gsd-yt/%(id)s.%(ext)s',
+});
 ```
 
-**Deploy strategy:** `deploy.sh` copies `better-sqlite3` from `node_modules/` alongside the deployed `gsd-tools.cjs`. The `require('better-sqlite3')` resolves via Node's standard module resolution at runtime.
+#### Subtitle Format Comparison
 
-**This is a proven pattern.** Claude Code itself distributes better-sqlite3 as an external native dependency (see [better-sqlite3 issue #1367](https://github.com/WiseLibs/better-sqlite3/issues/1367)). Some users hit `NODE_MODULE_VERSION` mismatch issues, but those only arise when mixing different Node.js versions — not an issue when the tool runs on the user's own Node.js installation.
+| Format | Flag | Output | Best For |
+|---|---|---|---|
+| `json3` | `--sub-format json3` | JSON with word-level timestamps, events array | Programmatic processing, structured data for RAG |
+| `vtt` | `--sub-format vtt` | WebVTT text with timestamps | Human-readable, simple parsing |
+| `srt` | `--sub-format srt` | SubRip text with timestamps | Widespread compatibility |
+| `srv3` | `--sub-format srv3` | YouTube's native XML format | Lossless preservation |
 
-**Confidence: HIGH** — esbuild's external behavior for native addons verified via esbuild docs (Context7, issues #2674, #2830). Claude Code's use of better-sqlite3 as external dep confirmed via GitHub issue.
+**Recommendation: Use `json3` for programmatic extraction.** It provides structured JSON that can be parsed without regex. For fallback, `vtt` is trivially parseable (strip timestamp lines, deduplicate overlapping cues).
 
-### Performance Profiling: node:perf_hooks (existing)
+#### VTT Parsing (Built-in, No Library Needed)
+
+```javascript
+// ~30 lines, zero dependencies — fits gsd-tools.cjs architecture
+function parseVttToText(vttContent) {
+  const lines = vttContent.split('\n');
+  const seen = new Set();
+  const textLines = [];
+  for (const line of lines) {
+    const trimmed = line.trim();
+    // Skip metadata, timestamps, and empty lines
+    if (!trimmed || trimmed === 'WEBVTT' || 
+        trimmed.startsWith('Kind:') || trimmed.startsWith('Language:') ||
+        trimmed.includes('-->') || /^\d+$/.test(trimmed)) continue;
+    // Strip HTML tags (yt-dlp auto-subs have <c> tags)
+    const clean = trimmed.replace(/<[^>]*>/g, '')
+                         .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>');
+    if (clean && !seen.has(clean)) {
+      seen.add(clean);
+      textLines.push(clean);
+    }
+  }
+  return textLines.join(' ');
+}
+```
+
+**No VTT library needed.** The existing codebase has 309+ regex patterns. VTT parsing is simpler than markdown frontmatter extraction (which is already built-in). Libraries like `node-webvtt`, `subtitle`, or `@plussub/srt-vtt-parser` would add unnecessary bundle weight.
+
+### NotebookLM: Dual-Path Integration
+
+#### Path A: Unofficial API via notebooklm-py (Recommended for Personal Use)
 
 | Technology | Version | Purpose | Why |
 |---|---|---|---|
-| node:perf_hooks (existing) | Node.js built-in | Performance measurement | Already integrated in profiler.js, available since Node.js 8, zero dependencies, `performance.mark()/measure()` is W3C standard API |
+| notebooklm-py | ^0.3.2 | Python CLI + async API for Google NotebookLM | Full programmatic access: create notebooks, add sources (URLs, YouTube, text, PDFs), chat/query, generate reports. 2.4K GitHub stars, MIT license, active development (479 commits). |
+| Python 3.10+ | >=3.10 | Runtime for notebooklm-py | Required dependency. Project already has Python check via yt-dlp (youtube-dl-exec requires Python 3.9+). |
 
-**No new library needed.** The existing `src/lib/profiler.js` (116 lines) already provides:
-- `startTimer(label)` / `endTimer(timer)` — high-resolution timing
-- `mark(label)` / `measure(label, start, end)` — named measurement spans
-- `writeBaseline(cwd, commandName)` — persisted timing data to `.planning/baselines/`
-- Zero-cost when `GSD_PROFILE` is not set (all functions early-return)
+**notebooklm-py capabilities relevant to research pipeline:**
 
-**What to enhance** (code changes, not new deps):
-1. Add `startTimer`/`endTimer` calls inside hot paths (file reads, markdown parsing, regex matching)
-2. Add sub-operation timing in the router (pre-command, command, post-command)
-3. Add a `gsd-tools profile <command>` wrapper that auto-enables `GSD_PROFILE=1` and formats results
-4. Add baseline comparison: read previous baseline JSON, compute delta percentages
-
-**Confidence: HIGH** — `node:perf_hooks` stable since Node.js 12. Existing profiler.js reviewed directly.
-
-### CLI Command Consolidation: Hand-rolled (existing pattern)
-
-| Technology | Version | Purpose | Why |
-|---|---|---|---|
-| Custom router (existing) | N/A | Subcommand dispatch | Already implements lazy-loading, switch-based routing for 100+ commands. Adding a framework would increase bundle size for marginal benefit. |
-
-**No framework needed.** The existing router.js (947 lines) already implements:
-- Lazy module loading (16 lazy loaders)
-- Subcommand routing (e.g., `state update`, `verify plan-structure`, `codebase ast`)
-- Global flag parsing (`--pretty`, `--verbose`, `--compact`, `--manifest`, `--fields`)
-- Help dispatch via `COMMAND_HELP` lookup
-- Performance profiling integration
-
-**Alternatives considered and rejected:**
-
-| Framework | Bundle Size | Why Not |
+| Feature | CLI Command | API Method |
 |---|---|---|
-| Commander.js | ~50KB | Adds arg parsing abstraction the router already handles. Would require rewriting all 100+ command dispatches. Marginal benefit for significant churn. |
-| yargs | ~200KB | Even heavier. Designed for complex option parsing — our commands use positional args and simple flags. |
-| oclif | ~500KB+ | Enterprise CLI framework with plugins, hooks, lifecycle. Total overkill for a single-file CLI tool. |
-| citty / clerc | ~10-20KB | Lightweight, but still adds dependency for something the router already does well. |
+| Create notebook | `notebooklm create "Research Topic"` | `client.notebooks.create("Topic")` |
+| Add URL source | `notebooklm source add "https://..."` | `client.sources.add_url(nb_id, url)` |
+| Add YouTube source | `notebooklm source add "https://youtube.com/..."` | `client.sources.add_url(nb_id, yt_url)` |
+| Add text source | `notebooklm source add --text "content"` | `client.sources.add_text(nb_id, text)` |
+| Query/Chat | `notebooklm ask "Summarize key themes"` | `client.chat.ask(nb_id, "question")` |
+| Generate report | `notebooklm generate report` | `client.artifacts.generate_report(nb_id)` |
+| Web research | `notebooklm research web "query"` | `client.research.web(nb_id, "query")` |
 
-**What consolidation actually means** (architecture, not dependencies):
-1. Group related top-level commands under parent commands (e.g., `gsd-tools config get` already works, but `config-set`, `config-get`, `config-ensure-section`, `config-migrate` are also separate top-level commands)
-2. Add route aliases so `gsd-tools config set` and `gsd-tools config-set` both work (backward compat)
-3. Potentially add a registration pattern instead of a giant switch statement
+**Authentication:** Uses browser-based login (`notebooklm login` opens Chromium via Playwright, captures session cookies). Session persists in `~/.config/notebooklm-py/`. Requires initial interactive setup.
 
-**Confidence: HIGH** — router.js reviewed directly. Framework alternatives researched via web search.
+**Dependencies:** `httpx>=0.27.0`, `click>=8.0.0`, `rich>=13.0.0`. Browser login additionally requires `playwright>=1.40.0` + Chromium.
+
+**⚠️ CRITICAL RISK:** This uses **undocumented Google APIs** reverse-engineered from the NotebookLM web UI. Google can change these endpoints without notice, breaking the library. Not suitable for production-critical workflows. Best for prototyping and personal research automation.
+
+**Confidence: MEDIUM** — Library verified via GitHub (v0.3.2, pyproject.toml confirmed), PyPI confirmed. However, built on undocumented APIs that can break at any time.
+
+#### Path B: Official Google Cloud NotebookLM Enterprise API
+
+| Technology | Version | Purpose | Why |
+|---|---|---|---|
+| Google Cloud REST API | v1alpha (Preview) | Official NotebookLM Enterprise API | Google-supported, stable endpoints, proper auth via gcloud/service accounts |
+
+**Official API capabilities (verified via Google Cloud docs, updated 2026-02-26):**
+
+| Feature | REST Endpoint | Status |
+|---|---|---|
+| Create notebook | `POST .../notebooks` | Available |
+| Add web source | `POST .../sources:batchCreate` with `webContent` | Available |
+| Add YouTube source | `POST .../sources:batchCreate` with `videoContent` | Available |
+| Add text source | `POST .../sources:batchCreate` with `textContent` | Available |
+| Upload file (PDF, MD, DOCX) | `POST .../sources:uploadFile` | Available |
+| Add Google Docs/Slides | `POST .../sources:batchCreate` with `googleDriveContent` | Available |
+| Retrieve source metadata | `GET .../sources/{id}` | Available |
+| Delete sources | `POST .../sources:batchDelete` | Available |
+| Generate audio overview | Dedicated API endpoint | Available |
+| Chat/Query | **NOT documented in official API** | Missing |
+| Generate reports | **NOT documented in official API** | Missing |
+
+**⚠️ CRITICAL GAP:** The official API does **not** expose chat/query functionality. You can create notebooks and add sources, but you cannot programmatically ask questions or get synthesized answers. This is a dealbreaker for RAG synthesis unless you pair it with Gemini API calls that reference the notebook's indexed content. The unofficial `notebooklm-py` fills this gap.
+
+**Requirements:** Google Cloud project + Gemini Enterprise license + IAM role assignment. Auth via `gcloud auth print-access-token`. The `v1alpha` API is Preview status — may change.
+
+**Confidence: HIGH for API availability, LOW for RAG synthesis** — Official docs verified directly (2026-02-26). The missing chat/query endpoint means the official API alone cannot perform research synthesis.
+
+#### Integration Strategy: Node.js → Python Subprocess
+
+```javascript
+// Pattern: Match existing git execSync pattern in git.js
+const { execFileSync } = require('child_process');
+
+function notebooklmExec(args, options = {}) {
+  try {
+    const result = execFileSync('notebooklm', args, {
+      encoding: 'utf8',
+      timeout: options.timeout || 120000,  // 2 min default (API calls can be slow)
+      ...options
+    });
+    return { success: true, output: result.trim() };
+  } catch (e) {
+    return { success: false, error: e.message };
+  }
+}
+
+// Create notebook and add research sources
+notebooklmExec(['create', 'React 19 Research']);
+notebooklmExec(['source', 'add', 'https://react.dev/blog/2024/12/05/react-19']);
+notebooklmExec(['source', 'add', 'https://youtube.com/watch?v=VIDEO_ID']);
+notebooklmExec(['source', 'add', '--text', transcriptContent]);
+
+// Synthesize — the actual RAG query
+const synthesis = notebooklmExec(['ask', 'Summarize the key architectural decisions and trade-offs']);
+```
+
+### MCP Servers for Developer Research
+
+The project already integrates Brave Search and Context7 MCP servers. Additional servers worth considering for the research pipeline:
+
+| MCP Server | Purpose | API Key Required | Recommendation |
+|---|---|---|---|
+| **Brave Search** (existing) | Web search, general research | Yes (free tier available) | **KEEP** — Already integrated, good for broad web search |
+| **Context7** (existing) | Library documentation, code examples | No (free) | **KEEP** — Best-in-class for library-specific docs |
+| **Exa** | Semantic search, research papers, personal sites | Yes (paid, $1/1000 searches) | **RECOMMEND** — Category-based search (research_paper, personal_site, company), semantic understanding, finds expert content that keyword search misses |
+| **Perplexity Sonar** | Real-time web search with synthesis | Yes (paid, $5/1000 queries for sonar-small) | **OPTIONAL** — Redundant with Brave Search for basic search. `sonar-deep-research` model is powerful but expensive. Only add if budget allows. |
+| **Microsoft Learn MCP** | Microsoft/Azure documentation | No (free, official) | **OPTIONAL** — Only if researching Microsoft stack. Not generally needed. |
+| **Firecrawl** | Web scraping, content extraction | Yes (free tier: 500 credits/mo) | **DEFER** — Overlaps with existing WebFetch capability. Only needed for JavaScript-heavy sites that WebFetch can't render. |
+
+**Recommendation: Add Exa MCP server.** It fills a gap between Brave Search (keyword-based) and Context7 (library-specific). Exa's semantic search with category filtering (`research_paper`, `personal_site`, `company`) is uniquely valuable for research pipelines that need expert opinions, academic papers, and authoritative technical blog posts.
+
+**Exa MCP configuration:**
+```json
+{
+  "mcpServers": {
+    "exa": {
+      "command": "npx",
+      "args": ["-y", "exa-mcp-server"],
+      "env": {
+        "EXA_API_KEY": "YOUR_KEY"
+      }
+    }
+  }
+}
+```
+
+**Confidence: HIGH for recommendations** — MCP server landscape verified via multiple 2025-2026 comparison articles and official documentation. Exa verified via official docs and GitHub (exa-labs/exa-mcp-server).
+
+### Fallback RAG: When NotebookLM Is Unavailable
+
+If NotebookLM is not configured (no login, no enterprise API), the research pipeline needs a fallback. **The fallback is the current LLM-only approach** — no local RAG framework should be added.
+
+| Fallback Option | Verdict | Reason |
+|---|---|---|
+| **Current LLM-only approach** | **USE THIS** | Existing gsd-project-researcher and gsd-phase-researcher already work without NotebookLM. Research quality degrades but pipeline doesn't break. Zero new dependencies. |
+| Local RAG with embeddings (LangChain.js, EmbedJs) | NO | Requires vector database, embedding model downloads (~100MB+), async pipeline. Violates synchronous CLI design, bloats bundle, adds complex dependency chain. Fundamentally wrong architecture for a CLI tool. |
+| SurfSense (open-source NotebookLM alternative) | NO | Full application, not a library. Requires Postgres, Redis, embedding models. Far too heavy for a CLI plugin. |
+| Embrix (local embeddings) | NO | 384-dim embeddings via @xenova/transformers — adds ~50MB model download, async inference. Not suitable for CLI. |
+
+**The project explicitly has "RAG / vector search — Wrong architecture for a CLI tool" in Out of Scope.** The v8.1 approach is to use NotebookLM *as an external service* for RAG, not to build RAG into the CLI. If NotebookLM is unavailable, fall back to LLM-only research (which already works).
+
+**Confidence: HIGH** — This aligns with explicit architectural decisions documented in PROJECT.md.
 
 ## What NOT to Add
 
 | Temptation | Why Resist |
 |---|---|
-| **node:sqlite** | Not available in Node.js 18 (project minimum). Experimental/RC status even in Node 22+/25. Would force minimum version bump to 22.13+ AND users would see `ExperimentalWarning` on every CLI invocation. Revisit when it reaches Stability 2 (Stable) in an LTS release. |
-| **sql.js** | Async initialization breaks synchronous CLI flow. ~1MB WASM binary inflates bundle from 1058KB to ~2058KB (nearly doubling it). Two-file distribution (.js + .wasm) complicates deploy. 2-5x slower than native for the sequential single-process use case. |
-| **Commander.js / yargs** | Adds bundled weight for marginal benefit. Current router is already lazy-loading, subcommand-aware, and handles all 100+ commands. Framework migration would touch every command handler. |
-| **clinic.js / 0x / pprof** | Heavy profiling tools designed for long-running servers. CLI tool runs for <5 seconds. `node:perf_hooks` with manual instrumentation is the correct approach for short-lived processes. |
-| **lru-cache** | For in-memory caching. The existing `Map()` caches in `helpers.js`, `frontmatter.js`, `config.js`, `regex-cache.js` work perfectly because CLI is a single invocation (<5s). No eviction needed. SQLite replaces the cross-invocation persistence need. |
-| **knex / kysely / drizzle** | SQL query builders. The cache schema is ~5 tables with simple CRUD. Raw prepared statements via better-sqlite3 are simpler, faster, and add zero overhead. |
-| **node-sqlite3-wasm** | WASM port targeting Node.js with filesystem persistence. Still slower than native binding. Solves a problem (browser compat) we don't have. |
+| **youtube-sr / ytsr** | HTML scraping libraries that break when YouTube changes layout. yt-dlp's `ytsearch:` prefix does the same thing more reliably via YouTube's internal APIs. |
+| **YouTube Data API v3** | Requires API key management, OAuth flows, quota tracking. yt-dlp provides everything needed without API keys. |
+| **node-webvtt / subtitle.js** | VTT parsing is ~30 lines of regex. Adding a library for this in a project with 309+ regex patterns is architectural inconsistency. |
+| **LangChain.js / LlamaIndex.js** | RAG framework for Node.js. Would require embedding models, vector store, async pipeline. Contradicts "single-file CLI" and "synchronous I/O" principles. |
+| **Chromadb / Pinecone / pgvector** | Vector databases for RAG. Way too heavy for a CLI tool. NotebookLM handles the vector search externally. |
+| **google-auth-library** | For NotebookLM Enterprise API auth. The official API uses `gcloud auth print-access-token` — just shell out to gcloud. No need for a Node.js auth library. |
+| **Perplexity MCP (unless budget allows)** | Redundant with Brave Search for basic web search. The deep research model is powerful but at ~$5/1000 queries, it's expensive for a development tool. Exa provides better category-based search at lower cost. |
+| **Firecrawl MCP** | Overlaps with existing WebFetch. Only needed for JS-rendered sites. Defer until a concrete need arises. |
 
 ## Dependencies Summary
 
 ### New Runtime Dependencies
 
-| Package | Version | Bundle Impact | Install Impact |
-|---|---|---|---|
-| better-sqlite3 | ^12.6.2 | 0KB (external) | ~10MB in node_modules (includes prebuilt native binaries for multiple platforms) |
+| Package | Version | Bundle Impact | Install Impact | Required? |
+|---|---|---|---|---|
+| youtube-dl-exec | ^3.1.3 | 0KB (external, like better-sqlite3) | ~5MB in node_modules + downloads yt-dlp binary (~20MB) on postinstall | Optional — YouTube features disabled if absent |
 
-### New Dev Dependencies
+### New External Tool Dependencies (Not npm)
+
+| Tool | Install Method | Version | Required? |
+|---|---|---|---|
+| yt-dlp | Auto-installed by youtube-dl-exec | latest | Optional — auto-installed if youtube-dl-exec is present |
+| Python 3.9+ | System package manager | >=3.9 | Optional — required for yt-dlp AND notebooklm-py |
+| notebooklm-py | `pip install notebooklm-py` | ^0.3.2 | Optional — NotebookLM synthesis disabled if absent |
+| Playwright + Chromium | `pip install 'notebooklm-py[browser]' && playwright install chromium` | >=1.40.0 | Optional — only for first-time notebooklm login |
+| gcloud CLI | Google Cloud SDK installer | latest | Optional — only for NotebookLM Enterprise API path |
+
+### No New Dev Dependencies
 
 None.
 
-### Updated Existing
+### Existing Dependencies (Unchanged)
 
-| Package | Current | Update To | Reason |
-|---|---|---|---|
-| esbuild | ^0.27.3 | (keep) | Current version handles externals correctly |
-| acorn | ^8.16.0 | (keep) | No changes needed |
-| tokenx | ^1.3.0 | (keep) | No changes needed |
+| Package | Version | Status |
+|---|---|---|
+| esbuild | ^0.27.3 | Keep — no changes needed |
+| acorn | ^8.16.0 | Keep — no changes needed |
+| tokenx | ^1.3.0 | Keep — no changes needed |
+
+### MCP Server Recommendations (User-Configured, Not Project Dependencies)
+
+| MCP Server | npm Package | Config Required |
+|---|---|---|
+| Brave Search | Already configured | BRAVE_API_KEY env var |
+| Context7 | Already configured | None |
+| Exa (NEW) | `exa-mcp-server` (npx) | EXA_API_KEY env var |
 
 ## Installation
 
 ```bash
-# Add SQLite
-npm install better-sqlite3
+# Core: YouTube capabilities (Node.js dependency)
+npm install youtube-dl-exec
 
-# Verify native compilation
-node -e "const db = require('better-sqlite3')(':memory:'); console.log('SQLite OK')"
+# Verify yt-dlp works
+npx youtube-dl-exec --version
+
+# Optional: NotebookLM integration (Python dependency)
+pip install "notebooklm-py[browser]"
+playwright install chromium
+notebooklm login  # Interactive, opens browser
+
+# Optional: NotebookLM Enterprise (Google Cloud)
+# Requires: Google Cloud project with Gemini Enterprise license
+gcloud auth login --enable-gdrive-access
 ```
 
 ### build.js Changes
@@ -150,162 +318,139 @@ node -e "const db = require('better-sqlite3')(':memory:'); console.log('SQLite O
 ```javascript
 // Add to external array in esbuild.build()
 external: [
-  'node:*', 'child_process', 'fs', 'path', 'os', 'crypto', 'util',
-  'stream', 'events', 'buffer', 'url', 'querystring',
-  'http', 'https', 'net', 'tls', 'zlib',
-  'better-sqlite3'  // Native addon — cannot be bundled
+  // ... existing externals ...
+  'youtube-dl-exec'  // Native binary wrapper — cannot/should not be bundled
 ],
 ```
 
-### deploy.sh Changes
+### Graceful Degradation Detection
 
-```bash
-# After copying bin/gsd-tools.cjs to deploy target:
-# Copy better-sqlite3 native module alongside it
-DEPLOY_DIR="$HOME/.config/oc/get-shit-done"
-cp bin/gsd-tools.cjs "$DEPLOY_DIR/bin/"
-
-# Copy the native module directory
-mkdir -p "$DEPLOY_DIR/node_modules/better-sqlite3"
-cp -r node_modules/better-sqlite3/lib "$DEPLOY_DIR/node_modules/better-sqlite3/"
-cp -r node_modules/better-sqlite3/build "$DEPLOY_DIR/node_modules/better-sqlite3/"
-cp node_modules/better-sqlite3/package.json "$DEPLOY_DIR/node_modules/better-sqlite3/"
-
-# Also need bindings and file-uri-to-path (better-sqlite3's dependencies)
-for dep in bindings file-uri-to-path; do
-  if [ -d "node_modules/$dep" ]; then
-    mkdir -p "$DEPLOY_DIR/node_modules/$dep"
-    cp -r "node_modules/$dep"/* "$DEPLOY_DIR/node_modules/$dep/"
-  fi
-done
+```javascript
+// src/lib/research-tools.js — detect available tools at startup
+function detectResearchTools() {
+  const tools = { ytdlp: false, notebooklm: false, notebooklmEnterprise: false };
+  
+  try {
+    require.resolve('youtube-dl-exec');
+    tools.ytdlp = true;
+  } catch {}
+  
+  try {
+    execFileSync('notebooklm', ['--version'], { encoding: 'utf8', timeout: 5000 });
+    tools.notebooklm = true;
+  } catch {}
+  
+  try {
+    execFileSync('gcloud', ['--version'], { encoding: 'utf8', timeout: 5000 });
+    tools.notebooklmEnterprise = true;  // May still need license check
+  } catch {}
+  
+  return tools;
+}
 ```
 
-## SQLite Cache Architecture (Informing ARCHITECTURE.md)
+## Integration Architecture (Informing ARCHITECTURE.md)
 
-### Cache Layer Design
-
-The SQLite database lives at `.planning/cache/gsd-cache.db`. It is a **read cache** — markdown files remain the authoritative source. The cache accelerates repeated parsing by storing pre-parsed structured data.
+### Research Pipeline Flow
 
 ```
-Markdown Files (authoritative)
+Research Query (from gsd-project-researcher or gsd-phase-researcher)
+    │
+    ├─► [Brave Search MCP] ──► Web results (URLs, snippets)
+    ├─► [Context7 MCP] ──► Library docs, code examples
+    ├─► [Exa MCP] ──► Semantic search, expert content, papers
+    ├─► [yt-dlp] ──► YouTube search → metadata + transcripts
     │
     ▼
-[Parser Layer] ─── parse on cache miss ──→ [SQLite Cache]
-    │                                           │
-    ▼                                           ▼
-  Results ◄─── cache hit (mtime check) ─── Cached Results
+[Source Collection] ──► Collated URLs, text content, transcripts
+    │
+    ▼
+┌─────────────────────────────────┐
+│ NotebookLM Available?           │
+│   YES → Create notebook,       │
+│          add sources,           │
+│          query for synthesis    │
+│   NO  → Pass raw sources to    │
+│          LLM for synthesis      │
+│          (current behavior)     │
+└─────────────────────────────────┘
+    │
+    ▼
+[Synthesis Output] ──► Research files (.planning/research/*.md)
 ```
 
-### Cache Invalidation Strategy
+### Subprocess Call Pattern
 
-| Strategy | How It Works | When to Use |
-|---|---|---|
-| mtime-based | Store `file_mtime` in cache row. On read, `stat()` the file. If mtime differs, re-parse. | Default for all files |
-| Hash-based | Store `content_hash` (SHA-256) in cache row. On read, hash file content. If hash differs, re-parse. | For files where mtime might be unreliable (e.g., git operations that preserve mtime) |
-| Explicit invalidation | After any `state update`, `phase complete`, etc., invalidate affected cache rows. | After write operations through gsd-tools |
-
-**Recommendation: mtime-based** for the common case (it's a single `fs.statSync` call, much cheaper than re-reading + re-hashing). Fall back to hash-based if mtime proves unreliable in practice.
-
-### better-sqlite3 Usage Pattern
+All external tool invocations follow the same pattern as `src/lib/git.js`:
 
 ```javascript
-const Database = require('better-sqlite3');
-
-// Open/create cache database
-const db = new Database(cachePath);
-db.pragma('journal_mode = WAL');    // Faster writes, concurrent reads
-db.pragma('synchronous = NORMAL');  // Good performance, acceptable durability for cache
-
-// Create schema
-db.exec(`
-  CREATE TABLE IF NOT EXISTS file_cache (
-    file_path TEXT PRIMARY KEY,
-    file_mtime REAL NOT NULL,
-    content_hash TEXT,
-    parsed_data TEXT NOT NULL,  -- JSON-serialized parsed result
-    parse_time_ms REAL,
-    cached_at TEXT DEFAULT (datetime('now'))
-  )
-`);
-
-// Prepared statements (reused across calls)
-const getStmt = db.prepare('SELECT * FROM file_cache WHERE file_path = ?');
-const putStmt = db.prepare(`
-  INSERT OR REPLACE INTO file_cache (file_path, file_mtime, content_hash, parsed_data, parse_time_ms)
-  VALUES (?, ?, ?, ?, ?)
-`);
-
-// Cache lookup
-function getCached(filePath) {
-  const stat = fs.statSync(filePath);
-  const row = getStmt.get(filePath);
-  if (row && row.file_mtime === stat.mtimeMs) {
-    return JSON.parse(row.parsed_data);  // Cache hit
+// Unified pattern: execFileSync with timeout, encoding, error handling
+function callExternalTool(binary, args, options = {}) {
+  const { timeout = 30000, cwd = process.cwd() } = options;
+  try {
+    return {
+      success: true,
+      output: execFileSync(binary, args, { 
+        encoding: 'utf8', timeout, cwd,
+        maxBuffer: 10 * 1024 * 1024  // 10MB for large metadata/transcripts
+      }).trim()
+    };
+  } catch (e) {
+    debugLog('research', `${binary} failed: ${e.message}`);
+    return { success: false, error: e.message, code: e.status };
   }
-  return null;  // Cache miss — caller must parse and call putCached()
 }
 ```
 
-### Graceful Degradation
+## Python Dependency Implications
 
-**Critical design principle:** If better-sqlite3 is unavailable (compilation failure, missing native module), the tool must still work. The cache is an optimization, not a requirement.
+The project already implicitly depends on Python through `youtube-dl-exec` (which requires Python 3.9+ for yt-dlp). Adding `notebooklm-py` extends this to Python 3.10+.
 
-```javascript
-let db = null;
-try {
-  const Database = require('better-sqlite3');
-  db = new Database(cachePath);
-  db.pragma('journal_mode = WAL');
-} catch (e) {
-  // Native module not available — run without cache
-  debugLog('cache', 'SQLite unavailable, running without cache', e.message);
-}
-```
+| Concern | Mitigation |
+|---|---|
+| Users without Python | Graceful degradation — YouTube and NotebookLM features disabled, research falls back to LLM-only |
+| Python version conflicts | Both yt-dlp and notebooklm-py work with Python 3.10+. Document minimum as 3.10. |
+| pip/venv management | Recommend `pipx install notebooklm-py` for isolated install. Or `uv tool install notebooklm-py` (notebooklm-py uses uv for development). |
+| Playwright/Chromium bloat | Only needed for first-time login. Can use `pip install notebooklm-py` without `[browser]` extra if user authenticates manually via environment variables. |
 
-This matches the existing pattern where `GSD_DEBUG` logging is opt-in, profiling is opt-in, and every feature degrades gracefully.
+**Recommendation:** Add a `gsd-tools util:check-research-tools` command that reports which optional research tools are available, with install instructions for missing ones.
 
-## Node.js Version Implications
+## NotebookLM API Comparison Matrix
 
-| Node.js Version | SQLite Status | Impact on Project |
+| Capability | notebooklm-py (Unofficial) | NotebookLM Enterprise API (Official) |
 |---|---|---|
-| 18.x (current min) | `node:sqlite` not available | better-sqlite3 is the only option |
-| 20.x | `node:sqlite` not available | better-sqlite3 is the only option |
-| 22.5 - 22.12 | `node:sqlite` experimental, requires `--experimental-sqlite` flag | Impractical for CLI tool |
-| 22.13+ | `node:sqlite` experimental, no flag needed but emits `ExperimentalWarning` | Usable but noisy |
-| 23.4+ | `node:sqlite` experimental, no flag needed | Usable but still experimental |
-| 25.7+ | `node:sqlite` Release Candidate (Stability 1.2) | Getting close but not stable yet |
+| **Auth** | Browser login (Playwright) | gcloud service account |
+| **Create notebook** | ✅ | ✅ |
+| **Add URL source** | ✅ | ✅ |
+| **Add YouTube source** | ✅ | ✅ (via videoContent) |
+| **Add text source** | ✅ | ✅ |
+| **Add PDF/files** | ✅ | ✅ |
+| **Chat/Query** | ✅ | ❌ Not in API |
+| **Generate report** | ✅ | ❌ Not in API |
+| **Web research** | ✅ (fast/deep modes) | ❌ Not in API |
+| **Source fulltext** | ✅ | ❌ Not documented |
+| **Cost** | Free (Google account) | Gemini Enterprise license |
+| **Stability** | LOW — undocumented APIs | MEDIUM — v1alpha Preview |
+| **Rate limits** | Undocumented, may be throttled | Enterprise quotas |
 
-**Recommendation:** Keep Node.js 18+ minimum. Use better-sqlite3 now. When `node:sqlite` reaches Stability 2 (Stable) in an LTS release, consider migrating. The cache module should abstract the SQLite provider behind a clean interface to make this future migration easy.
-
-## Future-Proofing: node:sqlite Migration Path
-
-The better-sqlite3 API and `node:sqlite` API are intentionally similar (node:sqlite was designed to be a compatible replacement). A future migration would be straightforward:
-
-```javascript
-// Current (better-sqlite3)
-const Database = require('better-sqlite3');
-const db = new Database(path);
-
-// Future (node:sqlite) — almost identical API
-const { DatabaseSync } = require('node:sqlite');
-const db = new DatabaseSync(path);
-```
-
-Both use `db.prepare(sql)`, `stmt.get()`, `stmt.all()`, `stmt.run()` with the same signatures. The `node:sqlite` module was explicitly modeled after better-sqlite3.
-
-**Action:** Create a `src/lib/cache.js` module that encapsulates SQLite access. All cache consumers go through this module, never importing better-sqlite3 directly. When `node:sqlite` stabilizes, only `cache.js` needs to change.
+**Bottom line:** For our RAG synthesis use case (add sources → query → get synthesis), only `notebooklm-py` provides the chat/query capability. The official API is useful for source management but cannot perform the actual research synthesis step.
 
 ## Sources
 
 | Source | Type | Confidence | Key Finding |
 |---|---|---|---|
-| [better-sqlite3 Context7 docs (v12.6.2)](https://github.com/wiselibs/better-sqlite3) | Context7 | HIGH | Synchronous API, WAL mode, prepared statements |
-| [Node.js sqlite docs (v25.7.0)](https://nodejs.org/api/sqlite.html) | Official docs | HIGH | Stability 1.2 (Release Candidate), available since 22.5 |
-| [esbuild Context7 docs](https://github.com/evanw/esbuild) | Context7 | HIGH | External declaration for native .node addons |
-| [esbuild issue #2674 — sqlite3 with esbuild](https://github.com/evanw/esbuild/issues/2674) | GitHub issue | HIGH | Confirms native addons cannot be bundled |
-| [better-sqlite3 issue #1367 — Claude Code distribution](https://github.com/WiseLibs/better-sqlite3/issues/1367) | GitHub issue | HIGH | Real-world example of external better-sqlite3 in CLI distribution |
-| [sql.js GitHub](https://github.com/sql-js/sql.js) | GitHub README | HIGH | Async initialization required, WASM binary distribution |
-| [Node.js perf_hooks docs](https://nodejs.org/api/perf_hooks.html) | Official docs | HIGH | Stable API, performance.mark/measure |
-| Existing codebase: `src/lib/profiler.js` | Direct review | HIGH | Already uses perf_hooks, opt-in via GSD_PROFILE |
-| Existing codebase: `src/router.js` | Direct review | HIGH | 947 lines, 16 lazy loaders, switch-based dispatch |
-| Existing codebase: `src/lib/helpers.js` | Direct review | HIGH | Map-based in-memory cache, works for single invocation |
+| [youtube-dl-exec Context7 docs (v3.x)](https://github.com/microlinkhq/youtube-dl-exec) | Context7 | HIGH | `dumpSingleJson`, `skipDownload`, subprocess control, Promise interface |
+| [youtube-dl-exec GitHub (v3.1.3)](https://github.com/microlinkhq/youtube-dl-exec/releases/tag/v3.1.3) | GitHub | HIGH | Latest release Feb 25, 2026. 602 stars, MIT license. Requires Python 3.9+. |
+| [yt-dlp Wiki/Docs (Context7)](https://github.com/yt-dlp/yt-dlp) | Context7 | HIGH | `ytsearch:` prefix, subtitle formats, rate limiting guidance |
+| [yt-dlp GitHub](https://github.com/yt-dlp/yt-dlp) | GitHub | HIGH | Subtitle formats: json3, vtt, srt, srv3. `--skip-download --write-info-json` for metadata-only |
+| [yt-dlp issue #9371](https://github.com/yt-dlp/yt-dlp/issues/9371) | GitHub | HIGH | `--write-sub --write-auto-sub --sub-lang en` subtitle extraction patterns |
+| [notebooklm-py GitHub (v0.3.2)](https://github.com/teng-lin/notebooklm-py) | GitHub | MEDIUM | Full API: create, sources, chat, artifacts. Uses undocumented Google APIs. 2.4K stars, MIT. |
+| [notebooklm-py pyproject.toml](https://github.com/teng-lin/notebooklm-py/blob/main/pyproject.toml) | GitHub | HIGH | Version 0.3.2, Python >=3.10, deps: httpx, click, rich. Optional: playwright for browser login. |
+| [Google Cloud NotebookLM Enterprise API](https://docs.cloud.google.com/gemini/enterprise/notebooklm-enterprise/docs/api-notebooks) | Official docs | HIGH | v1alpha Preview. Create/list/delete notebooks, share. Updated 2026-02-26. |
+| [Google Cloud NotebookLM Sources API](https://docs.cloud.google.com/gemini/enterprise/notebooklm-enterprise/docs/api-notebooks-sources) | Official docs | HIGH | Add sources: webContent, videoContent, textContent, Google Drive, file upload. No chat/query endpoint. |
+| [Exa MCP Server](https://github.com/exa-labs/exa-mcp-server) | GitHub | HIGH | Semantic search with categories (research_paper, personal_site). Code search via exa-code. |
+| [Perplexity MCP Server](https://github.com/perplexityai/modelcontextprotocol) | GitHub | HIGH | Official Perplexity MCP. Sonar models for real-time web search. Paid API. |
+| [Best MCP Servers 2026 (Builder.io)](https://www.builder.io/blog/best-mcp-servers-2026) | Web article | MEDIUM | MCP landscape comparison — Exa for semantic, Tavily for RAG, Brave for broad search |
+| [MCP Benchmark 2026 (AIMultiple)](https://aimultiple.com/browser-mcp) | Web article | MEDIUM | Benchmarked 8 MCP servers — Exa highest success rate for search & extraction |
+| [SurfSense (NotebookLM alternative)](https://github.com/Decentralised-AI/SurfSense-Open-Source-Alternative-to-NotebookLM) | GitHub | LOW | 2-tier RAG, 6000+ embedding models. Too heavy for CLI integration. |
+| [EmbedJs (Node.js RAG)](https://github.com/llm-tools/embedJs) | GitHub | LOW | Node.js RAG framework. Async, requires vector DB. Wrong architecture for CLI. |

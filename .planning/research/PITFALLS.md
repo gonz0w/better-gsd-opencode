@@ -1,369 +1,512 @@
 # Pitfalls Research
 
-**Domain:** Adding SQLite cache layer, agent architecture consolidation, command restructuring, and performance optimization to an existing Node.js single-file CLI tool (1058KB bundle, 751 tests, esbuild pipeline, file-copy deploy)
-**Researched:** 2026-03-01
-**Confidence:** HIGH — based on codebase analysis (34 src/ modules, 751 tests, existing in-memory Map cache, esbuild bundler config, deploy.sh pipeline), Node.js v25 `node:sqlite` official docs, esbuild native addon documentation, better-sqlite3 bundling issues, and prior v7.1 pitfall research
+**Domain:** Adding RAG-powered research pipeline (yt-dlp, notebooklm-py, Brave Search, Context7) to an existing zero-dependency single-file Node.js CLI tool (1133KB bundle, 762 tests, esbuild pipeline, file-copy deploy)
+**Researched:** 2026-03-02
+**Confidence:** HIGH — based on Context7 docs for notebooklm-py and yt-dlp, official troubleshooting guides, GitHub issue trackers, Brave Search results for real-world failure reports, and codebase analysis of existing gsd-tools.cjs architecture
 
 <!-- section: compact -->
 <pitfalls_compact>
 **Top pitfalls:**
-1. **Native SQLite addon breaks single-file deploy** — use `node:sqlite` (built-in) not `better-sqlite3`; requires Node ≥22.5 and still experimental (Phase: Cache Foundation)
-2. **Cache grows stale while markdown stays authoritative** — invalidate on every write via existing `invalidateFileCache()` pattern; hash-stamp entries; never trust cache over disk (Phase: Cache Foundation)
-3. **Agent consolidation breaks workflow spawn chains** — map ALL 41+ command wrappers and 19+ workflows to agent roles BEFORE merging; verify no spawn references break (Phase: Agent Audit)
-4. **Command rename breaks 751 tests and all workflows** — use alias-based migration: old names work for 1 version, emit deprecation warning, remove in v9.0 (Phase: Command Consolidation)
-5. **esbuild bundles WASM blob inflating bundle past 1500KB budget** — if using sql.js WASM, bundle size jumps ~1MB; `node:sqlite` adds 0KB to bundle (Phase: Cache Foundation)
+1. **notebooklm-py uses unofficial reverse-engineered API with cookie-based auth that expires every few weeks** — not a real API; Google can break it at any time; session cookies need manual browser re-login; account flagging risk (Phase: NotebookLM Integration)
+2. **yt-dlp breaks constantly as YouTube actively fights it** — nsig extraction failures, SABR streaming blocks, rate limiting require frequent yt-dlp updates; pinning a version guarantees breakage within weeks (Phase: YouTube Integration)
+3. **Python as a runtime dependency breaks the zero-dependency promise** — Node.js CLI must spawn Python subprocess for notebooklm-py; Python version requirements (>=3.10), venv management, PATH resolution, and cross-platform differences all introduce failure modes that don't exist today (Phase: Foundation)
+4. **RAG latency is minutes not seconds** — NotebookLM source ingestion takes 30 seconds to 5+ minutes; audio/artifact generation takes 3-45 minutes; current research workflow takes 10-30 seconds of LLM time; users will perceive RAG research as broken (Phase: Orchestration)
+5. **YouTube transcript unavailability pollutes research** — many videos lack subtitles; auto-generated captions are noisy; searching YouTube for "React hooks best practices" returns clickbait and outdated content alongside quality content; no reliable signal for filtering quality (Phase: YouTube Integration)
 
-**Tech debt traps:** premature SQLite schema, caching write paths not just reads, over-normalizing markdown into SQL tables, creating a migration framework for a single-file cache
+**Tech debt traps:** building a full RAG pipeline when NotebookLM's chat API can do direct Q&A against sources; overengineering the orchestration layer; storing NotebookLM auth in the project repo; adding playwright as a transitive dependency
 
-**Security risks:** SQLite file permissions in shared environments, SQL injection from unsanitized markdown content used in queries
+**Security risks:** Google session cookies in `~/.notebooklm/storage_state.json` contain full Google account access; yt-dlp can be tricked into downloading non-YouTube content if URLs aren't validated; API keys/cookies in environment variables leak through process listing
 
 **"Looks done but isn't" checks:**
-- Cache layer: verify `cachedReadFile()` and SQLite cache return IDENTICAL results for all 751 tests
-- Agent consolidation: verify every workflow `.md` file's agent spawn references resolve to an existing agent
-- Command rename: verify all 41 command wrappers in `commands/` use new names or valid aliases
-- Performance: verify `GSD_PROFILE=1` baselines show improvement, not regression
+- NotebookLM integration: verify auth token refresh works after 2+ weeks without re-login
+- yt-dlp transcripts: test with videos that have NO subtitles, ONLY auto-generated captions, and ONLY manual captions — three different code paths
+- Graceful fallback: disable ALL RAG tools (`yt-dlp` not installed, `notebooklm` not authenticated, Brave Search API key absent) and verify research workflow produces identical quality to current LLM-only approach
+- Latency: measure end-to-end time for a real research query through the full pipeline; if >3 minutes, the UX design is wrong
 </pitfalls_compact>
 <!-- /section -->
 
 <!-- section: critical_pitfalls -->
 ## Critical Pitfalls
 
-### Pitfall 1: Native SQLite Addon Destroys Single-File Deploy Model
+### Pitfall 1: notebooklm-py Is an Unofficial Reverse-Engineered API — Not a Real API
 
 **What goes wrong:**
-`better-sqlite3` is a native C++ addon. It compiles a `.node` binary during `npm install` that is platform-specific (linux-x64, darwin-arm64, etc.). esbuild cannot bundle `.node` files — the esbuild documentation explicitly states: "a native `.node` extension has expectations about the layout of the file system that are no longer true after bundling" (esbuild CHANGELOG-2022, issue #2830). The current build pipeline (`build.js`) produces a single `bin/gsd-tools.cjs` file that `deploy.sh` copies to `~/.config/oc/get-shit-done/bin/`. With `better-sqlite3`, deploy must ALSO copy `node_modules/better-sqlite3/build/Release/better_sqlite3.node` — plus ensure the load path resolves correctly from the deployed location.
+notebooklm-py (v0.x, 2.4k GitHub stars) is an **unofficial** Python client that reverse-engineers Google NotebookLM's internal `batchexecute` RPC endpoint. There is no official NotebookLM API. The library:
 
-This breaks three guarantees simultaneously:
-- **Single-file deploy:** `deploy.sh` copies `bin/`, `workflows/`, `templates/`, `references/`, `src/`, `agents/`. Adding a native addon means also copying `node_modules/` or the `.node` file, plus updating the require path.
-- **Cross-machine portability:** The `.node` binary compiled on the dev machine won't work if deployed to a machine with a different Node.js ABI version (`NODE_MODULE_VERSION` mismatch — documented in better-sqlite3 issue #1411 and multiple Reddit reports).
-- **esbuild bundling:** Must mark `better-sqlite3` as `external` in build.js, meaning it's resolved at runtime from `node_modules/`, not bundled.
+1. **Requires browser-based Google login** to obtain session cookies (`SID`, `HSID`, `SSID`, `APISID`, `SAPISID`, `__Secure-1PSID`, `__Secure-3PSID`). The `notebooklm login` command opens a Chromium browser via Playwright for the user to manually authenticate.
+2. **Cookies expire every few weeks.** When they expire, ALL API calls fail with `RPCError` or return `None`. The only fix is re-running `notebooklm login` — which requires a GUI browser, meaning headless servers and CI/CD environments cannot self-heal.
+3. **Google enforces strict rate limits** on the `batchexecute` endpoint. Manifestations: RPC calls returning `None`, `RPCError` with ID `R7cb6c`, `UserDisplayableError` with code `[3]`. Free tier: 50 chat queries/day. Paid tier: 500/day. Source limits: 50 per notebook (free), up to 600 (Ultra).
+4. **Google can break the API at any time.** As an undocumented internal endpoint, Google has no obligation to maintain backward compatibility. A Google-side change can render notebooklm-py non-functional until the library maintainer reverse-engineers the new protocol.
+5. **Account flagging risk.** Google's automated systems may flag accounts using unofficial API access. Reports exist of NotebookLM uploads triggering Google account lockouts (Reddit r/notebooklm, user reports of Terms of Service warnings followed by account disables). Google's API Terms of Service explicitly prohibit "reverse engineer[ing] or attempt[ing] to extract the source code from any API."
+
+**Consequences:**
+- Research pipeline has a **single point of failure** that depends on a third-party reverse-engineering effort
+- Authentication requires human interaction (browser login) — cannot be fully automated
+- Rate limits mean batch research operations will hit walls quickly
+- Legal/TOS risk for users' Google accounts
 
 **Why it happens:**
-`better-sqlite3` is the most-recommended SQLite library for Node.js (3,977 dependents on npm). Its synchronous API is a perfect fit for this CLI's synchronous I/O pattern. The temptation is strong. But "best library for a web server" ≠ "best library for a single-file CLI deployed by file copy."
+Google has not released an official NotebookLM API despite repeated community requests (Reddit r/notebooklm, June 2025: "it is in the plan" / "COMING SOON"). The gap between "NotebookLM is useful for research synthesis" and "there's no API" creates demand for unofficial solutions. notebooklm-py fills this gap, but inherits all the fragility of reverse-engineering.
 
-**How to avoid:**
-1. **Use `node:sqlite` (built-in).** Node.js v22.5+ includes `node:sqlite` as a built-in module. As of Node v25.7.0, it is **Stability 1.2 (Release Candidate)** — no longer behind `--experimental-sqlite` flag since v23.4.0/v22.13.0. It provides `DatabaseSync` with synchronous API (matching the CLI's sync I/O pattern), requires zero bundle size increase (it's a Node.js built-in), and needs no native compilation.
-2. **If `node:sqlite` stability is unacceptable,** use `sql.js` (SQLite compiled to WASM via emscripten). Pure JavaScript, no native addon, esbuild can bundle it. BUT: adds ~1MB WASM blob to bundle (exceeds 1500KB budget) and is 2-5x slower than native SQLite. This is a fallback, not a preference.
-3. **NEVER use `better-sqlite3` for this project.** The deployment model is incompatible. Period.
-4. **Bump minimum Node.js version to 22.5+ in package.json engines field.** Currently `>=18`. The `node:sqlite` module requires 22.5+. This is a breaking change that must be documented and announced.
-5. **Wrap `node:sqlite` import in a try/catch with graceful fallback.** If the user's Node.js doesn't support `node:sqlite`, fall back to the existing in-memory Map cache. The cache is an optimization, not a requirement.
+**Prevention:**
+1. **Design NotebookLM as a fully optional enhancement, never a requirement.** The research workflow MUST produce complete, high-quality output without NotebookLM. NotebookLM adds depth but its absence cannot degrade output.
+2. **Implement auth health checks before every research operation.** Before spawning the NotebookLM pipeline, run `notebooklm auth check --json` and parse the result. If auth is invalid, skip NotebookLM entirely and log a user-visible message: `"NotebookLM unavailable (session expired). Run 'notebooklm login' to re-authenticate. Continuing with LLM-only research."`
+3. **Implement aggressive timeouts.** NotebookLM operations should timeout after 60 seconds for chat queries, 120 seconds for source ingestion. If timeout fires, fall back to LLM-only synthesis.
+4. **Use a dedicated Google account for NotebookLM automation**, not the user's primary Google account. If the account gets flagged, it doesn't affect the user's email/drive/photos.
+5. **Monitor notebooklm-py releases** for breaking changes. Pin a known-good version in requirements but have a strategy for rapid updates when Google changes their endpoint.
+6. **Consider alternatives for synthesis.** Instead of NotebookLM, the orchestration layer could feed gathered sources (transcripts, search results, docs) directly into the LLM's context window as structured prompts. This eliminates the NotebookLM dependency entirely while keeping the multi-source research pattern.
 
-**Warning signs:**
-- `better-sqlite3` appears in `package.json` dependencies
-- `build.js` adds `better-sqlite3` to `external` array
-- `deploy.sh` gains `cp -r node_modules/` lines
-- CI/CD runs `npm install` with `--build-from-source` flags
-- Bundle size jumps past 1500KB budget
+**Detection (warning signs):**
+- `RPCError` appearing in research output
+- Research operations returning empty or `None` results
+- User reports "NotebookLM stopped working" after a few weeks
+- Google account security alerts for the authenticated account
+- notebooklm-py GitHub issues spike with "broken" reports
 
 **Phase to address:**
-Cache Foundation — the FIRST decision. Technology choice gates everything else.
+NotebookLM Integration — first task must be auth validation and fallback design, not feature implementation.
+
+**Confidence:** HIGH — based on Context7 notebooklm-py docs (authentication, troubleshooting, known limitations), GitHub teng-lin/notebooklm-py releases/issues, Reddit r/notebooklm user reports, Google API Terms of Service.
 
 ---
 
-### Pitfall 2: Cache Becomes Source of Truth Instead of Markdown
+### Pitfall 2: yt-dlp Is in a Perpetual Arms Race with YouTube
 
 **What goes wrong:**
-The system reads STATE.md, ROADMAP.md, PLAN.md dozens of times per CLI invocation. A SQLite cache eliminates repeated parsing by storing parsed results. But over time, code starts reading from cache WITHOUT checking if the markdown file changed. Three failure modes:
+YouTube actively combats third-party download/extraction tools. As of early 2026, YouTube has deployed multiple countermeasures:
 
-1. **External edit invalidation:** User edits ROADMAP.md in their editor. CLI reads cached version. Agent acts on stale roadmap data. Plans get created for a phase that was restructured.
-2. **Write-through failure:** `cmdStatePatch()` writes to STATE.md but doesn't update the cache. Next `cmdStateLoad()` reads stale cache. STATE.md says "Phase 5" but cache says "Phase 4."
-3. **Cache corruption silent fallback:** SQLite database file gets corrupted (power loss, concurrent access). CLI silently reads corrupt data instead of falling back to disk parsing. All downstream operations produce garbage.
+1. **SABR (Server-Based Adaptive Bit Rate) enforcement.** YouTube forces SABR streaming for certain clients, which breaks yt-dlp's format extraction. Error: `"YouTube is forcing SABR streaming for this client"`. This is a 2026-era escalation — yt-dlp must implement new client spoofing strategies.
+2. **nsig extraction failures.** YouTube's JavaScript player obfuscation changes regularly, breaking yt-dlp's signature decryption. Error: `"nsig extraction failed: Some formats may be missing"`. This is the MOST frequent breakage — multiple GitHub issues per month (#13241, #13249, #13252, #13260, #13968, #14707, #14734).
+3. **Rate limiting escalation.** Recent reports (Reddit r/youtubedl, June 2026): yt-dlp now "sleeps for 5-6 seconds as required by the site" during normal operation. Downloading transcripts/subtitles triggers rate limits even faster than video downloads.
+4. **PO Token requirements.** YouTube increasingly requires Proof of Origin tokens for certain operations. yt-dlp has implemented a PO Token Provider Framework, but it adds complexity and can fail independently.
 
-This is especially dangerous because the project has an established convention: `cachedReadFile()` (helpers.js line 30) explicitly documents "lives for single CLI invocation, no TTL needed." A persistent SQLite cache changes this assumption fundamentally — it persists ACROSS invocations. Every code path that assumes "cache = this invocation only" breaks.
+For our use case (transcript extraction, not video download), the impact is:
+- **Metadata extraction** (`--dump-json`) is generally reliable but still subject to rate limiting
+- **Subtitle/transcript extraction** (`--write-subs`, `--write-auto-sub`) requires the same player decryption that breaks regularly
+- **A pinned version of yt-dlp guarantees breakage within weeks** as YouTube deploys new countermeasures
+
+**Consequences:**
+- Research pipeline fails intermittently based on YouTube's current countermeasure state
+- Users see cryptic error messages from yt-dlp that have nothing to do with their research query
+- yt-dlp must be updated frequently (nightly builds sometimes required), which conflicts with reproducible builds
 
 **Why it happens:**
-The current in-memory Map cache is inherently safe: it's created at process start and discarded at process exit. There is zero staleness risk. SQLite persistence introduces a new failure mode that didn't exist before. Developers who are used to the "Map cache = always fresh" assumption will not think to add invalidation checks when reading from SQLite.
+YouTube's business model depends on ad views and YouTube Premium subscriptions. Third-party tools that extract content bypass both revenue streams. This is a structural conflict with no resolution — the arms race will continue indefinitely.
 
-**How to avoid:**
-1. **Hash-based invalidation.** Every cached entry stores the file's `mtime` (from `fs.statSync()`) and size. Before returning cached data, check: `current_mtime === cached_mtime && current_size === cached_size`. If mismatch, re-parse from disk and update cache. This adds one `statSync()` call per read — much cheaper than full file read + regex parsing.
-2. **Extend `invalidateFileCache(filePath)` to also invalidate SQLite cache.** Every existing call site that invalidates the Map cache (helpers.js line 46) must also invalidate the SQLite entry. Grep for all `invalidateFileCache` calls and ensure SQLite is included.
-3. **Write-through on ALL mutations.** Every command that writes a markdown file (`cmdStatePatch`, `cmdStateUpdate`, `cmdFrontmatterSet`, `cmdFrontmatterMerge`, `cmdMemoryWrite`) must update the SQLite cache in the same operation. Wrap file-write + cache-update in a single function.
-4. **Fallback-first design.** If SQLite open fails, cache read fails, or cache data fails validation: silently fall back to disk read. NEVER crash, NEVER return partial data. Match the existing pattern from `cachedReadFile()` which returns `null` on error.
-5. **Test with cache AND without cache.** Run the full 751-test suite with SQLite cache enabled AND disabled. Results must be identical. Any difference reveals a cache coherence bug.
+**Prevention:**
+1. **yt-dlp for metadata ONLY, not for video/audio download.** Use `yt-dlp --dump-json --flat-playlist "ytsearch10:React hooks"` to get video titles, descriptions, durations, and URLs. This is the least-breakage path because metadata extraction is lighter than media extraction.
+2. **Subtitles as a bonus, not a requirement.** Extract transcripts when available (`--write-auto-sub --sub-langs en --skip-download`), but design the pipeline to work with metadata-only (title, description, channel name) when transcripts are unavailable. Many dev tutorial videos (~30-40% based on community reports) lack any form of subtitles.
+3. **Version management via `--update-to nightly` is a trap.** Instead, check yt-dlp version before each research operation and warn if it's >30 days old: `"yt-dlp version is outdated (installed: 2026.01.15, latest: 2026.03.01). YouTube extraction may fail. Run 'yt-dlp -U' to update."`
+4. **Implement retry with exponential backoff.** First attempt fails → wait 2s → retry. Second fails → wait 5s → retry. Third fails → give up and continue research without YouTube data. Never block the research pipeline on yt-dlp failures.
+5. **Add `--sleep-interval 2 --max-sleep-interval 5`** to all yt-dlp invocations to respect rate limits proactively.
+6. **Cache successful transcript extractions.** Store extracted transcripts in `.planning/.cache/transcripts/` keyed by video ID. YouTube video content doesn't change after upload, so cached transcripts never go stale.
 
-**Warning signs:**
-- Tests pass with cache but fail without (or vice versa)
-- `init execute-phase` output differs between first run (cold cache) and second run (warm cache)
-- User reports "I edited ROADMAP.md but the tool still shows old data"
-- `GSD_DEBUG=1` shows "cache hit" for a file that was just modified
+**Detection (warning signs):**
+- `nsig extraction failed` in stderr output
+- `SABR streaming` warnings
+- yt-dlp commands taking >30 seconds for simple metadata queries
+- Transcript extraction returning empty files
+- `HTTP Error 429: Too Many Requests`
 
 **Phase to address:**
-Cache Foundation — invalidation strategy must be designed before ANY caching code is written.
+YouTube Integration — design for failure from day one; never assume yt-dlp will work on any given day.
+
+**Confidence:** HIGH — based on Context7 yt-dlp docs, 10+ GitHub issues from 2025-2026, Reddit r/youtubedl user reports, DEV Community article on 2026 YouTube blocking.
 
 ---
 
-### Pitfall 3: Agent Consolidation Breaks Workflow Spawn References
+### Pitfall 3: Adding Python as a Runtime Dependency to a Zero-Dependency Node.js CLI
 
 **What goes wrong:**
-The codebase has 11 agent definitions (in `agents/gsd-*.md`) and 41+ command wrappers (in `commands/gsd-*.md`) that spawn agents by name. Workflows (in `workflows/`) reference agents via spawn syntax (e.g., "spawn gsd-executor", "@agent gsd-planner"). If agent `gsd-plan-checker` is merged into `gsd-planner` (consolidation), every workflow that explicitly spawns `gsd-plan-checker` breaks.
+The current system (`gsd-tools.cjs`) has **zero runtime dependencies** — it's a single-file Node.js script that works with just `node`. Adding `notebooklm-py` (Python >=3.10, with `httpx`, `click`, `rich` dependencies, plus optional `playwright` for browser login) and `yt-dlp` (Python package or standalone binary) introduces an entirely new runtime:
 
-The dependency chain is:
-```
-commands/gsd-plan-phase.md → workflows/plan-phase.md → spawns gsd-planner + gsd-plan-checker
-commands/gsd-execute-phase.md → workflows/execute-phase.md → spawns gsd-executor + gsd-verifier
-commands/gsd-verify-work.md → workflows/verify-work.md → spawns gsd-verifier
-```
+1. **Python version fragmentation.** notebooklm-py requires Python >=3.10. macOS ships with Python 3 but may be 3.9. Many Linux distros still default to Python 3.8/3.9. Windows may not have Python at all. The Node.js CLI must discover which Python is available, and it might be `python`, `python3`, `python3.10`, or a full path.
 
-Renaming or merging an agent without updating EVERY reference in this chain causes the orchestrator to fail when it tries to spawn a non-existent agent. The host editor renders this as a silent failure (agent doesn't spawn) or an error dialog, depending on implementation.
+2. **Virtual environment hell.** Best practice is to install Python packages in a venv, not globally. But:
+   - Where does the venv live? Per-project (`.planning/.venv/`)? Per-user (`~/.config/gsd/venv/`)? Global (`/opt/gsd-python/`)?
+   - Who creates the venv? The Node.js CLI doing `execSync('python3 -m venv ...')` on first run?
+   - `venv` activation is shell-specific (`source bin/activate` vs `Scripts\activate.bat`). You can't "activate" a venv from Node.js — you must use the full path to the venv's Python binary.
 
-Additionally, `AGENT_MANIFESTS` in `src/lib/context.js` (line 99) has per-agent field whitelists. If `gsd-plan-checker` is merged into `gsd-planner`, the manifest for `gsd-planner` must be updated to include fields that `gsd-plan-checker` needed (e.g., `plans`, `plan_count`). Missing fields = missing context for the merged agent's checker behavior.
+3. **PATH resolution across `child_process`.** Node.js `execSync`/`spawn` inherits the parent's PATH by default, but:
+   - On macOS, GUI applications (including the host editor) may not inherit the user's shell PATH. Python installed via Homebrew (`/opt/homebrew/bin/python3`) may not be on PATH in the editor's process environment.
+   - If env is explicitly passed to `spawn()`, the parent's PATH may be overwritten (Node.js issue #34667 — "PATH environment variable is not updated in the spawned process" on Windows).
+   - `PYTHONPATH` in the subprocess may differ from the user's terminal (Reddit r/node report).
 
-**Why it happens:**
-Agent names are string references scattered across markdown files, not typed imports. There's no compile-time checking. A rename that would be caught by a linter in TypeScript is invisible in markdown until runtime.
+4. **Cross-platform Python binary naming.** Windows: `python` (from Microsoft Store or Python installer). macOS: `python3` (Homebrew) or `/usr/bin/python3` (Xcode CLT). Linux: `python3` or `python3.10` or `python`. The Node.js CLI must try multiple names.
 
-**How to avoid:**
-1. **Build an agent dependency map BEFORE any consolidation.** Run: `grep -r 'gsd-' agents/ commands/ workflows/ | grep -v '.git'` to find every cross-reference. Document which files reference which agents. This is the blast radius analysis.
-2. **Consolidation must be a rename-first, merge-second process.** Step 1: Add the new agent name as an alias (existing agent accepts both names). Step 2: Update all references to new name. Step 3: Remove old agent definition. Never do step 3 before step 2.
-3. **Update `AGENT_MANIFESTS` in context.js.** When merging agents, the new manifest must be the UNION of both old manifests' fields. A merged `gsd-planner` that also does plan-checking needs: `fields: ['phase_dir', 'phase_number', 'phase_name', 'plan_count', 'research_enabled', 'plan_checker_enabled', 'intent_summary', 'plans']` (union of planner + plan-checker fields).
-4. **Add a validation command:** `gsd-tools validate-agents` that reads all workflow `.md` files, extracts agent spawn references, and verifies each referenced agent exists in `agents/`. Run this as part of `deploy.sh` smoke test.
-5. **Update `deploy.sh` to verify agent count.** Currently it reports `AGENT_COUNT=$(ls "$AGENT_DIR"/gsd-*.md 2>/dev/null | wc -l)`. After consolidation, the expected count changes. Update the assertion.
+5. **yt-dlp installation methods diverge.** It can be: a pip package (`pip install yt-dlp`), a standalone binary (downloaded from GitHub releases), a system package (`brew install yt-dlp`, `apt install yt-dlp`), or a pipx-installed tool. Each method puts the binary in a different location with different update mechanisms.
 
-**Warning signs:**
-- Workflow says "spawn gsd-plan-checker" but `agents/gsd-plan-checker.md` no longer exists
-- `init execute-phase --manifest gsd-planner` returns fewer fields than before
-- Plan-checking step in `/gsd-plan-phase` silently skips (agent not found, no error)
-- Agent count in deploy output drops unexpectedly
-
-**Phase to address:**
-Agent Audit — complete the dependency map and consolidation plan BEFORE removing any agent definitions.
-
----
-
-### Pitfall 4: Command Rename Breaks 751 Tests and External Consumers
-
-**What goes wrong:**
-The router.js has 85 `case` branches. Command consolidation (e.g., merging `find-phase`, `list-phases`, `phases` into `phase list`, `phase find`) changes the command string that callers use. Three categories of callers break:
-
-1. **Test suite (751 tests, 17,965 lines).** Tests call commands via `execSync('node bin/gsd-tools.cjs find-phase 3')`. Renaming `find-phase` to `phase find` breaks every test that uses the old name.
-2. **Workflow files.** Workflows contain `gsd-tools find-phase` calls. There are 27+ workflow files with embedded CLI calls.
-3. **Agent system prompts.** Agent markdown files reference CLI commands for agents to call. `gsd-executor.md` (481 lines) contains multiple `gsd-tools` invocations.
-4. **User muscle memory.** External users who've memorized `gsd-tools find-phase` will get errors.
-
-A big-bang rename that changes all commands at once is a 1000+ line diff touching tests, workflows, agents, and the router. If any reference is missed, it causes a runtime failure that may not surface until that specific code path is exercised.
+**Consequences:**
+- A tool that "just works" today becomes one that requires a setup wizard
+- First-run experience goes from "instant" to "install Python, create venv, pip install dependencies, run browser login"
+- Support burden increases dramatically — "yt-dlp not found", "Python version too old", "pip not available"
+- Every new machine/environment requires redoing the Python setup
 
 **Why it happens:**
-Command names are string identifiers used across a distributed set of markdown and JavaScript files. There's no refactoring tool that renames a CLI command across markdown, JavaScript, and bash contexts simultaneously.
+NotebookLM's only available client library is Python. yt-dlp is written in Python. These are the tools available — there's no Node.js alternative for either.
 
-**How to avoid:**
-1. **Alias-based migration (MANDATORY).** In router.js, add aliases: `case 'find-phase': /* fall through */ case 'phase': { if (args[1] === 'find') { ... } }`. Old command works, new command works. Both route to the same handler.
-2. **Deprecation warnings.** When old command name is used, emit to stderr: `"[DEPRECATED] 'find-phase' is now 'phase find'. Old name will be removed in v9.0."` Use the existing `debugLog` pattern but write to stderr unconditionally.
-3. **Migrate tests incrementally.** Don't rename all tests at once. Add new tests using new command names. Mark old-name tests with comments. Remove old names in a future version.
-4. **Update workflows and agents IN THE SAME PHASE as the router change.** The command rename, workflow update, and agent update must be atomic — merged in the same commit. Otherwise there's a window where deployed workflows reference commands that don't exist.
-5. **Add a `COMMAND_ALIASES` map in constants.js.** `{ 'find-phase': 'phase find', 'list-phases': 'phase list', ... }`. Router checks aliases before failing with "unknown command." This also enables `--help` to show the canonical name.
-6. **Contract tests.** The existing snapshot tests for command output must be updated for new command names. But keep old-name snapshots until aliases are removed.
-
-**Warning signs:**
-- Tests fail with "Unknown command: find-phase" after rename
-- Agent says "running gsd-tools find-phase" and gets an error
-- Workflow stops mid-execution because CLI call returned non-zero exit code
-- `COMMAND_HELP` entries don't match actual command names
-
-**Phase to address:**
-Command Consolidation — implement aliases FIRST (old + new both work), then migrate callers, then (v9.0) remove old names.
-
----
-
-### Pitfall 5: node:sqlite Experimental Status and Node.js Version Constraint
-
-**What goes wrong:**
-`node:sqlite` is Stability 1.2 (Release Candidate) as of Node v25.7.0. The API has changed between versions:
-- v22.5.0: Added (experimental, behind `--experimental-sqlite` flag)
-- v23.4.0/v22.13.0: Flag removed, but still experimental
-- v24.0.0/v22.16.0: `timeout` option added, `aggregate` added
-- v25.5.0: `defensive` enabled by default
-- v25.7.0: Release Candidate status
-
-The current `package.json` specifies `"node": ">=18"`. Using `node:sqlite` requires bumping to `>=22.5`. Users running Node 18 or 20 (both still in LTS) will get: `Error: Cannot find module 'node:sqlite'`.
-
-Additionally, the API may change before reaching Stability 2 (Stable). Code written against v22.5 API may break on v25 due to new default options (`defensive: true` in v25.5 changes behavior — writes to shadow tables now fail by default).
-
-**Why it happens:**
-Node.js built-in SQLite is the RIGHT technology choice for this project (zero bundle impact, sync API, no native addon). But "right choice" doesn't mean "mature choice." Experimental APIs change.
-
-**How to avoid:**
-1. **Graceful capability detection.** Wrap `node:sqlite` import in try/catch:
-   ```javascript
-   let DatabaseSync = null;
-   try { ({ DatabaseSync } = require('node:sqlite')); }
-   catch { /* node:sqlite not available — cache disabled */ }
+**Prevention:**
+1. **yt-dlp: prefer standalone binary over Python package.** yt-dlp publishes self-contained binaries (Linux, macOS, Windows) on GitHub releases. These have zero Python dependency. Detect with `which yt-dlp` or check common install paths. If not found, provide install instructions: `"yt-dlp not found. Install: brew install yt-dlp (macOS) / sudo apt install yt-dlp (Linux) / winget install yt-dlp (Windows)"`
+2. **notebooklm-py: isolate in a managed venv.** Create venv at `~/.config/gsd/python-env/` (or `$NOTEBOOKLM_HOME`). On first use, the CLI checks for the venv, creates it if missing, installs notebooklm-py into it. All subsequent calls use the venv's Python binary directly: `execSync('~/.config/gsd/python-env/bin/python -m notebooklm ...')`. Never rely on PATH or venv activation.
+3. **Implement a `gsd-tools util:check-tools` command** that validates all optional dependencies:
    ```
-   If `DatabaseSync` is null, all cache operations return `null` and the system falls back to in-memory Map + disk reads (current behavior). Zero degradation for users on older Node.js.
-2. **Pin API surface.** Only use `DatabaseSync`, `prepare`, `run`, `all`, `get`, `exec`, `close`. These have been stable since v22.5.0. Avoid newer features (`aggregate`, `createTagStore`, `setAuthorizer`) that were added later and may change.
-3. **Isolate SQLite behind an abstraction layer.** Create `src/lib/cache.js` that exports `cacheGet(key)`, `cacheSet(key, value, mtime)`, `cacheInvalidate(key)`, `cacheStats()`. The implementation uses `node:sqlite` if available, in-memory Map otherwise. No other module imports `node:sqlite` directly.
-4. **Document the version requirement.** In `AGENTS.md`, `package.json`, and `--help` output: "SQLite cache requires Node.js ≥22.5. Cache is automatically disabled on older versions."
-5. **Test on both Node 22 LTS and Node 18.** CI must run tests with cache enabled (Node 22+) AND cache disabled (Node 18). Both must pass.
-6. **Use `enableDefensive(false)` explicitly** if schema requires shadow table writes, to avoid behavior change between v24 and v25.
+   yt-dlp:       ✓ installed (2026.02.14) — via standalone binary
+   notebooklm:   ✗ not configured (run 'gsd-tools util:setup-notebooklm')
+   brave-search: ✓ API key configured
+   context7:     ✓ available via MCP
+   ```
+4. **Never make Python a hard requirement.** The tool MUST work without Python installed. All Python-dependent features are optional enhancements. The `package.json` engines field stays at `"node": ">=22.5"` — no Python requirement.
+5. **Use `execFileSync` not `execSync` for spawning Python.** `execFileSync` avoids shell interpretation, is safer against injection, and is more predictable for PATH resolution.
+6. **Test the "nothing installed" path rigorously.** The most common environment is: Node.js installed, Python not installed (or wrong version), yt-dlp not installed, NotebookLM not authenticated. This MUST produce zero errors and graceful degradation.
 
-**Warning signs:**
-- `npm test` passes on developer's Node 25 but fails on user's Node 20
-- SQLite-related error in stack trace for user who didn't opt into caching
-- API change in new Node.js version breaks cache silently (wrong results, not crash)
-- Build succeeds but smoke test fails on deploy target machine
+**Detection (warning signs):**
+- `ENOENT` errors when spawning `python3` or `yt-dlp`
+- "ModuleNotFoundError: No module named 'notebooklm'" in subprocess stderr
+- Tests that pass in CI but fail on developer machines (different Python setup)
+- Setup instructions growing beyond 5 lines
 
 **Phase to address:**
-Cache Foundation — implement capability detection and fallback in the first task.
+Foundation — dependency detection and graceful degradation must be the FIRST thing built, before any feature code.
+
+**Confidence:** HIGH — based on Node.js child_process documentation, Stack Overflow reports of Python/Node.js integration issues, GitHub nodejs/node issues, codebase analysis showing existing `execSync` patterns in gsd-tools.cjs.
 
 ---
 
-### Pitfall 6: Caching Parsed Markdown Creates Schema Coupling
+### Pitfall 4: RAG Pipeline Latency Destroys the Research UX
 
 **What goes wrong:**
-ROADMAP.md is parsed by 309+ regex patterns into a structured object: `{ phases: [...], milestones: [...], active_milestone: {...} }`. This parsed result is cached in SQLite. But the parsing logic evolves — new regex patterns are added, field names change, nested structures are restructured. The cached data has the OLD schema. Two failure modes:
+The current research workflow (LLM-only) takes **10-30 seconds** — the LLM reads the prompt, searches with available tools (Brave Search, Context7), and synthesizes. Users experience this as fast. The proposed RAG pipeline introduces multiple serial stages:
 
-1. **Schema mismatch:** Code expects `result.phases[0].status` but cached data has `result.phases[0].state` (field renamed in a parser update). Runtime error.
-2. **Missing fields:** New parser extracts `intent_drift_score` from PLAN.md. Cached version doesn't have this field. Code does `if (result.intent_drift_score > 50)` → `undefined > 50` → false → drift never detected.
-3. **Schema version hell:** Adding a `schema_version` field to cache entries means writing migration code for a cache that's meant to be disposable. This is over-engineering.
+| Stage | Latency | Source |
+|-------|---------|--------|
+| YouTube search (`yt-dlp --flat-playlist ytsearch10:...`) | 3-8 seconds | yt-dlp metadata extraction |
+| Transcript extraction per video (up to 10 videos) | 2-5 seconds each, sequential | yt-dlp subtitle download |
+| NotebookLM notebook creation | 1-3 seconds | notebooklm-py API |
+| NotebookLM source ingestion (per source) | 2-10 seconds each, with required 2-second delays between sources | notebooklm-py docs recommend `asyncio.sleep(2)` between sources |
+| NotebookLM chat query for synthesis | 5-30 seconds | Depends on source volume |
+| **Total worst case** | **3-8 minutes** | Cumulative |
 
-This is especially acute for this codebase because the regex patterns are the product's core logic — they change frequently (309+ patterns accumulated over 7 versions). Caching their output means caching something that changes shape every milestone.
+This is 10-50x slower than current research. For the common case where the user runs `/bgsd-new-project` and expects to get a project scaffold in under a minute, a 5-minute research phase is a UX disaster.
+
+Additionally, NotebookLM artifact generation (audio, video) takes 3-45 minutes. While we're using chat/query not artifacts, the underlying API is rate-limited for all operations. Free tier: 50 chat queries/day means a researcher that queries NotebookLM 5 times per research run can only do 10 research operations per day.
+
+**Consequences:**
+- Users will perceive the RAG pipeline as "hanging" or "broken"
+- Users will disable the feature via config rather than wait
+- The 50-query/day free-tier limit means research becomes a scarce resource
+- Long-running operations interact badly with the CLI's synchronous architecture
 
 **Why it happens:**
-The temptation to cache parsed results (save regex time) conflicts with the reality that parsed results are tightly coupled to parser version. Web applications solve this with database migrations. CLI tools should NOT have migrations for a cache.
+The RAG pipeline involves network calls to three external services (YouTube, Google/NotebookLM, Brave Search) plus Python subprocess spawning. Each adds latency. The sequential nature of "gather → ingest → synthesize" creates a pipeline where total latency is the sum of all stages.
 
-**How to avoid:**
-1. **Cache raw file content + mtime, NOT parsed results.** The cache stores `(file_path, content_text, mtime, size)`. Parsing happens in-process from cached content. This eliminates schema coupling entirely — the cache is a filesystem accelerator, not a parsed-data store.
-2. **If parsed results ARE cached**, use a version stamp: `cache_version = hash(parser_source_code)`. On startup, compute hash of the relevant parser module. If it differs from cached version, invalidate entire cache. Crude but effective.
-3. **Make cache disposable.** `gsd-tools cache clear` deletes the SQLite file. No migrations, no schema evolution. If the cache is invalid, nuke it. The system must work perfectly with an empty cache.
-4. **Store cache in `.planning/.cache/` directory** (which is already gitignored — confirmed by `.planning/.gitignore`). Cache file is project-scoped, not global. Different projects don't pollute each other's cache.
+**Prevention:**
+1. **Progressive output, not batch-at-the-end.** As each stage completes, emit progress to stderr:
+   ```
+   [research] Searching YouTube for "React hooks patterns"... (3s)
+   [research] Found 8 videos, extracting transcripts... (12s)
+   [research] 5/8 transcripts available, feeding to NotebookLM... (25s)
+   [research] Synthesizing research from 12 sources... (45s)
+   [research] Research complete. (52s total)
+   ```
+2. **Parallelize the gather phase.** YouTube search, Brave Search, and Context7 queries are independent — run them concurrently. Use `Promise.all` or parallel subprocess spawning from Node.js. This reduces gather phase from serial (8+5+3=16s) to parallel (max 8s).
+3. **Limit YouTube videos to 5, not 10.** Diminishing returns beyond 5 videos. The top 5 search results are the most relevant; videos 6-10 add noise and double the transcript extraction time.
+4. **Skip NotebookLM for small research tasks.** If total gathered content is <20KB (a few search results, no transcripts), feed it directly to the LLM as context. NotebookLM adds value only when synthesizing LARGE volumes of content that exceed the LLM's context window.
+5. **Set a hard time budget.** Research phase gets a configurable timeout (default: 120 seconds). If the pipeline hasn't completed, use whatever partial results are available and synthesize with the LLM. `config.json`: `"research_timeout": 120`
+6. **Cache aggressively.** Same YouTube search query for "React hooks" should return cached results for 24 hours. Same Brave Search results cached for 1 hour. Transcripts cached indefinitely (video content doesn't change).
+7. **Show time estimates.** Before starting the RAG pipeline: `"Enhanced research pipeline will take ~45-90 seconds. Use --quick to skip (LLM-only, ~15 seconds)."` Let users opt out before waiting.
 
-**Warning signs:**
-- Cache entry has a `CREATE TABLE` with >5 columns (over-structured for a cache)
-- Migration code appears for cache schema
-- Tests create SQLite databases with specific schema versions
-- Error messages mention "cache schema mismatch" or "migration needed"
+**Detection (warning signs):**
+- User reports "research is stuck" or "taking forever"
+- Research operations hitting the 120-second timeout regularly
+- NotebookLM rate limit errors appearing mid-day
+- Users adding `research: false` to config.json to avoid the pipeline
 
 **Phase to address:**
-Cache Foundation — decide "cache raw content" vs "cache parsed results" in the architecture phase. Strong recommendation: cache raw content only.
+Orchestration — latency budget must be designed before implementing the full pipeline. Time-box each stage.
+
+**Confidence:** HIGH — based on notebooklm-py Known Limitations docs ("30 seconds to over 45 minutes"), NotebookLM tier limits documentation, yt-dlp observed latency from GitHub issues, existing gsd-tools timing from codebase analysis.
+
+---
+
+### Pitfall 5: YouTube Search Results Are Low-Signal for Developer Research
+
+**What goes wrong:**
+YouTube search for developer topics returns a mix of:
+- **High quality:** Conference talks (React Conf, JSConf), well-known educators (Fireship, Theo, ThePrimeagen)
+- **Low quality:** Clickbait ("Learn React in 10 minutes!"), outdated content (React class components tutorial from 2019), SEO-spam channels that repackage documentation as low-effort videos, AI-generated narration over copied slides
+- **Irrelevant:** Videos with matching keywords but wrong context ("hooks" returning fishing content, "react" returning chemistry content)
+
+When these are fed into NotebookLM for synthesis, the garbage sources pollute the synthesis output. NotebookLM doesn't distinguish between a React Conf talk by Dan Abramov and a clickbait tutorial by an unknown channel — both are "sources" with equal weight.
+
+Specific failure modes:
+1. **Outdated best practices.** YouTube search doesn't filter by date effectively. A 2019 video about React class components ranks well but teaches deprecated patterns.
+2. **Title/description keyword stuffing.** Low-quality videos stuff descriptions with keywords that match search queries but content is shallow.
+3. **No subtitles on quality videos.** Many conference talks and live-coding sessions lack subtitles. The best content is often the least accessible to transcript extraction.
+4. **Auto-generated captions are noisy.** Technical terms are frequently misrecognized: "useState" → "use state", "TypeScript" → "type script", "Next.js" → "next JS" or "nexus". This corrupts the source material for RAG synthesis.
+
+**Consequences:**
+- Research output includes outdated or incorrect recommendations
+- User trusts RAG-synthesized research less than LLM-only research (which at least has training data curation)
+- Time spent ingesting bad sources is wasted — negative ROI vs LLM-only approach
+- NotebookLM's query quota is consumed on garbage sources
+
+**Why it happens:**
+YouTube's search ranking optimizes for engagement (views, watch time, click-through rate), not for technical accuracy or currency. This is fundamentally misaligned with developer research needs.
+
+**Prevention:**
+1. **Pre-filter by channel reputation.** Maintain a curated allowlist of high-quality developer channels: `["Fireship", "Theo - t3.gg", "ThePrimeagen", "Traversy Media", "Web Dev Simplified", "Jack Herrington", "Ben Awad"]`. Only extract transcripts from videos by known channels. Others provide metadata-only (title, description) for potential relevance but not transcript ingestion.
+2. **Filter by recency.** Append current year to search queries: `"React hooks best practices 2026"`. Discard videos older than 2 years for fast-moving topics (frameworks, libraries). Allow older videos for stable topics (algorithms, design patterns).
+3. **Filter by video length.** Short videos (<5 min) are usually shallow overviews. Very long videos (>60 min) are often unedited livestreams. Sweet spot: 10-30 minutes for focused technical content.
+4. **Use metadata as pre-filter, not as final source.** Extract metadata for 20 videos, filter to top 5 by heuristics (channel reputation, view count, recency, duration), then extract transcripts only for the filtered set.
+5. **Transcript quality validation.** After extracting a transcript, check for minimum technical term density. If a video about "React hooks" has zero occurrences of "useState", "useEffect", "component", or "render" in its transcript, it's probably not about React — discard it.
+6. **Weight sources in NotebookLM.** When adding sources to a notebook, put high-confidence sources (official docs via Context7, Brave Search results from official sites) first. YouTube transcripts go last. NotebookLM synthesis will naturally weight earlier/primary sources more heavily.
+7. **Let the LLM evaluate YouTube results.** Instead of blindly feeding all transcripts to NotebookLM, have the research agent review the metadata and pick which videos to include. The LLM's judgment on relevance is better than keyword matching.
+
+**Detection (warning signs):**
+- Research output recommends deprecated patterns (e.g., React class components in 2026)
+- Research includes contradictory recommendations from different videos
+- Transcript content doesn't match the expected topic
+- NotebookLM synthesis is vague/generic despite having many sources (diluted by noise)
+
+**Phase to address:**
+YouTube Integration — quality filtering must be implemented before transcript extraction is wired into the pipeline.
+
+**Confidence:** MEDIUM — based on YouTube search behavior observation, community reports, general RAG quality literature. The specific percentage of developer videos with subtitles is estimated (30-40%) not measured.
+
+<!-- /section -->
+
+<!-- section: moderate_pitfalls -->
+## Moderate Pitfalls
+
+### Pitfall 6: NotebookLM Cookie Auth Creates a Security and Operational Nightmare
+
+**What goes wrong:**
+notebooklm-py stores Google session cookies at `~/.notebooklm/storage_state.json` with `0o600` permissions. These cookies provide full access to the authenticated Google account — not just NotebookLM, but Gmail, Drive, Photos, everything. The authentication flow:
+
+1. Run `notebooklm login` — opens Chromium browser via Playwright
+2. User logs into Google manually
+3. Session cookies saved to `storage_state.json`
+4. Cookies expire in "a few weeks" (no documented exact TTL)
+5. When expired, user must re-login via browser
+
+Operational issues:
+- **Headless environments can't re-authenticate.** If running on a server or in a docker container, `notebooklm login` fails because it needs a GUI browser.
+- **Chromium download required.** `playwright install chromium` downloads ~250MB of Chromium. This is a heavy dependency for a CLI tool feature.
+- **Cookie file is a high-value target.** Anyone who obtains `storage_state.json` has full Google account access. It's equivalent to a password file.
+- **Environment variable alternative (`NOTEBOOKLM_AUTH_JSON`)** puts cookies in an env var visible to any process that reads `/proc/PID/environ` on Linux.
+
+**Prevention:**
+1. **Document the security implications clearly.** When running `gsd-tools util:setup-notebooklm`, warn: `"This will store Google session cookies on disk. Use a dedicated Google account, not your primary account."`
+2. **Never store NotebookLM auth in the project directory.** Auth goes in `~/.notebooklm/` or `$NOTEBOOKLM_HOME`, never in `.planning/`. The `.planning/` directory may be committed to git.
+3. **Add `storage_state.json` and `*.notebooklm*` to the project's `.gitignore`** as a safety net.
+4. **Implement auth expiry detection proactively.** Before research operations, run `notebooklm auth check --json`. If cookies are >7 days old (not just expired), warn: `"NotebookLM auth is 12 days old and may expire soon. Run 'notebooklm login' to refresh."`
+5. **For CI/CD, provide a "no-NotebookLM" flag** that disables NotebookLM entirely, since re-authentication can't happen automatically.
+
+**Phase to address:**
+NotebookLM Integration — auth management is a prerequisite for any NotebookLM feature work.
+
+---
+
+### Pitfall 7: Scope Creep — Building a Full RAG System vs. Using Simpler Approaches
+
+**What goes wrong:**
+The project goal is "reduce LLM token spend while improving research quality." But the proposed pipeline (YouTube → NotebookLM → Synthesis) is a complex multi-service orchestration system. Simpler approaches might achieve 80% of the benefit at 20% of the complexity:
+
+- **Just feed search results into the LLM prompt.** Brave Search returns snippets. Context7 returns docs. These are already structured text. Concatenating them into the research agent's prompt (with a "synthesize these sources" instruction) doesn't need NotebookLM at all.
+- **YouTube metadata without transcripts.** Video titles and descriptions alone provide signals about what the ecosystem looks like: "React Server Components Tutorial — 2026 Update" tells you RSC is current without needing the full transcript.
+- **NotebookLM's value is for LARGE corpus synthesis.** If total gathered content is under the LLM's context window (~200K tokens for Claude, ~128K for GPT-4), there's no need for a separate RAG system. The LLM IS the RAG system.
+
+The risk is building a sophisticated pipeline that adds 3 minutes of latency, 2 external dependencies (Python, yt-dlp), and auth complexity (NotebookLM cookies) — when the LLM could do the same synthesis from the same sources in 15 seconds.
+
+**Prevention:**
+1. **Implement in layers, validate each layer's value:**
+   - Layer 0 (current): LLM-only research
+   - Layer 1: LLM + Brave Search + Context7 (already available via MCP)
+   - Layer 2: Layer 1 + YouTube metadata (add yt-dlp, metadata only)
+   - Layer 3: Layer 2 + YouTube transcripts (add transcript extraction)
+   - Layer 4: Layer 3 + NotebookLM synthesis (add Python dependency)
+
+   **Only build the next layer if the current layer is demonstrably insufficient.** Run the same research query at each layer and compare output quality.
+
+2. **Define success metrics before building.**
+   - Research output covers X% more sources than LLM-only
+   - Research includes N practical examples not in LLM training data
+   - Total time is under 2 minutes (hard cap)
+   - Fallback to Layer 0 is seamless
+
+3. **NotebookLM should be Layer 4, not Layer 1.** It has the most dependencies, highest latency, most fragile auth, and most operational complexity. Build everything else first and measure whether NotebookLM adds enough value to justify its cost.
+
+**Phase to address:**
+Architecture/Orchestration — design the layer progression before implementing any layer.
+
+---
+
+### Pitfall 8: Synchronous Architecture vs. Long-Running External Processes
+
+**What goes wrong:**
+gsd-tools.cjs uses `execSync` and `execFileSync` for all external process calls. This is correct for fast operations (git commands, file reads) but problematic for operations that take 10-60+ seconds:
+
+1. **No progress feedback.** `execSync` blocks until the subprocess completes. The user sees no output for 30+ seconds while yt-dlp extracts transcripts.
+2. **No timeout by default.** `execSync` waits forever. A hung yt-dlp process (network timeout, YouTube server error) hangs the CLI indefinitely.
+3. **No parallel execution.** Sequential `execSync` calls for 5 transcript extractions means 5× latency. Switching to async `spawn` or `execFile` requires restructuring the calling code.
+4. **stdio buffering.** `execSync` buffers the entire stdout/stderr into a string and returns it after the process exits. For a large transcript (10K+ lines), this is fine. But for a process that streams progress (yt-dlp's `[download]` messages), buffering loses the real-time feedback.
+
+**Prevention:**
+1. **Use `execFileSync` with `timeout` option.** All external tool calls get a timeout: `execFileSync('yt-dlp', [...], { timeout: 30000 })`. Timeout throws an error that's caught and triggers fallback.
+2. **Use `spawnSync` with `stdio: ['pipe', 'pipe', 'pipe']` for operations needing progress.** Parse stderr line-by-line after completion to extract yt-dlp's progress information, then emit a summary.
+3. **For truly long operations (NotebookLM), use async `spawn`.** The research orchestrator can use `child_process.spawn` (async) with event listeners, even though the rest of the CLI is synchronous. The orchestrator function becomes the async boundary:
+   ```javascript
+   function runResearchPipeline(query) {
+     // This is the one place where we go async
+     return new Promise((resolve, reject) => {
+       const proc = spawn('python3', ['-m', 'notebooklm', ...]);
+       // ... handle events ...
+     });
+   }
+   ```
+4. **Never block for >60 seconds without user feedback.** If an operation will take >5 seconds, emit a progress message to stderr before starting it.
+
+**Phase to address:**
+Foundation — establish the subprocess execution pattern before implementing any external tool integration.
+
+<!-- /section -->
+
+<!-- section: minor_pitfalls -->
+## Minor Pitfalls
+
+### Pitfall 9: Bundle Size Impact from New Orchestration Code
+
+**What goes wrong:**
+Current bundle is 1133KB (over the 1050KB soft budget). Adding orchestration code (YouTube search logic, NotebookLM API wrapper, source filtering, progress reporting) could push it further. However, since all Python/yt-dlp interaction is via subprocess calls (not bundled libraries), the impact should be modest — probably 10-30KB for new `src/lib/research.js` and `src/commands/research.js` modules.
+
+**Prevention:** Monitor bundle size in build output. Set a hard cap at 1200KB for v8.1. If orchestration code is larger than expected, refactor verbose string templates into compact formats.
+
+**Phase to address:** All phases — monitor continuously.
+
+---
+
+### Pitfall 10: Research Results Non-Determinism Across Runs
+
+**What goes wrong:**
+YouTube search results change over time. Brave Search results change. NotebookLM synthesis is non-deterministic. Running the same research query twice may produce different recommendations. This makes research output unreviewable — "was the research good?" becomes unanswerable if you can't reproduce it.
+
+**Prevention:**
+1. Log all gathered sources (URLs, video IDs, search queries) into a `research-sources.json` in `.planning/research/`. This creates an audit trail.
+2. Cache gathered sources for 24 hours. Re-runs within the cache window produce identical inputs (synthesis may still vary due to LLM non-determinism).
+3. Include source URLs in the research output files (SUMMARY.md, STACK.md, etc.) so human reviewers can validate.
+
+**Phase to address:** Orchestration — implement source logging from the start.
+
+---
+
+### Pitfall 11: MCP Server Discovery Scope Creep
+
+**What goes wrong:**
+The v8.1 spec mentions "MCP server discovery for additional research tools." This could become a rabbit hole of auto-detecting available MCP servers, probing their capabilities, and dynamically routing research queries. The existing MCP profiling system (v4.0) already detects 20 known servers. Adding "discovery" implies finding UNKNOWN servers, which is an open-ended problem.
+
+**Prevention:** Scope this to "recommend MCP servers that enhance research" — a static mapping, not runtime discovery. Example: if Brave Search MCP is available, use it; if Context7 MCP is available, use it. Print a list of recommended servers that aren't yet configured. Don't build a generic MCP discovery framework.
+
+**Phase to address:** Research Workflow Integration — defer to the last phase; not critical for core pipeline.
 
 <!-- /section -->
 
 <!-- section: tech_debt -->
 ## Technical Debt Patterns
 
-Shortcuts that seem reasonable but create long-term problems.
-
 | Shortcut | Immediate Benefit | Long-term Cost | When Acceptable |
 |----------|-------------------|----------------|-----------------|
-| Cache parsed results instead of raw content | Saves regex parsing time (~5ms per file) | Schema coupling; cache invalidation bugs; migration complexity | Never for this project — regex parsing is fast enough |
-| Skip alias migration for command renames | Simpler router, fewer code paths | All external consumers break simultaneously; no migration path | Never — backward compat is a project constraint |
-| Merge agents without updating manifests | Faster consolidation | Merged agent gets wrong context; token waste or missing data | Never — manifest is the agent's contract |
-| Hard-code Node.js ≥22.5 without fallback | Simpler code; no conditional imports | Users on Node 18/20 LTS can't use the tool AT ALL | Only when Node 22 reaches "Maintenance" LTS phase |
-| Global SQLite cache file (`~/.cache/gsd/`) | Shared cache across projects | Cross-project data leakage; wrong project's data served | Never — cache must be project-scoped |
-| Bypass existing `invalidateFileCache()` for SQLite | Avoid touching helpers.js | Two invalidation systems drift; one gets stale | Never — extend existing function |
+| Call `notebooklm-py` CLI directly instead of Python API | No Python API wrapper code needed | Slower (process spawn per operation), harder to handle errors, output parsing fragile | Acceptable for v8.1 MVP — optimize later if NotebookLM proves valuable |
+| Skip YouTube channel reputation filtering | Simpler implementation, all results treated equally | Garbage sources pollute research; user trust degrades | Never — at minimum filter by video age and duration |
+| Store yt-dlp binary path in config.json | Works for one machine | Path is machine-specific; breaks when config is shared or backed up | Acceptable if also falls back to PATH lookup |
+| Skip progress reporting for external tools | Simpler code, fewer stderr writes | Users think tool is hung during 30+ second operations | Never — any operation >5 seconds needs progress feedback |
+| Put NotebookLM auth check inline in research code | Works, fewer modules | Auth logic scattered across research functions; hard to test | Never — auth validation belongs in a single utility function |
+| Hardcode YouTube search to English | Simpler queries, predictable results | Non-English users get worse research results | Acceptable for v8.1 — internationalize in future |
 
 ## Integration Gotchas
 
-Common mistakes when connecting cache layer to existing systems.
-
 | Integration | Common Mistake | Correct Approach |
 |-------------|----------------|------------------|
-| `cachedReadFile()` → SQLite | Replacing Map cache with SQLite entirely | Layer SQLite UNDER Map cache: SQLite → Map → disk. Map is per-invocation L1; SQLite is cross-invocation L2 |
-| `getPhaseTree()` → SQLite | Caching the full phase tree object | Cache individual file contents; let `getPhaseTree()` build the tree from cached file reads |
-| `init execute-phase` → SQLite | Caching the full init output blob | Cache input files (STATE.md, ROADMAP.md, plans); let init re-compose from cached inputs |
-| `cmdStatePatch()` → SQLite | Forgetting to invalidate cache after write | Add `cacheInvalidate(statePath)` call inside `cmdStatePatch()` immediately after `fs.writeFileSync()` |
-| `deploy.sh` → SQLite | Deploying the cache database file | Add `.planning/.cache/*.db` to deploy exclusion; cache is per-machine, not deployable |
-| `npm test` → SQLite | Tests sharing a SQLite cache between test cases | Each test creates its own temp directory; SQLite file is inside the temp directory; zero shared state |
-| Agent manifest → consolidated agent | Keeping old manifest key for removed agent | Remove old key from `AGENT_MANIFESTS`; add combined manifest under new agent name |
-<!-- /section -->
-
-<!-- section: performance -->
-## Performance Traps
-
-Patterns that work at small scale but fail as usage grows.
-
-| Trap | Symptoms | Prevention | When It Breaks |
-|------|----------|------------|----------------|
-| Opening SQLite connection per CLI invocation | 10-30ms overhead per command; negates caching benefit for fast commands | Lazy-open: only connect to SQLite if a cache-eligible read is requested | Always — every invocation pays the cost |
-| WAL mode on network filesystem | SQLite WAL requires shared memory; NFS doesn't support it; silent corruption | Use `journal_mode=DELETE` for safety, or detect filesystem type first | When `.planning/` is on NFS/CIFS/SMB mount |
-| Caching files that are rarely re-read | SQLite write overhead for files read once per invocation; net slower | Only cache files read 2+ times per invocation: STATE.md, ROADMAP.md, config.json | Immediately — most files are read once |
-| Full-table scan for cache lookup | `SELECT * FROM cache WHERE path = ?` without index | `CREATE INDEX idx_path ON cache(path)` | At ~100 cached files (unlikely, but defensive) |
-| Synchronous SQLite blocking process exit | `database.close()` not called; SQLite WAL checkpoint blocks on exit | Register `process.on('exit', () => db.close())` or use `Symbol.dispose` | When WAL mode is enabled and writes pending |
-| Profiling with `GSD_PROFILE=1` but not measuring cache hit rate | Can't tell if cache is helping or hurting | Add cache hit/miss counters to profiler output; export via `cacheStats()` | Can't diagnose performance issues without this |
+| Node.js → Python subprocess | Using `execSync('python3 -m notebooklm ...')` | Use `execFileSync` with explicit Python path from venv: `execFileSync('/path/to/venv/bin/python', ['-m', 'notebooklm', ...])` |
+| Node.js → yt-dlp | Parsing yt-dlp stdout with regex | Use `--dump-json` flag — yt-dlp outputs machine-readable JSON. Parse with `JSON.parse()`. |
+| yt-dlp → NotebookLM | Feeding raw auto-captions as sources | Clean transcripts first: remove filler words, timestamp markers, and repeated lines. Auto-captions have 10-20% error rate. |
+| NotebookLM → Research output | Taking NotebookLM synthesis verbatim | NotebookLM synthesis is a starting point. The research agent should validate, cross-reference with Context7/Brave results, and add confidence levels. |
+| Config → tool availability | Checking tool availability once at startup | Check before each research operation. User may install yt-dlp mid-session. |
+| Error handling → user messaging | Exposing raw Python tracebacks or yt-dlp errors | Catch subprocess errors, parse for known error patterns (auth expired, rate limit, nsig failed), and emit user-friendly messages. |
+| Research cache → research output | Caching the final SUMMARY.md | Cache SOURCE MATERIALS (transcripts, search results). Never cache the synthesized output — different queries need different synthesis even from the same sources. |
 <!-- /section -->
 
 <!-- section: security -->
 ## Security Mistakes
 
-Domain-specific security issues beyond general web security.
-
 | Mistake | Risk | Prevention |
 |---------|------|------------|
-| SQLite file readable by other users | Other processes on shared machine can read cached project data | `fs.chmodSync(dbPath, 0o600)` after creation; verify umask |
-| SQL injection from markdown content | Markdown content containing `'; DROP TABLE` stored via string concatenation | Always use parameterized queries (`db.prepare('INSERT INTO cache VALUES (?, ?)').run(path, content)`); never interpolate |
-| Cache file path traversal | Attacker-crafted file path in cache key escapes `.planning/` | Validate all cache keys: `path.resolve(key).startsWith(path.resolve(cwd))` |
-| Stale cache serving old security patches | Security fix in PLAN.md not picked up because cache serves pre-fix version | mtime-based invalidation catches this; but test explicitly |
-<!-- /section -->
-
-<!-- section: ux -->
-## UX Pitfalls
-
-Common user experience mistakes when restructuring CLI commands.
-
-| Pitfall | User Impact | Better Approach |
-|---------|-------------|-----------------|
-| Removing old command names without deprecation period | User scripts and muscle memory break instantly | Alias old → new for one major version; deprecation warning to stderr |
-| Consolidating too many concepts under one command | `phase` command with 15 subcommands is as bad as 15 separate commands | Max 7 subcommands per parent command; group by user intent, not implementation |
-| Changing output format during rename | Command works but output JSON schema changed; downstream consumers break | Renames ONLY change the command name; output schema stays identical |
-| Silent cache degradation | User doesn't know cache is disabled because Node.js is too old | On first run, if cache unavailable: `[info] SQLite cache unavailable (Node.js >=22.5 required). Using in-memory cache.` |
-| Help text showing only new names | User tries `--help` with old name, gets "unknown command" | Help system resolves aliases: `gsd-tools find-phase --help` shows help AND says "Note: this command is now `phase find`" |
+| NotebookLM `storage_state.json` readable by other users | Full Google account access (Gmail, Drive, everything) | Verify `0o600` permissions; never copy to `.planning/`; add to `.gitignore` |
+| NotebookLM cookies in environment variables | Visible via `/proc/PID/environ` on Linux, `Get-Process` on Windows | Prefer file-based auth over `NOTEBOOKLM_AUTH_JSON` env var for local dev |
+| yt-dlp invoked with unsanitized user input as URL | Command injection or downloading from arbitrary domains | Validate URLs match YouTube domain pattern before passing to yt-dlp; use `execFileSync` not `execSync` |
+| Brave Search API key stored in `config.json` in `.planning/` | API key committed to git if `.planning/` is tracked | Store API keys in `~/.config/gsd/secrets.json` or environment variables, never in project directory |
+| NotebookLM notebook contents visible to Google | Research queries and sources uploaded to Google's servers | Document this in privacy notice; don't upload proprietary/confidential source material |
+| Cached transcripts contain copyrighted content | YouTube video transcripts are derivative works | Cache locally only; never redistribute; purge on project cleanup |
 <!-- /section -->
 
 <!-- section: looks_done -->
 ## "Looks Done But Isn't" Checklist
 
-Things that appear complete but are missing critical pieces.
-
-- [ ] **SQLite cache "works":** Run full 751-test suite with `NODE_SQLITE_CACHE=1` AND `NODE_SQLITE_CACHE=0`. Both must produce identical results. Any diff = cache coherence bug.
-- [ ] **Cache invalidation "complete":** Edit STATE.md externally (via editor, not CLI). Run `gsd-tools state` twice. Second run must show the edited content, not cached stale content. Verify mtime check works.
-- [ ] **Agent consolidation "safe":** Run `grep -r 'gsd-plan-checker\|gsd-codebase-mapper\|gsd-integration-checker' workflows/ commands/ agents/` — zero hits for any removed agent name. All references updated.
-- [ ] **Command aliases "working":** Old command name produces identical output to new command name. `gsd-tools find-phase 3` === `gsd-tools phase find 3`. Deprecation warning goes to stderr, not stdout (would corrupt JSON piping).
-- [ ] **Bundle size "within budget":** After adding cache module, `build.js` reports ≤1500KB. If using `node:sqlite` (built-in), bundle size should be unchanged (~1058KB).
-- [ ] **Node 18 fallback "graceful":** On Node 18, tool starts without errors. Cache features silently disabled. All existing functionality works. `GSD_DEBUG=1` shows "node:sqlite not available."
-- [ ] **deploy.sh "updated":** After agent consolidation, `AGENT_COUNT` matches new expected count. Old agent files are NOT deployed. `.planning/.cache/*.db` is NOT deployed.
-- [ ] **Manifest "merged":** After merging `gsd-plan-checker` into `gsd-planner`, run `gsd-tools init execute-phase --manifest gsd-planner`. Output includes fields from BOTH old manifests: `plans`, `plan_count`, `phase_dir`, `phase_number`, `phase_name`, `research_enabled`, `plan_checker_enabled`, `intent_summary`.
+- [ ] **NotebookLM integration "works":** Auth check passes today. Wait 2 weeks WITHOUT re-login. Does it still work? Cookie expiry is the real test, not initial auth.
+- [ ] **yt-dlp transcript extraction "works":** Test with 3 videos: one with manual subtitles, one with auto-generated only, one with NO subtitles. All three cases must be handled gracefully. Test with a video that has subtitles in a non-English language only.
+- [ ] **Graceful fallback "complete":** Uninstall yt-dlp, remove NotebookLM auth, remove Brave Search API key. Run `/bgsd-new-project`. Research phase must complete successfully using LLM-only approach. Zero errors, zero degraded output.
+- [ ] **Latency "acceptable":** Time the full pipeline from research start to research files written. If >120 seconds, the architecture needs revision. If >60 seconds, progress reporting must be visible.
+- [ ] **Source quality "verified":** Run research for a well-known topic (e.g., "React state management 2026"). Check research output for outdated recommendations (Redux vs. Zustand), deprecated patterns (class components), or contradictions. If found, source filtering is insufficient.
+- [ ] **Python dependency "isolated":** Remove Python from PATH. Run all 762 tests. Every test must pass. Python is never required for core functionality.
+- [ ] **Error messages "user-friendly":** Trigger each failure mode (auth expired, yt-dlp not found, rate limited, no subtitles, timeout). Every error must produce a clear, actionable message — never a raw traceback or cryptic error code.
+- [ ] **Config "documented":** All new config options (`research_timeout`, `youtube_max_results`, `notebooklm_enabled`) appear in `gsd-tools settings list` output and have `--help` descriptions.
+- [ ] **Cache "disposable":** Delete `.planning/.cache/`. Run research. Everything rebuilds automatically. No "cache corrupted" errors, no setup required.
 <!-- /section -->
 
-<!-- section: recovery -->
-## Recovery Strategies
+<!-- section: phase_warnings -->
+## Phase-Specific Warnings
 
-When pitfalls occur despite prevention, how to recover.
+| Phase Topic | Likely Pitfall | Mitigation |
+|-------------|---------------|------------|
+| Foundation / Dependency Detection | Python not found, wrong version, yt-dlp not installed | Multi-strategy discovery: check PATH, common install locations, venv; provide install instructions; never fail |
+| YouTube Integration | nsig extraction failure, rate limiting, no transcripts | Retry with backoff; metadata-only fallback; transcript caching; version freshness check |
+| NotebookLM Integration | Auth expired, rate limited, API changed | Health check before use; hard timeout; LLM-only fallback; monitor library releases |
+| Orchestration Layer | Pipeline too slow, sources too noisy | Time-box each stage; parallel where possible; quality filtering before ingestion; progressive output |
+| Research Workflow Integration | Existing agents confused by new data format | New research data must match existing SUMMARY.md / STACK.md / FEATURES.md / PITFALLS.md format exactly; research agent produces same output format regardless of data source |
+| MCP Server Discovery | Scope creep into generic discovery framework | Static mapping of known research-relevant MCP servers; recommend, don't auto-discover |
+
+## Recovery Strategies
 
 | Pitfall | Recovery Cost | Recovery Steps |
 |---------|---------------|----------------|
-| Native addon breaks deploy (P1) | HIGH | Remove `better-sqlite3`; refactor all SQLite code to use `node:sqlite` or remove cache entirely |
-| Cache serves stale data (P2) | LOW | `gsd-tools cache clear` (delete SQLite file); fix invalidation logic; re-run |
-| Agent spawn reference broken (P3) | MEDIUM | Grep all workflow/command files; add missing agent definitions or fix references; re-deploy |
-| Command rename breaks tests (P4) | MEDIUM | Add aliases for old names in router.js; all tests pass again immediately; migrate incrementally |
-| Node.js version too old (P5) | LOW | Cache auto-disables; no recovery needed; user upgrades Node.js when ready |
-| Schema coupling in cache (P6) | LOW | Delete cache file; it rebuilds automatically on next run |
-| Agent manifest incomplete (P3) | LOW | Update `AGENT_MANIFESTS` in context.js; merged agent gets full field set |
+| NotebookLM API breaks (Google-side change) | MEDIUM | Disable NotebookLM in config; research falls back to LLM-only; wait for notebooklm-py update |
+| yt-dlp breaks (YouTube countermeasure) | LOW | Update yt-dlp (`yt-dlp -U`); if still broken, disable YouTube in config; research continues without video sources |
+| Google account flagged | HIGH | Switch to different Google account; re-run `notebooklm login`; if primary account, contact Google support |
+| Python venv corrupted | LOW | Delete venv directory; re-run `gsd-tools util:setup-notebooklm`; venv rebuilds from scratch |
+| Research output quality degraded | MEDIUM | Check source filtering heuristics; review cached transcripts for quality; tighten channel allowlist; increase recency filter |
+| Pipeline timeout on every run | MEDIUM | Reduce YouTube video count; skip NotebookLM for small research; increase timeout; check network connectivity |
 
-## Pitfall-to-Phase Mapping
-
-How roadmap phases should address these pitfalls.
-
-| Pitfall | Prevention Phase | Verification |
-|---------|------------------|--------------|
-| P1: Native addon breaks deploy | Cache Foundation (technology decision) | `build.js` produces single file; `deploy.sh` succeeds; no `node_modules/` copied |
-| P2: Cache serves stale data | Cache Foundation (invalidation strategy) | Edit-then-read test: external edit → CLI reads fresh content |
-| P3: Agent spawn references break | Agent Audit (dependency map) | `validate-agents` command returns zero errors; all workflow spawns resolve |
-| P4: Command rename breaks callers | Command Consolidation (aliases) | Old AND new command names produce identical output |
-| P5: node:sqlite experimental | Cache Foundation (capability detection) | Tests pass on Node 18 (no cache) AND Node 22+ (with cache) |
-| P6: Schema coupling in cache | Cache Foundation (architecture) | Cache stores raw content only; no schema version field; `cache clear` fully recovers |
 <!-- /section -->
 
 <!-- section: sources -->
 ## Sources
 
-- **Node.js v25.7.0 `node:sqlite` docs** (https://nodejs.org/api/sqlite.html): Stability 1.2 Release Candidate; `DatabaseSync` synchronous API; available since v22.5.0; flag removed since v23.4.0/v22.13.0 — HIGH confidence
-- **esbuild CHANGELOG-2022** (via Context7, /evanw/esbuild): Native `.node` extensions cannot be bundled; must use `external` flag; packages must be resolved at runtime from `node_modules` — HIGH confidence
-- **better-sqlite3 npm page** (https://www.npmjs.com/package/better-sqlite3): 3,977 dependents; requires native compilation; prebuilt binaries for LTS only — HIGH confidence
-- **esbuild issue #2830** (https://github.com/evanw/esbuild/issues/2830): SQLite3 prebuilt binaries cannot be bundled; require external + manual file copy — HIGH confidence
-- **better-sqlite3 issue #1411** (https://github.com/WiseLibs/better-sqlite3/issues/1411): Build fails on Node 25; native compilation fragility — HIGH confidence
-- **sql.js** (https://github.com/sql-js/sql.js): SQLite compiled to WASM; pure JS; no native addon; ~1MB bundle size — HIGH confidence
-- **SQLite corruption docs** (https://www.sqlite.org/howtocorrupt.html): Cache invalidation failures, WAL mode on network filesystems — HIGH confidence
-- **Codebase analysis:** `build.js` (94 lines, esbuild config with external Node builtins), `deploy.sh` (87 lines, file-copy deploy), `src/lib/helpers.js` (946 lines, Map cache, `cachedReadFile`, `invalidateFileCache`), `src/lib/context.js` (389 lines, `AGENT_MANIFESTS`), `src/router.js` (947 lines, 85 case branches), `package.json` (engines: `>=18`)
-- **Prior v7.1 PITFALLS.md:** Integration gotchas for file cache invalidation after branch switch, worktree namespace separation — directly applicable patterns
+- **Context7 notebooklm-py docs** (/teng-lin/notebooklm-py): Authentication system (cookie-based, browser login, 4-level auth precedence), rate limiting (batchexecute endpoint, RPCError R7cb6c, UserDisplayableError [3]), known limitations (artifact generation failures, 30s-45min processing times), error handling patterns — HIGH confidence
+- **Context7 yt-dlp docs** (/yt-dlp/yt-dlp): Subtitle extraction (`--write-subs`, `--write-auto-sub`), rate limiting (`--sleep-interval`), player_skip options, PO Token Provider Framework — HIGH confidence
+- **GitHub teng-lin/notebooklm-py**: Installation requirements (Python >=3.10, httpx, click, rich, optional playwright), authentication storage (`~/.notebooklm/storage_state.json`, `NOTEBOOKLM_AUTH_JSON`), cookie domain priority fixes — HIGH confidence
+- **DeepWiki notebooklm-py analysis** (deepwiki.com/teng-lin/notebooklm-py/1.2-installation-and-setup): System requirements, browser-based login flow, token extraction process (CSRF SNlM0e, session FdrFJe), platform-specific notes — HIGH confidence
+- **NotebookLM tier limits** (Brave Search, multiple sources: support.google.com, elephas.app, xda-developers.com, Medium): Free=50 sources/50 queries/day, Plus=100/500, Pro=300, Ultra=600 sources — HIGH confidence
+- **yt-dlp GitHub issues** (#13241, #13249, #13252, #13260, #13968, #14707, #14734): nsig extraction failures, SABR streaming enforcement — HIGH confidence
+- **Reddit r/youtubedl** (multiple 2025-2026 threads): Rate limiting escalation, sleep delays, IP bans — MEDIUM confidence
+- **DEV Community** (dev.to/ali_ibrahim): 2026 YouTube SABR blocking, yt-dlp workarounds — MEDIUM confidence
+- **Google API Terms of Service** (developers.google.com/terms): Reverse engineering prohibition — HIGH confidence
+- **Reddit r/notebooklm**: Account flagging reports, API access questions, daily limit complaints — MEDIUM confidence
+- **Node.js child_process docs** (nodejs.org/api/child_process.html): PATH issues on Windows, env passing, spawn vs execSync — HIGH confidence
+- **Stack Overflow / GitHub nodejs/node**: Python subprocess from Node.js issues (venv activation, PYTHONPATH, ENOENT errors) — MEDIUM confidence
+- **RAG quality literature** (dextralabs.com, nb-data.com, medium.com multiple authors): Garbage-in/garbage-out, irrelevant retrieval, chunk quality — MEDIUM confidence
+- **Codebase analysis:** gsd-tools.cjs (28201 lines, execSync patterns), PROJECT.md (251 lines, v8.1 requirements), config.json schema (brave_search, research settings) — HIGH confidence
+
+<!-- /section -->
 
 ---
-*Pitfalls research for: GSD Plugin v8.0 Performance & Agent Architecture*
-*Researched: 2026-03-01*
+*Pitfalls research for: bGSD Plugin v8.1 RAG-Powered Research Pipeline*
+*Researched: 2026-03-02*
