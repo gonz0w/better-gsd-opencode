@@ -45,18 +45,60 @@ npm run build     # Build validation
 ```
 
 ## Slash Commands
-11 commands available in `commands/`:
-- `/bgsd-velocity` — Execution velocity metrics and completion forecast
-- `/bgsd-codebase-impact` — Module dependencies and blast radius analysis
-- `/bgsd-context-budget` — Token usage estimation for plan files
+41 commands available in `commands/`:
+
+**Project Lifecycle:**
+- `/bgsd-new-project` — Initialize a new project with planning structure
+- `/bgsd-new-milestone` — Start a new milestone
+- `/bgsd-complete-milestone` — Complete current milestone and archive
+- `/bgsd-progress` — Show project progress and status
+- `/bgsd-resume-work` — Resume work on an existing project
+- `/bgsd-pause-work` — Pause current work session
+
+**Planning:**
+- `/bgsd-discuss-phase` — Discuss and scope a phase before planning
+- `/bgsd-plan-phase` — Create execution plans for a phase
+- `/bgsd-research-phase` — Research phase requirements
+- `/bgsd-execute-phase` — Execute plans in a phase
+- `/bgsd-add-phase` — Add a new phase to the roadmap
+- `/bgsd-insert-phase` — Insert a phase at a specific position
+- `/bgsd-remove-phase` — Remove a phase from the roadmap
+- `/bgsd-plan-milestone-gaps` — Plan gap closure from verification
+- `/bgsd-list-phase-assumptions` — List assumptions for a phase
+
+**Execution & Verification:**
+- `/bgsd-verify-work` — Verify completed work against criteria
+- `/bgsd-audit-milestone` — Audit milestone completion
+- `/bgsd-check-todos` — Check and manage todo items
+- `/bgsd-add-todo` — Add a todo item
+- `/bgsd-quick` — Quick task execution
+
+**Analysis & Diagnostics:**
+- `/bgsd-velocity` — Execution velocity metrics and forecast
+- `/bgsd-codebase-impact` — Module dependencies and blast radius
+- `/bgsd-context-budget` — Token usage estimation for plans
+- `/bgsd-map-codebase` — Map codebase structure
+- `/bgsd-health` — Project health check
+- `/bgsd-debug` — Debug planning issues
+
+**Search & History:**
+- `/bgsd-search-decisions` — Search past decisions
+- `/bgsd-search-lessons` — Search completed phase lessons
+- `/bgsd-session-diff` — Git commits since last session
 - `/bgsd-rollback-info` — Commits and revert command for a plan
-- `/bgsd-search-decisions` — Search past decisions across STATE.md and archives
-- `/bgsd-search-lessons` — Search completed phase lessons for patterns
-- `/bgsd-session-diff` — Git commits since last session activity
-- `/bgsd-test-run` — Parse test output with pass/fail gating
-- `/bgsd-trace-requirement` — Trace requirement from spec to files on disk
+- `/bgsd-trace-requirement` — Trace requirement from spec to files
+
+**Configuration & Maintenance:**
+- `/bgsd-settings` — View/edit settings
+- `/bgsd-set-profile` — Set user profile
 - `/bgsd-validate-config` — Schema validation for config.json
 - `/bgsd-validate-deps` — Phase dependency graph validation
+- `/bgsd-test-run` — Parse test output with pass/fail gating
+- `/bgsd-update` — Check for and apply updates
+- `/bgsd-reapply-patches` — Reapply editor patches
+- `/bgsd-cleanup` — Clean up stale planning artifacts
+- `/bgsd-help` — Show help and available commands
+- `/bgsd-join-discord` — Join the bGSD Discord community
 
 ## IMPORTANT: String Replacement Warning
 The Anthropic auth plugin rewrites ALL system prompt text, replacing the host editor
