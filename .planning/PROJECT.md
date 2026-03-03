@@ -2,29 +2,28 @@
 
 ## What This Is
 
-A single-file Node.js CLI built from 34 organized `src/` modules via esbuild, producing `bin/gsd-tools.cjs`. It provides structured data operations for AI-driven project planning workflows running in the host editor. Nine versions shipped: v1.0 (test suite, module split, observability), v1.1 (context reduction — 46.7% CLI, 54.6% workflow, 67% reference compression), v2.0 (state validation, cross-session memory, quality scoring), v3.0 (intent engineering — INTENT.md, drift validation, workflow injection), v4.0 (environment awareness, MCP profiling, worktree parallelism), v5.0 (codebase intelligence — convention extraction, dependency graphs, lifecycle awareness), v6.0 (UX overhaul — shared formatting engine, TTY-aware smart output, branded CLI), v7.0 (agent orchestration — AST intelligence, task routing, context efficiency, TDD execution, review gates), v7.1 (trajectory engineering — checkpoint, pivot, compare, choose, decision journal, dead-end detection), and v8.0 (performance & agent architecture — SQLite caching, agent consolidation 11→9, namespace routing, profiler instrumentation, token budgets, RACI matrix).
+A single-file Node.js CLI built from 34 organized `src/` modules via esbuild, producing `bin/gsd-tools.cjs`. It provides structured data operations for AI-driven project planning workflows running in the host editor. Ten versions shipped: v1.0 (test suite, module split, observability), v1.1 (context reduction — 46.7% CLI, 54.6% workflow, 67% reference compression), v2.0 (state validation, cross-session memory, quality scoring), v3.0 (intent engineering — INTENT.md, drift validation, workflow injection), v4.0 (environment awareness, MCP profiling, worktree parallelism), v5.0 (codebase intelligence — convention extraction, dependency graphs, lifecycle awareness), v6.0 (UX overhaul — shared formatting engine, TTY-aware smart output, branded CLI), v7.0 (agent orchestration — AST intelligence, task routing, context efficiency, TDD execution, review gates), v7.1 (trajectory engineering — checkpoint, pivot, compare, choose, decision journal, dead-end detection), v8.0 (performance & agent architecture — SQLite caching, agent consolidation 11→9, namespace routing, profiler instrumentation, token budgets, RACI matrix), and v8.1 (RAG-powered research — YouTube integration, NotebookLM synthesis, multi-source orchestration, 4-tier degradation, session persistence).
 
 ## Core Value
 
 Manage and deliver high-quality software with high-quality documentation, while continuously reducing token usage and improving performance.
 
-## Current Milestone: v8.1 RAG-Powered Research Pipeline
+## Current Milestone: (No active milestone)
 
-**Goal:** Enhance the research workflow with RAG-powered tools — YouTube search (yt-dlp), NotebookLM API (notebooklm-py), Brave Search, and Context7 — so domain research is synthesized externally, reducing LLM token spend while improving research quality.
+**Last shipped:** v8.1 RAG-Powered Research Pipeline (2026-03-03)
 
-**Target features:**
-- YouTube metadata search and transcript extraction via yt-dlp for developer content discovery
-- NotebookLM API integration (notebooklm-py) for RAG-based research synthesis
-- Orchestration layer that feeds Brave Search, Context7, YouTube, and other sources into NotebookLM
-- Graceful fallback — all RAG tools optional; research degrades to current LLM-only approach if unconfigured
-- MCP server discovery for additional research tools (recommend and auto-detect available servers)
-- Research workflow integration — existing gsd-project-researcher and gsd-phase-researcher use new pipeline when available
+**Shipped in v8.1:**
+- YouTube integration via yt-dlp: `research:yt-search` (metadata, filtering) and `research:yt-transcript` (VTT parsing)
+- NotebookLM integration via notebooklm-py: notebook management, RAG-grounded Q&A, research report generation
+- Research orchestration pipeline with 4-tier degradation (Full RAG → Sources only → Brave/Context7 → Pure LLM)
+- MCP server discovery for Brave Search, Context7, Exa with capability detection
+- SQLite research cache extending v8.0 cache layer
+- Session persistence with `--resume` flag and stage checkpointing
+- Research workflow integration in gsd-project-researcher and gsd-phase-researcher agents
 
-## Current State
+<details>
+<summary>Previous: v8.0 Performance & Agent Architecture (shipped 2026-03-03)</summary>
 
-**Last shipped:** v8.0 Performance & Agent Architecture (2026-03-03)
-
-**Shipped in v8.0:**
 - Two-layer SQLite caching (L1 in-memory Map + L2 SQLite via `node:sqlite`) with graceful degradation to Map-only on Node <22.5
 - Agent consolidation (11→9): merged gsd-integration-checker into gsd-verifier, gsd-research-synthesizer into gsd-roadmapper
 - RACI matrix mapping every lifecycle step to exactly one responsible agent, with automated audit command
@@ -32,6 +31,8 @@ Manage and deliver high-quality software with high-quality documentation, while 
 - Namespace routing for CLI commands (`init:`, `plan:`, `execute:`, `verify:`, `util:` prefixes)
 - Profiler instrumentation on hot paths (`GSD_PROFILE=1`), compare command with regression highlighting
 - Auto changelog generation in milestone wrapup workflow
+
+</details>
 
 <details>
 <summary>Previous: v7.1 Trajectory Engineering (shipped 2026-03-02)</summary>

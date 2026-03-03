@@ -228,3 +228,13 @@
 - `.planning/milestones/v1.0-REQUIREMENTS.md`
 
 ---
+
+## v8.1 RAG-Powered Research Pipeline (Shipped: 2026-03-03)
+
+**Phases completed:** 5 phases, 10 plans, 0 tasks
+
+**Key accomplishments:**
+- (none recorded)
+
+---
+
