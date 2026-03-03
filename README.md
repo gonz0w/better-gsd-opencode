@@ -2,7 +2,7 @@
 
 A structured project planning and execution system for [OpenCode](https://github.com/opencode-ai/opencode). bGSD turns AI-assisted coding from ad-hoc prompting into milestone-driven development with planning, execution, verification, and memory that persists across sessions.
 
-**762 tests** | **Zero runtime dependencies** | **41 slash commands** | **100+ CLI operations** | **9 specialized AI agents** | **7 milestones shipped**
+**762 tests** | **Zero runtime dependencies** | **41 slash commands** | **100+ CLI operations** | **9 specialized AI agents** | **8 milestones shipped**
 
 ---
 
@@ -289,6 +289,18 @@ Decisions, lessons, bookmarks, and trajectory journals persist across `/clear` a
 /gsd-velocity                             # Plans/day, completion forecast
 ```
 
+### Performance & Architecture (v8.0)
+
+The latest milestone focused on runtime performance, system simplification, and release readiness:
+
+- **SQLite Caching (L1/L2)** — Two-layer cache: in-memory Map (L1) for instant hits + SQLite via `node:sqlite` (L2) for persistent cache across CLI invocations. Graceful degradation to Map-only on Node <22.5. Zero dependencies — uses Node's built-in `DatabaseSync`.
+- **Agent Consolidation (12→9)** — Merged gsd-integration-checker into gsd-verifier, gsd-research-synthesizer into gsd-roadmapper. Fewer agents, same capabilities, less coordination overhead.
+- **Namespace Routing** — Commands organized into semantic namespaces (`init:`, `plan:`, `execute:`, `verify:`, `util:`) with colon syntax for clarity and discoverability.
+- **Token Budgets** — Each agent has a declared token budget (60-80K). Context builder warns when injection approaches budget, preventing context rot.
+- **RACI Matrix** — Every lifecycle step has exactly one responsible agent. No ambiguity in agent roles.
+- **Profiler Instrumentation** — `GSD_PROFILE=1` emits timing data for file reads, git operations, markdown parsing, and AST analysis. `profiler compare` shows before/after timing deltas with color-coded regression highlighting.
+- **Auto Changelog** — `gsd-tools milestone complete` auto-generates version docs from git log and STATE.md metrics.
+
 ### Trajectory Engineering (v7.1)
 
 Structured exploration for comparing implementation approaches. Checkpoint your work, try different strategies, compare metrics, and choose a winner — all while preserving planning state.
@@ -432,7 +444,7 @@ node bin/gsd-tools.cjs state validate --raw
 ```
 src/
   index.js                 # Entry point
-  router.js                # Command routing, global flags
+  router.js                # Command routing, namespace dispatch, global flags
   commands/
     init.js                # 13 init subcommands (context injection for workflows)
     intent.js              # Intent CRUD, tracing, drift scoring
@@ -464,6 +476,7 @@ src/
     lifecycle.js           # Lifecycle awareness
     orchestration.js       # Task classification/routing
     profiler.js            # Performance profiling
+    cache.js               # L1/L2 caching (Map + SQLite)
     regex-cache.js         # Compiled regex cache
     review/
       stage-review.js      # Two-stage review (spec+quality)
@@ -476,7 +489,7 @@ Built with esbuild into a single `bin/gsd-tools.cjs` file. Workflows are markdow
 
 ## Requirements
 
-- Node.js >= 18
+- Node.js >= 22.5 (required for `node:sqlite` caching; falls back to in-memory cache on older versions)
 - [OpenCode](https://github.com/opencode-ai/opencode) installed and configured
 
 ## License

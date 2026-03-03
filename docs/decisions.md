@@ -48,7 +48,7 @@ Why bGSD is built the way it is. Every major architectural and product decision 
 
 ### Intelligence as Data, Not Agents
 
-**Decision:** New capabilities are CLI commands that produce richer data for existing agents, not new agent roles. Hard cap at 12 agent roles (11 original + gsd-reviewer).
+**Decision:** New capabilities are CLI commands that produce richer data for existing agents, not new agent roles. Hard cap at 9 agent roles (consolidated from 12 in v8.0).
 
 **Why:** DeepMind research shows coordination overhead grows quadratically with agent count. Cursor's experiment with 20 equal-status agents failed. Gas Town's production incident (DB down 2 days) came from autonomous agents. The right approach is fewer, smarter agents with better data.
 
@@ -57,7 +57,7 @@ Why bGSD is built the way it is. Every major architectural and product decision 
 - Dynamic agent spawning based on task — rejected because Cursor validated that pre-planned parallelism beats self-spawning
 - Autonomous agent teams — rejected because 67% AI PR rejection rate (LinearB) and 9% more bugs (DORA 2025) show human-in-the-loop is correct
 
-**Outcome:** Good. 12 agent roles cover all needs. New intelligence (task classification, context budgets, AST analysis) is delivered as CLI data that existing agents consume.
+**Outcome:** Good. 9 agent roles cover all needs. New intelligence (task classification, context budgets, AST analysis) is delivered as CLI data that existing agents consume. v8.0 consolidated from 12→9 by merging redundant roles.
 
 ---
 
@@ -209,7 +209,7 @@ Why bGSD is built the way it is. Every major architectural and product decision 
 
 **Why:** This mirrors how real software is built. Milestones provide natural checkpoints for archival, retrospection, and scope management.
 
-**Outcome:** Good. bGSD itself has shipped 7 milestones (v1.0 through v7.0) in 8 days, demonstrating the system works at scale.
+**Outcome:** Good. bGSD itself has shipped 8 milestones (v1.0 through v8.0) in 13 days, demonstrating the system works at scale.
 
 ---
 
@@ -306,6 +306,16 @@ Why bGSD is built the way it is. Every major architectural and product decision 
 | TDD gate validation via execSync with 120s timeout | Synchronous test execution fits CLI model; timeout prevents hangs | Good — predictable |
 | Auto test-after-edit (non-blocking) | Catches errors early without stopping execution flow | Good — error prevention |
 
+### v8.0 Decisions (Performance & Architecture)
+
+| Decision | Rationale | Outcome |
+|----------|-----------|---------|
+| `node:sqlite` (built-in DatabaseSync) over `better-sqlite3` | Preserves single-file deploy, zero native dependencies | Good — graceful fallback to Map-only on Node <22.5 |
+| Agent consolidation 12→9 | DeepMind research on quadratic coordination cost; merged redundant roles | Good — same capabilities, simpler system |
+| Namespace routing with colon syntax | Semantic organization (`init:`, `plan:`, `execute:`, `verify:`, `util:`) improves discoverability | Good — all 762 tests pass with namespace format |
+| Token budgets per agent (60-80K) | Prevents context rot from unbounded injection | Good — context builder warns on budget exceedance |
+| No backward compatibility aliases for command renames | Single user, rename and update all references | Good — clean codebase, no alias debt |
+
 ---
 
 ## Out of Scope Decisions
@@ -318,7 +328,7 @@ Decisions about what NOT to build, with reasoning.
 | npm package publishing | Plugin is deployed via file copy, not a library |
 | ESM output format | CJS avoids __dirname/require rewriting complexity |
 | RAG / vector search | Wrong architecture for a CLI tool; file-based search suffices |
-| SQLite codebase index | Heavy dependency with marginal ROI over JSON + git |
+| SQLite codebase index | v8.0 added SQLite for caching (L1/L2), validating that `node:sqlite` works; codebase indexing via SQLite remains out of scope (JSON + git suffices) |
 | Runtime MCP server connection | Static analysis of MCP config is sufficient |
 | CI/CD pipeline management | Handled by external tooling |
 | TypeScript migration | Not worth 34-module migration cost |
@@ -326,7 +336,7 @@ Decisions about what NOT to build, with reasoning.
 | Autonomous agent teams | 67% AI PR rejection rate, 9% more bugs — human-in-the-loop is correct |
 | Dynamic agent spawning | Cursor's 20-agent failure validates pre-planned parallelism |
 | LLM SDK integration | bGSD produces prompts, doesn't call LLM APIs directly |
-| Agent role explosion (>12) | Coordination overhead grows quadratically; intelligence = data, not agents |
+| Agent role explosion (>9) | Coordination overhead grows quadratically; intelligence = data, not agents |
 
 ---
 

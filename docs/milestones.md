@@ -16,8 +16,9 @@ Complete history of every bGSD milestone, what was delivered, and the metrics.
 | v5.0 | Codebase Intelligence | 7 | 14 | 2 days | 572 | 672KB |
 | v6.0 | UX & Developer Experience | 7 | 11 | 1 day | 574 | 681KB |
 | v7.0 | Agent Orchestration & Efficiency | 8 | 15 | 2 days | 762 | 1000KB |
-| v7.1 | Trajectory Engineering | 5 | 10 | In progress | 751 | 1050KB |
-| **Total** | | **49+** | **110+** | **~10 days** | | |
+| v7.1 | Trajectory Engineering | 6 | 10 | 1 day | 762 | 1050KB |
+| v8.0 | Performance & Architecture | 5 | ~10 | 3 days | 762 | 1058KB |
+| **Total** | | **55** | **~122** | **~13 days** | | |
 
 ---
 
@@ -66,13 +67,14 @@ Complete history of every bGSD milestone, what was delivered, and the metrics.
 
 ---
 
-## v7.1 Trajectory Engineering (In Progress)
+## v7.1 Trajectory Engineering
 
-**Started:** 2026-02-28 | **Phases:** 45-49 (5 complete) | **Plans:** 10 completed
+**Shipped:** 2026-03-01 | **Phases:** 45-50 | **Plans:** 10
+**Tests:** 762 | **Bundle:** 1050KB
 
 **Goal:** Add trajectory engineering capabilities — named checkpoints with auto-metrics, selective code rewind, pivot/compare/choose lifecycle, and decision journaling for safe experimentation.
 
-**What has been delivered:**
+**What was delivered:**
 
 ### Foundation (Phase 45)
 - **Trajectory store** — New memory store type (`trajectories`) with auto-generated 6-char hex IDs and collision detection
@@ -107,6 +109,38 @@ Complete history of every bGSD milestone, what was delivered, and the metrics.
 - **Branch cleanup** — ALL trajectory working branches deleted (including winner, since code is now merged)
 - **Journal recording** — `category: 'choose'` entry with `tags: ['choose', 'lifecycle-complete']` marking the exploration as complete
 - **12 dedicated tests** — Full coverage of merge, tag archival, branch cleanup, journal integrity, and error handling
+
+---
+
+## v8.0 Performance & Architecture
+
+**Shipped:** 2026-03-03 | **Phases:** 51-55 | **Plans:** ~10
+**Tests:** 762 | **Bundle:** 1058KB
+
+**Goal:** Optimize runtime performance with SQLite caching, consolidate agent system from 12 to 9, add namespace routing, profiler instrumentation, and release-readiness improvements.
+
+**What was delivered:**
+
+### Cache Foundation (Phases 51-52)
+- **L1/L2 caching** — Two-layer cache via `node:sqlite` `DatabaseSync`: in-memory Map (L1) for instant hits, SQLite (L2) for persistent cache across CLI invocations. Zero dependencies — uses Node's built-in module.
+- **Graceful Map fallback** — Falls back to Map-only on Node <22.5 with zero crashes and zero warnings.
+- **Hot-path command wiring** — All hot-path commands (phase, verify, misc) use `cachedReadFile()` for `.planning/` file reads.
+- **Cache warm with auto-discovery** — `cache warm` command with auto-discovery of `.planning/` files, `--no-cache` flag for test parity.
+- **Explicit invalidation** — Cache invalidated on all gsd-tools file writes for immediate consistency.
+
+### Agent Consolidation (Phase 53)
+- **RACI matrix** — Every lifecycle step has exactly one responsible agent. Agent audit command validates the matrix.
+- **Agent merges** — Merged gsd-integration-checker into gsd-verifier, gsd-research-synthesizer into gsd-roadmapper (12→9 agents).
+- **Token budgets** — All 9 agent manifests declare token budgets (80K for planning/execution, 60K for verification/research). Context builder warns on budget exceedance.
+
+### Command Consolidation (Phase 54)
+- **Namespace routing** — Commands organized into semantic namespaces (`init:`, `plan:`, `execute:`, `verify:`, `util:`) with colon syntax. Router supports both namespaced and flat command formats.
+- **Auto changelog** — `gsd-tools milestone complete` auto-generates version docs from git log and STATE.md metrics.
+
+### Profiler & Validation (Phase 55)
+- **Profiler instrumentation** — `GSD_PROFILE=1` emits timing data for file reads, git operations, markdown parsing, and AST analysis.
+- **Profiler compare** — `profiler compare` shows before/after timing deltas with color-coded regression highlighting.
+- **Cache speedup validation** — `cache-speedup` command validates cache effectiveness with measurable timing data.
 
 ---
 
@@ -223,9 +257,12 @@ Complete history of every bGSD milestone, what was delivered, and the metrics.
 2026-02-26  v5.0 shipped
 2026-02-27  v6.0 shipped, v7.0 shipped (same day)
 2026-02-28  v7.1 started (Trajectory Engineering)
+2026-03-01  v7.1 shipped
+2026-03-01  v8.0 started (Performance & Architecture)
+2026-03-03  v8.0 shipped
 ```
 
-Total: 7 milestones shipped + v7.1 in progress, 46+ phases, 104+ plans, ~25 hours execution time across ~10 days.
+Total: 8 milestones shipped, 55 phases, ~122 plans, ~27 hours execution time across ~13 days.
 
 ---
 
