@@ -8,6 +8,18 @@ A single-file Node.js CLI built from 34 organized `src/` modules via esbuild, pr
 
 Manage and deliver high-quality software with high-quality documentation, while continuously reducing token usage and improving performance.
 
+## Current Milestone: v8.1 RAG-Powered Research Pipeline
+
+**Goal:** Enhance the research workflow with RAG-powered tools — YouTube search (yt-dlp), NotebookLM API (notebooklm-py), Brave Search, and Context7 — so domain research is synthesized externally, reducing LLM token spend while improving research quality.
+
+**Target features:**
+- YouTube metadata search and transcript extraction via yt-dlp for developer content discovery
+- NotebookLM API integration (notebooklm-py) for RAG-based research synthesis
+- Orchestration layer that feeds Brave Search, Context7, YouTube, and other sources into NotebookLM
+- Graceful fallback — all RAG tools optional; research degrades to current LLM-only approach if unconfigured
+- MCP server discovery for additional research tools (recommend and auto-detect available servers)
+- Research workflow integration — existing gsd-project-researcher and gsd-phase-researcher use new pipeline when available
+
 ## Current State
 
 **Last shipped:** v8.0 Performance & Agent Architecture (2026-03-03)
@@ -155,7 +167,12 @@ Manage and deliver high-quality software with high-quality documentation, while 
 
 ### Active
 
-None — all v8.0 requirements shipped. Ready for next milestone.
+- [ ] YouTube metadata search and transcript extraction via yt-dlp
+- [ ] NotebookLM API integration for RAG-based research synthesis
+- [ ] Research orchestration layer (multi-source → NotebookLM → synthesis)
+- [ ] Graceful fallback when RAG tools are unconfigured
+- [ ] MCP server discovery for research tool recommendations
+- [ ] Research workflow integration with existing agents
 
 ### Out of Scope
 
@@ -231,4 +248,4 @@ Known tech debt: Bundle at ~1133KB (over 1050KB budget). `node:sqlite` is Stabil
 | Namespace routing (colon syntax) | Semantic grouping for 100+ CLI commands | Good — discoverable, backward-compatible |
 
 ---
-*Last updated: 2026-03-03 after v8.0 milestone complete*
+*Last updated: 2026-03-03 after v8.1 milestone start*

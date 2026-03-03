@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-03-01)
 
 **Core value:** Manage and deliver high-quality software with high-quality documentation, while continuously reducing token usage and improving performance
-**Current focus:** v8.0 complete — ready for next milestone
+**Current focus:** v8.1 — RAG-Powered Research Pipeline
 
 ## Current Position
 
-Phase: 55 of 55 (Profiler & Performance Validation)
-Plan: 2 of 2 in current phase
-Status: Milestone complete
-Last activity: 2026-03-03 — Completed v8.0 milestone (Performance & Agent Architecture)
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-03-03 — Milestone v8.1 started
 
-Progress: [██████████████████████████████████████] 100% (v8.0 SHIPPED)
+Progress: [                                      ] 0% (v8.1)
 
 ## Performance Metrics
 
