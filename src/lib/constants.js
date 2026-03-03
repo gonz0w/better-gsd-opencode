@@ -1864,6 +1864,8 @@ Examples:
   gsd-tools research:nlm-report abc123 --type briefing-doc
   gsd-tools research:nlm-report abc123 --type study-guide
   gsd-tools research:nlm-report abc123 --prompt "Focus on security implications"`,
+  'research:collect --resume': 'Resume interrupted research session from last completed stage',
+  'research collect --resume': 'Resume interrupted research session from last completed stage',
 };
 
 module.exports = { MODEL_PROFILES, CONFIG_SCHEMA, COMMAND_HELP, VALID_TRAJECTORY_SCOPES };

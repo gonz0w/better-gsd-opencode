@@ -1173,6 +1173,54 @@ function formatSourcesForAgent(sources, query, nlmSynthesis) {
   return lines.join('\n');
 }
 
+// ─── Session Persistence Helpers ────────────────────────────────────────────
+
+/**
+ * Save research session checkpoint to disk.
+ * @param {string} cwd - Project root directory
+ * @param {object} data - Session data to persist
+ */
+function saveSession(cwd, data) {
+  const sessionPath = path.join(cwd, '.planning', 'research-session.json');
+  try {
+    fs.writeFileSync(sessionPath, JSON.stringify({ ...data, last_saved: new Date().toISOString() }, null, 2));
+  } catch (e) {
+    debugLog('research.session', 'failed to save session: ' + e.message);
+  }
+}
+
+/**
+ * Load an existing research session if query matches.
+ * @param {string} cwd - Project root directory
+ * @param {string} query - Current query (must match session query exactly)
+ * @returns {object|null} Session data or null if no matching session
+ */
+function loadSession(cwd, query) {
+  const sessionPath = path.join(cwd, '.planning', 'research-session.json');
+  try {
+    if (!fs.existsSync(sessionPath)) return null;
+    const data = JSON.parse(fs.readFileSync(sessionPath, 'utf-8'));
+    // Only resume if query matches exactly
+    if (data.query !== query) return null;
+    return data;
+  } catch (e) {
+    return null;
+  }
+}
+
+/**
+ * Delete the research session file on successful completion.
+ * @param {string} cwd - Project root directory
+ */
+function deleteSession(cwd) {
+  const sessionPath = path.join(cwd, '.planning', 'research-session.json');
+  try {
+    if (fs.existsSync(sessionPath)) fs.unlinkSync(sessionPath);
+  } catch (e) {
+    debugLog('research.session', 'failed to delete session: ' + e.message);
+  }
+}
+
 /**
  * Format research:collect data for TTY display.
  * @param {object} data - Collect result object
@@ -1236,9 +1284,10 @@ function cmdResearchCollect(cwd, args, raw) {
   const config = loadConfig(cwd);
   const ragEnabled = config.rag_enabled !== false;
 
-  // Parse --quick and --no-cache flags
+  // Parse --quick, --no-cache, and --resume flags
   const quick = args.includes('--quick');
   const noCache = args.includes('--no-cache');
+  const resume = args.includes('--resume');
 
   // Quick mode: bypass pipeline entirely
   if (quick || !ragEnabled) {
@@ -1288,46 +1337,86 @@ function cmdResearchCollect(cwd, args, raw) {
     }
   }
 
+  // Load resume session if --resume flag present
+  let session = null;
+  if (resume) {
+    session = loadSession(cwd, query);
+    if (session) {
+      status('Resuming session from stage: ' + (session.completed_stages.slice(-1)[0] || 'start'));
+    } else {
+      status('No matching session found — starting fresh');
+    }
+  }
+
+  // Initialize accumulators from session if available
+  const allSources = session ? [...(session.sources || [])] : [];
+  const timing = session ? { ...(session.timing || {}) } : {};
+  const completedStages = session ? new Set(session.completed_stages || []) : new Set();
+
   // Allocate per-stage timeout
   const stageTimeout = Math.max(5000, Math.floor((config.rag_timeout || 30) * 1000 / 2));
 
   // Determine total stage count based on tier
   const totalStages = tier.number === 1 ? 4 : 3;
 
-  const allSources = [];
-  const timing = {};
   const pipelineStart = Date.now();
 
   // Stage 1: Web sources
-  status(`[1/${totalStages}] Collecting web sources...`);
-  const webStart = Date.now();
-  const webSources = collectWebSources(cwd, query, config, stageTimeout);
-  timing.web_ms = Date.now() - webStart;
-  allSources.push(...webSources);
+  if (completedStages.has('web')) {
+    status(`[1/${totalStages}] Web sources: restored from session (${allSources.filter(s => s.source === 'brave_search').length} sources)`);
+    timing.web_ms = timing.web_ms || 0;
+  } else {
+    status(`[1/${totalStages}] Collecting web sources...`);
+    const webStart = Date.now();
+    const webSources = collectWebSources(cwd, query, config, stageTimeout);
+    timing.web_ms = Date.now() - webStart;
+    allSources.push(...webSources);
+    completedStages.add('web');
+    saveSession(cwd, { query, tier: tier.number, started: session ? session.started : new Date().toISOString(), completed_stages: [...completedStages], sources: allSources, timing, nlm_synthesis: null });
+  }
 
   // Stage 2: YouTube sources
-  if (cliTools['yt-dlp'] && cliTools['yt-dlp'].available) {
+  if (completedStages.has('youtube')) {
+    status(`[2/${totalStages}] YouTube: restored from session (${allSources.filter(s => s.source === 'yt-dlp').length} sources)`);
+    timing.youtube_ms = timing.youtube_ms || 0;
+  } else if (cliTools['yt-dlp'] && cliTools['yt-dlp'].available) {
     status(`[2/${totalStages}] Searching YouTube...`);
     const ytStart = Date.now();
     const ytSources = collectYouTubeSources(cwd, query, config, stageTimeout);
     timing.youtube_ms = Date.now() - ytStart;
     allSources.push(...ytSources);
+    completedStages.add('youtube');
+    saveSession(cwd, { query, tier: tier.number, started: session ? session.started : new Date().toISOString(), completed_stages: [...completedStages], sources: allSources, timing, nlm_synthesis: null });
   } else {
     status(`[2/${totalStages}] YouTube: skipped (yt-dlp not installed)`);
     timing.youtube_ms = 0;
+    completedStages.add('youtube');
+    saveSession(cwd, { query, tier: tier.number, started: session ? session.started : new Date().toISOString(), completed_stages: [...completedStages], sources: allSources, timing, nlm_synthesis: null });
   }
 
   // Stage 3: Context7 availability note
-  timing.context7_available = !!(mcpServers['context7'] && mcpServers['context7'].configured && mcpServers['context7'].enabled);
-  status(`[3/${totalStages}] Context7: available to agent directly via MCP`);
+  if (completedStages.has('context7')) {
+    status(`[3/${totalStages}] Context7: restored from session`);
+  } else {
+    timing.context7_available = !!(mcpServers['context7'] && mcpServers['context7'].configured && mcpServers['context7'].enabled);
+    status(`[3/${totalStages}] Context7: available to agent directly via MCP`);
+    completedStages.add('context7');
+    saveSession(cwd, { query, tier: tier.number, started: session ? session.started : new Date().toISOString(), completed_stages: [...completedStages], sources: allSources, timing, nlm_synthesis: null });
+  }
 
   // Stage 4: NotebookLM synthesis (Tier 1 only)
-  let nlmSynthesis = null;
-  if (tier.number === 1 && allSources.length > 0) {
+  let nlmSynthesis = session ? (session.nlm_synthesis || null) : null;
+  if (completedStages.has('nlm')) {
+    if (tier.number === 1) {
+      status('[4/4] NotebookLM: restored from session');
+    }
+  } else if (tier.number === 1 && allSources.length > 0) {
     status('[4/4] NotebookLM synthesis...');
     const nlmStart = Date.now();
     nlmSynthesis = collectNlmSynthesis(cwd, query, allSources, stageTimeout);
     timing.nlm_ms = Date.now() - nlmStart;
+    completedStages.add('nlm');
+    saveSession(cwd, { query, tier: tier.number, started: session ? session.started : new Date().toISOString(), completed_stages: [...completedStages], sources: allSources, timing, nlm_synthesis: nlmSynthesis });
   } else {
     if (tier.number === 1) {
       status('[4/4] NotebookLM: skipped (no sources to synthesize)');
@@ -1360,6 +1449,9 @@ function cmdResearchCollect(cwd, args, raw) {
       cache.setResearch(query, result);
     }
   }
+
+  // Delete session on successful full completion
+  deleteSession(cwd);
 
   output(result, { formatter: formatCollect, raw });
 }
@@ -1907,4 +1999,4 @@ function cmdResearchNlmAddSource(cwd, args, raw) {
   }
 }
 
-module.exports = { detectCliTools, detectMcpServers, calculateTier, cmdResearchCapabilities, cmdResearchYtSearch, cmdResearchYtTranscript, cmdResearchCollect, cmdResearchNlmCreate, cmdResearchNlmAddSource, cmdResearchNlmAsk, cmdResearchNlmReport, collectWebSources, collectYouTubeSources, collectNlmSynthesis, formatSourcesForAgent, parseVtt };
+module.exports = { detectCliTools, detectMcpServers, calculateTier, cmdResearchCapabilities, cmdResearchYtSearch, cmdResearchYtTranscript, cmdResearchCollect, cmdResearchNlmCreate, cmdResearchNlmAddSource, cmdResearchNlmAsk, cmdResearchNlmReport, collectWebSources, collectYouTubeSources, collectNlmSynthesis, formatSourcesForAgent, parseVtt, saveSession, loadSession, deleteSession };
