@@ -247,7 +247,11 @@ Plans:
 
 **Research needed:** Yes — notebooklm-py CLI output formats, auth failure modes, rate limits, fire-and-poll patterns for long operations
 
-**Plans:** TBD
+**Plans:** 2 plans
+
+Plans:
+- [ ] 59-01-PLAN.md — NLM notebook management commands + auth health checking
+- [ ] 59-02-PLAN.md — NLM ask/report commands + Tier 1 pipeline integration
 
 ### Phase 60: testing-caching-polish
 
