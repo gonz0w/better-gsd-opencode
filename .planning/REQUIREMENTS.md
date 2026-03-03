@@ -3,7 +3,7 @@
 ## YouTube Integration
 
 - [x] **YT-01**: User can search YouTube for developer content via yt-dlp `ytsearch:` prefix and receive structured metadata (title, duration, views, channel, upload date, video ID)
-- [ ] **YT-02**: User can extract transcripts from YouTube videos via yt-dlp auto/manual subtitle download with built-in VTT-to-text parser
+- [x] **YT-02**: User can extract transcripts from YouTube videos via yt-dlp auto/manual subtitle download with built-in VTT-to-text parser
 - [x] **YT-03**: User can filter YouTube search results by recency, duration, view count, and channel allowlist before expensive transcript extraction
 
 ## NotebookLM Integration
@@ -50,7 +50,7 @@
 | Requirement | Phase | Status |
 |-------------|-------|--------|
 | YT-01 | Phase 57 | Complete |
-| YT-02 | Phase 57 | Pending |
+| YT-02 | Phase 57 | Complete |
 | YT-03 | Phase 57 | Complete |
 | NLM-01 | Phase 59 | Pending |
 | NLM-02 | Phase 59 | Pending |

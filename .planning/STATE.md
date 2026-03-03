@@ -10,9 +10,9 @@ See: .planning/PROJECT.md (updated 2026-03-03)
 ## Current Position
 
 Phase: 57 of 60 (youtube-integration)
-Plan: 1 of 2 ✓
-Status: Plan 01 complete — ready for Plan 02
-Last activity: 2026-03-03 — Completed 57-01-PLAN.md (yt-search command with quality scoring)
+Plan: 2 of 2 ✓
+Status: Phase 57 complete — all plans executed
+Last activity: 2026-03-03 — Completed 57-02-PLAN.md (yt-transcript extraction)
 
 Progress: [######                                ] 15% (v8.1)
 
@@ -40,6 +40,7 @@ Progress: [######                                ] 15% (v8.1)
 | Phase 56 P01 | 8 min | 2 tasks | 3 files |
 | Phase 56 P02 | 7 min | 2 tasks | 5 files |
 | Phase 57 P01 | 5 min | 2 tasks | 4 files |
+| Phase 57 P02 | 5min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -57,6 +58,8 @@ All v1.0-v8.0 decisions recorded in PROJECT.md Key Decisions table with outcomes
 - [Phase 56]: research namespace added as top-level command namespace for clean separation
 - [Phase 57]: Quality score weights: recency 40pts + views 30pts (log-scale) + duration 30pts (bell curve at 15-20min) — demotes clickbait
 - [Phase 57]: yt-dlp check runs before query validation — fail fast on missing dependency
+- [Phase 57]: VTT auto-sub deduplication strips consecutive identical lines for clean agent consumption
+- [Phase 57]: Full transcript always returned in JSON — TTY display truncation only, no data loss
 
 ### Pending Todos
 
@@ -67,10 +70,10 @@ None — milestone starting fresh.
 - NotebookLM unofficial API (notebooklm-py) uses cookie auth that expires every few weeks — Google can break it anytime
 - yt-dlp in perpetual arms race with YouTube — nsig/SABR breakage requires frequent updates
 - Full RAG pipeline latency 3-8 min vs 10-30 sec LLM-only — progressive output and --quick flag mitigate
-- Bundle at ~1159KB — 9KB added in Phase 57 P01, monitor against 1500KB budget
+- Bundle at ~1170KB — 11KB added in Phase 57 P02, monitor against 1500KB budget
 
 ## Session Continuity
 
 Last session: 2026-03-03
-Stopped at: Completed 57-01-PLAN.md (yt-search command)
-Next step: /bgsd-execute-phase 57 (Phase 57 Plan 02 — YouTube transcript extraction)
+Stopped at: Completed 57-02-PLAN.md (yt-transcript extraction)
+Next step: Phase 57 complete — next phase in RAG research pipeline
