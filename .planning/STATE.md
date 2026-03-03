@@ -46,6 +46,8 @@ Progress: [########################################] 100% (v8.1)
 | Phase 59 P01 | 11 min | 2 tasks | 4 files |
 | Phase 59 P02 | 8min | 2 tasks | 5 files |
 | Phase 60 P01 | 13 min | 2 tasks | 5 files |
+| Phase 60 P02 | 18 min | 2 tasks | 3 files |
+| Phase 60 P02 | 18 min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -76,6 +78,9 @@ All v1.0-v8.0 decisions recorded in PROJECT.md Key Decisions table with outcomes
 - [Phase 60]: research cache keyed on query string — exact match semantics, TTL 1 hour, LRU eviction
 - [Phase 60]: cache write skipped if source_count=0 — avoids caching empty/failed pipeline runs
 - [Phase 60]: 'cache' namespace added to router (cache:research-stats, cache:research-clear) for symmetry with 'research' namespace
+- [Phase 60]: Session file for research:collect keyed on query string — exact match required for resume, different query = fresh run
+- [Phase 60]: deleteSession() called after successful output — session only deleted when all pipeline stages complete
+- [Phase 60]: Per-stage checkpoint: each stage (web/youtube/context7/nlm) writes session file immediately after completion
 
 ### Pending Todos
 
@@ -86,11 +91,11 @@ None — milestone starting fresh.
 - NotebookLM unofficial API (notebooklm-py) uses cookie auth that expires every few weeks — Google can break it anytime
 - yt-dlp in perpetual arms race with YouTube — nsig/SABR breakage requires frequent updates
 - Full RAG pipeline latency 3-8 min vs 10-30 sec LLM-only — progressive output and --quick flag mitigate
-- Bundle at ~1212KB — 8KB added in Phase 60 P01 (research cache integration), monitor against 1500KB budget
+- Bundle at ~1216KB — 4KB added in Phase 60 P02 (session persistence), monitor against 1500KB budget
 - Two pre-existing config-migrate test failures (from Phase 56 RAG key additions) need cleanup
 
 ## Session Continuity
 
 Last session: 2026-03-03
-Stopped at: Completed 60-01-PLAN.md (research cache integration)
-Next step: Phase 60 Plan 01 complete. All plans in phase 60 done — ready for milestone completion.
+Stopped at: Completed 60-02-PLAN.md (research session persistence)
+Next step: Phase 60 complete — all plans done. v8.1 milestone ready for wrapup/completion.
