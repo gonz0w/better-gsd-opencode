@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-03-03)
 ## Current Position
 
 Phase: 56 of 60 (foundation-and-config)
-Plan: —
-Status: Ready to plan
-Last activity: 2026-03-02 — Roadmap created (5 phases, 17 requirements)
+Plan: 2 of 2
+Status: Ready to execute
+Last activity: 2026-03-03 — Completed 56-01-PLAN.md (config schema + research detection)
 
-Progress: [                                      ] 0% (v8.1)
+Progress: [####                                  ] 10% (v8.1)
 
 ## Performance Metrics
 
@@ -37,6 +37,7 @@ Progress: [                                      ] 0% (v8.1)
 | v7.0 | 8 | 15 | 2 days |
 | v7.1 | 6 | 12 | 3 days |
 | v8.0 | 5 | 14 | 3 days |
+| Phase 56 P01 | 8 min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -48,6 +49,8 @@ All v1.0-v8.0 decisions recorded in PROJECT.md Key Decisions table with outcomes
 - [v8.1 Research]: 4-tier graceful degradation: Full RAG → Sources without synthesis → Brave/Context7 only → Pure LLM
 - [v8.1 Research]: All external tools invoked via execFileSync subprocess pattern (matching git.js), zero bundled deps
 - [v8.1 Research]: NotebookLM is a quality enhancer, never a requirement — pipeline works at Tier 2-3 without it
+- [Phase 56]: MCP config detection handles 3 JSON shapes (mcpServers, mcp.servers, mcp-direct) for cross-editor compatibility
+- [Phase 56]: notebooklm-py detection falls back to 'nlm' binary name for alternate installations
 
 ### Pending Todos
 
@@ -62,6 +65,6 @@ None — milestone starting fresh.
 
 ## Session Continuity
 
-Last session: 2026-03-02
-Stopped at: Roadmap created for v8.1 (5 phases, 56-60)
-Next step: /bgsd-plan-phase 56
+Last session: 2026-03-03
+Stopped at: Completed 56-01-PLAN.md
+Next step: /bgsd-execute-phase 56 (Plan 02 — capabilities command + init integration)

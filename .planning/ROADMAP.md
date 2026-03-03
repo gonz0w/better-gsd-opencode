@@ -179,7 +179,7 @@ Full details: `.planning/milestones/v8.0-ROADMAP.md`
 
 **Research needed:** No — extends existing CONFIG_SCHEMA and checkBinary patterns
 
-**Plans:** 2 plans
+**Plans:** 1/2 plans executed
 
 Plans:
 - [ ] 56-01-PLAN.md — Config schema & research detection infrastructure
@@ -274,7 +274,7 @@ Plans:
 | 37-44 | v7.0 | 15/15 | Complete | 2026-02-27 |
 | 45-50 | v7.1 | 12/12 | Complete | 2026-03-02 |
 | 51-55 | v8.0 | 14/14 | Complete | 2026-03-03 |
-| 56. foundation-and-config | v8.1 | 0/2 | Planned | - |
+| 56. foundation-and-config | 1/2 | In Progress|  | - |
 | 57. youtube-integration | v8.1 | 0/? | Not started | - |
 | 58. research-orchestration | v8.1 | 0/? | Not started | - |
 | 59. notebooklm-integration | v8.1 | 0/? | Not started | - |
