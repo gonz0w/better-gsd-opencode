@@ -1779,7 +1779,9 @@ Error: { error, install_hint | reauth_command | details }
 Examples:
   gsd-tools research:nlm-report abc123 --type briefing-doc
   gsd-tools research:nlm-report abc123 --type study-guide
-  gsd-tools research:nlm-report abc123 --prompt "Focus on security implications"`
+  gsd-tools research:nlm-report abc123 --prompt "Focus on security implications"`,
+      "research:collect --resume": "Resume interrupted research session from last completed stage",
+      "research collect --resume": "Resume interrupted research session from last completed stage"
     };
     module2.exports = { MODEL_PROFILES, CONFIG_SCHEMA, COMMAND_HELP, VALID_TRAJECTORY_SCOPES };
   }
@@ -20894,6 +20896,33 @@ var require_research = __commonJS({
       lines.push("</collected_sources>");
       return lines.join("\n");
     }
+    function saveSession(cwd, data) {
+      const sessionPath = path.join(cwd, ".planning", "research-session.json");
+      try {
+        fs.writeFileSync(sessionPath, JSON.stringify({ ...data, last_saved: (/* @__PURE__ */ new Date()).toISOString() }, null, 2));
+      } catch (e) {
+        debugLog("research.session", "failed to save session: " + e.message);
+      }
+    }
+    function loadSession(cwd, query) {
+      const sessionPath = path.join(cwd, ".planning", "research-session.json");
+      try {
+        if (!fs.existsSync(sessionPath)) return null;
+        const data = JSON.parse(fs.readFileSync(sessionPath, "utf-8"));
+        if (data.query !== query) return null;
+        return data;
+      } catch (e) {
+        return null;
+      }
+    }
+    function deleteSession(cwd) {
+      const sessionPath = path.join(cwd, ".planning", "research-session.json");
+      try {
+        if (fs.existsSync(sessionPath)) fs.unlinkSync(sessionPath);
+      } catch (e) {
+        debugLog("research.session", "failed to delete session: " + e.message);
+      }
+    }
     function formatCollect(data) {
       const lines = [];
       lines.push(banner("Research Collection"));
@@ -20931,6 +20960,7 @@ var require_research = __commonJS({
       const ragEnabled = config.rag_enabled !== false;
       const quick = args.includes("--quick");
       const noCache = args.includes("--no-cache");
+      const resume = args.includes("--resume");
       if (quick || !ragEnabled) {
         const result2 = {
           tier: 4,
@@ -20970,34 +21000,70 @@ var require_research = __commonJS({
           }
         }
       }
+      let session = null;
+      if (resume) {
+        session = loadSession(cwd, query);
+        if (session) {
+          status("Resuming session from stage: " + (session.completed_stages.slice(-1)[0] || "start"));
+        } else {
+          status("No matching session found \u2014 starting fresh");
+        }
+      }
+      const allSources = session ? [...session.sources || []] : [];
+      const timing = session ? { ...session.timing || {} } : {};
+      const completedStages = session ? new Set(session.completed_stages || []) : /* @__PURE__ */ new Set();
       const stageTimeout = Math.max(5e3, Math.floor((config.rag_timeout || 30) * 1e3 / 2));
       const totalStages = tier.number === 1 ? 4 : 3;
-      const allSources = [];
-      const timing = {};
       const pipelineStart = Date.now();
-      status(`[1/${totalStages}] Collecting web sources...`);
-      const webStart = Date.now();
-      const webSources = collectWebSources(cwd, query, config, stageTimeout);
-      timing.web_ms = Date.now() - webStart;
-      allSources.push(...webSources);
-      if (cliTools["yt-dlp"] && cliTools["yt-dlp"].available) {
+      if (completedStages.has("web")) {
+        status(`[1/${totalStages}] Web sources: restored from session (${allSources.filter((s) => s.source === "brave_search").length} sources)`);
+        timing.web_ms = timing.web_ms || 0;
+      } else {
+        status(`[1/${totalStages}] Collecting web sources...`);
+        const webStart = Date.now();
+        const webSources = collectWebSources(cwd, query, config, stageTimeout);
+        timing.web_ms = Date.now() - webStart;
+        allSources.push(...webSources);
+        completedStages.add("web");
+        saveSession(cwd, { query, tier: tier.number, started: session ? session.started : (/* @__PURE__ */ new Date()).toISOString(), completed_stages: [...completedStages], sources: allSources, timing, nlm_synthesis: null });
+      }
+      if (completedStages.has("youtube")) {
+        status(`[2/${totalStages}] YouTube: restored from session (${allSources.filter((s) => s.source === "yt-dlp").length} sources)`);
+        timing.youtube_ms = timing.youtube_ms || 0;
+      } else if (cliTools["yt-dlp"] && cliTools["yt-dlp"].available) {
         status(`[2/${totalStages}] Searching YouTube...`);
         const ytStart = Date.now();
         const ytSources = collectYouTubeSources(cwd, query, config, stageTimeout);
         timing.youtube_ms = Date.now() - ytStart;
         allSources.push(...ytSources);
+        completedStages.add("youtube");
+        saveSession(cwd, { query, tier: tier.number, started: session ? session.started : (/* @__PURE__ */ new Date()).toISOString(), completed_stages: [...completedStages], sources: allSources, timing, nlm_synthesis: null });
       } else {
         status(`[2/${totalStages}] YouTube: skipped (yt-dlp not installed)`);
         timing.youtube_ms = 0;
+        completedStages.add("youtube");
+        saveSession(cwd, { query, tier: tier.number, started: session ? session.started : (/* @__PURE__ */ new Date()).toISOString(), completed_stages: [...completedStages], sources: allSources, timing, nlm_synthesis: null });
       }
-      timing.context7_available = !!(mcpServers["context7"] && mcpServers["context7"].configured && mcpServers["context7"].enabled);
-      status(`[3/${totalStages}] Context7: available to agent directly via MCP`);
-      let nlmSynthesis = null;
-      if (tier.number === 1 && allSources.length > 0) {
+      if (completedStages.has("context7")) {
+        status(`[3/${totalStages}] Context7: restored from session`);
+      } else {
+        timing.context7_available = !!(mcpServers["context7"] && mcpServers["context7"].configured && mcpServers["context7"].enabled);
+        status(`[3/${totalStages}] Context7: available to agent directly via MCP`);
+        completedStages.add("context7");
+        saveSession(cwd, { query, tier: tier.number, started: session ? session.started : (/* @__PURE__ */ new Date()).toISOString(), completed_stages: [...completedStages], sources: allSources, timing, nlm_synthesis: null });
+      }
+      let nlmSynthesis = session ? session.nlm_synthesis || null : null;
+      if (completedStages.has("nlm")) {
+        if (tier.number === 1) {
+          status("[4/4] NotebookLM: restored from session");
+        }
+      } else if (tier.number === 1 && allSources.length > 0) {
         status("[4/4] NotebookLM synthesis...");
         const nlmStart = Date.now();
         nlmSynthesis = collectNlmSynthesis(cwd, query, allSources, stageTimeout);
         timing.nlm_ms = Date.now() - nlmStart;
+        completedStages.add("nlm");
+        saveSession(cwd, { query, tier: tier.number, started: session ? session.started : (/* @__PURE__ */ new Date()).toISOString(), completed_stages: [...completedStages], sources: allSources, timing, nlm_synthesis: nlmSynthesis });
       } else {
         if (tier.number === 1) {
           status("[4/4] NotebookLM: skipped (no sources to synthesize)");
@@ -21023,6 +21089,7 @@ var require_research = __commonJS({
           cache.setResearch(query, result);
         }
       }
+      deleteSession(cwd);
       output2(result, { formatter: formatCollect, raw });
     }
     function getNlmBinary(cwd) {
@@ -21404,7 +21471,7 @@ var require_research = __commonJS({
         output2({ error: "Failed to add source", notebook_id: notebookId, source_url: sourceUrl, details: (err.message || "").slice(0, 300) }, { formatter: formatNlmAddSource, raw });
       }
     }
-    module2.exports = { detectCliTools, detectMcpServers, calculateTier, cmdResearchCapabilities, cmdResearchYtSearch, cmdResearchYtTranscript, cmdResearchCollect, cmdResearchNlmCreate, cmdResearchNlmAddSource, cmdResearchNlmAsk, cmdResearchNlmReport, collectWebSources, collectYouTubeSources, collectNlmSynthesis, formatSourcesForAgent, parseVtt };
+    module2.exports = { detectCliTools, detectMcpServers, calculateTier, cmdResearchCapabilities, cmdResearchYtSearch, cmdResearchYtTranscript, cmdResearchCollect, cmdResearchNlmCreate, cmdResearchNlmAddSource, cmdResearchNlmAsk, cmdResearchNlmReport, collectWebSources, collectYouTubeSources, collectNlmSynthesis, formatSourcesForAgent, parseVtt, saveSession, loadSession, deleteSession };
   }
 });
 
