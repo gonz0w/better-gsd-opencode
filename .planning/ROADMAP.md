@@ -274,7 +274,7 @@ Plans:
 | 37-44 | v7.0 | 15/15 | Complete | 2026-02-27 |
 | 45-50 | v7.1 | 12/12 | Complete | 2026-03-02 |
 | 51-55 | v8.0 | 14/14 | Complete | 2026-03-03 |
-| 56. foundation-and-config | 2/2 | Complete   | 2026-03-03 | - |
+| 56. foundation-and-config | 2/2 | Complete    | 2026-03-03 | - |
 | 57. youtube-integration | v8.1 | 0/? | Not started | - |
 | 58. research-orchestration | v8.1 | 0/? | Not started | - |
 | 59. notebooklm-integration | v8.1 | 0/? | Not started | - |
