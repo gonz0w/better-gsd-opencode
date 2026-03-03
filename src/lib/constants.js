@@ -1547,7 +1547,9 @@ Subcommands:
   capabilities    Report available research tools, tier, and recommendations
   yt-search       Search YouTube via yt-dlp with filtering and quality scoring
   yt-transcript   Extract clean plain-text transcript from YouTube video
-  collect         Orchestrate multi-source collection pipeline with tier degradation`,
+  collect         Orchestrate multi-source collection pipeline with tier degradation
+  nlm-create      Create a NotebookLM notebook
+  nlm-add-source  Add a source (URL, file, YouTube) to a NotebookLM notebook`,
   'research capabilities': `Usage: gsd-tools research capabilities
 
 Report available research tools, current degradation tier, and recommendations.
@@ -1712,6 +1714,74 @@ Examples:
   gsd-tools research:collect "nodejs subprocess patterns"
   gsd-tools research:collect --quick "test query"
   gsd-tools research:collect "react hooks" --pretty`,
+  'research nlm-create': `Usage: gsd-tools research nlm-create "title"
+
+Create a NotebookLM notebook and return its ID.
+
+Arguments:
+  title              Notebook title (required)
+
+Checks binary availability and auth health before execution.
+Missing binary returns install hint. Expired auth returns re-auth instructions.
+
+Output: { notebook_id, title, raw_output }
+Error: { error, install_hint | reauth_command }
+
+Examples:
+  gsd-tools research nlm-create "GSD Research Notes"
+  gsd-tools research:nlm-create "Phase 59 Sources"`,
+  'research:nlm-create': `Usage: gsd-tools research:nlm-create "title"
+
+Create a NotebookLM notebook and return its ID.
+
+Arguments:
+  title              Notebook title (required)
+
+Checks binary availability and auth health before execution.
+Missing binary returns install hint. Expired auth returns re-auth instructions.
+
+Output: { notebook_id, title, raw_output }
+Error: { error, install_hint | reauth_command }
+
+Examples:
+  gsd-tools research:nlm-create "GSD Research Notes"
+  gsd-tools research:nlm-create "Phase 59 Sources"`,
+  'research nlm-add-source': `Usage: gsd-tools research nlm-add-source <notebook-id> "source-url-or-path"
+
+Add a source (URL, YouTube URL, local file) to a NotebookLM notebook.
+
+Arguments:
+  notebook-id        Notebook ID from nlm-create (required)
+  source-url-or-path Source URL or local file path (required)
+
+Sets the active notebook first, then adds the source. Uses 60s timeout for source processing.
+Checks binary availability and auth health before execution.
+
+Output: { notebook_id, source_url, raw_output }
+Error: { error, install_hint | reauth_command | details }
+
+Examples:
+  gsd-tools research nlm-add-source abc123 "https://example.com/docs"
+  gsd-tools research:nlm-add-source abc123 "https://youtube.com/watch?v=xxx"
+  gsd-tools research:nlm-add-source abc123 "./docs/research.pdf"`,
+  'research:nlm-add-source': `Usage: gsd-tools research:nlm-add-source <notebook-id> "source-url-or-path"
+
+Add a source (URL, YouTube URL, local file) to a NotebookLM notebook.
+
+Arguments:
+  notebook-id        Notebook ID from nlm-create (required)
+  source-url-or-path Source URL or local file path (required)
+
+Sets the active notebook first, then adds the source. Uses 60s timeout for source processing.
+Checks binary availability and auth health before execution.
+
+Output: { notebook_id, source_url, raw_output }
+Error: { error, install_hint | reauth_command | details }
+
+Examples:
+  gsd-tools research:nlm-add-source abc123 "https://example.com/docs"
+  gsd-tools research:nlm-add-source abc123 "https://youtube.com/watch?v=xxx"
+  gsd-tools research:nlm-add-source abc123 "./docs/research.pdf"`,
 };
 
 module.exports = { MODEL_PROFILES, CONFIG_SCHEMA, COMMAND_HELP, VALID_TRAJECTORY_SCOPES };
