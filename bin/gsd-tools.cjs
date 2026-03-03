@@ -1463,7 +1463,9 @@ Subcommands:
   capabilities    Report available research tools, tier, and recommendations
   yt-search       Search YouTube via yt-dlp with filtering and quality scoring
   yt-transcript   Extract clean plain-text transcript from YouTube video
-  collect         Orchestrate multi-source collection pipeline with tier degradation`,
+  collect         Orchestrate multi-source collection pipeline with tier degradation
+  nlm-create      Create a NotebookLM notebook
+  nlm-add-source  Add a source (URL, file, YouTube) to a NotebookLM notebook`,
       "research capabilities": `Usage: gsd-tools research capabilities
 
 Report available research tools, current degradation tier, and recommendations.
@@ -1627,7 +1629,75 @@ At Tier 4 (--quick or no tools), agent_context is empty string.
 Examples:
   gsd-tools research:collect "nodejs subprocess patterns"
   gsd-tools research:collect --quick "test query"
-  gsd-tools research:collect "react hooks" --pretty`
+  gsd-tools research:collect "react hooks" --pretty`,
+      "research nlm-create": `Usage: gsd-tools research nlm-create "title"
+
+Create a NotebookLM notebook and return its ID.
+
+Arguments:
+  title              Notebook title (required)
+
+Checks binary availability and auth health before execution.
+Missing binary returns install hint. Expired auth returns re-auth instructions.
+
+Output: { notebook_id, title, raw_output }
+Error: { error, install_hint | reauth_command }
+
+Examples:
+  gsd-tools research nlm-create "GSD Research Notes"
+  gsd-tools research:nlm-create "Phase 59 Sources"`,
+      "research:nlm-create": `Usage: gsd-tools research:nlm-create "title"
+
+Create a NotebookLM notebook and return its ID.
+
+Arguments:
+  title              Notebook title (required)
+
+Checks binary availability and auth health before execution.
+Missing binary returns install hint. Expired auth returns re-auth instructions.
+
+Output: { notebook_id, title, raw_output }
+Error: { error, install_hint | reauth_command }
+
+Examples:
+  gsd-tools research:nlm-create "GSD Research Notes"
+  gsd-tools research:nlm-create "Phase 59 Sources"`,
+      "research nlm-add-source": `Usage: gsd-tools research nlm-add-source <notebook-id> "source-url-or-path"
+
+Add a source (URL, YouTube URL, local file) to a NotebookLM notebook.
+
+Arguments:
+  notebook-id        Notebook ID from nlm-create (required)
+  source-url-or-path Source URL or local file path (required)
+
+Sets the active notebook first, then adds the source. Uses 60s timeout for source processing.
+Checks binary availability and auth health before execution.
+
+Output: { notebook_id, source_url, raw_output }
+Error: { error, install_hint | reauth_command | details }
+
+Examples:
+  gsd-tools research nlm-add-source abc123 "https://example.com/docs"
+  gsd-tools research:nlm-add-source abc123 "https://youtube.com/watch?v=xxx"
+  gsd-tools research:nlm-add-source abc123 "./docs/research.pdf"`,
+      "research:nlm-add-source": `Usage: gsd-tools research:nlm-add-source <notebook-id> "source-url-or-path"
+
+Add a source (URL, YouTube URL, local file) to a NotebookLM notebook.
+
+Arguments:
+  notebook-id        Notebook ID from nlm-create (required)
+  source-url-or-path Source URL or local file path (required)
+
+Sets the active notebook first, then adds the source. Uses 60s timeout for source processing.
+Checks binary availability and auth health before execution.
+
+Output: { notebook_id, source_url, raw_output }
+Error: { error, install_hint | reauth_command | details }
+
+Examples:
+  gsd-tools research:nlm-add-source abc123 "https://example.com/docs"
+  gsd-tools research:nlm-add-source abc123 "https://youtube.com/watch?v=xxx"
+  gsd-tools research:nlm-add-source abc123 "./docs/research.pdf"`
     };
     module2.exports = { MODEL_PROFILES, CONFIG_SCHEMA, COMMAND_HELP, VALID_TRAJECTORY_SCOPES };
   }
@@ -20652,7 +20722,166 @@ var require_research = __commonJS({
       };
       output2(result, { formatter: formatCollect, raw });
     }
-    module2.exports = { detectCliTools, detectMcpServers, calculateTier, cmdResearchCapabilities, cmdResearchYtSearch, cmdResearchYtTranscript, cmdResearchCollect, collectWebSources, collectYouTubeSources, formatSourcesForAgent, parseVtt };
+    function getNlmBinary(cwd) {
+      const cliTools = detectCliTools(cwd);
+      const nlm = cliTools["notebooklm-py"];
+      if (!nlm.available) {
+        return {
+          available: false,
+          error: "notebooklm-py not installed",
+          install_hint: 'pip install "notebooklm-py[browser]" && playwright install chromium && notebooklm login'
+        };
+      }
+      return { available: true, path: nlm.path || "notebooklm" };
+    }
+    function checkNlmAuth(nlmPath, timeout) {
+      try {
+        const stdout = execFileSync(nlmPath, ["list", "--json"], {
+          encoding: "utf-8",
+          timeout: timeout || 1e4,
+          stdio: "pipe"
+        });
+        const parsed = JSON.parse(stdout);
+        return { authenticated: true, notebooks: parsed };
+      } catch (err) {
+        const msg = (err.message || "") + (err.stderr || "");
+        const isAuthError = /auth|cookie|login|401|403|session|expired|unauthorized/i.test(msg);
+        return {
+          authenticated: false,
+          reason: isAuthError ? "auth_expired" : "unknown_error",
+          message: isAuthError ? "NotebookLM auth expired. Run: notebooklm login" : `NotebookLM check failed: ${(err.message || "").slice(0, 200)}`,
+          reauth_command: "notebooklm login"
+        };
+      }
+    }
+    function formatNlmError(data) {
+      const lines = [];
+      lines.push(color.red(`Error: ${data.error}`));
+      if (data.install_hint) {
+        lines.push(color.yellow(`Install: ${data.install_hint}`));
+      }
+      if (data.reauth_command) {
+        lines.push(color.yellow(`Re-authenticate: ${data.reauth_command}`));
+      }
+      if (data.details) {
+        lines.push(color.dim(data.details));
+      }
+      if (data.usage) {
+        lines.push(color.dim(`Usage: ${data.usage}`));
+      }
+      return lines.join("\n");
+    }
+    function formatNlmCreate(data) {
+      const lines = [];
+      lines.push(banner("NotebookLM Create"));
+      lines.push("");
+      if (data.error) {
+        return lines.join("\n") + formatNlmError(data);
+      }
+      lines.push(color.green(SYMBOLS.check + " Notebook created"));
+      lines.push(color.bold("Notebook ID: ") + (data.notebook_id || "\u2014"));
+      lines.push(color.bold("Title: ") + (data.title || "\u2014"));
+      return lines.join("\n");
+    }
+    function formatNlmAddSource(data) {
+      const lines = [];
+      lines.push(banner("NotebookLM Add Source"));
+      lines.push("");
+      if (data.error) {
+        return lines.join("\n") + formatNlmError(data);
+      }
+      lines.push(color.green(SYMBOLS.check + " Source added"));
+      lines.push(color.bold("Notebook: ") + (data.notebook_id || "\u2014"));
+      lines.push(color.bold("Source: ") + (data.source_url || "\u2014"));
+      return lines.join("\n");
+    }
+    function cmdResearchNlmCreate(cwd, args, raw) {
+      const nlmBinary = getNlmBinary(cwd);
+      if (!nlmBinary.available) {
+        output2({ error: nlmBinary.error, install_hint: nlmBinary.install_hint }, { formatter: formatNlmCreate, raw });
+        return;
+      }
+      const config = loadConfig(cwd);
+      const authTimeout = Math.min(1e4, Math.floor((config.rag_timeout || 30) * 1e3 / 3));
+      const auth = checkNlmAuth(nlmBinary.path, authTimeout);
+      if (!auth.authenticated) {
+        output2({ error: auth.message, reauth_command: auth.reauth_command }, { formatter: formatNlmCreate, raw });
+        return;
+      }
+      const title = args.filter((a) => !a.startsWith("--")).join(" ").trim();
+      if (!title) {
+        output2({ error: "Missing notebook title", usage: 'research:nlm-create "My Notebook Title"' }, { formatter: formatNlmCreate, raw });
+        return;
+      }
+      try {
+        const stdout = execFileSync(nlmBinary.path, ["create", title, "--json"], {
+          encoding: "utf-8",
+          timeout: 3e4,
+          stdio: "pipe"
+        });
+        const parsed = JSON.parse(stdout);
+        const result = {
+          notebook_id: parsed.id || parsed.notebook_id || null,
+          title: parsed.title || title,
+          raw_output: parsed
+        };
+        output2(result, { formatter: formatNlmCreate, raw });
+      } catch (err) {
+        output2({ error: "Failed to create notebook", details: (err.message || "").slice(0, 300) }, { formatter: formatNlmCreate, raw });
+      }
+    }
+    function cmdResearchNlmAddSource(cwd, args, raw) {
+      const nlmBinary = getNlmBinary(cwd);
+      if (!nlmBinary.available) {
+        output2({ error: nlmBinary.error, install_hint: nlmBinary.install_hint }, { formatter: formatNlmAddSource, raw });
+        return;
+      }
+      const config = loadConfig(cwd);
+      const authTimeout = Math.min(1e4, Math.floor((config.rag_timeout || 30) * 1e3 / 3));
+      const auth = checkNlmAuth(nlmBinary.path, authTimeout);
+      if (!auth.authenticated) {
+        output2({ error: auth.message, reauth_command: auth.reauth_command }, { formatter: formatNlmAddSource, raw });
+        return;
+      }
+      const positional = args.filter((a) => !a.startsWith("--"));
+      const notebookId = positional[0];
+      const sourceUrl = positional.slice(1).join(" ").trim();
+      if (!notebookId) {
+        output2({ error: "Missing notebook ID", usage: 'research:nlm-add-source <notebook-id> "source-url-or-path"' }, { formatter: formatNlmAddSource, raw });
+        return;
+      }
+      if (!sourceUrl) {
+        output2({ error: "Missing source URL or path", usage: 'research:nlm-add-source <notebook-id> "source-url-or-path"' }, { formatter: formatNlmAddSource, raw });
+        return;
+      }
+      try {
+        execFileSync(nlmBinary.path, ["use", notebookId], {
+          encoding: "utf-8",
+          timeout: 1e4,
+          stdio: "pipe"
+        });
+      } catch (err) {
+        output2({ error: "Failed to set active notebook", notebook_id: notebookId, details: (err.message || "").slice(0, 300) }, { formatter: formatNlmAddSource, raw });
+        return;
+      }
+      try {
+        const stdout = execFileSync(nlmBinary.path, ["source", "add", sourceUrl, "--json"], {
+          encoding: "utf-8",
+          timeout: 6e4,
+          stdio: "pipe"
+        });
+        const parsed = JSON.parse(stdout);
+        const result = {
+          notebook_id: notebookId,
+          source_url: sourceUrl,
+          raw_output: parsed
+        };
+        output2(result, { formatter: formatNlmAddSource, raw });
+      } catch (err) {
+        output2({ error: "Failed to add source", notebook_id: notebookId, source_url: sourceUrl, details: (err.message || "").slice(0, 300) }, { formatter: formatNlmAddSource, raw });
+      }
+    }
+    module2.exports = { detectCliTools, detectMcpServers, calculateTier, cmdResearchCapabilities, cmdResearchYtSearch, cmdResearchYtTranscript, cmdResearchCollect, cmdResearchNlmCreate, cmdResearchNlmAddSource, collectWebSources, collectYouTubeSources, formatSourcesForAgent, parseVtt };
   }
 });
 
@@ -27909,7 +28138,7 @@ var require_router = __commonJS({
         });
       }
       if (!command) {
-        error("Usage: gsd-tools <namespace:command> [args] [--pretty] [--verbose]\nCommands: init:<workflow>, plan:<intent|requirements|roadmap|phases|find-phase|milestone|phase>, execute:<commit|rollback-info|session-diff|session-summary|velocity|worktree|tdd|test-run>, verify:<state|verify|assertions|search-decisions|search-lessons|review|context-budget|token-budget>, util:<config-get|config-set|env|current-timestamp|list-todos|todo|memory|mcp|classify|frontmatter|progress|websearch|history-digest|trace-requirement|codebase|cache|agent>, research:<capabilities|yt-search|yt-transcript|collect>");
+        error("Usage: gsd-tools <namespace:command> [args] [--pretty] [--verbose]\nCommands: init:<workflow>, plan:<intent|requirements|roadmap|phases|find-phase|milestone|phase>, execute:<commit|rollback-info|session-diff|session-summary|velocity|worktree|tdd|test-run>, verify:<state|verify|assertions|search-decisions|search-lessons|review|context-budget|token-budget>, util:<config-get|config-set|env|current-timestamp|list-todos|todo|memory|mcp|classify|frontmatter|progress|websearch|history-digest|trace-requirement|codebase|cache|agent>, research:<capabilities|yt-search|yt-transcript|collect|nlm-create|nlm-add-source>");
       }
       if (args.includes("--help") || args.includes("-h")) {
         const subForHelp = args[1] && !args[1].startsWith("-") ? args[1] : "";
@@ -28477,8 +28706,12 @@ Available: execute-phase, plan-phase, new-project, new-milestone, quick, resume,
               lazyResearch().cmdResearchYtTranscript(cwd, restArgs, raw);
             } else if (subCmd === "collect") {
               lazyResearch().cmdResearchCollect(cwd, restArgs, raw);
+            } else if (subCmd === "nlm-create") {
+              lazyResearch().cmdResearchNlmCreate(cwd, restArgs, raw);
+            } else if (subCmd === "nlm-add-source") {
+              lazyResearch().cmdResearchNlmAddSource(cwd, restArgs, raw);
             } else {
-              error("Unknown research subcommand. Available: capabilities, yt-search, yt-transcript, collect");
+              error("Unknown research subcommand. Available: capabilities, yt-search, yt-transcript, collect, nlm-create, nlm-add-source");
             }
             break;
           }
