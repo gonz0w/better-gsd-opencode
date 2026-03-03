@@ -1,6 +1,7 @@
 'use strict';
 
 const fs = require('fs');
+const os = require('os');
 const path = require('path');
 const { execFileSync } = require('child_process');
 const { checkBinary } = require('../commands/env');
@@ -653,4 +654,340 @@ function cmdResearchYtSearch(cwd, args, raw) {
   output(result, { formatter: formatYtSearch, raw });
 }
 
-module.exports = { detectCliTools, detectMcpServers, calculateTier, cmdResearchCapabilities, cmdResearchYtSearch };
+// ─── YouTube Transcript Command ──────────────────────────────────────────────
+
+/**
+ * Parse VTT subtitle content into clean text.
+ * Handles deduplication of overlapping cue lines (common in auto-generated subs),
+ * HTML tag stripping, and optional timestamp preservation.
+ *
+ * @param {string} vttContent - Raw VTT file content
+ * @param {boolean} keepTimestamps - If true, preserve [HH:MM:SS] markers
+ * @returns {string} Cleaned transcript text
+ */
+function parseVtt(vttContent, keepTimestamps) {
+  const lines = vttContent.split('\n');
+  const cues = [];
+  let currentTimestamp = null;
+  let currentLines = [];
+  let inCue = false;
+
+  const timestampRe = /^(\d{2}:\d{2}:\d{2})\.\d{3}\s*-->\s*\d{2}:\d{2}:\d{2}\.\d{3}/;
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+
+    // Skip WEBVTT header and metadata
+    if (trimmed === 'WEBVTT' || trimmed.startsWith('Kind:') || trimmed.startsWith('Language:') || trimmed.startsWith('NOTE')) {
+      continue;
+    }
+
+    // Check for timestamp line
+    const tsMatch = trimmed.match(timestampRe);
+    if (tsMatch) {
+      // Save previous cue if any
+      if (currentLines.length > 0) {
+        cues.push({ timestamp: currentTimestamp, text: currentLines.join(' ') });
+      }
+      currentTimestamp = tsMatch[1];
+      currentLines = [];
+      inCue = true;
+      continue;
+    }
+
+    // Skip cue index numbers (numeric-only lines before timestamp)
+    if (/^\d+$/.test(trimmed)) {
+      continue;
+    }
+
+    // Empty line ends current cue
+    if (trimmed === '') {
+      if (inCue && currentLines.length > 0) {
+        cues.push({ timestamp: currentTimestamp, text: currentLines.join(' ') });
+        currentLines = [];
+        inCue = false;
+      }
+      continue;
+    }
+
+    // Content line — strip HTML/VTT tags
+    if (inCue) {
+      let cleaned = trimmed
+        .replace(/<[^>]+>/g, '')  // Strip all HTML/VTT tags
+        .replace(/&amp;/g, '&')
+        .replace(/&lt;/g, '<')
+        .replace(/&gt;/g, '>')
+        .replace(/&nbsp;/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+      if (cleaned) {
+        currentLines.push(cleaned);
+      }
+    }
+  }
+
+  // Flush final cue
+  if (currentLines.length > 0) {
+    cues.push({ timestamp: currentTimestamp, text: currentLines.join(' ') });
+  }
+
+  // Deduplicate consecutive identical lines (auto-subs repeat across overlapping cues)
+  const deduped = [];
+  let prevText = null;
+  for (const cue of cues) {
+    if (cue.text !== prevText) {
+      deduped.push(cue);
+      prevText = cue.text;
+    }
+  }
+
+  // Build output
+  let result;
+  if (keepTimestamps) {
+    result = deduped.map(c => `[${c.timestamp}] ${c.text}`).join('\n');
+  } else {
+    result = deduped.map(c => c.text).join(' ');
+  }
+
+  // Clean up excessive whitespace
+  result = result.replace(/  +/g, ' ').replace(/\n{3,}/g, '\n\n').trim();
+
+  return result;
+}
+
+/**
+ * Extract video ID from various YouTube URL formats or bare ID.
+ * @param {string} input - Video ID or YouTube URL
+ * @returns {string|null} Video ID or null if unparseable
+ */
+function extractVideoId(input) {
+  if (!input) return null;
+
+  // Bare ID: 11-character alphanumeric + hyphens/underscores
+  if (/^[\w-]{11}$/.test(input)) {
+    return input;
+  }
+
+  // Full URL formats
+  try {
+    const url = new URL(input);
+    // youtube.com/watch?v=ID
+    if (url.searchParams.has('v')) {
+      return url.searchParams.get('v');
+    }
+    // youtu.be/ID
+    if (url.hostname === 'youtu.be') {
+      return url.pathname.slice(1).split('/')[0] || null;
+    }
+    // youtube.com/embed/ID or youtube.com/v/ID
+    const embedMatch = url.pathname.match(/\/(embed|v)\/([\w-]+)/);
+    if (embedMatch) {
+      return embedMatch[2];
+    }
+  } catch {
+    // Not a valid URL — treat as bare ID
+  }
+
+  // Fallback: return as-is (could be an ID without strict 11-char match)
+  return input;
+}
+
+/**
+ * Format yt-transcript results for TTY display.
+ * @param {object} data - yt-transcript result object
+ * @returns {string}
+ */
+function formatYtTranscript(data) {
+  const lines = [];
+
+  lines.push(banner('YouTube Transcript'));
+  lines.push('');
+
+  if (data.error) {
+    lines.push(color.red(`Error: ${data.error}`));
+    if (data.install_hint) {
+      lines.push(color.yellow(`Install: ${data.install_hint}`));
+    }
+    return lines.join('\n');
+  }
+
+  if (!data.has_subtitles) {
+    lines.push(color.yellow(data.message || 'No subtitles available for this video'));
+    lines.push(color.dim(`Video ID: ${data.video_id}`));
+    return lines.join('\n');
+  }
+
+  // Metadata header
+  lines.push(color.bold('Video ID: ') + data.video_id);
+  lines.push(color.dim(`Language: ${data.language}${data.auto_generated ? ' (auto-generated)' : ''}`));
+  lines.push(color.dim(`Words: ${data.word_count} | Characters: ${data.char_count}`));
+  lines.push('');
+
+  // Transcript text (truncated for display, full in JSON)
+  const displayLimit = 2000;
+  if (data.transcript.length > displayLimit) {
+    lines.push(data.transcript.slice(0, displayLimit));
+    lines.push('');
+    lines.push(color.dim(`... truncated for display (${data.char_count} chars total). Use JSON output for full transcript.`));
+  } else {
+    lines.push(data.transcript);
+  }
+
+  return lines.join('\n');
+}
+
+/**
+ * Command handler: research yt-transcript
+ * Extract and clean YouTube video transcripts via yt-dlp subtitle download.
+ *
+ * @param {string} cwd - Project root directory
+ * @param {string[]} args - Command arguments
+ * @param {boolean} raw - Raw output mode
+ */
+function cmdResearchYtTranscript(cwd, args, raw) {
+  // 1. Check yt-dlp availability
+  const cliTools = detectCliTools(cwd);
+  if (!cliTools['yt-dlp'].available) {
+    const result = { error: 'yt-dlp not installed', install_hint: 'pip install yt-dlp', available: false };
+    output(result, { formatter: formatYtTranscript, raw });
+    return;
+  }
+
+  // 2. Parse args
+  const keepTimestamps = args.includes('--timestamps');
+  const lang = parseFlag(args, '--lang', 'en');
+
+  // Extract positional video ID/URL (first arg not starting with --)
+  const positional = args.filter(a => !a.startsWith('--'));
+  // Remove flag values from positional
+  const flagValues = new Set();
+  for (let i = 0; i < args.length; i++) {
+    if (args[i] === '--lang' && i + 1 < args.length) {
+      flagValues.add(args[i + 1]);
+    }
+  }
+  const videoInput = positional.filter(a => !flagValues.has(a))[0];
+
+  if (!videoInput) {
+    const result = { error: 'Missing video ID or URL', usage: 'research:yt-transcript <video-id|url> [--timestamps] [--lang LANG]' };
+    output(result, { formatter: formatYtTranscript, raw });
+    return;
+  }
+
+  const videoId = extractVideoId(videoInput);
+  if (!videoId) {
+    const result = { error: 'Could not parse video ID from input', input: videoInput };
+    output(result, { formatter: formatYtTranscript, raw });
+    return;
+  }
+
+  const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
+  const ytdlpPath = cliTools['yt-dlp'].path || 'yt-dlp';
+
+  // 3. Download subtitles to temp dir
+  let tmpDir;
+  try {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gsd-yt-'));
+  } catch (e) {
+    const result = { error: 'Failed to create temp directory', details: e.message };
+    output(result, { formatter: formatYtTranscript, raw });
+    return;
+  }
+
+  try {
+    try {
+      execFileSync(ytdlpPath, [
+        '--write-sub',
+        '--write-auto-sub',
+        '--sub-lang', lang + ',en,en-auto',
+        '--sub-format', 'vtt',
+        '--skip-download',
+        '--no-warnings',
+        '-o', path.join(tmpDir, '%(id)s'),
+        videoUrl,
+      ], { encoding: 'utf-8', timeout: 30000, stdio: 'pipe' });
+    } catch (err) {
+      // yt-dlp exits non-zero for some cases but still writes subtitle files.
+      // Only treat as hard error if no files were written at all.
+      debugLog('research.yt-transcript', `yt-dlp exited with error: ${err.message}`);
+    }
+
+    // 4. Find VTT file in tmpDir
+    let vttFiles;
+    try {
+      vttFiles = fs.readdirSync(tmpDir).filter(f => f.endsWith('.vtt'));
+    } catch {
+      vttFiles = [];
+    }
+
+    if (vttFiles.length === 0) {
+      const result = {
+        video_id: videoId,
+        error: null,
+        transcript: null,
+        message: 'No subtitles available for this video',
+        has_subtitles: false,
+      };
+      output(result, { formatter: formatYtTranscript, raw });
+      return;
+    }
+
+    // Prefer exact lang match over auto-generated
+    let selectedFile = vttFiles[0]; // fallback to first
+    let autoGenerated = true;
+    let detectedLang = lang;
+
+    for (const f of vttFiles) {
+      // yt-dlp file naming: {id}.{lang}.vtt
+      const parts = f.replace('.vtt', '').split('.');
+      const fileLang = parts.length > 1 ? parts.slice(1).join('.') : '';
+
+      if (fileLang === lang) {
+        selectedFile = f;
+        autoGenerated = false;
+        detectedLang = lang;
+        break;
+      }
+      if (fileLang === 'en' && lang !== 'en') {
+        selectedFile = f;
+        autoGenerated = false;
+        detectedLang = 'en';
+      }
+    }
+
+    // Detect auto-generated from filename pattern (e.g., "en-auto" or just being the only option)
+    if (selectedFile.includes('-auto')) {
+      autoGenerated = true;
+    }
+
+    // 5. Parse VTT content
+    const vttContent = fs.readFileSync(path.join(tmpDir, selectedFile), 'utf-8');
+    const transcript = parseVtt(vttContent, keepTimestamps);
+
+    // 8. Return structured result
+    const wordCount = transcript.split(/\s+/).filter(Boolean).length;
+    const charCount = transcript.length;
+
+    const result = {
+      video_id: videoId,
+      has_subtitles: true,
+      language: detectedLang,
+      auto_generated: autoGenerated,
+      transcript,
+      word_count: wordCount,
+      char_count: charCount,
+    };
+
+    output(result, { formatter: formatYtTranscript, raw });
+
+  } finally {
+    // 7. Clean up tmpDir
+    try {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    } catch {
+      debugLog('research.yt-transcript', `failed to clean up tmpDir: ${tmpDir}`);
+    }
+  }
+}
+
+module.exports = { detectCliTools, detectMcpServers, calculateTier, cmdResearchCapabilities, cmdResearchYtSearch, cmdResearchYtTranscript, parseVtt };

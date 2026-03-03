@@ -127,7 +127,7 @@ async function main() {
   }
 
   if (!command) {
-    error('Usage: gsd-tools <namespace:command> [args] [--pretty] [--verbose]\nCommands: init:<workflow>, plan:<intent|requirements|roadmap|phases|find-phase|milestone|phase>, execute:<commit|rollback-info|session-diff|session-summary|velocity|worktree|tdd|test-run>, verify:<state|verify|assertions|search-decisions|search-lessons|review|context-budget|token-budget>, util:<config-get|config-set|env|current-timestamp|list-todos|todo|memory|mcp|classify|frontmatter|progress|websearch|history-digest|trace-requirement|codebase|cache|agent>, research:<capabilities|yt-search>');
+    error('Usage: gsd-tools <namespace:command> [args] [--pretty] [--verbose]\nCommands: init:<workflow>, plan:<intent|requirements|roadmap|phases|find-phase|milestone|phase>, execute:<commit|rollback-info|session-diff|session-summary|velocity|worktree|tdd|test-run>, verify:<state|verify|assertions|search-decisions|search-lessons|review|context-budget|token-budget>, util:<config-get|config-set|env|current-timestamp|list-todos|todo|memory|mcp|classify|frontmatter|progress|websearch|history-digest|trace-requirement|codebase|cache|agent>, research:<capabilities|yt-search|yt-transcript>');
   }
 
   // --help / -h: print command help to stderr (never contaminates JSON stdout)
@@ -702,8 +702,10 @@ async function main() {
           lazyResearch().cmdResearchCapabilities(cwd, restArgs, raw);
         } else if (subCmd === 'yt-search') {
           lazyResearch().cmdResearchYtSearch(cwd, restArgs, raw);
+        } else if (subCmd === 'yt-transcript') {
+          lazyResearch().cmdResearchYtTranscript(cwd, restArgs, raw);
         } else {
-          error('Unknown research subcommand. Available: capabilities, yt-search');
+          error('Unknown research subcommand. Available: capabilities, yt-search, yt-transcript');
         }
         break;
       }
@@ -1571,8 +1573,10 @@ async function main() {
         lazyResearch().cmdResearchCapabilities(cwd, args.slice(2), raw);
       } else if (resSub === 'yt-search') {
         lazyResearch().cmdResearchYtSearch(cwd, args.slice(2), raw);
+      } else if (resSub === 'yt-transcript') {
+        lazyResearch().cmdResearchYtTranscript(cwd, args.slice(2), raw);
       } else {
-        error('Unknown research subcommand. Available: capabilities, yt-search');
+        error('Unknown research subcommand. Available: capabilities, yt-search, yt-transcript');
       }
       break;
     }

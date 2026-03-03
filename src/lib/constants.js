@@ -1545,7 +1545,8 @@ Research infrastructure commands.
 
 Subcommands:
   capabilities    Report available research tools, tier, and recommendations
-  yt-search       Search YouTube via yt-dlp with filtering and quality scoring`,
+  yt-search       Search YouTube via yt-dlp with filtering and quality scoring
+  yt-transcript   Extract clean plain-text transcript from YouTube video`,
   'research capabilities': `Usage: gsd-tools research capabilities
 
 Report available research tools, current degradation tier, and recommendations.
@@ -1604,6 +1605,52 @@ Quality score (0-100): Recency (40pts) + Views (30pts log-scale) + Duration (30p
 Examples:
   gsd-tools research:yt-search "nodejs streams tutorial"
   gsd-tools research:yt-search "react hooks" --count 5 --min-views 1000`,
+  'research yt-transcript': `Usage: gsd-tools research yt-transcript <video-id|url> [options]
+
+Extract clean plain-text transcript from a YouTube video via yt-dlp subtitle download.
+
+Arguments:
+  video-id|url       YouTube video ID or full URL (required)
+
+Options:
+  --timestamps       Preserve [HH:MM:SS] timestamp markers (default: stripped)
+  --lang LANG        Subtitle language code (default: en)
+
+Output: { video_id, has_subtitles, language, auto_generated, transcript, word_count, char_count }
+
+When no subtitles are available: { video_id, has_subtitles: false, message: "No subtitles available" }
+When yt-dlp is missing: { error: "yt-dlp not installed", install_hint: "pip install yt-dlp" }
+
+Full transcript is always returned — no truncation in JSON output.
+
+Examples:
+  gsd-tools research yt-transcript dQw4w9WgXcQ
+  gsd-tools research:yt-transcript "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+  gsd-tools research yt-transcript dQw4w9WgXcQ --timestamps
+  gsd-tools research:yt-transcript dQw4w9WgXcQ --lang es`,
+  'research:yt-transcript': `Usage: gsd-tools research:yt-transcript <video-id|url> [options]
+
+Extract clean plain-text transcript from a YouTube video via yt-dlp subtitle download.
+
+Arguments:
+  video-id|url       YouTube video ID or full URL (required)
+
+Options:
+  --timestamps       Preserve [HH:MM:SS] timestamp markers (default: stripped)
+  --lang LANG        Subtitle language code (default: en)
+
+Output: { video_id, has_subtitles, language, auto_generated, transcript, word_count, char_count }
+
+When no subtitles are available: { video_id, has_subtitles: false, message: "No subtitles available" }
+When yt-dlp is missing: { error: "yt-dlp not installed", install_hint: "pip install yt-dlp" }
+
+Full transcript is always returned — no truncation in JSON output.
+
+Examples:
+  gsd-tools research:yt-transcript dQw4w9WgXcQ
+  gsd-tools research:yt-transcript "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+  gsd-tools research:yt-transcript dQw4w9WgXcQ --timestamps
+  gsd-tools research:yt-transcript dQw4w9WgXcQ --lang es`,
 };
 
 module.exports = { MODEL_PROFILES, CONFIG_SCHEMA, COMMAND_HELP, VALID_TRAJECTORY_SCOPES };
