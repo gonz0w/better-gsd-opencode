@@ -1782,6 +1782,88 @@ Examples:
   gsd-tools research:nlm-add-source abc123 "https://example.com/docs"
   gsd-tools research:nlm-add-source abc123 "https://youtube.com/watch?v=xxx"
   gsd-tools research:nlm-add-source abc123 "./docs/research.pdf"`,
+  'research nlm-ask': `Usage: gsd-tools research nlm-ask <notebook-id> "question" [--new]
+
+Ask a question against a NotebookLM notebook and receive a grounded answer with citations.
+
+Arguments:
+  notebook-id  Notebook ID to ask against (required)
+  question     Question text (required, remaining positional args joined)
+
+Options:
+  --new        Start a fresh conversation (clears conversation history)
+
+Sets the active notebook first, then sends the question. Uses 30s timeout.
+Checks binary availability and auth health before execution.
+
+Output: { notebook_id, question, answer, references, raw_output }
+Error: { error, install_hint | reauth_command | details }
+
+Examples:
+  gsd-tools research nlm-ask abc123 "What are the key themes?"
+  gsd-tools research:nlm-ask abc123 "Summarize implementation approach" --new`,
+  'research:nlm-ask': `Usage: gsd-tools research:nlm-ask <notebook-id> "question" [--new]
+
+Ask a question against a NotebookLM notebook and receive a grounded answer with citations.
+
+Arguments:
+  notebook-id  Notebook ID to ask against (required)
+  question     Question text (required, remaining positional args joined)
+
+Options:
+  --new        Start a fresh conversation (clears conversation history)
+
+Sets the active notebook first, then sends the question. Uses 30s timeout.
+Checks binary availability and auth health before execution.
+
+Output: { notebook_id, question, answer, references, raw_output }
+Error: { error, install_hint | reauth_command | details }
+
+Examples:
+  gsd-tools research:nlm-ask abc123 "What are the key themes?"
+  gsd-tools research:nlm-ask abc123 "Summarize implementation approach" --new`,
+  'research nlm-report': `Usage: gsd-tools research nlm-report <notebook-id> [--type TYPE] [--prompt "text"]
+
+Generate a structured report from a NotebookLM notebook.
+
+Arguments:
+  notebook-id  Notebook ID to generate report from (required)
+
+Options:
+  --type TYPE   Report type: briefing-doc (default), study-guide, blog-post
+  --prompt "text"  Custom report prompt (optional)
+
+Uses 60s timeout — report generation is slow. Sets active notebook first.
+Checks binary availability and auth health before execution.
+
+Output: { notebook_id, report_type, content, raw_output }
+Error: { error, install_hint | reauth_command | details }
+
+Examples:
+  gsd-tools research nlm-report abc123 --type briefing-doc
+  gsd-tools research:nlm-report abc123 --type study-guide
+  gsd-tools research:nlm-report abc123 --prompt "Focus on security implications"`,
+  'research:nlm-report': `Usage: gsd-tools research:nlm-report <notebook-id> [--type TYPE] [--prompt "text"]
+
+Generate a structured report from a NotebookLM notebook.
+
+Arguments:
+  notebook-id  Notebook ID to generate report from (required)
+
+Options:
+  --type TYPE   Report type: briefing-doc (default), study-guide, blog-post
+  --prompt "text"  Custom report prompt (optional)
+
+Uses 60s timeout — report generation is slow. Sets active notebook first.
+Checks binary availability and auth health before execution.
+
+Output: { notebook_id, report_type, content, raw_output }
+Error: { error, install_hint | reauth_command | details }
+
+Examples:
+  gsd-tools research:nlm-report abc123 --type briefing-doc
+  gsd-tools research:nlm-report abc123 --type study-guide
+  gsd-tools research:nlm-report abc123 --prompt "Focus on security implications"`,
 };
 
 module.exports = { MODEL_PROFILES, CONFIG_SCHEMA, COMMAND_HELP, VALID_TRAJECTORY_SCOPES };

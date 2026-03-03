@@ -1116,18 +1116,26 @@ function truncateTranscript(text, maxChars) {
 
 /**
  * Format collected sources into XML-tagged string for agent consumption.
- * Used in agent_context field at Tier 2/3.
+ * Used in agent_context field at Tier 1/2/3.
  *
  * @param {object[]} sources - Array of source objects
  * @param {string} query - The original research query
+ * @param {object|null} [nlmSynthesis] - NLM synthesis result (Tier 1 only), or null
  * @returns {string} XML-tagged string or empty string if no sources
  */
-function formatSourcesForAgent(sources, query) {
+function formatSourcesForAgent(sources, query, nlmSynthesis) {
   if (!sources || sources.length === 0) return '';
 
   const lines = [];
   lines.push('<collected_sources>');
   lines.push(`<research_query>${escapeXmlAttr(query)}</research_query>`);
+
+  // NLM synthesis block — before raw sources so agent sees synthesis first
+  if (nlmSynthesis && nlmSynthesis.answer) {
+    lines.push(`<nlm_synthesis query="${escapeXmlAttr(query)}" sources_loaded="${nlmSynthesis.sources_loaded || 0}">`);
+    lines.push(nlmSynthesis.answer);
+    lines.push('</nlm_synthesis>');
+  }
 
   for (const src of sources) {
     if (src.type === 'youtube') {
@@ -1250,12 +1258,15 @@ function cmdResearchCollect(cwd, args, raw) {
   // Allocate per-stage timeout
   const stageTimeout = Math.max(5000, Math.floor((config.rag_timeout || 30) * 1000 / 2));
 
+  // Determine total stage count based on tier
+  const totalStages = tier.number === 1 ? 4 : 3;
+
   const allSources = [];
   const timing = {};
   const pipelineStart = Date.now();
 
   // Stage 1: Web sources
-  status('[1/3] Collecting web sources...');
+  status(`[1/${totalStages}] Collecting web sources...`);
   const webStart = Date.now();
   const webSources = collectWebSources(cwd, query, config, stageTimeout);
   timing.web_ms = Date.now() - webStart;
@@ -1263,24 +1274,38 @@ function cmdResearchCollect(cwd, args, raw) {
 
   // Stage 2: YouTube sources
   if (cliTools['yt-dlp'] && cliTools['yt-dlp'].available) {
-    status('[2/3] Searching YouTube...');
+    status(`[2/${totalStages}] Searching YouTube...`);
     const ytStart = Date.now();
     const ytSources = collectYouTubeSources(cwd, query, config, stageTimeout);
     timing.youtube_ms = Date.now() - ytStart;
     allSources.push(...ytSources);
   } else {
-    status('[2/3] YouTube: skipped (yt-dlp not installed)');
+    status(`[2/${totalStages}] YouTube: skipped (yt-dlp not installed)`);
     timing.youtube_ms = 0;
   }
 
   // Stage 3: Context7 availability note
   timing.context7_available = !!(mcpServers['context7'] && mcpServers['context7'].configured && mcpServers['context7'].enabled);
-  status('[3/3] Context7: available to agent directly via MCP');
+  status(`[3/${totalStages}] Context7: available to agent directly via MCP`);
+
+  // Stage 4: NotebookLM synthesis (Tier 1 only)
+  let nlmSynthesis = null;
+  if (tier.number === 1 && allSources.length > 0) {
+    status('[4/4] NotebookLM synthesis...');
+    const nlmStart = Date.now();
+    nlmSynthesis = collectNlmSynthesis(cwd, query, allSources, stageTimeout);
+    timing.nlm_ms = Date.now() - nlmStart;
+  } else {
+    if (tier.number === 1) {
+      status('[4/4] NotebookLM: skipped (no sources to synthesize)');
+    }
+    timing.nlm_ms = 0;
+  }
 
   timing.total_ms = Date.now() - pipelineStart;
 
-  // Build agent_context XML
-  const agent_context = formatSourcesForAgent(allSources, query);
+  // Build agent_context XML (includes NLM synthesis block at Tier 1 if available)
+  const agent_context = formatSourcesForAgent(allSources, query, nlmSynthesis);
 
   status(`Research collection complete: ${allSources.length} sources, Tier ${tier.number} (${timing.total_ms}ms)`);
 
@@ -1291,6 +1316,7 @@ function cmdResearchCollect(cwd, args, raw) {
     source_count: allSources.length,
     sources: allSources,
     timing,
+    nlm_synthesis: nlmSynthesis,
     agent_context,
   };
 
@@ -1465,6 +1491,312 @@ function cmdResearchNlmCreate(cwd, args, raw) {
 }
 
 /**
+ * Format nlm-ask result for TTY display.
+ * @param {object} data - Ask result
+ * @returns {string}
+ */
+function formatNlmAsk(data) {
+  const lines = [];
+  lines.push(banner('NotebookLM Ask'));
+  lines.push('');
+
+  if (data.error) {
+    return lines.join('\n') + formatNlmError(data);
+  }
+
+  lines.push(color.bold('Question: ') + (data.question || '—'));
+  lines.push('');
+  lines.push(color.bold('Answer:'));
+  lines.push(data.answer || color.dim('(no answer)'));
+
+  if (data.references && data.references.length > 0) {
+    lines.push('');
+    lines.push(color.dim('References:'));
+    for (const ref of data.references) {
+      lines.push(color.dim(`  • ${ref}`));
+    }
+  }
+
+  return lines.join('\n');
+}
+
+/**
+ * Command handler: research nlm-ask
+ * Ask a question against a NotebookLM notebook and receive a grounded answer.
+ *
+ * @param {string} cwd - Project root directory
+ * @param {string[]} args - Command arguments (notebook_id, ...question)
+ * @param {boolean} raw - Raw output mode
+ */
+function cmdResearchNlmAsk(cwd, args, raw) {
+  // 1. Check binary
+  const nlmBinary = getNlmBinary(cwd);
+  if (!nlmBinary.available) {
+    output({ error: nlmBinary.error, install_hint: nlmBinary.install_hint }, { formatter: formatNlmAsk, raw });
+    return;
+  }
+
+  // 2. Check auth
+  const config = loadConfig(cwd);
+  const authTimeout = Math.min(10000, Math.floor((config.rag_timeout || 30) * 1000 / 3));
+  const auth = checkNlmAuth(nlmBinary.path, authTimeout);
+  if (!auth.authenticated) {
+    output({ error: auth.message, reauth_command: auth.reauth_command }, { formatter: formatNlmAsk, raw });
+    return;
+  }
+
+  // 3. Parse args: first positional = notebook_id, rest = question
+  const positional = args.filter(a => !a.startsWith('--'));
+  // Remove values of named flags
+  const flagValues = new Set();
+  for (let i = 0; i < args.length; i++) {
+    if (args[i].startsWith('--') && i + 1 < args.length && !args[i + 1].startsWith('--')) {
+      flagValues.add(args[i + 1]);
+    }
+  }
+  const cleanPositional = positional.filter(a => !flagValues.has(a));
+
+  const notebookId = cleanPositional[0];
+  const question = cleanPositional.slice(1).join(' ').trim();
+  const newFlag = args.includes('--new');
+
+  if (!notebookId) {
+    output({ error: 'Missing notebook ID', usage: 'research:nlm-ask <notebook-id> "question" [--new]' }, { formatter: formatNlmAsk, raw });
+    return;
+  }
+  if (!question) {
+    output({ error: 'Missing question', usage: 'research:nlm-ask <notebook-id> "question" [--new]' }, { formatter: formatNlmAsk, raw });
+    return;
+  }
+
+  // 4. Set active notebook
+  try {
+    execFileSync(nlmBinary.path, ['use', notebookId], {
+      encoding: 'utf-8',
+      timeout: 10000,
+      stdio: 'pipe',
+    });
+  } catch (err) {
+    output({ error: 'Failed to set active notebook', notebook_id: notebookId, details: (err.message || '').slice(0, 300) }, { formatter: formatNlmAsk, raw });
+    return;
+  }
+
+  // 5. Ask question
+  try {
+    const askArgs = ['ask', question, '--json'];
+    if (newFlag) askArgs.push('--new');
+    const stdout = execFileSync(nlmBinary.path, askArgs, {
+      encoding: 'utf-8',
+      timeout: 30000,
+      stdio: 'pipe',
+    });
+    const parsed = JSON.parse(stdout);
+    const result = {
+      notebook_id: notebookId,
+      question,
+      answer: parsed.answer || null,
+      references: parsed.references || [],
+      raw_output: parsed,
+    };
+    output(result, { formatter: formatNlmAsk, raw });
+  } catch (err) {
+    output({ error: 'Failed to ask question', details: (err.message || '').slice(0, 300) }, { formatter: formatNlmAsk, raw });
+  }
+}
+
+/**
+ * Format nlm-report result for TTY display.
+ * @param {object} data - Report result
+ * @returns {string}
+ */
+function formatNlmReport(data) {
+  const lines = [];
+  lines.push(banner('NotebookLM Report'));
+  lines.push('');
+
+  if (data.error) {
+    return lines.join('\n') + formatNlmError(data);
+  }
+
+  lines.push(color.bold('Notebook: ') + (data.notebook_id || '—'));
+  lines.push(color.bold('Type: ') + (data.report_type || '—'));
+  lines.push('');
+  lines.push(color.bold('Content:'));
+  lines.push(data.content || color.dim('(no content)'));
+
+  return lines.join('\n');
+}
+
+/**
+ * Command handler: research nlm-report
+ * Generate a structured report from a NotebookLM notebook.
+ *
+ * @param {string} cwd - Project root directory
+ * @param {string[]} args - Command arguments (notebook_id, --type, --prompt)
+ * @param {boolean} raw - Raw output mode
+ */
+function cmdResearchNlmReport(cwd, args, raw) {
+  // 1. Check binary
+  const nlmBinary = getNlmBinary(cwd);
+  if (!nlmBinary.available) {
+    output({ error: nlmBinary.error, install_hint: nlmBinary.install_hint }, { formatter: formatNlmReport, raw });
+    return;
+  }
+
+  // 2. Check auth
+  const config = loadConfig(cwd);
+  const authTimeout = Math.min(10000, Math.floor((config.rag_timeout || 30) * 1000 / 3));
+  const auth = checkNlmAuth(nlmBinary.path, authTimeout);
+  if (!auth.authenticated) {
+    output({ error: auth.message, reauth_command: auth.reauth_command }, { formatter: formatNlmReport, raw });
+    return;
+  }
+
+  // 3. Parse args: first positional = notebook_id, --type and --prompt as flags
+  const positional = args.filter(a => !a.startsWith('--'));
+  const flagValues = new Set();
+  for (let i = 0; i < args.length; i++) {
+    if (args[i].startsWith('--') && i + 1 < args.length && !args[i + 1].startsWith('--')) {
+      flagValues.add(args[i + 1]);
+    }
+  }
+  const cleanPositional = positional.filter(a => !flagValues.has(a));
+
+  const notebookId = cleanPositional[0];
+  const reportType = parseFlag(args, '--type', 'briefing-doc');
+  const customPrompt = parseFlag(args, '--prompt', null);
+
+  const validTypes = ['briefing-doc', 'study-guide', 'blog-post'];
+
+  if (!notebookId) {
+    output({ error: 'Missing notebook ID', usage: 'research:nlm-report <notebook-id> [--type briefing-doc|study-guide|blog-post] [--prompt "custom"]' }, { formatter: formatNlmReport, raw });
+    return;
+  }
+
+  // 4. Set active notebook
+  try {
+    execFileSync(nlmBinary.path, ['use', notebookId], {
+      encoding: 'utf-8',
+      timeout: 10000,
+      stdio: 'pipe',
+    });
+  } catch (err) {
+    output({ error: 'Failed to set active notebook', notebook_id: notebookId, details: (err.message || '').slice(0, 300) }, { formatter: formatNlmReport, raw });
+    return;
+  }
+
+  // 5. Generate report
+  try {
+    const reportArgs = ['generate', 'report', '--type', reportType, '--json'];
+    if (customPrompt) {
+      reportArgs.push('--prompt', customPrompt);
+    }
+    const stdout = execFileSync(nlmBinary.path, reportArgs, {
+      encoding: 'utf-8',
+      timeout: 60000,
+      stdio: 'pipe',
+    });
+    const parsed = JSON.parse(stdout);
+    const result = {
+      notebook_id: notebookId,
+      report_type: reportType,
+      content: parsed.content || parsed.report || null,
+      raw_output: parsed,
+    };
+    output(result, { formatter: formatNlmReport, raw });
+  } catch (err) {
+    output({ error: 'Failed to generate report', details: (err.message || '').slice(0, 300) }, { formatter: formatNlmReport, raw });
+  }
+}
+
+/**
+ * Collect NotebookLM synthesis for the Tier 1 pipeline.
+ * Creates a temporary session notebook, loads top source URLs, and asks a synthesis question.
+ * Returns null on ANY error — NLM failure silently falls back to Tier 2 sources.
+ *
+ * @param {string} cwd - Project root directory
+ * @param {string} query - Research query
+ * @param {object[]} sources - Collected sources (web + youtube)
+ * @param {number} timeout - Timeout in milliseconds per operation
+ * @returns {{ answer: string, notebook_id: string, sources_loaded: number }|null}
+ */
+function collectNlmSynthesis(cwd, query, sources, timeout) {
+  try {
+    // 1. Check binary availability
+    const nlmBinary = getNlmBinary(cwd);
+    if (!nlmBinary.available) {
+      debugLog('research.nlm', 'notebooklm-py not available — skipping Tier 1 synthesis');
+      return null;
+    }
+    const nlmPath = nlmBinary.path;
+
+    // 2. Check auth (fast probe)
+    const auth = checkNlmAuth(nlmPath, 5000);
+    if (!auth.authenticated) {
+      debugLog('research.nlm', `NLM auth check failed: ${auth.reason} — skipping synthesis`);
+      return null;
+    }
+
+    // 3. Create session notebook
+    const notebookTitle = `[GSD] ${query.slice(0, 50)}`;
+    const createStdout = execFileSync(nlmPath, ['create', notebookTitle, '--json'], {
+      encoding: 'utf-8',
+      timeout,
+      stdio: 'pipe',
+    });
+    const createParsed = JSON.parse(createStdout);
+    const notebookId = createParsed.id || createParsed.notebook_id;
+    if (!notebookId) {
+      debugLog('research.nlm', 'NLM create returned no notebook_id — skipping synthesis');
+      return null;
+    }
+    debugLog('research.nlm', `created session notebook: ${notebookId}`);
+
+    // 4. Add top 2-3 source URLs (web + youtube only, skip sources without URLs)
+    const urlSources = sources.filter(s => s.url).slice(0, 3);
+    let sourcesLoaded = 0;
+    for (const src of urlSources) {
+      try {
+        execFileSync(nlmPath, ['use', notebookId], { encoding: 'utf-8', timeout, stdio: 'pipe' });
+        execFileSync(nlmPath, ['source', 'add', src.url, '--json'], { encoding: 'utf-8', timeout, stdio: 'pipe' });
+        sourcesLoaded++;
+        debugLog('research.nlm', `added source: ${src.url}`);
+      } catch (srcErr) {
+        debugLog('research.nlm', `failed to add source ${src.url}: ${srcErr.message}`);
+        // Continue — partial sources are fine
+      }
+    }
+
+    if (sourcesLoaded === 0) {
+      debugLog('research.nlm', 'no sources loaded — skipping synthesis question');
+      return null;
+    }
+
+    // 5. Ask synthesis question
+    const synthesisQuestion = `Provide a comprehensive technical summary about: ${query}. Focus on practical implementation details, best practices, and common pitfalls.`;
+    execFileSync(nlmPath, ['use', notebookId], { encoding: 'utf-8', timeout, stdio: 'pipe' });
+    const askStdout = execFileSync(nlmPath, ['ask', synthesisQuestion, '--json', '--new'], {
+      encoding: 'utf-8',
+      timeout,
+      stdio: 'pipe',
+    });
+    const askParsed = JSON.parse(askStdout);
+    const answer = askParsed.answer;
+    if (!answer) {
+      debugLog('research.nlm', 'NLM ask returned no answer — returning null');
+      return null;
+    }
+
+    debugLog('research.nlm', `synthesis complete: ${answer.length} chars, ${sourcesLoaded} sources`);
+    return { answer, notebook_id: notebookId, sources_loaded: sourcesLoaded };
+
+  } catch (err) {
+    debugLog('research.nlm', `collectNlmSynthesis failed: ${err.message} — silent fallback`);
+    return null;
+  }
+}
+
+/**
  * Command handler: research nlm-add-source
  * Add a source (URL, file path) to a NotebookLM notebook.
  *
@@ -1534,4 +1866,4 @@ function cmdResearchNlmAddSource(cwd, args, raw) {
   }
 }
 
-module.exports = { detectCliTools, detectMcpServers, calculateTier, cmdResearchCapabilities, cmdResearchYtSearch, cmdResearchYtTranscript, cmdResearchCollect, cmdResearchNlmCreate, cmdResearchNlmAddSource, collectWebSources, collectYouTubeSources, formatSourcesForAgent, parseVtt };
+module.exports = { detectCliTools, detectMcpServers, calculateTier, cmdResearchCapabilities, cmdResearchYtSearch, cmdResearchYtTranscript, cmdResearchCollect, cmdResearchNlmCreate, cmdResearchNlmAddSource, cmdResearchNlmAsk, cmdResearchNlmReport, collectWebSources, collectYouTubeSources, collectNlmSynthesis, formatSourcesForAgent, parseVtt };
