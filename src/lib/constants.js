@@ -1537,6 +1537,30 @@ Agent management.
 Subcommands:
   audit                    Audit agent coverage
   list                     List all agents`,
+
+  // research namespace
+  'research': `Usage: gsd-tools research <subcommand> [options]
+
+Research infrastructure commands.
+
+Subcommands:
+  capabilities    Report available research tools, tier, and recommendations`,
+  'research capabilities': `Usage: gsd-tools research capabilities
+
+Report available research tools, current degradation tier, and recommendations.
+
+Detects: yt-dlp (YouTube), notebooklm-py (RAG synthesis), Brave Search MCP, Context7 MCP, Exa MCP.
+Shows: 4-tier degradation level, per-tool status, install hints for missing tools.
+
+Output: { rag_enabled, current_tier, tiers, cli_tools, mcp_servers, recommendations }`,
+  'research:capabilities': `Usage: gsd-tools research:capabilities
+
+Report available research tools, current degradation tier, and recommendations.
+
+Detects: yt-dlp (YouTube), notebooklm-py (RAG synthesis), Brave Search MCP, Context7 MCP, Exa MCP.
+Shows: 4-tier degradation level, per-tool status, install hints for missing tools.
+
+Output: { rag_enabled, current_tier, tiers, cli_tools, mcp_servers, recommendations }`,
 };
 
 module.exports = { MODEL_PROFILES, CONFIG_SCHEMA, COMMAND_HELP, VALID_TRAJECTORY_SCOPES };

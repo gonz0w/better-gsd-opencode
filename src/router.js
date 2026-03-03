@@ -28,6 +28,7 @@ function lazyOrchestration() { return _modules.orchestration || (_modules.orches
 function lazyCache() { return _modules.cache || (_modules.cache = require('./commands/cache')); }
 function lazyAgent() { return _modules.agent || (_modules.agent = require('./commands/agent')); }
 function lazyProfiler() { return _modules.profiler || (_modules.profiler = require('./commands/profiler')); }
+function lazyResearch() { return _modules.research || (_modules.research = require('./commands/research')); }
 
 
 async function main() {
@@ -126,7 +127,7 @@ async function main() {
   }
 
   if (!command) {
-    error('Usage: gsd-tools <namespace:command> [args] [--pretty] [--verbose]\nCommands: init:<workflow>, plan:<intent|requirements|roadmap|phases|find-phase|milestone|phase>, execute:<commit|rollback-info|session-diff|session-summary|velocity|worktree|tdd|test-run>, verify:<state|verify|assertions|search-decisions|search-lessons|review|context-budget|token-budget>, util:<config-get|config-set|env|current-timestamp|list-todos|todo|memory|mcp|classify|frontmatter|progress|websearch|history-digest|trace-requirement|codebase|cache|agent>');
+    error('Usage: gsd-tools <namespace:command> [args] [--pretty] [--verbose]\nCommands: init:<workflow>, plan:<intent|requirements|roadmap|phases|find-phase|milestone|phase>, execute:<commit|rollback-info|session-diff|session-summary|velocity|worktree|tdd|test-run>, verify:<state|verify|assertions|search-decisions|search-lessons|review|context-budget|token-budget>, util:<config-get|config-set|env|current-timestamp|list-todos|todo|memory|mcp|classify|frontmatter|progress|websearch|history-digest|trace-requirement|codebase|cache|agent>, research:<capabilities>');
   }
 
   // --help / -h: print command help to stderr (never contaminates JSON stdout)
@@ -695,9 +696,19 @@ async function main() {
         break;
       }
 
+      // research namespace
+      case 'research': {
+        if (subCmd === 'capabilities') {
+          lazyResearch().cmdResearchCapabilities(cwd, restArgs, raw);
+        } else {
+          error('Unknown research subcommand. Available: capabilities');
+        }
+        break;
+      }
+
       // Unknown namespace
       default:
-        error(`Unknown namespace: ${namespace}. Available namespaces: init, plan, execute, verify, util`);
+        error(`Unknown namespace: ${namespace}. Available namespaces: init, plan, execute, verify, util, research`);
     }
     return; // Exit after handling namespaced command
   }
@@ -1548,6 +1559,16 @@ async function main() {
           commands: ['status', 'clear', 'warm'],
           help: 'gsd-tools cache <status|clear|warm> [files...]'
         }, raw, 'cache');
+      }
+      break;
+    }
+
+    case 'research': {
+      const resSub = args[1];
+      if (resSub === 'capabilities') {
+        lazyResearch().cmdResearchCapabilities(cwd, args.slice(2), raw);
+      } else {
+        error('Unknown research subcommand. Available: capabilities');
       }
       break;
     }

@@ -4,7 +4,46 @@ const fs = require('fs');
 const path = require('path');
 const { checkBinary } = require('../commands/env');
 const { loadConfig } = require('../lib/config');
-const { debugLog } = require('../lib/output');
+const { output, debugLog } = require('../lib/output');
+const { banner, sectionHeader, formatTable, color, SYMBOLS } = require('../lib/format');
+
+// ─── Tier Calculation ────────────────────────────────────────────────────────
+
+/**
+ * Tier definitions for degradation levels.
+ */
+const TIER_DEFINITIONS = [
+  { number: 1, name: 'Full RAG', description: 'All tools available — YouTube + MCP + NotebookLM synthesis' },
+  { number: 2, name: 'Sources without synthesis', description: 'YouTube + MCP sources, LLM synthesizes' },
+  { number: 3, name: 'Brave/Context7 only', description: 'Web search sources only, no video content' },
+  { number: 4, name: 'Pure LLM', description: 'No external sources, LLM knowledge only' },
+];
+
+/**
+ * Calculate the current degradation tier based on detected tools.
+ * Shared between capabilities command and init output (DRY).
+ *
+ * @param {object} cliTools - Result from detectCliTools()
+ * @param {object} mcpServers - Result from detectMcpServers()
+ * @param {boolean} ragEnabled - Whether RAG is enabled in config
+ * @returns {{ number: number, name: string }}
+ */
+function calculateTier(cliTools, mcpServers, ragEnabled) {
+  if (!ragEnabled) {
+    return { number: 4, name: 'Pure LLM' };
+  }
+
+  const hasMcp = Object.entries(mcpServers)
+    .filter(([k]) => k !== 'warning')
+    .some(([, s]) => s.configured && s.enabled);
+  const hasYtdlp = cliTools['yt-dlp']?.available || false;
+  const hasNlm = cliTools['notebooklm-py']?.available || false;
+
+  if (hasMcp && hasYtdlp && hasNlm) return { number: 1, name: 'Full RAG' };
+  if (hasMcp && hasYtdlp) return { number: 2, name: 'Sources without synthesis' };
+  if (hasMcp) return { number: 3, name: 'Brave/Context7 only' };
+  return { number: 4, name: 'Pure LLM' };
+}
 
 // ─── CLI Tool Detection ──────────────────────────────────────────────────────
 
@@ -202,4 +241,149 @@ function detectMcpServers(cwd) {
   return results;
 }
 
-module.exports = { detectCliTools, detectMcpServers };
+// ─── Capabilities Command ────────────────────────────────────────────────────
+
+/**
+ * Format capabilities data for TTY display.
+ * @param {object} data - Capabilities result object
+ * @returns {string}
+ */
+function formatCapabilities(data) {
+  const lines = [];
+
+  lines.push(banner('Research Capabilities'));
+  lines.push('');
+
+  // Current tier — prominent display
+  const tierColor = data.current_tier.number <= 2 ? color.green : data.current_tier.number === 3 ? color.yellow : color.red;
+  lines.push(color.bold('Research Tier: ') + tierColor(`${data.current_tier.number} — ${data.current_tier.name}`));
+  lines.push('');
+
+  // RAG status
+  lines.push(color.dim(`RAG Enabled: ${data.rag_enabled ? color.green(SYMBOLS.check + ' yes') : color.red(SYMBOLS.cross + ' no')}`));
+  lines.push('');
+
+  // CLI Tools table
+  lines.push(sectionHeader('CLI Tools'));
+  const cliRows = Object.entries(data.cli_tools).map(([name, info]) => {
+    const statusIcon = info.available ? color.green(SYMBOLS.check) : color.red(SYMBOLS.cross);
+    const version = info.version || color.dim('—');
+    return [statusIcon, name, version, info.install_hint || ''];
+  });
+  lines.push(formatTable(['', 'Tool', 'Version', 'Install'], cliRows));
+  lines.push('');
+
+  // MCP Servers table
+  lines.push(sectionHeader('MCP Servers'));
+  const mcpRows = Object.entries(data.mcp_servers)
+    .filter(([k]) => k !== 'warning')
+    .map(([id, info]) => {
+      let statusIcon;
+      if (info.configured && info.enabled) statusIcon = color.green(SYMBOLS.check);
+      else if (info.configured && !info.enabled) statusIcon = color.yellow(SYMBOLS.warning);
+      else statusIcon = color.red(SYMBOLS.cross);
+      const status = info.configured ? (info.enabled ? 'enabled' : 'disabled') : 'not configured';
+      const match = info.name_match || color.dim('—');
+      return [statusIcon, id, status, match];
+    });
+  lines.push(formatTable(['', 'Server', 'Status', 'Config Key'], mcpRows));
+
+  if (data.warning) {
+    lines.push('');
+    lines.push(color.yellow(SYMBOLS.warning + ' ' + data.warning));
+  }
+
+  // Recommendations
+  if (data.recommendations.length > 0) {
+    lines.push('');
+    lines.push(sectionHeader('Recommendations'));
+    for (const rec of data.recommendations) {
+      lines.push(`  ${color.yellow(SYMBOLS.arrow)} ${color.bold(rec.tool)}: ${rec.benefit}`);
+      lines.push(`    Install: ${color.cyan(rec.install)}`);
+    }
+  }
+
+  // Tier overview
+  lines.push('');
+  lines.push(sectionHeader('Tier Overview'));
+  for (const tier of data.tiers) {
+    const icon = tier.active ? color.green(SYMBOLS.check) : color.dim(SYMBOLS.pending);
+    const label = tier.active ? color.bold(`Tier ${tier.number}`) : color.dim(`Tier ${tier.number}`);
+    lines.push(`  ${icon} ${label}: ${tier.name} — ${tier.description}`);
+  }
+
+  return lines.join('\n');
+}
+
+/**
+ * Command handler: research capabilities
+ * Reports available research tools, degradation tier, and recommendations.
+ *
+ * @param {string} cwd - Project root directory
+ * @param {string[]} args - Command arguments
+ * @param {boolean} raw - Raw output mode
+ */
+function cmdResearchCapabilities(cwd, args, raw) {
+  const config = loadConfig(cwd);
+  const ragEnabled = config.rag_enabled !== false;
+
+  const cliTools = detectCliTools(cwd);
+  const mcpServers = detectMcpServers(cwd);
+  const currentTier = calculateTier(cliTools, mcpServers, ragEnabled);
+
+  // Build tiers array with active flag
+  const tiers = TIER_DEFINITIONS.map(t => ({
+    ...t,
+    active: t.number === currentTier.number,
+  }));
+
+  // Build recommendations for missing tools
+  const recommendations = [];
+
+  if (!cliTools['yt-dlp'].available) {
+    recommendations.push({
+      tool: 'yt-dlp',
+      install: 'pip install yt-dlp',
+      benefit: 'Enables YouTube transcript extraction for developer content research',
+    });
+  }
+
+  if (!cliTools['notebooklm-py'].available) {
+    recommendations.push({
+      tool: 'notebooklm-py',
+      install: 'pip install notebooklm-py',
+      benefit: 'Enables RAG synthesis via NotebookLM for grounded research answers',
+    });
+  }
+
+  const mcpBenefits = {
+    'brave-search': 'Web search with rich snippets for current documentation and discussions',
+    'context7': 'Library documentation lookup with version-specific code examples',
+    'exa': 'Semantic code search across GitHub, Stack Overflow, and official docs',
+  };
+
+  for (const [id, info] of Object.entries(mcpServers)) {
+    if (id === 'warning') continue;
+    if (!info.configured) {
+      recommendations.push({
+        tool: `${id} MCP`,
+        install: `Add ${id} server to MCP config`,
+        benefit: mcpBenefits[id] || `Enables ${id} MCP server for research`,
+      });
+    }
+  }
+
+  const result = {
+    rag_enabled: ragEnabled,
+    current_tier: currentTier,
+    tiers,
+    cli_tools: cliTools,
+    mcp_servers: mcpServers,
+    recommendations,
+    warning: mcpServers.warning || null,
+  };
+
+  output(result, { formatter: formatCapabilities, raw });
+}
+
+module.exports = { detectCliTools, detectMcpServers, calculateTier, cmdResearchCapabilities };

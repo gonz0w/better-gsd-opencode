@@ -1453,7 +1453,30 @@ Agent management.
 
 Subcommands:
   audit                    Audit agent coverage
-  list                     List all agents`
+  list                     List all agents`,
+      // research namespace
+      "research": `Usage: gsd-tools research <subcommand> [options]
+
+Research infrastructure commands.
+
+Subcommands:
+  capabilities    Report available research tools, tier, and recommendations`,
+      "research capabilities": `Usage: gsd-tools research capabilities
+
+Report available research tools, current degradation tier, and recommendations.
+
+Detects: yt-dlp (YouTube), notebooklm-py (RAG synthesis), Brave Search MCP, Context7 MCP, Exa MCP.
+Shows: 4-tier degradation level, per-tool status, install hints for missing tools.
+
+Output: { rag_enabled, current_tier, tiers, cli_tools, mcp_servers, recommendations }`,
+      "research:capabilities": `Usage: gsd-tools research:capabilities
+
+Report available research tools, current degradation tier, and recommendations.
+
+Detects: yt-dlp (YouTube), notebooklm-py (RAG synthesis), Brave Search MCP, Context7 MCP, Exa MCP.
+Shows: 4-tier degradation level, per-tool status, install hints for missing tools.
+
+Output: { rag_enabled, current_tier, tiers, cli_tools, mcp_servers, recommendations }`
     };
     module2.exports = { MODEL_PROFILES, CONFIG_SCHEMA, COMMAND_HELP, VALID_TRAJECTORY_SCOPES };
   }
@@ -26682,6 +26705,275 @@ ${BOLD}Results:${RESET}
   }
 });
 
+// src/commands/research.js
+var require_research = __commonJS({
+  "src/commands/research.js"(exports2, module2) {
+    "use strict";
+    var fs = require("fs");
+    var path = require("path");
+    var { checkBinary } = require_env();
+    var { loadConfig } = require_config();
+    var { output: output2, debugLog } = require_output();
+    var { banner, sectionHeader, formatTable, color, SYMBOLS } = require_format();
+    var TIER_DEFINITIONS = [
+      { number: 1, name: "Full RAG", description: "All tools available \u2014 YouTube + MCP + NotebookLM synthesis" },
+      { number: 2, name: "Sources without synthesis", description: "YouTube + MCP sources, LLM synthesizes" },
+      { number: 3, name: "Brave/Context7 only", description: "Web search sources only, no video content" },
+      { number: 4, name: "Pure LLM", description: "No external sources, LLM knowledge only" }
+    ];
+    function calculateTier(cliTools, mcpServers, ragEnabled) {
+      if (!ragEnabled) {
+        return { number: 4, name: "Pure LLM" };
+      }
+      const hasMcp = Object.entries(mcpServers).filter(([k]) => k !== "warning").some(([, s]) => s.configured && s.enabled);
+      const hasYtdlp = cliTools["yt-dlp"]?.available || false;
+      const hasNlm = cliTools["notebooklm-py"]?.available || false;
+      if (hasMcp && hasYtdlp && hasNlm) return { number: 1, name: "Full RAG" };
+      if (hasMcp && hasYtdlp) return { number: 2, name: "Sources without synthesis" };
+      if (hasMcp) return { number: 3, name: "Brave/Context7 only" };
+      return { number: 4, name: "Pure LLM" };
+    }
+    function detectCliTools(cwd) {
+      const config = loadConfig(cwd);
+      const results = {
+        "yt-dlp": { available: false, version: null, path: null, install_hint: "pip install yt-dlp" },
+        "notebooklm-py": { available: false, version: null, path: null, install_hint: "pip install notebooklm-py" }
+      };
+      if (config.ytdlp_path) {
+        debugLog("research.cli", `checking configured yt-dlp path: ${config.ytdlp_path}`);
+        try {
+          if (fs.existsSync(config.ytdlp_path)) {
+            const binary = checkBinary(config.ytdlp_path, "--version");
+            results["yt-dlp"].available = binary.available;
+            results["yt-dlp"].version = binary.version;
+            results["yt-dlp"].path = config.ytdlp_path;
+          }
+        } catch {
+          debugLog("research.cli", `configured yt-dlp path not accessible: ${config.ytdlp_path}`);
+        }
+      } else {
+        const binary = checkBinary("yt-dlp", "--version");
+        results["yt-dlp"].available = binary.available;
+        results["yt-dlp"].version = binary.version;
+        results["yt-dlp"].path = binary.path;
+      }
+      if (config.nlm_path) {
+        debugLog("research.cli", `checking configured nlm path: ${config.nlm_path}`);
+        try {
+          if (fs.existsSync(config.nlm_path)) {
+            const binary = checkBinary(config.nlm_path, "--version");
+            results["notebooklm-py"].available = binary.available;
+            results["notebooklm-py"].version = binary.version;
+            results["notebooklm-py"].path = config.nlm_path;
+          }
+        } catch {
+          debugLog("research.cli", `configured nlm path not accessible: ${config.nlm_path}`);
+        }
+      } else {
+        let binary = checkBinary("notebooklm-py", "--version");
+        if (binary.available) {
+          results["notebooklm-py"].available = true;
+          results["notebooklm-py"].version = binary.version;
+          results["notebooklm-py"].path = binary.path;
+        } else {
+          debugLog("research.cli", "notebooklm-py not found, trying nlm");
+          binary = checkBinary("nlm", "--version");
+          if (binary.available) {
+            results["notebooklm-py"].available = true;
+            results["notebooklm-py"].version = binary.version;
+            results["notebooklm-py"].path = binary.path;
+          }
+        }
+      }
+      return results;
+    }
+    var MCP_RESEARCH_SERVERS = [
+      { id: "brave-search", keywords: ["brave"] },
+      { id: "context7", keywords: ["context7"] },
+      { id: "exa", keywords: ["exa"] }
+    ];
+    function detectMcpServers(cwd) {
+      const config = loadConfig(cwd);
+      const results = {
+        "brave-search": { configured: false, enabled: false, name_match: null },
+        "context7": { configured: false, enabled: false, name_match: null },
+        "exa": { configured: false, enabled: false, name_match: null }
+      };
+      let mcpConfigPath = config.mcp_config_path;
+      if (!mcpConfigPath) {
+        const homedir = process.env.HOME || process.env.USERPROFILE || "";
+        const defaultPaths = [
+          path.join(homedir, ".config", "oc", "opencode.json"),
+          path.join(homedir, ".config", "opencode", "opencode.json")
+        ];
+        for (const p of defaultPaths) {
+          try {
+            if (fs.existsSync(p)) {
+              mcpConfigPath = p;
+              debugLog("research.mcp", `auto-detected MCP config: ${p}`);
+              break;
+            }
+          } catch {
+          }
+        }
+      }
+      if (!mcpConfigPath) {
+        debugLog("research.mcp", "no MCP config file found");
+        results.warning = "MCP config not found \u2014 set mcp_config_path in config or place opencode.json in ~/.config/oc/";
+        return results;
+      }
+      let configData;
+      try {
+        const raw = fs.readFileSync(mcpConfigPath, "utf-8");
+        configData = JSON.parse(raw);
+      } catch (e) {
+        debugLog("research.mcp", `failed to read MCP config: ${e.message}`);
+        results.warning = `MCP config unreadable at ${mcpConfigPath}: ${e.message}`;
+        return results;
+      }
+      let servers = null;
+      if (configData.mcpServers && typeof configData.mcpServers === "object") {
+        servers = configData.mcpServers;
+      } else if (configData.mcp && typeof configData.mcp === "object") {
+        if (configData.mcp.servers && typeof configData.mcp.servers === "object") {
+          servers = configData.mcp.servers;
+        } else {
+          servers = {};
+          for (const [key, val] of Object.entries(configData.mcp)) {
+            if (val && typeof val === "object" && !Array.isArray(val)) {
+              servers[key] = val;
+            }
+          }
+        }
+      }
+      if (!servers || Object.keys(servers).length === 0) {
+        debugLog("research.mcp", "no mcpServers found in config");
+        results.warning = `No MCP servers found in ${mcpConfigPath}`;
+        return results;
+      }
+      for (const [serverName, serverConfig] of Object.entries(servers)) {
+        const nameLower = serverName.toLowerCase();
+        for (const research of MCP_RESEARCH_SERVERS) {
+          const matched = research.keywords.some((kw) => nameLower.includes(kw));
+          if (matched) {
+            results[research.id].configured = true;
+            results[research.id].name_match = serverName;
+            if (serverConfig && serverConfig.disabled === true) {
+              results[research.id].enabled = false;
+            } else {
+              results[research.id].enabled = true;
+            }
+            debugLog("research.mcp", `matched ${serverName} \u2192 ${research.id} (enabled: ${results[research.id].enabled})`);
+            break;
+          }
+        }
+      }
+      return results;
+    }
+    function formatCapabilities(data) {
+      const lines = [];
+      lines.push(banner("Research Capabilities"));
+      lines.push("");
+      const tierColor = data.current_tier.number <= 2 ? color.green : data.current_tier.number === 3 ? color.yellow : color.red;
+      lines.push(color.bold("Research Tier: ") + tierColor(`${data.current_tier.number} \u2014 ${data.current_tier.name}`));
+      lines.push("");
+      lines.push(color.dim(`RAG Enabled: ${data.rag_enabled ? color.green(SYMBOLS.check + " yes") : color.red(SYMBOLS.cross + " no")}`));
+      lines.push("");
+      lines.push(sectionHeader("CLI Tools"));
+      const cliRows = Object.entries(data.cli_tools).map(([name, info]) => {
+        const statusIcon = info.available ? color.green(SYMBOLS.check) : color.red(SYMBOLS.cross);
+        const version = info.version || color.dim("\u2014");
+        return [statusIcon, name, version, info.install_hint || ""];
+      });
+      lines.push(formatTable(["", "Tool", "Version", "Install"], cliRows));
+      lines.push("");
+      lines.push(sectionHeader("MCP Servers"));
+      const mcpRows = Object.entries(data.mcp_servers).filter(([k]) => k !== "warning").map(([id, info]) => {
+        let statusIcon;
+        if (info.configured && info.enabled) statusIcon = color.green(SYMBOLS.check);
+        else if (info.configured && !info.enabled) statusIcon = color.yellow(SYMBOLS.warning);
+        else statusIcon = color.red(SYMBOLS.cross);
+        const status = info.configured ? info.enabled ? "enabled" : "disabled" : "not configured";
+        const match = info.name_match || color.dim("\u2014");
+        return [statusIcon, id, status, match];
+      });
+      lines.push(formatTable(["", "Server", "Status", "Config Key"], mcpRows));
+      if (data.warning) {
+        lines.push("");
+        lines.push(color.yellow(SYMBOLS.warning + " " + data.warning));
+      }
+      if (data.recommendations.length > 0) {
+        lines.push("");
+        lines.push(sectionHeader("Recommendations"));
+        for (const rec of data.recommendations) {
+          lines.push(`  ${color.yellow(SYMBOLS.arrow)} ${color.bold(rec.tool)}: ${rec.benefit}`);
+          lines.push(`    Install: ${color.cyan(rec.install)}`);
+        }
+      }
+      lines.push("");
+      lines.push(sectionHeader("Tier Overview"));
+      for (const tier of data.tiers) {
+        const icon = tier.active ? color.green(SYMBOLS.check) : color.dim(SYMBOLS.pending);
+        const label = tier.active ? color.bold(`Tier ${tier.number}`) : color.dim(`Tier ${tier.number}`);
+        lines.push(`  ${icon} ${label}: ${tier.name} \u2014 ${tier.description}`);
+      }
+      return lines.join("\n");
+    }
+    function cmdResearchCapabilities(cwd, args, raw) {
+      const config = loadConfig(cwd);
+      const ragEnabled = config.rag_enabled !== false;
+      const cliTools = detectCliTools(cwd);
+      const mcpServers = detectMcpServers(cwd);
+      const currentTier = calculateTier(cliTools, mcpServers, ragEnabled);
+      const tiers = TIER_DEFINITIONS.map((t) => ({
+        ...t,
+        active: t.number === currentTier.number
+      }));
+      const recommendations = [];
+      if (!cliTools["yt-dlp"].available) {
+        recommendations.push({
+          tool: "yt-dlp",
+          install: "pip install yt-dlp",
+          benefit: "Enables YouTube transcript extraction for developer content research"
+        });
+      }
+      if (!cliTools["notebooklm-py"].available) {
+        recommendations.push({
+          tool: "notebooklm-py",
+          install: "pip install notebooklm-py",
+          benefit: "Enables RAG synthesis via NotebookLM for grounded research answers"
+        });
+      }
+      const mcpBenefits = {
+        "brave-search": "Web search with rich snippets for current documentation and discussions",
+        "context7": "Library documentation lookup with version-specific code examples",
+        "exa": "Semantic code search across GitHub, Stack Overflow, and official docs"
+      };
+      for (const [id, info] of Object.entries(mcpServers)) {
+        if (id === "warning") continue;
+        if (!info.configured) {
+          recommendations.push({
+            tool: `${id} MCP`,
+            install: `Add ${id} server to MCP config`,
+            benefit: mcpBenefits[id] || `Enables ${id} MCP server for research`
+          });
+        }
+      }
+      const result = {
+        rag_enabled: ragEnabled,
+        current_tier: currentTier,
+        tiers,
+        cli_tools: cliTools,
+        mcp_servers: mcpServers,
+        recommendations,
+        warning: mcpServers.warning || null
+      };
+      output2(result, { formatter: formatCapabilities, raw });
+    }
+    module2.exports = { detectCliTools, detectMcpServers, calculateTier, cmdResearchCapabilities };
+  }
+});
+
 // src/router.js
 var require_router = __commonJS({
   "src/router.js"(exports2, module2) {
@@ -26745,6 +27037,9 @@ var require_router = __commonJS({
     }
     function lazyProfiler() {
       return _modules.profiler || (_modules.profiler = require_profiler2());
+    }
+    function lazyResearch() {
+      return _modules.research || (_modules.research = require_research());
     }
     async function main2() {
       const args = process.argv.slice(2);
@@ -26812,7 +27107,7 @@ var require_router = __commonJS({
         });
       }
       if (!command) {
-        error("Usage: gsd-tools <namespace:command> [args] [--pretty] [--verbose]\nCommands: init:<workflow>, plan:<intent|requirements|roadmap|phases|find-phase|milestone|phase>, execute:<commit|rollback-info|session-diff|session-summary|velocity|worktree|tdd|test-run>, verify:<state|verify|assertions|search-decisions|search-lessons|review|context-budget|token-budget>, util:<config-get|config-set|env|current-timestamp|list-todos|todo|memory|mcp|classify|frontmatter|progress|websearch|history-digest|trace-requirement|codebase|cache|agent>");
+        error("Usage: gsd-tools <namespace:command> [args] [--pretty] [--verbose]\nCommands: init:<workflow>, plan:<intent|requirements|roadmap|phases|find-phase|milestone|phase>, execute:<commit|rollback-info|session-diff|session-summary|velocity|worktree|tdd|test-run>, verify:<state|verify|assertions|search-decisions|search-lessons|review|context-budget|token-budget>, util:<config-get|config-set|env|current-timestamp|list-todos|todo|memory|mcp|classify|frontmatter|progress|websearch|history-digest|trace-requirement|codebase|cache|agent>, research:<capabilities>");
       }
       if (args.includes("--help") || args.includes("-h")) {
         const subForHelp = args[1] && !args[1].startsWith("-") ? args[1] : "";
@@ -27370,9 +27665,18 @@ Available: execute-phase, plan-phase, new-project, new-milestone, quick, resume,
             }
             break;
           }
+          // research namespace
+          case "research": {
+            if (subCmd === "capabilities") {
+              lazyResearch().cmdResearchCapabilities(cwd, restArgs, raw);
+            } else {
+              error("Unknown research subcommand. Available: capabilities");
+            }
+            break;
+          }
           // Unknown namespace
           default:
-            error(`Unknown namespace: ${namespace}. Available namespaces: init, plan, execute, verify, util`);
+            error(`Unknown namespace: ${namespace}. Available namespaces: init, plan, execute, verify, util, research`);
         }
         return;
       }
@@ -28170,6 +28474,15 @@ Available: execute-phase, plan-phase, new-project, new-milestone, quick, resume,
               commands: ["status", "clear", "warm"],
               help: "gsd-tools cache <status|clear|warm> [files...]"
             }, raw, "cache");
+          }
+          break;
+        }
+        case "research": {
+          const resSub = args[1];
+          if (resSub === "capabilities") {
+            lazyResearch().cmdResearchCapabilities(cwd, args.slice(2), raw);
+          } else {
+            error("Unknown research subcommand. Available: capabilities");
           }
           break;
         }
