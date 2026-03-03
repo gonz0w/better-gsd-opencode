@@ -1544,7 +1544,8 @@ Subcommands:
 Research infrastructure commands.
 
 Subcommands:
-  capabilities    Report available research tools, tier, and recommendations`,
+  capabilities    Report available research tools, tier, and recommendations
+  yt-search       Search YouTube via yt-dlp with filtering and quality scoring`,
   'research capabilities': `Usage: gsd-tools research capabilities
 
 Report available research tools, current degradation tier, and recommendations.
@@ -1561,6 +1562,48 @@ Detects: yt-dlp (YouTube), notebooklm-py (RAG synthesis), Brave Search MCP, Cont
 Shows: 4-tier degradation level, per-tool status, install hints for missing tools.
 
 Output: { rag_enabled, current_tier, tiers, cli_tools, mcp_servers, recommendations }`,
+  'research yt-search': `Usage: gsd-tools research yt-search "topic" [options]
+
+Search YouTube via yt-dlp and return structured, filtered, quality-scored results.
+
+Arguments:
+  topic              Search query (required)
+
+Options:
+  --count N          Pre-filter result count (default: 10)
+  --max-age DAYS     Maximum video age in days (default: 730 = ~2 years)
+  --min-duration SEC Minimum duration in seconds (default: 300 = 5 min)
+  --max-duration SEC Maximum duration in seconds (default: 3600 = 60 min)
+  --min-views N      Minimum view count (default: 0)
+
+Output: { query, pre_filter_count, post_filter_count, results: [{ id, title, channel, duration, view_count, upload_date, url, description, quality_score }] }
+
+Quality score (0-100): Recency (40pts) + Views (30pts log-scale) + Duration (30pts bell curve at 15-20min).
+
+Examples:
+  gsd-tools research yt-search "nodejs streams tutorial"
+  gsd-tools research:yt-search "react hooks" --count 5 --min-views 1000`,
+  'research:yt-search': `Usage: gsd-tools research:yt-search "topic" [options]
+
+Search YouTube via yt-dlp and return structured, filtered, quality-scored results.
+
+Arguments:
+  topic              Search query (required)
+
+Options:
+  --count N          Pre-filter result count (default: 10)
+  --max-age DAYS     Maximum video age in days (default: 730 = ~2 years)
+  --min-duration SEC Minimum duration in seconds (default: 300 = 5 min)
+  --max-duration SEC Maximum duration in seconds (default: 3600 = 60 min)
+  --min-views N      Minimum view count (default: 0)
+
+Output: { query, pre_filter_count, post_filter_count, results: [{ id, title, channel, duration, view_count, upload_date, url, description, quality_score }] }
+
+Quality score (0-100): Recency (40pts) + Views (30pts log-scale) + Duration (30pts bell curve at 15-20min).
+
+Examples:
+  gsd-tools research:yt-search "nodejs streams tutorial"
+  gsd-tools research:yt-search "react hooks" --count 5 --min-views 1000`,
 };
 
 module.exports = { MODEL_PROFILES, CONFIG_SCHEMA, COMMAND_HELP, VALID_TRAJECTORY_SCOPES };

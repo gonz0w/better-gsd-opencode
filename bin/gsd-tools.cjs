@@ -1460,7 +1460,8 @@ Subcommands:
 Research infrastructure commands.
 
 Subcommands:
-  capabilities    Report available research tools, tier, and recommendations`,
+  capabilities    Report available research tools, tier, and recommendations
+  yt-search       Search YouTube via yt-dlp with filtering and quality scoring`,
       "research capabilities": `Usage: gsd-tools research capabilities
 
 Report available research tools, current degradation tier, and recommendations.
@@ -1476,7 +1477,49 @@ Report available research tools, current degradation tier, and recommendations.
 Detects: yt-dlp (YouTube), notebooklm-py (RAG synthesis), Brave Search MCP, Context7 MCP, Exa MCP.
 Shows: 4-tier degradation level, per-tool status, install hints for missing tools.
 
-Output: { rag_enabled, current_tier, tiers, cli_tools, mcp_servers, recommendations }`
+Output: { rag_enabled, current_tier, tiers, cli_tools, mcp_servers, recommendations }`,
+      "research yt-search": `Usage: gsd-tools research yt-search "topic" [options]
+
+Search YouTube via yt-dlp and return structured, filtered, quality-scored results.
+
+Arguments:
+  topic              Search query (required)
+
+Options:
+  --count N          Pre-filter result count (default: 10)
+  --max-age DAYS     Maximum video age in days (default: 730 = ~2 years)
+  --min-duration SEC Minimum duration in seconds (default: 300 = 5 min)
+  --max-duration SEC Maximum duration in seconds (default: 3600 = 60 min)
+  --min-views N      Minimum view count (default: 0)
+
+Output: { query, pre_filter_count, post_filter_count, results: [{ id, title, channel, duration, view_count, upload_date, url, description, quality_score }] }
+
+Quality score (0-100): Recency (40pts) + Views (30pts log-scale) + Duration (30pts bell curve at 15-20min).
+
+Examples:
+  gsd-tools research yt-search "nodejs streams tutorial"
+  gsd-tools research:yt-search "react hooks" --count 5 --min-views 1000`,
+      "research:yt-search": `Usage: gsd-tools research:yt-search "topic" [options]
+
+Search YouTube via yt-dlp and return structured, filtered, quality-scored results.
+
+Arguments:
+  topic              Search query (required)
+
+Options:
+  --count N          Pre-filter result count (default: 10)
+  --max-age DAYS     Maximum video age in days (default: 730 = ~2 years)
+  --min-duration SEC Minimum duration in seconds (default: 300 = 5 min)
+  --max-duration SEC Maximum duration in seconds (default: 3600 = 60 min)
+  --min-views N      Minimum view count (default: 0)
+
+Output: { query, pre_filter_count, post_filter_count, results: [{ id, title, channel, duration, view_count, upload_date, url, description, quality_score }] }
+
+Quality score (0-100): Recency (40pts) + Views (30pts log-scale) + Duration (30pts bell curve at 15-20min).
+
+Examples:
+  gsd-tools research:yt-search "nodejs streams tutorial"
+  gsd-tools research:yt-search "react hooks" --count 5 --min-views 1000`
     };
     module2.exports = { MODEL_PROFILES, CONFIG_SCHEMA, COMMAND_HELP, VALID_TRAJECTORY_SCOPES };
   }
@@ -19631,10 +19674,11 @@ var require_research = __commonJS({
     "use strict";
     var fs = require("fs");
     var path = require("path");
+    var { execFileSync } = require("child_process");
     var { checkBinary } = require_env();
     var { loadConfig } = require_config();
     var { output: output2, debugLog } = require_output();
-    var { banner, sectionHeader, formatTable, color, SYMBOLS } = require_format();
+    var { banner, sectionHeader, formatTable, color, SYMBOLS, truncate } = require_format();
     var TIER_DEFINITIONS = [
       { number: 1, name: "Full RAG", description: "All tools available \u2014 YouTube + MCP + NotebookLM synthesis" },
       { number: 2, name: "Sources without synthesis", description: "YouTube + MCP sources, LLM synthesizes" },
@@ -19890,7 +19934,186 @@ var require_research = __commonJS({
       };
       output2(result, { formatter: formatCapabilities, raw });
     }
-    module2.exports = { detectCliTools, detectMcpServers, calculateTier, cmdResearchCapabilities };
+    function parseFlag(args, flag, defaultValue) {
+      const idx = args.indexOf(flag);
+      if (idx === -1 || idx + 1 >= args.length) return defaultValue;
+      return args[idx + 1];
+    }
+    function formatDuration(sec) {
+      if (sec == null) return "\u2014";
+      const m = Math.floor(sec / 60);
+      const s = sec % 60;
+      return `${m}:${String(s).padStart(2, "0")}`;
+    }
+    function formatViews(views) {
+      if (views == null) return "\u2014";
+      if (views >= 1e6) return (views / 1e6).toFixed(1) + "M";
+      if (views >= 1e3) return (views / 1e3).toFixed(1) + "K";
+      return String(views);
+    }
+    function computeQualityScore(result, maxAgeDays) {
+      const now = Date.now();
+      let recency = 20;
+      if (result.upload_date) {
+        const uploadTime = new Date(result.upload_date).getTime();
+        if (!isNaN(uploadTime)) {
+          const ageDays = (now - uploadTime) / (1e3 * 60 * 60 * 24);
+          recency = Math.max(0, 40 * (1 - ageDays / maxAgeDays));
+        }
+      }
+      let viewScore = 10;
+      if (result.view_count != null) {
+        viewScore = Math.min(30, Math.log10(result.view_count + 1) * 6);
+      }
+      let durationScore = 15;
+      if (result.duration != null) {
+        const dur = result.duration;
+        const idealMin = 900;
+        const idealMax = 1200;
+        if (dur >= idealMin && dur <= idealMax) {
+          durationScore = 30;
+        } else if (dur < idealMin) {
+          const minBound = 300;
+          durationScore = dur <= minBound ? 10 : 10 + 20 * ((dur - minBound) / (idealMin - minBound));
+        } else {
+          const maxBound = 3600;
+          durationScore = dur >= maxBound ? 10 : 30 - 20 * ((dur - idealMax) / (maxBound - idealMax));
+        }
+      }
+      const total = recency + viewScore + durationScore;
+      return Math.min(100, Math.max(0, Math.round(total)));
+    }
+    function formatYtSearch(data) {
+      const lines = [];
+      lines.push(banner("YouTube Search"));
+      lines.push("");
+      if (data.error) {
+        lines.push(color.red(`Error: ${data.error}`));
+        if (data.install_hint) {
+          lines.push(color.yellow(`Install: ${data.install_hint}`));
+        }
+        if (data.details) {
+          lines.push(color.dim(data.details));
+        }
+        return lines.join("\n");
+      }
+      lines.push(color.bold("Query: ") + data.query);
+      lines.push(color.dim(`Results: ${data.post_filter_count} of ${data.pre_filter_count} (after filtering)`));
+      lines.push("");
+      if (data.results.length === 0) {
+        lines.push(color.yellow("No results match the current filters."));
+        return lines.join("\n");
+      }
+      const rows = data.results.map((r) => {
+        const scoreColor = r.quality_score >= 60 ? color.green : r.quality_score >= 30 ? color.yellow : color.red;
+        return [
+          scoreColor(String(r.quality_score)),
+          truncate(r.title || "", 50),
+          truncate(r.channel || "", 20),
+          formatDuration(r.duration),
+          formatViews(r.view_count),
+          r.upload_date ? r.upload_date.slice(0, 10) : "\u2014"
+        ];
+      });
+      lines.push(formatTable(["Score", "Title", "Channel", "Duration", "Views", "Date"], rows));
+      return lines.join("\n");
+    }
+    function cmdResearchYtSearch(cwd, args, raw) {
+      const cliTools = detectCliTools(cwd);
+      if (!cliTools["yt-dlp"].available) {
+        const result2 = { error: "yt-dlp not installed", install_hint: "pip install yt-dlp", available: false };
+        output2(result2, { formatter: formatYtSearch, raw });
+        return;
+      }
+      const count = parseInt(parseFlag(args, "--count", "10"), 10);
+      const maxAgeDays = parseInt(parseFlag(args, "--max-age", "730"), 10);
+      const minDuration = parseInt(parseFlag(args, "--min-duration", "300"), 10);
+      const maxDuration = parseInt(parseFlag(args, "--max-duration", "3600"), 10);
+      const minViews = parseInt(parseFlag(args, "--min-views", "0"), 10);
+      const positional = args.filter((a) => !a.startsWith("--"));
+      const flagValues = /* @__PURE__ */ new Set();
+      for (let i = 0; i < args.length; i++) {
+        if (args[i].startsWith("--") && i + 1 < args.length && !args[i + 1].startsWith("--")) {
+          flagValues.add(args[i + 1]);
+        }
+      }
+      const query = positional.filter((a) => !flagValues.has(a)).join(" ").trim();
+      if (!query) {
+        const result2 = { error: "Missing search query", usage: 'research:yt-search "topic" [--count N] [--max-age DAYS] [--min-duration SEC] [--max-duration SEC] [--min-views N]' };
+        output2(result2, { formatter: formatYtSearch, raw });
+        return;
+      }
+      let rawResults;
+      try {
+        const ytdlpPath = cliTools["yt-dlp"].path || "yt-dlp";
+        const stdout = execFileSync(ytdlpPath, [
+          `ytsearch${count}:${query}`,
+          "--dump-json",
+          "--flat-playlist",
+          "--no-download",
+          "--no-warnings"
+        ], { encoding: "utf-8", timeout: 3e4, stdio: "pipe" });
+        rawResults = stdout.trim().split("\n").filter(Boolean).map((line) => {
+          try {
+            return JSON.parse(line);
+          } catch {
+            return null;
+          }
+        }).filter(Boolean);
+      } catch (err) {
+        const result2 = { error: "yt-dlp search failed", details: err.message };
+        output2(result2, { formatter: formatYtSearch, raw });
+        return;
+      }
+      const extracted = rawResults.map((r) => {
+        const id = r.id || null;
+        let uploadDate = null;
+        if (r.upload_date && /^\d{8}$/.test(r.upload_date)) {
+          uploadDate = `${r.upload_date.slice(0, 4)}-${r.upload_date.slice(4, 6)}-${r.upload_date.slice(6, 8)}`;
+        }
+        return {
+          id,
+          title: r.title || null,
+          channel: r.uploader || r.channel || null,
+          duration: r.duration != null ? r.duration : null,
+          view_count: r.view_count != null ? r.view_count : null,
+          upload_date: uploadDate,
+          url: id ? `https://www.youtube.com/watch?v=${id}` : null,
+          description: r.description ? r.description.slice(0, 200) : null
+        };
+      });
+      const preFilterCount = extracted.length;
+      const now = Date.now();
+      const filtered = extracted.filter((r) => {
+        if (r.upload_date) {
+          const uploadTime = new Date(r.upload_date).getTime();
+          if (!isNaN(uploadTime)) {
+            const ageDays = (now - uploadTime) / (1e3 * 60 * 60 * 24);
+            if (ageDays > maxAgeDays) return false;
+          }
+        }
+        if (r.duration != null) {
+          if (r.duration < minDuration || r.duration > maxDuration) return false;
+        }
+        if (r.view_count != null) {
+          if (r.view_count < minViews) return false;
+        }
+        return true;
+      });
+      const scored = filtered.map((r) => ({
+        ...r,
+        quality_score: computeQualityScore(r, maxAgeDays)
+      }));
+      scored.sort((a, b) => b.quality_score - a.quality_score);
+      const result = {
+        query,
+        pre_filter_count: preFilterCount,
+        post_filter_count: scored.length,
+        results: scored
+      };
+      output2(result, { formatter: formatYtSearch, raw });
+    }
+    module2.exports = { detectCliTools, detectMcpServers, calculateTier, cmdResearchCapabilities, cmdResearchYtSearch };
   }
 });
 
@@ -27147,7 +27370,7 @@ var require_router = __commonJS({
         });
       }
       if (!command) {
-        error("Usage: gsd-tools <namespace:command> [args] [--pretty] [--verbose]\nCommands: init:<workflow>, plan:<intent|requirements|roadmap|phases|find-phase|milestone|phase>, execute:<commit|rollback-info|session-diff|session-summary|velocity|worktree|tdd|test-run>, verify:<state|verify|assertions|search-decisions|search-lessons|review|context-budget|token-budget>, util:<config-get|config-set|env|current-timestamp|list-todos|todo|memory|mcp|classify|frontmatter|progress|websearch|history-digest|trace-requirement|codebase|cache|agent>, research:<capabilities>");
+        error("Usage: gsd-tools <namespace:command> [args] [--pretty] [--verbose]\nCommands: init:<workflow>, plan:<intent|requirements|roadmap|phases|find-phase|milestone|phase>, execute:<commit|rollback-info|session-diff|session-summary|velocity|worktree|tdd|test-run>, verify:<state|verify|assertions|search-decisions|search-lessons|review|context-budget|token-budget>, util:<config-get|config-set|env|current-timestamp|list-todos|todo|memory|mcp|classify|frontmatter|progress|websearch|history-digest|trace-requirement|codebase|cache|agent>, research:<capabilities|yt-search>");
       }
       if (args.includes("--help") || args.includes("-h")) {
         const subForHelp = args[1] && !args[1].startsWith("-") ? args[1] : "";
@@ -27709,8 +27932,10 @@ Available: execute-phase, plan-phase, new-project, new-milestone, quick, resume,
           case "research": {
             if (subCmd === "capabilities") {
               lazyResearch().cmdResearchCapabilities(cwd, restArgs, raw);
+            } else if (subCmd === "yt-search") {
+              lazyResearch().cmdResearchYtSearch(cwd, restArgs, raw);
             } else {
-              error("Unknown research subcommand. Available: capabilities");
+              error("Unknown research subcommand. Available: capabilities, yt-search");
             }
             break;
           }
@@ -28521,8 +28746,10 @@ Available: execute-phase, plan-phase, new-project, new-milestone, quick, resume,
           const resSub = args[1];
           if (resSub === "capabilities") {
             lazyResearch().cmdResearchCapabilities(cwd, args.slice(2), raw);
+          } else if (resSub === "yt-search") {
+            lazyResearch().cmdResearchYtSearch(cwd, args.slice(2), raw);
           } else {
-            error("Unknown research subcommand. Available: capabilities");
+            error("Unknown research subcommand. Available: capabilities, yt-search");
           }
           break;
         }
