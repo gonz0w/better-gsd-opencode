@@ -1,5 +1,39 @@
 # Milestones
 
+## ✅ v8.2 Cleanup, Performance & Validation (Shipped: 2026-03-07)
+
+**Delivered:** Dead code removal, namespace-only routing, init performance optimization, and RACI-validated agent architecture with handoff contracts
+
+**Phases completed:** 6 phases (61-66), 14 plans
+**Commits:** 67 | **Files changed:** 148 | **Lines:** +18,370 / -9,080
+**Timeline:** 5 days (2026-03-03 → 2026-03-07)
+**Bundle:** 1,163KB (down from 1,216KB)
+
+**Key accomplishments:**
+- Built audit infrastructure (knip, madge, esbuild metafile) and manifest-based deploy sync with automatic stale file removal
+- Removed ~80 dead internal exports from 24 files + 12 dead files (1 JS, 11 .md), cleaned 4 orphaned CONFIG_SCHEMA keys
+- Migrated all CLI routing to namespace:command syntax, removing ~890-line backward-compat block (router.js 1642→928 lines, bundle -35KB)
+- Achieved 24-40% init speedup with 97% I/O reduction via lazy acorn loading (230KB deferred) and cached git info
+- Created RACI matrix (23 lifecycle steps, 12 handoff contracts) validating clean separation across all 9 agents — zero merge candidates
+- All 22 requirements delivered, 0 new test failures introduced
+
+**What's next:** Ready for next milestone — `/bgsd-new-milestone`
+
+**Archives:**
+- `.planning/milestones/v8.2-ROADMAP.md`
+- `.planning/milestones/v8.2-REQUIREMENTS.md`
+
+---
+
+## ✅ v8.1 RAG-Powered Research Pipeline (Shipped: 2026-03-03)
+
+**Phases completed:** 5 phases, 10 plans, 0 tasks
+
+**Key accomplishments:**
+- (none recorded)
+
+---
+
 ## ✅ v7.1 Trajectory Engineering (Shipped: 2026-03-02)
 
 **Delivered:** Structured exploration system with checkpoint, pivot, compare, and choose commands for managing multiple approaches, plus a decision journal and dead-end detection for agent context
@@ -226,15 +260,6 @@
 **Archives:**
 - `.planning/milestones/v1.0-ROADMAP.md`
 - `.planning/milestones/v1.0-REQUIREMENTS.md`
-
----
-
-## v8.1 RAG-Powered Research Pipeline (Shipped: 2026-03-03)
-
-**Phases completed:** 5 phases, 10 plans, 0 tasks
-
-**Key accomplishments:**
-- (none recorded)
 
 ---
 

@@ -2,23 +2,34 @@
 
 ## What This Is
 
-A single-file Node.js CLI built from 34 organized `src/` modules via esbuild, producing `bin/gsd-tools.cjs`. It provides structured data operations for AI-driven project planning workflows running in the host editor. Ten versions shipped: v1.0 (test suite, module split, observability), v1.1 (context reduction — 46.7% CLI, 54.6% workflow, 67% reference compression), v2.0 (state validation, cross-session memory, quality scoring), v3.0 (intent engineering — INTENT.md, drift validation, workflow injection), v4.0 (environment awareness, MCP profiling, worktree parallelism), v5.0 (codebase intelligence — convention extraction, dependency graphs, lifecycle awareness), v6.0 (UX overhaul — shared formatting engine, TTY-aware smart output, branded CLI), v7.0 (agent orchestration — AST intelligence, task routing, context efficiency, TDD execution, review gates), v7.1 (trajectory engineering — checkpoint, pivot, compare, choose, decision journal, dead-end detection), v8.0 (performance & agent architecture — SQLite caching, agent consolidation 11→9, namespace routing, profiler instrumentation, token budgets, RACI matrix), and v8.1 (RAG-powered research — YouTube integration, NotebookLM synthesis, multi-source orchestration, 4-tier degradation, session persistence).
+A single-file Node.js CLI built from 34 organized `src/` modules via esbuild, producing `bin/gsd-tools.cjs`. It provides structured data operations for AI-driven project planning workflows running in the host editor. Twelve versions shipped: v1.0 (test suite, module split, observability), v1.1 (context reduction — 46.7% CLI, 54.6% workflow, 67% reference compression), v2.0 (state validation, cross-session memory, quality scoring), v3.0 (intent engineering — INTENT.md, drift validation, workflow injection), v4.0 (environment awareness, MCP profiling, worktree parallelism), v5.0 (codebase intelligence — convention extraction, dependency graphs, lifecycle awareness), v6.0 (UX overhaul — shared formatting engine, TTY-aware smart output, branded CLI), v7.0 (agent orchestration — AST intelligence, task routing, context efficiency, TDD execution, review gates), v7.1 (trajectory engineering — checkpoint, pivot, compare, choose, decision journal, dead-end detection), v8.0 (performance & agent architecture — SQLite caching, agent consolidation 11→9, namespace routing, profiler instrumentation, token budgets, RACI matrix), v8.1 (RAG-powered research — YouTube integration, NotebookLM synthesis, multi-source orchestration, 4-tier degradation, session persistence), and v8.2 (cleanup & validation — dead code removal, namespace-only routing, 24-40% init speedup, RACI handoff contracts).
 
 ## Core Value
 
 Manage and deliver high-quality software with high-quality documentation, while continuously reducing token usage and improving performance.
 
-## Current Milestone: v8.2 Cleanup, Performance & Validation
+## Current State
 
-**Goal:** Harden the entire workflow — eliminate dead code/files/config, tune performance hot paths, restructure commands, and sharpen agent boundaries for world-class developer orchestration.
+**Last shipped:** v8.2 Cleanup, Performance & Validation (2026-03-07)
 
-**Target features:**
-- Full dead code/file/config audit with removal of orphaned artifacts across src/, workflows, templates, references, and config entries
-- Performance tuning of init times, bundle size, file loads, and profiler-identified hot paths
-- Command structure cleanup — remove stale slash commands (join-discord, internal-only), consolidate overlapping commands into subcommand groups
-- Agent architecture refinement — sharpen or merge agents based on audit, refine context boundaries, improve handoff contracts between agents
+**What shipped in v8.2:**
+- Dead code audit and removal (~80 exports, 12 files, router.js 1642→928 lines)
+- Namespace-only CLI routing (890-line backward-compat block removed, bundle -53KB)
+- Init command optimization (24-40% faster, 97% I/O reduction, lazy acorn loading)
+- RACI matrix with 23 lifecycle steps, 12 handoff contracts, zero agent overlap
+- All 22 requirements delivered, 0 new test failures
 
-**Last shipped:** v8.1 RAG-Powered Research Pipeline (2026-03-03)
+**Next Milestone Goals:** TBD — run `/bgsd-new-milestone` to define
+
+<details>
+<summary>Previous: v8.1 RAG-Powered Research Pipeline (shipped 2026-03-03)</summary>
+
+- YouTube integration via yt-dlp with search, transcript extraction, quality scoring
+- NotebookLM RAG synthesis via notebooklm-py with auth health checking
+- Multi-source research pipeline with 4-tier graceful degradation
+- SQLite caching for research results with session persistence and resume
+
+</details>
 
 <details>
 <summary>Previous: v8.0 Performance & Agent Architecture (shipped 2026-03-03)</summary>
@@ -29,7 +40,6 @@ Manage and deliver high-quality software with high-quality documentation, while 
 - Token budgets (60-80K) declared in all 9 agent manifests, context builder enforces limits
 - Namespace routing for CLI commands (`init:`, `plan:`, `execute:`, `verify:`, `util:` prefixes)
 - Profiler instrumentation on hot paths (`GSD_PROFILE=1`), compare command with regression highlighting
-- Auto changelog generation in milestone wrapup workflow
 
 </details>
 
@@ -37,61 +47,17 @@ Manage and deliver high-quality software with high-quality documentation, while 
 <summary>Previous: v7.1 Trajectory Engineering (shipped 2026-03-02)</summary>
 
 - Decision journal foundation with trajectories sacred memory store, crypto-generated IDs, cross-session persistence
-- Selective git rewind preserving `.planning/` state via protected-path denylist
-- Checkpoint system with named snapshots, auto-collected metrics (tests, LOC delta, complexity), branch-based tracking
-- Pivot engine with structured reason capture, auto-checkpoint of abandoned work, stuck-detector integration
-- Multi-attempt comparison with side-by-side metrics matrix, color-coded TTY output, JSON fallback
-- Choose & cleanup lifecycle — merge winner via `--no-ff`, archive alternatives as tags, branch cleanup
-- Agent context integration — dead-end detection, `previous_attempts` in init execute-phase, scope validation
-- Commit attribution via git trailers, anti-pattern detection, stuck/loop recovery
+- Checkpoint system with named snapshots, auto-collected metrics, branch-based tracking
+- Pivot engine with structured reason capture, auto-checkpoint, selective rewind
+- Multi-attempt comparison with side-by-side metrics matrix
+- Choose & cleanup lifecycle — merge winner via `--no-ff`, archive alternatives as tags
 
 </details>
 
 <details>
-<summary>Previous: v7.0 Agent Orchestration & Efficiency (shipped 2026-02-27)</summary>
+<summary>Previous: v1.0-v7.0 (shipped 2026-02-22 through 2026-02-27)</summary>
 
-- Contract test safety net with snapshot-based consumer tests for all init/state JSON output
-- Enhanced git.js with structured log, diff, blame, branch info, pre-commit safety checks
-- AST intelligence via acorn parser — function signatures, export analysis, complexity metrics, ~1k token repo map
-- Orchestration intelligence — task complexity scoring (1-5), automatic agent/model routing, execution mode selection
-- Context efficiency — agent manifests (40-60% token reduction), compact serialization, task-scoped file injection
-- gsd-reviewer agent with two-stage review (spec compliance + code quality), severity classification (BLOCKER/WARNING/INFO)
-- TDD execution engine — RED→GREEN→REFACTOR state machine with orchestrator gates, auto test-after-edit
-
-</details>
-
-<details>
-<summary>Previous: v6.0 UX & Developer Experience (shipped 2026-02-27)</summary>
-
-- Shared formatting engine (`src/lib/format.js`) with formatTable, progressBar, banner, box, and ~2KB picocolors-pattern color utility
-- Smart output detection — human-readable branded output in TTY mode, JSON when piped — with `--raw` and `--pretty` overrides
-- All user-facing commands migrated to shared formatting (init, state, verify, codebase, velocity, intent)
-- Workflow output tightened across 27 files (455-line reduction), ui-brand.md updated with bGSD patterns
-- 11 slash command wrappers created in `commands/` directory with deploy.sh safe sync
-- AGENTS.md rewritten as lean 59-line project index
-
-</details>
-
-<details>
-<summary>Previous: v5.0 Codebase Intelligence (shipped 2026-02-26)</summary>
-
-- Codebase-intel.json storage with git-hash watermarks, staleness detection, incremental analysis
-- Convention extraction (naming patterns, file organization, framework macros) with confidence scoring
-- Module dependency graph across 6 languages with Tarjan's SCC cycle detection
-- Lifecycle awareness for execution order with extensible detector registry
-- Task-scoped context injection with heuristic relevance scoring and 5K token budget
-- Non-blocking background re-analysis with lock file and --refresh flag
-
-</details>
-
-<details>
-<summary>Previous: v4.0 Environment & Execution Intelligence (shipped 2026-02-25)</summary>
-
-- Environment detection engine with 26 manifest patterns, package manager detection, binary version checks
-- MCP server profiling with 20-server known database, 16-type relevance scoring, auto-disable with backup/restore
-- Structured requirements with ASSERTIONS.md template, per-assertion verification, traceability chains
-- Git worktree parallelism with full lifecycle, conflict pre-check, lockfile auto-resolution
-- Session management with session-summary CLI and complete-and-clear workflow
+See `.planning/MILESTONES.md` for full history of v1.0 through v7.0.
 
 </details>
 
@@ -167,12 +133,7 @@ Manage and deliver high-quality software with high-quality documentation, while 
 
 ### Active
 
-- [ ] Full dead code audit — orphaned functions, exports, modules in src/
-- [ ] Stale file audit — unused workflows, templates, references, config entries
-- [ ] Performance tuning — init times, bundle size, file load optimization
-- [ ] Command restructuring — remove stale commands, consolidate into subcommand groups
-- [ ] Agent architecture audit — overlap detection, manifest refinement, context boundary sharpening
-- [ ] Agent handoff contracts — structured context passing between agents
+No active requirements — next milestone not yet defined. Run `/bgsd-new-milestone` to start.
 
 ### Out of Scope
 
@@ -190,14 +151,14 @@ Manage and deliver high-quality software with high-quality documentation, while 
 
 ## Context
 
-Shipped v1.0 through v8.0. 762 tests passing, 34 src/ modules, ~1133KB bundle, esbuild bundler.
+Shipped v1.0 through v8.2. 762 tests passing, 34 src/ modules, ~1163KB bundle, esbuild bundler.
 Platform: OC (host editor).
 Tech stack: Node.js >= 22.5 (required for `node:sqlite` caching), node:test, esbuild, tokenx (bundled), acorn (bundled).
 Source: 34 modules — `src/lib/` (18 modules) and `src/commands/` (14 modules) + router + index.
 Deploy pipeline: `npm run build` → esbuild bundle → `deploy.sh` with smoke test and rollback.
 9 specialized AI agents, 41 slash commands, 45 workflows.
 
-Known tech debt: Bundle at ~1133KB (over 1050KB budget). `node:sqlite` is Stability 1.2 (Release Candidate).
+Known tech debt: Bundle at ~1163KB (over 1050KB budget). `node:sqlite` is Stability 1.2 (Release Candidate). 31 pre-existing test failures (config-migrate, compact, codebase-impact, codebase ast CLI handler).
 
 ## Constraints
 
@@ -248,4 +209,4 @@ Known tech debt: Bundle at ~1133KB (over 1050KB budget). `node:sqlite` is Stabil
 | Namespace routing (colon syntax) | Semantic grouping for 100+ CLI commands | Good — discoverable, backward-compatible |
 
 ---
-*Last updated: 2026-03-06 after v8.2 milestone start*
+*Last updated: 2026-03-07 after v8.2 milestone completion*
