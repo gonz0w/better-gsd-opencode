@@ -9,12 +9,12 @@ See: .planning/PROJECT.md (updated 2026-03-03)
 
 ## Current Position
 
-Phase: 62 of 66 (Audit & Discovery)
-Plan: 2 of 2 in current phase
-Status: Ready to execute
-Last activity: 2026-03-07 — Completed 62-01 (Dead Code & Circular Dep Audit)
+Phase: 63 of 66 (Dead Code Removal)
+Plan: 1 of N in current phase
+Status: Ready to plan/execute
+Last activity: 2026-03-07 — Completed 62-02 (Command Reference Map & Audit Summary)
 
-Progress: [████____________________________________] 10% (v8.2)
+Progress: [████████________________________________] 20% (v8.2)
 
 ## Performance Metrics
 
@@ -51,6 +51,7 @@ Progress: [████____________________________________] 10% (v8.2)
 | Phase 61 P01 | 23 min | 2 tasks | 3 files |
 | Phase 61 P02 | 9 min | 2 tasks | 7 files |
 | Phase 62 P01 | 3 min | 2 tasks | 4 files |
+| Phase 62 P02 | 3 min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -92,6 +93,9 @@ All v1.0-v8.0 decisions recorded in PROJECT.md Key Decisions table with outcomes
 - [Phase 61]: performance.json un-gitignored — git history preserves baseline snapshots per CONTEXT.md decision
 - [Phase Phase 62]: Router-consumed check takes priority over cross-module — most knip false positives are router dispatch
 - [Phase Phase 62]: Internal helper classification separates exports used within-file from truly dead code
+- [Phase 62]: 281 commands tracked (namespaced + legacy) — high orphan count from duplicate forms, not missing functionality
+- [Phase 62]: 4 exports reclassified from truly_dead/internal to documented_helper via markdown reference scan
+- [Phase 62]: Phase 63 removal scope is conservative: 0 exports, 1 file — most knip findings are router dispatch false positives
 
 ### Pending Todos
 
@@ -105,5 +109,5 @@ None — milestone starting fresh.
 ## Session Continuity
 
 Last session: 2026-03-07
-Stopped at: Completed 62-01-PLAN.md
-Next step: Execute 62-02-PLAN.md (Command Reference Map)
+Stopped at: Completed 62-02-PLAN.md
+Next step: Plan/execute Phase 63 (Dead Code Removal)

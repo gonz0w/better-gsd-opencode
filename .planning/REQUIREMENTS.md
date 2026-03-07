@@ -12,7 +12,7 @@ Requirements for the cleanup, performance & validation milestone. Each maps to r
 - [x] **AUDIT-01**: Build system produces esbuild metafile with per-module byte attribution on every build
 - [x] **AUDIT-02**: Dead code detection identifies all unused exports, files, and dependencies across src/ modules
 - [x] **AUDIT-03**: Circular dependency check confirms zero cycles across the module graph
-- [ ] **AUDIT-04**: Command reference map cross-references all CLI commands against their markdown consumers (agents, workflows, commands, templates)
+- [x] **AUDIT-04**: Command reference map cross-references all CLI commands against their markdown consumers (agents, workflows, commands, templates)
 - [x] **AUDIT-05**: Performance baselines captured for init command timing, bundle size, and file I/O counts
 - [x] **AUDIT-06**: Deploy script uses manifest-based sync to remove stale files from deploy target
 
@@ -79,7 +79,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | AUDIT-06 | Phase 61 | Complete | ./deploy.sh |
 | AUDIT-02 | Phase 62 | Complete | npm test |
 | AUDIT-03 | Phase 62 | Complete | npm test |
-| AUDIT-04 | Phase 62 | Pending | npm test |
+| AUDIT-04 | Phase 62 | Complete | npm test |
 | DEAD-01 | Phase 63 | Pending | npm test |
 | DEAD-02 | Phase 63 | Pending | npm test |
 | DEAD-03 | Phase 63 | Pending | npm test |
