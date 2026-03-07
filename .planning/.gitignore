@@ -1,3 +1,4 @@
 env-manifest.json
 .cache/
 baselines/*.json
+!baselines/performance.json
