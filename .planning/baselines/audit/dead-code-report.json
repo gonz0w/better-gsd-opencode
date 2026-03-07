@@ -1,8 +1,7 @@
 {
-  "generated_at": "2026-03-07T02:39:21.782Z",
+  "generated_at": "2026-03-07T02:40:51.565Z",
   "knip_total_unused": 263,
   "unused_files": [
-    "audit-exports.js",
     "src/lib/review/stage-review.js"
   ],
   "classification": {
@@ -1334,6 +1333,6 @@
     "cross_module_count": 0,
     "truly_dead_count": 1,
     "internal_helper_count": 108,
-    "unused_files_count": 2
+    "unused_files_count": 1
   }
 }
