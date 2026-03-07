@@ -10,9 +10,9 @@ See: .planning/PROJECT.md (updated 2026-03-03)
 ## Current Position
 
 Phase: 66 of 66 (Agent Architecture Refinement)
-Plan: 1 of 3 in current phase ✓
+Plan: 2 of 3 in current phase ✓
 Status: In progress
-Last activity: 2026-03-07 — Completed 66-01 (RACI Matrix & Handoff Contracts)
+Last activity: 2026-03-07 — Completed 66-02 (Manifest Audit & Merge Evaluation)
 
 Progress: [█████████_______________________________] 23% (v8.2)
 
@@ -60,6 +60,7 @@ Progress: [█████████_______________________________] 23% (v8.2
 | Phase 65-01 P01 | 27 min | 2 tasks | 2 files |
 | Phase 65 P02 | 12 min | 2 tasks | 3 files |
 | Phase 66 P01 | 4 min | 2 tasks | 10 files |
+| Phase 66 P02 | 7 min | 2 tasks | 9 files |
 
 ## Accumulated Context
 
@@ -120,6 +121,9 @@ All v1.0-v8.0 decisions recorded in PROJECT.md Key Decisions table with outcomes
 - [Phase 65-02]: Replace autoTriggerCodebaseIntel with readCodebaseIntel in init fast paths — stale-but-fast acceptable per CONTEXT.md
 - [Phase 65-02]: Cache getGitInfo per invocation and combine rev-parse calls — eliminates 3 redundant git subprocess spawns
 - [Phase 66]: 23 lifecycle steps at sub-stage granularity for RACI matrix; dual-source contract design with agent frontmatter + central RACI.md
+- [Phase 66]: All 9 agent tool grants verified as actually used — zero removals after conservative static analysis
+- [Phase 66]: Reviewer agent kept as references/reviewer-agent.md — review protocol loaded by executor, not a standalone agent
+- [Phase 66]: Zero agent pairs have >50% RACI overlap — current 9-agent architecture has clean separation of concerns
 
 ### Pending Todos
 
@@ -134,5 +138,5 @@ None — milestone starting fresh.
 ## Session Continuity
 
 Last session: 2026-03-07
-Stopped at: Completed 66-01-PLAN.md
-Next step: Continue with 66-02-PLAN.md (Manifest audit & merge evaluation)
+Stopped at: Completed 66-02-PLAN.md
+Next step: Continue with 66-03-PLAN.md (Contract validation tooling)

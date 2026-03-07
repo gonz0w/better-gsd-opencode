@@ -33,9 +33,9 @@ Requirements for the cleanup, performance & validation milestone. Each maps to r
 ### Agent Architecture
 
 - [x] **AGENT-01**: RACI matrix re-validated with zero overlap warnings across all 9 agents
-- [ ] **AGENT-02**: Agent manifests tightened — unused context fields removed, token budgets verified against actual usage
+- [x] **AGENT-02**: Agent manifests tightened — unused context fields removed, token budgets verified against actual usage
 - [x] **AGENT-03**: Structured handoff contracts documented for each agent-to-agent transition
-- [ ] **AGENT-04**: Agent merge evaluation completed — any agents with overlapping responsibilities merged or restructured
+- [x] **AGENT-04**: Agent merge evaluation completed — any agents with overlapping responsibilities merged or restructured
 
 ### Performance
 
@@ -93,9 +93,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 | PERF-03 | Phase 65 | Complete | npm test |
 | PERF-04 | Phase 65 | Complete | npm test |
 | AGENT-01 | Phase 66 | Complete | npm test |
-| AGENT-02 | Phase 66 | Pending | npm test |
+| AGENT-02 | Phase 66 | Complete | npm test |
 | AGENT-03 | Phase 66 | Complete | npm test |
-| AGENT-04 | Phase 66 | Pending | npm test |
+| AGENT-04 | Phase 66 | Complete | npm test |
 
 **Coverage:**
 - v8.2 requirements: 22 total
