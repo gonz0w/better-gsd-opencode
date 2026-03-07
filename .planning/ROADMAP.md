@@ -173,7 +173,7 @@ Full details: `.planning/milestones/v8.1-ROADMAP.md`
   Plans:
   - [ ] 62-01-PLAN.md — Dead code audit with router cross-reference & circular dependency check
   - [ ] 62-02-PLAN.md — Command reference map & final audit summary with markdown cross-reference
-- [ ] **Phase 63: Dead Code Removal** - Remove confirmed dead exports, unused files, stale constants and config (3 plans)
+- [x] **Phase 63: Dead Code Removal** - Remove confirmed dead exports, unused files, stale constants and config (3 plans) (completed 2026-03-07)
   Plans:
   - [x] 63-01-PLAN.md — Dead file removal + internal helper export cleanup (95 exports across 24 files)
   - [x] 63-02-PLAN.md — Constants audit + config cleanup (COMMAND_HELP, CONFIG_SCHEMA)
@@ -219,7 +219,7 @@ Plans:
   3. constants.js has been audited and unused regex patterns, constants, and mappings are removed
   4. Stale config.json keys and agent manifest fields are cleaned up
   5. All 762+ tests still pass after removals
-**Plans**: 3 plans (2 complete, 1 gap closure)
+**Plans**: 3/3 plans complete
 Plans:
 - [x] 63-01-PLAN.md — Dead file removal + internal helper export cleanup
 - [x] 63-02-PLAN.md — Constants audit + config cleanup
@@ -278,7 +278,7 @@ Plans:
 | 56-60 | v8.1 | 10/10 | Complete | 2026-03-03 |
 | 61. Tooling & Safety Net | 2/2 | Complete    | 2026-03-07 | - |
 | 62. Audit & Discovery | 2/2 | Complete    | 2026-03-07 | - |
-| 63. Dead Code Removal | 2/2 | Complete    | 2026-03-07 | - |
+| 63. Dead Code Removal | 3/3 | Complete   | 2026-03-07 | - |
 | 64. Command & Workflow Cleanup | v8.2 | 0/0 | Not started | - |
 | 65. Performance Tuning | v8.2 | 0/0 | Not started | - |
 | 66. Agent Architecture Refinement | v8.2 | 0/0 | Not started | - |
