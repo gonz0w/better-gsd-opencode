@@ -12,8 +12,10 @@ commands/*.md              # Slash command wrappers (deployed to host editor)
 workflows/*.md             # Workflow definitions (invoked by commands)
 templates/*.md             # Document templates (PLAN.md, STATE.md, etc.)
 references/*.md            # Reference docs loaded by agents
-deploy.sh                  # Deploy changes to host editor config
-build.js                   # Build script — bundles src/ into bin/gsd-tools.cjs
+plugin.js                  # OpenCode plugin (session, env, compaction hooks)
+install.js                 # npx installer (mirrors deploy.sh for end users)
+deploy.sh                  # Deploy changes to host editor config (dev workflow)
+build.cjs                  # Build script — bundles src/ into bin/gsd-tools.cjs
 ```
 
 ## Key Commands

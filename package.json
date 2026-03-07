@@ -1,31 +1,58 @@
 {
-  "name": "gsd-tools",
+  "name": "get-shit-done-oc",
   "version": "1.0.0",
-  "description": "CLI utility for GSD workflow operations",
+  "description": "AI project planning and execution plugin for OpenCode — structured milestones, 40 slash commands, 9 specialized agents",
+  "type": "module",
   "bin": {
-    "gsd-tools": "./bin/gsd-tools.cjs"
+    "get-shit-done-oc": "./install.js"
   },
   "engines": {
     "node": ">=18"
   },
   "scripts": {
     "test": "node --test bin/gsd-tools.test.cjs",
-    "build": "node build.js",
+    "build": "node build.cjs",
     "audit:dead-code": "npx knip --include exports,files --workspace .",
-    "audit:exports": "node audit-exports.js",
+    "audit:exports": "node audit-exports.cjs",
     "audit:circular": "npx madge --circular src/",
-    "audit:commands": "node audit-commands.js",
+    "audit:commands": "node audit-commands.cjs",
     "audit:all": "npm run audit:exports && npm run audit:circular && npm run audit:commands",
-    "baseline": "node baseline.js"
+    "baseline": "node baseline.cjs"
   },
+  "files": [
+    "bin/gsd-tools.cjs",
+    "bin/manifest.json",
+    "commands/",
+    "agents/",
+    "workflows/",
+    "templates/",
+    "references/",
+    "plugin.js",
+    "install.js",
+    "VERSION",
+    "README.md",
+    "LICENSE"
+  ],
+  "keywords": [
+    "opencode",
+    "opencode-plugin",
+    "ai",
+    "planning",
+    "project-management",
+    "cli",
+    "developer-tools"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/gonz0w/bgsd-oc.git"
+  },
+  "homepage": "https://github.com/gonz0w/bgsd-oc#readme",
+  "license": "MIT",
   "devDependencies": {
+    "acorn": "^8.16.0",
     "esbuild": "^0.27.3",
     "knip": "^5.85.0",
-    "madge": "^8.0.0"
-  },
-  "private": true,
-  "dependencies": {
-    "acorn": "^8.16.0",
+    "madge": "^8.0.0",
     "tokenx": "^1.3.0"
   }
 }

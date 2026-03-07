@@ -4,10 +4,8 @@ A structured project planning and execution system for [OpenCode](https://github
 
 **762 tests** | **Zero runtime dependencies** | **40 slash commands** | **100+ CLI operations** | **9 specialized AI agents** | **11 milestones shipped**
 
+> **Note:** bGSD creates a `~/.config/oc` symlink pointing to `~/.config/opencode` to work around a path mangling issue in the Anthropic auth module. This is created automatically during installation.
 
-**NOTE** create symlink in your home directory ~/.opencode ~/.oc 
-   When using this plugin to develop itself, the anthropic nodejs module has a blanket replace of oppencode with Claude, and boy does that mess things up. the fix for now is the symlink.  
-  I assume the anthrpoic nodejs module does this to fake out the LLM, but it took a while to figure that one out.  careful using this plugin to develop itself (inception style)
 ---
 
 ## The Problem
@@ -37,9 +35,13 @@ Every step produces structured documents in `.planning/` that agents read for co
 
 ## Quick Start
 
+### Install via npm
+
 ```bash
-clone this repo, run deploy.sh (we are in dev mode, no npx plugin yet)
+npx get-shit-done-oc
 ```
+
+This installs all bGSD commands, agents, workflows, and the plugin into your OpenCode config directory (`~/.config/opencode/`).
 
 Then in OpenCode:
 
@@ -48,6 +50,18 @@ Then in OpenCode:
 ```
 
 That's it. bGSD walks you through everything: what you want to build, how to break it down, and then executes it phase by phase.
+
+### Uninstall
+
+```bash
+npx get-shit-done-oc --uninstall
+```
+
+### Update
+
+```bash
+npx get-shit-done-oc@latest
+```
 
 See the **[Getting Started Guide](docs/getting-started.md)** for the full walkthrough, or the **[Expert Guide](docs/expert-guide.md)** if you want full control.
 
@@ -567,6 +581,8 @@ See the **[Full Configuration Reference](docs/configuration.md)** for all option
 
 ## Development
 
+> **For end users:** Use `npx get-shit-done-oc` to install. The instructions below are for contributors working on bGSD itself.
+
 ```bash
 # Clone
 git clone https://github.com/gonz0w/bgsd-oc.git
@@ -582,7 +598,7 @@ npm test
 # Test a specific command
 node bin/gsd-tools.cjs state validate --raw
 
-# Deploy to live OpenCode config
+# Deploy to live OpenCode config (dev workflow)
 ./deploy.sh
 ```
 
