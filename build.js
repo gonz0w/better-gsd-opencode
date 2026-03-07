@@ -216,8 +216,6 @@ async function build() {
   collectFiles('templates', (name) => name.endsWith('.md'));
   // references/ — all .md files
   collectFiles('references', (name) => name.endsWith('.md'));
-  // src/ — all files
-  collectFiles('src', () => true);
   // commands/ — bgsd-*.md files
   collectFiles('commands', (name) => name.startsWith('bgsd-') && name.endsWith('.md'));
   // agents/ — gsd-*.md files

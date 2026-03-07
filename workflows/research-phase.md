@@ -22,6 +22,7 @@ PHASE_INFO=$(node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs plan:roadm
 ```
 
 If `found` is false: Error and exit.
+If `found` is true: Extract `phase_number`, `phase_name`, `goal` from JSON.
 
 ## Step 2: Check Existing Research
 
@@ -29,14 +30,22 @@ If `found` is false: Error and exit.
 ls .planning/phases/${PHASE}-*/RESEARCH.md 2>/dev/null
 ```
 
-If exists: Offer update/view/skip options.
+If exists: Offer: 1) Update research, 2) View existing, 3) Skip. Wait for response.
+If doesn't exist: Continue.
 
 ## Step 3: Gather Phase Context
 
 ```bash
 INIT=$(node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs init:phase-op "${PHASE}")
-# Extract: phase_dir, padded_phase, phase_number, state_path, requirements_path, context_path
+# Extract: phase_dir, padded_phase, phase_number, commit_docs, state_path, requirements_path, context_path, research_path
 ```
+
+Use paths from INIT (do not inline file contents in orchestrator context):
+- `requirements_path`
+- `context_path`
+- `state_path`
+
+Present summary with phase description and what files the researcher will load.
 
 ## Step 3.5: Collect Research Sources
 
@@ -68,21 +77,41 @@ AGENT_CONTEXT=$(echo "$COLLECT_OUTPUT" | jq -r '.agent_context // ""')
 
 ## Step 4: Spawn Researcher
 
+Research modes: ecosystem (default), feasibility, implementation, comparison.
+
 ```
 Task(
-  prompt="<objective>
-Research implementation approach for Phase {phase}: {name}
+  prompt="<research_type>
+Phase Research — investigating HOW to implement a specific phase well.
+</research_type>
+
+<key_insight>
+The question is NOT 'which library should I use?'
+
+The question is: 'What do I not know that I don't know?'
+
+For this phase, discover:
+- What's the established architecture pattern?
+- What libraries form the standard stack?
+- What problems do people commonly hit?
+- What's SOTA vs what the agent's training thinks is SOTA?
+- What should NOT be hand-rolled?
+</key_insight>
+
+<objective>
+Research implementation approach for Phase {phase_number}: {phase_name}
+Mode: ecosystem
 </objective>
 
 <files_to_read>
-- {context_path} (USER DECISIONS from /bgsd-discuss-phase)
-- {requirements_path} (Project requirements)
-- {state_path} (Project decisions and history)
+- {requirements_path} (Requirements)
+- {context_path} (Phase context from discuss-phase, if exists)
+- {state_path} (Prior project decisions and blockers)
 - .planning/INTENT.md (Project intent — objective, desired outcomes, target users. Skip if absent.)
 </files_to_read>
 
 <additional_context>
-Phase description: {description}
+**Phase description:** {phase_description}
 If INTENT.md exists: scope research to align with stated project objective and desired outcomes. Prioritize findings relevant to P1 outcomes.
 
 {If TIER < 4 AND AGENT_CONTEXT is non-empty:}
@@ -92,18 +121,77 @@ The following sources were collected automatically from web search and YouTube. 
 {End if — omit this entire block when TIER == 4 or AGENT_CONTEXT is empty}
 </additional_context>
 
+<downstream_consumer>
+Your RESEARCH.md will be loaded by `/bgsd-plan-phase` which uses specific sections:
+- `## Standard Stack` → Plans use these libraries
+- `## Architecture Patterns` → Task structure follows these
+- `## Don't Hand-Roll` → Tasks NEVER build custom solutions for listed problems
+- `## Common Pitfalls` → Verification steps check for these
+- `## Code Examples` → Task actions reference these patterns
+
+Be prescriptive, not exploratory. 'Use X' not 'Consider X or Y.'
+</downstream_consumer>
+
+<quality_gate>
+Before declaring complete, verify:
+- [ ] All domains investigated (not just some)
+- [ ] Negative claims verified with official docs
+- [ ] Multiple sources for critical claims
+- [ ] Confidence levels assigned honestly
+- [ ] Section names match what plan-phase expects
+</quality_gate>
+
 <output>
 Write to: .planning/phases/${PHASE}-{slug}/${PHASE}-RESEARCH.md
 </output>",
   subagent_type="gsd-phase-researcher",
-  model="{researcher_model}"
+  model="{researcher_model}",
+  description="Research Phase {phase}"
 )
 ```
 
-## Step 5: Handle Return
+## Step 5: Handle Agent Return
 
-- `## RESEARCH COMPLETE` — Display summary, offer: Plan/Dig deeper/Review/Done
-- `## CHECKPOINT REACHED` — Present to user, spawn continuation
-- `## RESEARCH INCONCLUSIVE` — Show attempts, offer: Add context/Try different mode/Manual
+**`## RESEARCH COMPLETE`:** Display summary, offer: Plan phase, Dig deeper, Review full, Done.
+
+**`## CHECKPOINT REACHED`:** Present to user, get response, spawn continuation.
+
+**`## RESEARCH INCONCLUSIVE`:** Show what was attempted, offer: Add context, Try different mode, Manual.
+
+## Step 6: Spawn Continuation Agent
+
+```markdown
+<objective>
+Continue research for Phase {phase_number}: {phase_name}
+</objective>
+
+<prior_state>
+<files_to_read>
+- .planning/phases/${PHASE}-{slug}/${PHASE}-RESEARCH.md (Existing research)
+</files_to_read>
+</prior_state>
+
+<checkpoint_response>
+**Type:** {checkpoint_type}
+**Response:** {user_response}
+</checkpoint_response>
+```
+
+```
+Task(
+  prompt="First, read __OPENCODE_CONFIG__/agents/bgsd-phase-researcher.md for your role and instructions.\n\n" + continuation_prompt,
+  subagent_type="general",
+  model="{researcher_model}",
+  description="Continue research Phase {phase}"
+)
+```
 
 </process>
+
+<success_criteria>
+- [ ] Phase validated against roadmap
+- [ ] Existing research checked
+- [ ] gsd-phase-researcher spawned with context
+- [ ] Checkpoints handled correctly
+- [ ] User knows next steps
+</success_criteria>

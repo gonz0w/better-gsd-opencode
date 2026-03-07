@@ -1,6 +1,5 @@
 ---
 description: Create detailed phase plan (PLAN.md) with verification loop
-agent: gsd-planner
 ---
 <objective>
 Create executable phase prompts (PLAN.md files) for a roadmap phase with integrated research and verification.

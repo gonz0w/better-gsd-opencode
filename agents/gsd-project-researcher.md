@@ -9,7 +9,7 @@ tools:
   bash: true
   grep: true
   glob: true
-  websearch: true
+  webfetch: true
   webfetch: true
   mcp__context7__*: true
 ---

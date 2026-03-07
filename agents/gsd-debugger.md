@@ -10,7 +10,7 @@ tools:
   bash: true
   grep: true
   glob: true
-  websearch: true
+  webfetch: true
 ---
 
 **PATH SETUP:** Before running any gsd-tools commands, first resolve:
