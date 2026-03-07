@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-03-03)
 
 **Core value:** Manage and deliver high-quality software with high-quality documentation, while continuously reducing token usage and improving performance
-**Current focus:** v8.1 — RAG-Powered Research Pipeline
+**Current focus:** v8.2 — Cleanup, Performance & Validation
 
 ## Current Position
 
-Phase: 60 of 60 (testing-caching-polish)
-Plan: 1 of 1
-Status: Plan 60-01 complete — research_cache table, API, and cache:research commands delivered
-Last activity: 2026-03-03 — Completed 60-01-PLAN.md (research cache integration)
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-03-06 — Milestone v8.2 started
 
-Progress: [########################################] 100% (v8.1)
+Progress: [________________________________________] 0% (v8.2)
 
 ## Performance Metrics
 
@@ -88,14 +88,11 @@ None — milestone starting fresh.
 
 ### Blockers/Concerns
 
-- NotebookLM unofficial API (notebooklm-py) uses cookie auth that expires every few weeks — Google can break it anytime
-- yt-dlp in perpetual arms race with YouTube — nsig/SABR breakage requires frequent updates
-- Full RAG pipeline latency 3-8 min vs 10-30 sec LLM-only — progressive output and --quick flag mitigate
-- Bundle at ~1216KB — 4KB added in Phase 60 P02 (session persistence), monitor against 1500KB budget
+- Bundle at ~1216KB — target measurable reduction via dead code removal
 - Two pre-existing config-migrate test failures (from Phase 56 RAG key additions) need cleanup
 
 ## Session Continuity
 
-Last session: 2026-03-03
-Stopped at: Completed 60-02-PLAN.md (research session persistence)
-Next step: Phase 60 complete — all plans done. v8.1 milestone ready for wrapup/completion.
+Last session: 2026-03-06
+Stopped at: Milestone v8.2 initialized, defining requirements
+Next step: Complete requirements scoping, then create roadmap

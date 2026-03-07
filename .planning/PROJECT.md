@@ -8,18 +8,17 @@ A single-file Node.js CLI built from 34 organized `src/` modules via esbuild, pr
 
 Manage and deliver high-quality software with high-quality documentation, while continuously reducing token usage and improving performance.
 
-## Current Milestone: (No active milestone)
+## Current Milestone: v8.2 Cleanup, Performance & Validation
+
+**Goal:** Harden the entire workflow — eliminate dead code/files/config, tune performance hot paths, restructure commands, and sharpen agent boundaries for world-class developer orchestration.
+
+**Target features:**
+- Full dead code/file/config audit with removal of orphaned artifacts across src/, workflows, templates, references, and config entries
+- Performance tuning of init times, bundle size, file loads, and profiler-identified hot paths
+- Command structure cleanup — remove stale slash commands (join-discord, internal-only), consolidate overlapping commands into subcommand groups
+- Agent architecture refinement — sharpen or merge agents based on audit, refine context boundaries, improve handoff contracts between agents
 
 **Last shipped:** v8.1 RAG-Powered Research Pipeline (2026-03-03)
-
-**Shipped in v8.1:**
-- YouTube integration via yt-dlp: `research:yt-search` (metadata, filtering) and `research:yt-transcript` (VTT parsing)
-- NotebookLM integration via notebooklm-py: notebook management, RAG-grounded Q&A, research report generation
-- Research orchestration pipeline with 4-tier degradation (Full RAG → Sources only → Brave/Context7 → Pure LLM)
-- MCP server discovery for Brave Search, Context7, Exa with capability detection
-- SQLite research cache extending v8.0 cache layer
-- Session persistence with `--resume` flag and stage checkpointing
-- Research workflow integration in gsd-project-researcher and gsd-phase-researcher agents
 
 <details>
 <summary>Previous: v8.0 Performance & Agent Architecture (shipped 2026-03-03)</summary>
@@ -168,12 +167,12 @@ Manage and deliver high-quality software with high-quality documentation, while 
 
 ### Active
 
-- [ ] YouTube metadata search and transcript extraction via yt-dlp
-- [ ] NotebookLM API integration for RAG-based research synthesis
-- [ ] Research orchestration layer (multi-source → NotebookLM → synthesis)
-- [ ] Graceful fallback when RAG tools are unconfigured
-- [ ] MCP server discovery for research tool recommendations
-- [ ] Research workflow integration with existing agents
+- [ ] Full dead code audit — orphaned functions, exports, modules in src/
+- [ ] Stale file audit — unused workflows, templates, references, config entries
+- [ ] Performance tuning — init times, bundle size, file load optimization
+- [ ] Command restructuring — remove stale commands, consolidate into subcommand groups
+- [ ] Agent architecture audit — overlap detection, manifest refinement, context boundary sharpening
+- [ ] Agent handoff contracts — structured context passing between agents
 
 ### Out of Scope
 
@@ -249,4 +248,4 @@ Known tech debt: Bundle at ~1133KB (over 1050KB budget). `node:sqlite` is Stabil
 | Namespace routing (colon syntax) | Semantic grouping for 100+ CLI commands | Good — discoverable, backward-compatible |
 
 ---
-*Last updated: 2026-03-03 after v8.1 milestone start*
+*Last updated: 2026-03-06 after v8.2 milestone start*
