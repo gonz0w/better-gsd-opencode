@@ -1,6 +1,6 @@
 # Testing Patterns
 
-**Analysis Date:** 2026-02-26
+**Analysis Date:** 2026-03-07
 
 ## Test Framework
 
@@ -14,9 +14,8 @@
 
 **Run Commands:**
 ```bash
-npm test                              # Run all tests (577 tests)
-node --test bin/gsd-tools.test.cjs    # Run main test suite directly
-node --test bin/format.test.cjs       # Run format module tests separately
+npm test                              # Run all 771 tests
+node --test bin/gsd-tools.test.cjs    # Run main test suite directly (18,125 lines)
 ```
 
 ## Test File Organization
@@ -24,28 +23,32 @@ node --test bin/format.test.cjs       # Run format module tests separately
 **Location:**
 - Co-located in `bin/` alongside the built artifact
 - Tests run against the **built bundle** (`bin/gsd-tools.cjs`), not source files
-- Exception: `bin/format.test.cjs` imports directly from `src/lib/format` (unit tests)
+- Exception: Some tests directly `require('../src/commands/agent')` for unit-level testing of internal functions
 
 **Naming:**
-- `bin/gsd-tools.test.cjs` — main test suite (13,736 lines, 577 tests, 80 describe blocks)
-- `bin/format.test.cjs` — format module unit tests (365 lines, 45 tests)
+- `bin/gsd-tools.test.cjs` — single monolithic test file (18,125 lines, 771 tests, 120 describe blocks)
 
 **Structure:**
 ```
 bin/
 ├── gsd-tools.cjs          # Built CLI bundle (tested artifact)
-├── gsd-tools.test.cjs     # Main test suite (integration + unit)
-└── format.test.cjs         # Format module unit tests
+├── gsd-tools.test.cjs     # Monolithic test suite (integration + unit + contract)
+└── manifest.json           # Build manifest
+test/
+└── __snapshots__/
+    ├── init-phase-op.json  # Snapshot fixture for init:phase-op output
+    └── state-read.json     # Snapshot fixture for verify:state output
 ```
 
 ## Test Architecture
 
-**Integration-first approach:** The primary test suite (`gsd-tools.test.cjs`) tests the CLI as a subprocess. Each test:
-1. Creates a temp directory with `.planning/` structure
-2. Runs `node bin/gsd-tools.cjs <command>` via `execSync`
-3. Parses JSON stdout
-4. Asserts on the JSON output structure and values
-5. Cleans up temp directory
+**Integration-first approach:** The primary test suite tests the CLI as a subprocess. Each test:
+1. Creates a temp directory with `.planning/phases/` structure
+2. Writes fixture files (ROADMAP.md, STATE.md, config.json, PLAN.md, SUMMARY.md)
+3. Runs `node bin/gsd-tools.cjs <namespace:command> [args]` via `execSync`
+4. Parses JSON stdout
+5. Asserts on the JSON output structure and values
+6. Cleans up temp directory in `afterEach`
 
 **No mocking.** Tests use real filesystem operations — no mocks, stubs, or test doubles. The test helper `runGsdTools()` spawns an actual child process.
 
@@ -74,7 +77,7 @@ describe('command-name command', () => {
     fs.writeFileSync(path.join(tmpDir, '.planning', 'ROADMAP.md'), `# Roadmap...`);
 
     // Execute
-    const result = runGsdTools('roadmap get-phase 1', tmpDir);
+    const result = runGsdTools('plan:roadmap get-phase 1', tmpDir);
 
     // Assert success
     assert.ok(result.success, `Command failed: ${result.error}`);
@@ -86,7 +89,7 @@ describe('command-name command', () => {
   });
 
   test('missing input returns graceful error', () => {
-    const result = runGsdTools('roadmap get-phase 99', tmpDir);
+    const result = runGsdTools('plan:roadmap get-phase 99', tmpDir);
     assert.ok(result.success, `Command should succeed: ${result.error}`);
     const output = JSON.parse(result.output);
     assert.strictEqual(output.found, false, 'should return not found');
@@ -142,33 +145,117 @@ function cleanup(tmpDir) {
 }
 ```
 
+## Snapshot Testing
+
+**Custom snapshot comparison** (not node:test snapshots — custom implementation at line 14397):
+
+**`snapshotCompare(actual, fixturePath)`:**
+- Compares actual JSON output against stored fixture in `test/__snapshots__/*.json`
+- Bootstrap mode: if `GSD_UPDATE_SNAPSHOTS=1` env var is set or fixture doesn't exist, writes the fixture
+- Deep comparison: recursively compares objects/arrays/primitives
+- Reports diffs with key paths: `"phase_dir: expected '.planning/phases/01-foundation', got '...'"`
+- Returns `{ pass, message }` — not an assertion, caller asserts
+
+**Usage:**
+```javascript
+test('init phase-op output matches snapshot', () => {
+  const result = runGsdTools('init:phase-op 1 --verbose', tmpDir);
+  const actual = JSON.parse(result.output);
+
+  const fixturePath = path.join(__dirname, '..', 'test', '__snapshots__', 'init-phase-op.json');
+  const snap = snapshotCompare(actual, fixturePath);
+  assert.ok(snap.pass, snap.message);
+});
+```
+
+**Update snapshots:**
+```bash
+GSD_UPDATE_SNAPSHOTS=1 npm test
+```
+
+**Snapshot files:**
+- `test/__snapshots__/init-phase-op.json` — full output of `init:phase-op` command
+- `test/__snapshots__/state-read.json` — full output of `verify:state` command
+
+## Contract Testing
+
+**Custom contract check** (line 14472) — validates required fields exist with correct types:
+
+**`contractCheck(actual, requiredFields, contextName)`:**
+- Verifies each required field exists with correct type
+- **Additive-safe**: new fields in actual are ALLOWED (don't break contract)
+- Missing or wrong-type fields FAIL
+- Supports dot-notation keys for nested access
+- Returns `{ pass, message }` with detailed violation report
+
+**Usage:**
+```javascript
+test('init plan-phase has required fields', () => {
+  const result = runGsdTools('init:plan-phase 1 --verbose', tmpDir);
+  const actual = JSON.parse(result.output);
+
+  const contract = contractCheck(actual, [
+    { key: 'phase_found', type: 'boolean' },
+    { key: 'phase_dir', type: 'string' },
+    { key: 'phase_number', type: 'string' },
+    { key: 'plan_count', type: 'number' },
+    { key: 'research_enabled', type: 'boolean' },
+  ], 'init-plan-phase');
+  assert.ok(contract.pass, contract.message);
+});
+```
+
+**Contract test blocks (7 total):**
+- `'contract: init phase-op (full snapshot)'`
+- `'contract: state read (full snapshot)'`
+- `'contract: init plan-phase fields'`
+- `'contract: init new-project fields'`
+- `'contract: init execute-phase fields'`
+- `'contract: state read fields'`
+- `'contract: init progress fields'`
+
 ## Test Categories
 
-**80 describe blocks organized into categories:**
+**120 describe blocks organized into categories:**
 
-**Command Tests (unit-level, 60+ blocks):**
+**Command Tests (90+ blocks):**
 - One `describe` per CLI command/subcommand
-- Named `'{command} command'` or `'{command} {subcommand}'`
+- Named `'{namespace:command} command'` or `'{feature-name}'`
 - Examples: `'history-digest command'`, `'phase next-decimal command'`, `'state validate'`
+- Cover: `history-digest`, `phases list`, `roadmap get-phase`, `phase next-decimal`, `phase-plan-index`, `state-snapshot`, `summary-extract`, `init commands`, `roadmap analyze`, `phase add/insert/remove/complete`, `milestone complete`, `validate consistency`, `progress`, `todo complete`, `scaffold`, `state update/patch/add-decision/add-blocker/resolve-blocker/record-session/advance-plan/record-metric`, `frontmatter round-trip/edge-cases`, `debug logging`, `shell sanitization`, `temp file cleanup`, `--help flag`, `config-migrate`, `codebase-impact`, `--fields flag`, `token estimation`, `extractAtReferences`, `context-budget`, `extract-sections`, `state validate/pre-flight`, `memory commands/compact/trajectories`, `verify analyze-plan/deliverables/requirements/regression/plan-wave/plan-deps/plan-structure/quality`, `mcp-profile`, `assertions`, `worktree`, `session-summary`, `codebase intelligence/conventions/deps/context/lifecycle`, `git log/diff-summary/blame/branch-info/rewind/trajectory-branch`, `pre-commit checks`, `commit --agent`, `codebase ast/exports/complexity/repo-map`, `orchestration`, `agent audit/validate-contracts`, `trajectory checkpoint/list/pivot/compare/choose/dead-ends`, `review`, `tdd`, `profiler`
 
-**Integration Tests (5 blocks):**
+**Integration Tests (5+ blocks):**
 - Named `'integration: {description}'`
 - Test multi-command workflows and round-trip operations:
-  - `'integration: workflow sequences'` — multi-step verify workflows
-  - `'integration: state round-trip'` — patch → get → verify persistence
-  - `'integration: config migration'` — old → new config format
-  - `'integration: e2e simulation'` — full plan lifecycle
-  - `'integration: snapshot tests'` — output format stability
+  - `'integration: workflow sequences'` — init → state → roadmap → verify
+  - `'integration: state round-trip'` — patch → get → verify persistence → add-decision → get-back
+  - Memory write → read → list sequence
+  - Verify requirements with mixed coverage
+
+**Contract/Snapshot Tests (7 blocks):**
+- Named `'contract: {command} (full snapshot)'` or `'contract: {command} fields'`
+- Ensure CLI output format stability for agent consumers
+- Use `snapshotCompare()` for full output validation
+- Use `contractCheck()` for field-level type validation
 
 **Cross-cutting Tests:**
-- `'--help flag'` — help text output for all commands
+- `'--help flag'` — help text output for commands
 - `'--fields flag'` — JSON field filtering
-- `'compact default behavior'` — compact mode across all init commands
-- `'build system'` — bundle size within budget
-- `'build pipeline'` — build + test pipeline
-- `'debug logging'` — GSD_DEBUG env var behavior
-- `'shell sanitization'` — input escaping
+- `'build system'` — build succeeds, shebang correct, bundle size within budget, timing <500ms
+- `'file cache'` — cache-enabled commands produce valid output
+- `'debug logging'` — `GSD_DEBUG=1` behavior (stderr output, stdout JSON untouched)
+- `'shell sanitization'` — input escaping prevents injection
 - `'temp file cleanup'` — large payload tmpfile lifecycle
+- `'profiler'` — `GSD_PROFILE=1` baseline generation and comparison
+
+## Environment Variables in Tests
+
+| Variable | Purpose | Usage |
+|----------|---------|-------|
+| `GSD_DEBUG=1` | Enable debug logging | Tested in `debug logging` block |
+| `GSD_UPDATE_SNAPSHOTS=1` | Update snapshot fixtures | Bootstrap/regenerate snapshots |
+| `GSD_PROFILE=1` | Enable profiler | Tested in `profiler` block |
+| `GSD_CACHE_FORCE_MAP=1` | Force Map-based cache (skip SQLite) | Via `--no-cache` flag |
 
 ## Mocking
 
@@ -177,17 +264,12 @@ function cleanup(tmpDir) {
 **Approach:** All tests use real filesystem I/O in isolated temp directories. No mocking of:
 - `fs` module
 - `child_process` (except `runGsdTools` spawns real subprocess)
-- `process.exit` 
+- `process.exit`
 - Git operations
-
-**What to Mock:** Nothing — the test architecture avoids mocking by:
-1. Creating temp directories per test
-2. Running the CLI as a subprocess (complete isolation)
-3. Asserting on JSON output (black-box testing)
 
 **What NOT to Mock:**
 - Filesystem operations (use real temp dirs instead)
-- Git commands (tested as integration where needed)
+- Git commands (tested as integration where needed — some tests do `git init && git commit`)
 - External processes (subprocess execution is the test mechanism)
 
 ## Fixtures and Factories
@@ -212,30 +294,20 @@ key-decisions:
 ```
 
 **Fixture patterns for common file types:**
-- STATE.md: Field key-value pairs (`**Current Phase:** 03`)
-- ROADMAP.md: Phase headers with goals (`### Phase 1: Foundation\n**Goal:** Set up project`)
-- PLAN.md: YAML frontmatter + `## Task` headers
-- SUMMARY.md: YAML frontmatter with provides/decisions/patterns arrays
-- config.json: Direct `JSON.stringify()` of config objects
+- **STATE.md:** Field key-value pairs with `**Field:** value` pattern
+- **ROADMAP.md:** Phase headers with goals: `### Phase 1: Foundation\n**Goal:** Set up project`
+- **PLAN.md:** YAML frontmatter (`wave`, `plan`, `phase`, `type`, `autonomous`, `depends_on`, `requirements`, `files_modified`, `must_haves`) + `<task>` XML blocks
+- **SUMMARY.md:** YAML frontmatter with `provides`, `key-decisions`, `patterns-established`, `tech-stack` arrays
+- **config.json:** Direct `JSON.stringify()` of config objects
+- **REQUIREMENTS.md:** Markdown checklist: `- [ ] **REQ-01**: Description`
+- **INTENT.md:** XML-tagged sections (`<objective>`, `<users>`, `<outcomes>`, `<criteria>`)
 
 **Specialized helpers for complex setups:**
-```javascript
-// In lifecycle tests section:
-function createLifecycleProject(files) {
-  const tmpDir = createTempProject();
-  // Create .planning/codebase directory for intel
-  fs.mkdirSync(path.join(tmpDir, '.planning', 'codebase'), { recursive: true });
-  for (const [relativePath, content] of Object.entries(files)) {
-    const fullPath = path.join(tmpDir, relativePath);
-    fs.mkdirSync(path.dirname(fullPath), { recursive: true });
-    fs.writeFileSync(fullPath, content);
-  }
-  return tmpDir;
-}
-```
+- Some describe blocks define their own helpers (e.g., `writeTrajectoryEntries()` for trajectory tests)
+- Git-dependent tests do inline `execSync('git init && git config ... && git add . && git commit ...')`
 
 **Location:**
-- No separate fixtures directory
+- No separate fixtures directory (except `test/__snapshots__/` for snapshot fixtures)
 - All test data is inline within test functions
 - Helper functions defined at the top of the test file or within describe blocks
 
@@ -245,63 +317,76 @@ function createLifecycleProject(files) {
 
 **View Coverage:** Not available — `node:test` has `--experimental-test-coverage` but it's not configured.
 
-**Implicit coverage tracking via `test-coverage` command:**
+**Implicit coverage tracking:**
 ```bash
-node bin/gsd-tools.cjs test-coverage
+node bin/gsd-tools.cjs verify:test-coverage
 ```
 This introspects the test file for `runGsdTools('command ...')` calls and compares against router commands to report command-level coverage (not line-level).
 
 ## Test Types
 
-**Unit Tests:**
-- `bin/format.test.cjs` — direct function imports, tests individual format primitives
-- Some tests within `gsd-tools.test.cjs` test pure functions (frontmatter round-trip, slug generation, shell sanitization)
-- Pattern: import function directly, call with args, assert on return value
+**Unit Tests (via direct require):**
+- Some tests within `gsd-tools.test.cjs` directly require source modules:
+  ```javascript
+  const agentModule = require('../src/commands/agent');
+  const result = agentModule.parseRaciMatrix(path.join(refsDir, 'RACI.md'));
+  ```
+- Pure function tests: frontmatter round-trip, slug generation, shell sanitization, extractAtReferences
 
-**Integration Tests (CLI subprocess):**
-- The vast majority of tests (570+) in `gsd-tools.test.cjs`
-- Spawn `node bin/gsd-tools.cjs` as subprocess with temp directory as cwd
+**Integration Tests (CLI subprocess — the vast majority):**
+- 750+ tests spawn `node bin/gsd-tools.cjs` as subprocess with temp directory as cwd
 - Assert on JSON stdout, check stderr for errors
 - Test real filesystem, real file parsing, real frontmatter extraction
 
+**Contract Tests:**
+- Snapshot comparison for full output shape stability
+- Field-level type checking for additive-safe API contracts
+- Ensure agents consuming CLI output don't break when new fields are added
+
+**Build Validation Tests:**
+```javascript
+describe('build system', () => {
+  test('npm run build succeeds with exit code 0', () => { ... });
+  test('build produces bin/gsd-tools.cjs from src/', () => { ... });
+  test('built file has working shebang on line 1', () => { ... });
+  test('built current-timestamp outputs valid ISO format', () => { ... });
+  test('built state load works in temp project', () => { ... });
+  test('build completes in under 500ms', () => { ... });
+});
+```
+
 **E2E Simulation:**
-- `'integration: e2e simulation'` block tests full plan lifecycle:
-  - Create project structure → run init → check state → advance plan → verify
-- `'integration: workflow sequences'` tests multi-step verify workflows
+- `'integration: workflow sequences'` tests full lifecycle:
+  - init:progress → verify:state → plan:roadmap analyze → verify:state patch → verify:state get → memory write → memory read → memory list → verify:verify requirements
 
 ## Common Patterns
 
 **Success Testing:**
 ```javascript
 test('command returns expected output', () => {
-  // Setup files
   fs.writeFileSync(path.join(tmpDir, '.planning', 'ROADMAP.md'), content);
-
-  const result = runGsdTools('roadmap analyze', tmpDir);
+  const result = runGsdTools('plan:roadmap analyze', tmpDir);
   assert.ok(result.success, `Command failed: ${result.error}`);
-
   const output = JSON.parse(result.output);
-  assert.strictEqual(output.total_phases, 3, 'should have 3 phases');
+  assert.strictEqual(output.phase_count, 3, 'should have 3 phases');
   assert.ok(Array.isArray(output.phases), 'phases should be array');
 });
 ```
 
-**Error Testing:**
+**Error Testing (recoverable — JSON error response):**
 ```javascript
-test('missing input returns graceful error', () => {
-  const result = runGsdTools('roadmap get-phase 99', tmpDir);
-  // Note: many "error" cases still return success=true with error in JSON
+test('missing phase returns not found', () => {
+  const result = runGsdTools('plan:roadmap get-phase 99', tmpDir);
   assert.ok(result.success, `Command should succeed: ${result.error}`);
   const output = JSON.parse(result.output);
   assert.strictEqual(output.found, false, 'should return not found');
-  assert.strictEqual(output.error, 'Phase not found', 'should report error');
 });
 ```
 
-**Fatal error testing (process.exit(1)):**
+**Error Testing (fatal — process.exit(1)):**
 ```javascript
 test('missing required arg exits with error', () => {
-  const result = runGsdTools('commit', tmpDir);  // No message
+  const result = runGsdTools('execute:commit', tmpDir);  // No message
   assert.strictEqual(result.success, false, 'should fail');
   assert.ok(result.error.includes('Error:'), 'should have error message on stderr');
 });
@@ -310,37 +395,42 @@ test('missing required arg exits with error', () => {
 **Backward Compatibility Testing:**
 ```javascript
 test('flat provides field still works (backward compatibility)', () => {
-  // Test old format still parses correctly
   fs.writeFileSync(path.join(phaseDir, '01-01-SUMMARY.md'), `---\nprovides:\n  - "Direct provides"\n---\n`);
-  const result = runGsdTools('history-digest', tmpDir);
+  const result = runGsdTools('util:history-digest', tmpDir);
   const digest = JSON.parse(result.output);
   assert.deepStrictEqual(digest.phases['01'].provides, ['Direct provides']);
 });
 ```
 
-**Size/Performance Testing:**
+**Malformed Input Graceful Handling:**
 ```javascript
-test('compact default reduces init output size by at least 38% vs --verbose', () => {
-  const commands = ['init progress', 'init execute-phase 03', /* ... */];
-  const reductions = [];
-  for (const cmd of commands) {
-    const full = runGsdTools(`${cmd} --verbose`, tmpDir);
-    const compact = runGsdTools(`${cmd}`, tmpDir);
-    // Calculate byte-size reduction...
-  }
-  const avgReduction = reductions.reduce((sum, r) => sum + r.reduction, 0) / reductions.length;
-  assert.ok(avgReduction >= 38, `Expected >=38%, got ${avgReduction.toFixed(1)}%`);
+test('malformed SUMMARY.md skipped gracefully', () => {
+  fs.writeFileSync(path.join(phaseDir, '01-02-SUMMARY.md'), `# Just a heading\nNo frontmatter here\n`);
+  fs.writeFileSync(path.join(phaseDir, '01-03-SUMMARY.md'), `---\nbroken: [unclosed\n---\n`);
+  const result = runGsdTools('util:history-digest', tmpDir);
+  assert.ok(result.success, `Command should succeed despite malformed files`);
 });
 ```
 
-**Build Validation Testing:**
+**Performance/Size Testing:**
 ```javascript
-describe('build system', () => {
-  test('bundle size within budget', () => {
-    const stat = fs.statSync('bin/gsd-tools.cjs');
-    const sizeKB = Math.round(stat.size / 1024);
-    assert.ok(sizeKB <= 1000, `Bundle ${sizeKB}KB exceeds 1000KB budget`);
-  });
+test('build completes in under 500ms', () => {
+  const result = execSync('npm run build', { cwd: path.join(__dirname, '..'), encoding: 'utf-8', timeout: 15000 });
+  const match = result.match(/in (\d+)ms/);
+  const elapsed = parseInt(match[1], 10);
+  assert.ok(elapsed < 500, `Build took ${elapsed}ms, should be under 500ms`);
+});
+```
+
+**Git-Dependent Testing:**
+```javascript
+test('trajectory checkpoint creates entry', () => {
+  fs.mkdirSync(path.join(tmpDir, '.planning', 'memory'), { recursive: true });
+  fs.writeFileSync(path.join(tmpDir, 'dummy.txt'), 'hello');
+  execSync('git init && git config user.email "test@test.com" && git config user.name "Test" && git add . && git commit -m "init"', { cwd: tmpDir, stdio: 'pipe' });
+
+  const result = runGsdTools('execute:trajectory checkpoint test-cp --scope task', tmpDir);
+  assert.ok(result.success, `Command failed: ${result.error}`);
 });
 ```
 
@@ -348,26 +438,50 @@ describe('build system', () => {
 
 **For a new command:**
 1. Add a new `describe` block in `bin/gsd-tools.test.cjs`
-2. Use the section divider comment pattern above the `describe`
+2. Use the section divider comment pattern above the `describe`:
+   ```javascript
+   // ─────────────────────────────────────────────────────────────────────────────
+   // new-command description
+   // ─────────────────────────────────────────────────────────────────────────────
+   ```
 3. Include `beforeEach`/`afterEach` with `createTempProject`/`cleanup`
-4. Test at minimum: happy path, missing input, edge case
-5. Use `runGsdTools('new-command args', tmpDir)` pattern
+4. Test at minimum: happy path, missing input, edge case, backward compatibility
+5. Use `runGsdTools('namespace:command args', tmpDir)` pattern
 6. Parse output as JSON, assert on structure
+7. Use namespaced command format (e.g., `'plan:phase add "New Phase"'`)
 
 **For a new lib function:**
-1. If it's a format primitive: add tests to `bin/format.test.cjs`
-2. If it's a parsing/utility function: either test via CLI in main test suite, or add direct import test
+1. If testable via CLI: add integration test using `runGsdTools`
+2. If internal-only: require directly from source and test unit-level:
+   ```javascript
+   const { myFunction } = require('../src/lib/mymodule');
+   ```
 3. Follow existing `describe`/`test` naming patterns
 
+**For a new contract:**
+1. Add a `describe('contract: command-name fields', ...)` block
+2. Use `contractCheck(actual, requiredFields, contextName)`
+3. Define required fields with `{ key, type }` objects
+4. Test that adding new fields doesn't break contract (additive safety)
+
 **Test naming convention:**
-- Describe: `'{command-name} command'` or `'{command} {subcommand}'`
+- Describe: `'{command-name} command'` or `'{feature-name}'` or `'contract: {command} fields'`
 - Test: descriptive lowercase sentence starting with action verb or condition:
   - `'extracts phase section from ROADMAP.md'`
   - `'returns not found for missing phase'`
   - `'handles decimal phase numbers'`
   - `'empty phases directory returns empty array'`
   - `'malformed SUMMARY.md skipped gracefully'`
+  - `'adding new field to plan-phase does not break contract'`
+
+## Known Testing Limitations
+
+- **Test runtime:** Full suite takes 2+ minutes due to subprocess spawning per test
+- **No parallel execution:** Tests run sequentially (each creates temp dirs)
+- **No line-level coverage:** Only command-level coverage tracking available
+- **Single file:** All 771 tests in one 18,125-line file (no file splitting)
+- **Build dependency:** Most tests require `npm run build` to have been run first (test against built bundle)
 
 ---
 
-*Testing analysis: 2026-02-26*
+*Testing analysis: 2026-03-07*
