@@ -186,7 +186,7 @@ Full details: `.planning/milestones/v8.1-ROADMAP.md`
   Plans:
   - [ ] 65-01-PLAN.md — Bundle size reduction via acorn lazy-loading & composition audit
   - [ ] 65-02-PLAN.md — Init hot path optimization & file I/O reduction
-- [ ] **Phase 66: Agent Architecture Refinement** - Re-validate RACI, tighten manifests, document handoff contracts, evaluate merges (3 plans)
+- [x] **Phase 66: Agent Architecture Refinement** - Re-validate RACI, tighten manifests, document handoff contracts, evaluate merges (3 plans) (completed 2026-03-07)
   Plans:
 - [x] 66-01-PLAN.md — RACI matrix creation & handoff contracts with agent frontmatter
   - [ ] 66-02-PLAN.md — Manifest audit & merge evaluation using RACI overlap analysis
@@ -273,7 +273,7 @@ Plans:
   2. Agent manifests tightened — unused context fields removed and token budgets verified against actual measured usage
   3. Structured handoff contracts documented for each agent-to-agent transition (what context passes, what format, what the receiving agent expects)
   4. Agent merge evaluation completed — any agents with >50% overlapping responsibilities merged or restructured
-**Plans**: 2/3 plans executed
+**Plans**: 3/3 plans complete
 
 Plans:
 - [ ] 66-01-PLAN.md — RACI matrix creation & handoff contracts with agent frontmatter
@@ -302,4 +302,4 @@ Plans:
 | 63. Dead Code Removal | 3/3 | Complete    | 2026-03-07 | - |
 | 64. Command & Workflow Cleanup | 2/2 | Complete   | 2026-03-07 | - |
 | 65. Performance Tuning | 2/2 | Complete   | 2026-03-07 | - |
-| 66. Agent Architecture Refinement | 2/3 | In Progress|  | - |
+| 66. Agent Architecture Refinement | 3/3 | Complete   | 2026-03-07 | - |
