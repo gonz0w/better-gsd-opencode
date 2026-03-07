@@ -16431,7 +16431,6 @@ var require_ast = __commonJS({
     "use strict";
     var fs = require("fs");
     var path = require("path");
-    var acorn = require_acorn();
     var { LANGUAGE_MAP } = require_codebase_intel();
     var { startTimer, endTimer } = require_profiler();
     function stripTypeScript(code) {
@@ -16455,6 +16454,7 @@ var require_ast = __commonJS({
       return code;
     }
     function parseWithAcorn(code) {
+      const acorn = require_acorn();
       const baseOpts = {
         ecmaVersion: "latest",
         allowReturnOutsideFunction: true,

@@ -2,7 +2,6 @@
 
 const fs = require('fs');
 const path = require('path');
-const acorn = require('acorn');
 const { LANGUAGE_MAP } = require('./codebase-intel');
 const { startTimer, endTimer } = require('./profiler');
 
@@ -79,6 +78,7 @@ function stripTypeScript(code) {
  * @returns {object|null} AST or null if parse fails
  */
 function parseWithAcorn(code) {
+  const acorn = require('acorn');
   const baseOpts = {
     ecmaVersion: 'latest',
     allowReturnOutsideFunction: true,
