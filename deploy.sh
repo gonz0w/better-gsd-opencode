@@ -124,7 +124,7 @@ echo "  Path placeholders resolved to: $OPENCODE_CFG (symlink to ~/.config/openc
 # Step 4: Smoke test deployed artifact
 echo ""
 echo "Running smoke test..."
-SMOKE=$(node "$DEST/bin/gsd-tools.cjs" current-timestamp --raw 2>/dev/null) || true
+SMOKE=$(node "$DEST/bin/gsd-tools.cjs" util:current-timestamp --raw 2>/dev/null) || true
 if [ -z "$SMOKE" ]; then
 	echo "  ❌ Smoke test FAILED — deployed artifact does not execute correctly."
 	echo "  Rolling back to backup..."
