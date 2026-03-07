@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-03-03)
 ## Current Position
 
 Phase: 63 of 66 (Dead Code Removal)
-Plan: 1 of N in current phase
-Status: Ready to plan/execute
-Last activity: 2026-03-07 — Completed 62-02 (Command Reference Map & Audit Summary)
+Plan: 2 of 2 in current phase
+Status: Ready to execute
+Last activity: 2026-03-07 — Completed 63-01 (Dead File & Export Cleanup)
 
-Progress: [████████________________________________] 20% (v8.2)
+Progress: [█████████_______________________________] 23% (v8.2)
 
 ## Performance Metrics
 
@@ -52,6 +52,7 @@ Progress: [████████________________________________] 20% (v8.2)
 | Phase 61 P02 | 9 min | 2 tasks | 7 files |
 | Phase 62 P01 | 3 min | 2 tasks | 4 files |
 | Phase 62 P02 | 3 min | 2 tasks | 4 files |
+| Phase 63 P01 | 16 min | 2 tasks | 24 files |
 
 ## Accumulated Context
 
@@ -96,6 +97,9 @@ All v1.0-v8.0 decisions recorded in PROJECT.md Key Decisions table with outcomes
 - [Phase 62]: 281 commands tracked (namespaced + legacy) — high orphan count from duplicate forms, not missing functionality
 - [Phase 62]: 4 exports reclassified from truly_dead/internal to documented_helper via markdown reference scan
 - [Phase 62]: Phase 63 removal scope is conservative: 0 exports, 1 file — most knip findings are router dispatch false positives
+- [Phase 63]: ~80 internal helper exports removed from module.exports across 24 files — 15 fewer than planned due to cross-module false positives
+- [Phase 63]: branchInfo/trajectoryBranch kept in git.js — router-consumed, not internal despite audit classification
+- [Phase 63]: detectCliTools/detectMcpServers/calculateTier kept in research.js — cross-module imports from init.js
 
 ### Pending Todos
 
@@ -103,11 +107,11 @@ None — milestone starting fresh.
 
 ### Blockers/Concerns
 
-- Bundle at ~1216KB — target measurable reduction via dead code removal
+- Bundle at ~1211KB (reduced from 1216KB via export cleanup)
 - Two pre-existing config-migrate test failures (from Phase 56 RAG key additions) need cleanup
 
 ## Session Continuity
 
 Last session: 2026-03-07
-Stopped at: Completed 62-02-PLAN.md
-Next step: Plan/execute Phase 63 (Dead Code Removal)
+Stopped at: Completed 63-01-PLAN.md
+Next step: Execute Phase 63 Plan 02 (CONFIG_SCHEMA & COMMAND_HELP cleanup)

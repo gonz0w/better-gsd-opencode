@@ -18,8 +18,8 @@ Requirements for the cleanup, performance & validation milestone. Each maps to r
 
 ### Dead Code Removal
 
-- [ ] **DEAD-01**: All unused function exports identified by audit are removed from src/ modules
-- [ ] **DEAD-02**: All unreferenced workflow, template, and reference files are removed
+- [x] **DEAD-01**: All unused function exports identified by audit are removed from src/ modules
+- [x] **DEAD-02**: All unreferenced workflow, template, and reference files are removed
 - [ ] **DEAD-03**: Constants.js audited and unused regex patterns, constants, and mappings removed
 - [ ] **DEAD-04**: Stale config.json keys and agent manifest fields cleaned
 
@@ -80,8 +80,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | AUDIT-02 | Phase 62 | Complete | npm test |
 | AUDIT-03 | Phase 62 | Complete | npm test |
 | AUDIT-04 | Phase 62 | Complete | npm test |
-| DEAD-01 | Phase 63 | Pending | npm test |
-| DEAD-02 | Phase 63 | Pending | npm test |
+| DEAD-01 | Phase 63 | Complete | npm test |
+| DEAD-02 | Phase 63 | Complete | npm test |
 | DEAD-03 | Phase 63 | Pending | npm test |
 | DEAD-04 | Phase 63 | Pending | npm test |
 | CMD-01 | Phase 64 | Pending | npm test |

@@ -218,7 +218,7 @@ Plans:
   3. constants.js has been audited and unused regex patterns, constants, and mappings are removed
   4. Stale config.json keys and agent manifest fields are cleaned up
   5. All 762+ tests still pass after removals
-**Plans**: 2 plans
+**Plans**: 1/2 plans executed
 Plans:
 - [ ] 63-01-PLAN.md — Dead file removal + internal helper export cleanup
 - [ ] 63-02-PLAN.md — Constants audit + config cleanup
@@ -276,7 +276,7 @@ Plans:
 | 56-60 | v8.1 | 10/10 | Complete | 2026-03-03 |
 | 61. Tooling & Safety Net | 2/2 | Complete    | 2026-03-07 | - |
 | 62. Audit & Discovery | 2/2 | Complete    | 2026-03-07 | - |
-| 63. Dead Code Removal | v8.2 | 0/0 | Not started | - |
+| 63. Dead Code Removal | 1/2 | In Progress|  | - |
 | 64. Command & Workflow Cleanup | v8.2 | 0/0 | Not started | - |
 | 65. Performance Tuning | v8.2 | 0/0 | Not started | - |
 | 66. Agent Architecture Refinement | v8.2 | 0/0 | Not started | - |
