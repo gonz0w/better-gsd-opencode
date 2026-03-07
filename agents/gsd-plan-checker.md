@@ -1,6 +1,7 @@
 ---
 description: Verifies plans will achieve phase goal before execution. Goal-backward analysis of plan quality. Spawned by /bgsd-plan-phase orchestrator.
 color: "#00FF00"
+# estimated_tokens: ~11k (system prompt: 661 lines)
 tools:
   read: true
   bash: true

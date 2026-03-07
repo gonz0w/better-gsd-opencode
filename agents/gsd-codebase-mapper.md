@@ -1,6 +1,7 @@
 ---
 description: Explores codebase and writes structured analysis documents. Spawned by map-codebase with a focus area (tech, arch, quality, concerns). Writes documents directly to reduce orchestrator context load.
 color: "#00FFFF"
+# estimated_tokens: ~13k (system prompt: 794 lines)
 tools:
   read: true
   bash: true

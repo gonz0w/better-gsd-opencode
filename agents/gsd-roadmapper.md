@@ -1,6 +1,7 @@
 ---
 description: Creates project roadmaps with phase breakdown, requirement mapping, success criteria derivation, and coverage validation. Spawned by /bgsd-new-project orchestrator.
 color: "#800080"
+# estimated_tokens: ~11k (system prompt: 667 lines)
 tools:
   read: true
   write: true

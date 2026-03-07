@@ -1,6 +1,7 @@
 ---
 description: Investigates bugs using scientific method, manages debug sessions, handles checkpoints. Spawned by /bgsd-debug orchestrator.
 color: "#FFA500"
+# estimated_tokens: ~20k (system prompt: 1222 lines)
 tools:
   read: true
   write: true

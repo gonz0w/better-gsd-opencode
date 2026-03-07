@@ -1,6 +1,7 @@
 ---
 description: Researches how to implement a phase before planning. Produces RESEARCH.md consumed by gsd-planner. Spawned by /bgsd-plan-phase orchestrator.
 color: "#00FFFF"
+# estimated_tokens: ~9k (system prompt: 527 lines)
 tools:
   read: true
   write: true

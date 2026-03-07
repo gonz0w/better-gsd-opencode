@@ -1,6 +1,7 @@
 ---
 description: Creates executable phase plans with task breakdown, dependency analysis, and goal-backward verification. Spawned by /bgsd-plan-phase orchestrator.
 color: "#00FF00"
+# estimated_tokens: ~20k (system prompt: 1212 lines)
 tools:
   read: true
   write: true

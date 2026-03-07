@@ -1,6 +1,7 @@
 ---
 description: Researches domain ecosystem before roadmap creation. Produces files in .planning/research/ consumed during roadmap creation. Spawned by /bgsd-new-project or /bgsd-new-milestone orchestrators.
 color: "#00FFFF"
+# estimated_tokens: ~11k (system prompt: 655 lines)
 tools:
   read: true
   write: true

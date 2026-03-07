@@ -1,6 +1,7 @@
 ---
 description: Executes GSD plans with atomic commits, deviation handling, checkpoint protocols, and state management. Spawned by execute-phase orchestrator or execute-plan command.
 color: "#FFFF00"
+# estimated_tokens: ~8k (system prompt: 489 lines)
 tools:
   read: true
   write: true
