@@ -255,7 +255,7 @@ Plans:
   2. Bundle size is measurably reduced compared to v8.1 baseline (~1216KB)
   3. Init commands complete in <100ms with cache layer (vs current baseline)
   4. Redundant file reads and parsing in hot paths are identified and reduced
-**Plans**: 2 plans
+**Plans**: 1/2 plans executed
 Plans:
 - [ ] 65-01-PLAN.md — Bundle size reduction via acorn lazy-loading & composition audit
 - [ ] 65-02-PLAN.md — Init hot path optimization & file I/O reduction
@@ -292,5 +292,5 @@ Plans:
 | 62. Audit & Discovery | 2/2 | Complete    | 2026-03-07 | - |
 | 63. Dead Code Removal | 3/3 | Complete    | 2026-03-07 | - |
 | 64. Command & Workflow Cleanup | 2/2 | Complete   | 2026-03-07 | - |
-| 65. Performance Tuning | v8.2 | 0/2 | Planned | - |
+| 65. Performance Tuning | 1/2 | In Progress|  | - |
 | 66. Agent Architecture Refinement | v8.2 | 0/0 | Not started | - |

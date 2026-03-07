@@ -40,7 +40,7 @@ Requirements for the cleanup, performance & validation milestone. Each maps to r
 ### Performance
 
 - [ ] **PERF-01**: CPU hot paths profiled and top bottlenecks optimized
-- [ ] **PERF-02**: Bundle size measurably reduced vs v8.1 baseline (~1216KB)
+- [x] **PERF-02**: Bundle size measurably reduced vs v8.1 baseline (~1216KB)
 - [ ] **PERF-03**: Init commands optimized toward <100ms with cache layer
 - [ ] **PERF-04**: Redundant file reads and parsing in hot paths reduced
 
@@ -89,7 +89,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | CMD-03 | Phase 64 | Complete | npm test |
 | CMD-04 | Phase 64 | Complete | npm test |
 | PERF-01 | Phase 65 | Pending | npm test |
-| PERF-02 | Phase 65 | Pending | npm run build |
+| PERF-02 | Phase 65 | Complete | npm run build |
 | PERF-03 | Phase 65 | Pending | npm test |
 | PERF-04 | Phase 65 | Pending | npm test |
 | AGENT-01 | Phase 66 | Pending | npm test |
