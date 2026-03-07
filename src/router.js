@@ -353,11 +353,22 @@ async function main() {
           lazyMisc().cmdTdd(cwd, tddSub, tddArgs, raw);
         } else if (subcommand === 'test-run') {
           lazyFeatures().cmdTestRun(cwd, raw);
+        } else if (subcommand === 'trajectory') {
+          const trajSub = restArgs[0];
+          switch (trajSub) {
+            case 'checkpoint': lazyTrajectory().cmdTrajectoryCheckpoint(cwd, restArgs, raw); break;
+            case 'list': lazyTrajectory().cmdTrajectoryList(cwd, restArgs.slice(1), raw); break;
+            case 'pivot': lazyTrajectory().cmdTrajectoryPivot(cwd, restArgs, raw); break;
+            case 'compare': lazyTrajectory().cmdTrajectoryCompare(cwd, restArgs, raw); break;
+            case 'choose': lazyTrajectory().cmdTrajectoryChoose(cwd, restArgs, raw); break;
+            case 'dead-ends': lazyTrajectory().cmdTrajectoryDeadEnds(cwd, restArgs.slice(1), raw); break;
+            default: error('Unknown trajectory subcommand: ' + trajSub + '. Available: checkpoint, list, pivot, compare, choose, dead-ends');
+          }
         } else if (subcommand === 'profile') {
           // Handle profile via environment variable, not a command
           error('Set GSD_PROFILE=1 to enable performance profiling');
         } else {
-          error(`Unknown execute subcommand: ${subcommand}. Available: commit, rollback-info, session-diff, session-summary, velocity, worktree, tdd, test-run`);
+          error(`Unknown execute subcommand: ${subcommand}. Available: commit, rollback-info, session-diff, session-summary, velocity, worktree, tdd, test-run, trajectory`);
         }
         break;
       }
@@ -501,8 +512,31 @@ async function main() {
           }
         } else if (subcommand === 'token-budget') {
           lazyFeatures().cmdTokenBudget(cwd, raw);
+        } else if (subcommand === 'summary') {
+          const countCheck = (() => {
+            const idx = restArgs.indexOf('--check-count');
+            return idx !== -1 ? parseInt(restArgs[idx + 1], 10) : 2;
+          })();
+          lazyMisc().cmdVerifySummary(cwd, restArgs[0], countCheck, raw);
+        } else if (subcommand === 'validate') {
+          const validateSub = restArgs[0];
+          if (validateSub === 'consistency') {
+            lazyVerify().cmdValidateConsistency(cwd, raw);
+          } else if (validateSub === 'health') {
+            lazyVerify().cmdValidateHealth(cwd, { repair: restArgs.includes('--repair') }, raw);
+          } else if (validateSub === 'roadmap') {
+            lazyVerify().cmdValidateRoadmap(cwd, { repair: restArgs.includes('--repair') }, raw);
+          } else {
+            error('Unknown validate subcommand. Available: consistency, health, roadmap');
+          }
+        } else if (subcommand === 'validate-dependencies') {
+          lazyFeatures().cmdValidateDependencies(cwd, restArgs[0], raw);
+        } else if (subcommand === 'validate-config') {
+          lazyFeatures().cmdValidateConfig(cwd, raw);
+        } else if (subcommand === 'test-coverage') {
+          lazyFeatures().cmdTestCoverage(cwd, raw);
         } else {
-          error(`Unknown verify subcommand: ${subcommand}. Available: state, verify, assertions, search-decisions, search-lessons, review, context-budget, token-budget`);
+          error(`Unknown verify subcommand: ${subcommand}. Available: state, verify, assertions, search-decisions, search-lessons, review, context-budget, token-budget, summary, validate, validate-dependencies, validate-config, test-coverage`);
         }
         break;
       }
@@ -690,8 +724,150 @@ async function main() {
           } else {
             error('Unknown agent subcommand. Available: audit, list');
           }
+        } else if (subcommand === 'resolve-model') {
+          lazyMisc().cmdResolveModel(cwd, restArgs[0], raw);
+        } else if (subcommand === 'template') {
+          const tmplSub = restArgs[0];
+          if (tmplSub === 'select') {
+            lazyMisc().cmdTemplateSelect(cwd, restArgs[1], raw);
+          } else if (tmplSub === 'fill') {
+            const templateType = restArgs[1];
+            const phaseIdx = restArgs.indexOf('--phase');
+            const planIdx = restArgs.indexOf('--plan');
+            const nameIdx = restArgs.indexOf('--name');
+            const typeIdx = restArgs.indexOf('--type');
+            const waveIdx = restArgs.indexOf('--wave');
+            const fieldsIdx = restArgs.indexOf('--fields');
+            lazyMisc().cmdTemplateFill(cwd, templateType, {
+              phase: phaseIdx !== -1 ? restArgs[phaseIdx + 1] : null,
+              plan: planIdx !== -1 ? restArgs[planIdx + 1] : null,
+              name: nameIdx !== -1 ? restArgs[nameIdx + 1] : null,
+              type: typeIdx !== -1 ? restArgs[typeIdx + 1] : 'execute',
+              wave: waveIdx !== -1 ? restArgs[waveIdx + 1] : '1',
+              fields: fieldsIdx !== -1 ? JSON.parse(restArgs[fieldsIdx + 1]) : {},
+            }, raw);
+          } else {
+            error('Unknown template subcommand. Available: select, fill');
+          }
+        } else if (subcommand === 'generate-slug') {
+          lazyMisc().cmdGenerateSlug(restArgs[0], raw);
+        } else if (subcommand === 'verify-path-exists') {
+          lazyMisc().cmdVerifyPathExists(cwd, restArgs[0], raw);
+        } else if (subcommand === 'config-ensure-section') {
+          lazyMisc().cmdConfigEnsureSection(cwd, raw);
+        } else if (subcommand === 'config-migrate') {
+          lazyMisc().cmdConfigMigrate(cwd, raw);
+        } else if (subcommand === 'scaffold') {
+          const scaffoldType = restArgs[0];
+          const phaseIdx = restArgs.indexOf('--phase');
+          const nameIdx = restArgs.indexOf('--name');
+          const scaffoldOptions = {
+            phase: phaseIdx !== -1 ? restArgs[phaseIdx + 1] : null,
+            name: nameIdx !== -1 ? restArgs.slice(nameIdx + 1).join(' ') : null,
+          };
+          lazyMisc().cmdScaffold(cwd, scaffoldType, scaffoldOptions, raw);
+        } else if (subcommand === 'phase-plan-index') {
+          lazyMisc().cmdPhasePlanIndex(cwd, restArgs[0], raw);
+        } else if (subcommand === 'state-snapshot') {
+          lazyMisc().cmdStateSnapshot(cwd, raw);
+        } else if (subcommand === 'summary-extract') {
+          const summaryPath = restArgs[0];
+          const seFieldsIdx = restArgs.indexOf('--fields');
+          const fields = seFieldsIdx !== -1 ? restArgs[seFieldsIdx + 1].split(',') : null;
+          lazyMisc().cmdSummaryExtract(cwd, summaryPath, fields, raw);
+        } else if (subcommand === 'quick-summary') {
+          lazyFeatures().cmdQuickTaskSummary(cwd, raw);
+        } else if (subcommand === 'extract-sections') {
+          lazyFeatures().cmdExtractSections(cwd, restArgs, raw);
+        } else if (subcommand === 'git') {
+          const gitSub = restArgs[0];
+          const gitMod = lazyGit();
+          const { output: gitOutput } = require('./lib/output');
+          switch (gitSub) {
+            case 'log': {
+              const countIdx = restArgs.indexOf('--count');
+              const sinceIdx = restArgs.indexOf('--since');
+              const untilIdx = restArgs.indexOf('--until');
+              const authorIdx = restArgs.indexOf('--author');
+              const pathIdx = restArgs.indexOf('--path');
+              const gitOpts = {
+                count: countIdx !== -1 ? parseInt(restArgs[countIdx + 1], 10) : 20,
+                since: sinceIdx !== -1 ? restArgs[sinceIdx + 1] : undefined,
+                until: untilIdx !== -1 ? restArgs[untilIdx + 1] : undefined,
+                author: authorIdx !== -1 ? restArgs[authorIdx + 1] : undefined,
+                path: pathIdx !== -1 ? restArgs[pathIdx + 1] : undefined,
+              };
+              gitOutput(gitMod.structuredLog(cwd, gitOpts), raw);
+              break;
+            }
+            case 'diff-summary': {
+              const fromIdx = restArgs.indexOf('--from');
+              const toIdx = restArgs.indexOf('--to');
+              const dsPathIdx = restArgs.indexOf('--path');
+              gitOutput(gitMod.diffSummary(cwd, {
+                from: fromIdx !== -1 ? restArgs[fromIdx + 1] : undefined,
+                to: toIdx !== -1 ? restArgs[toIdx + 1] : undefined,
+                path: dsPathIdx !== -1 ? restArgs[dsPathIdx + 1] : undefined,
+              }), raw);
+              break;
+            }
+            case 'blame': {
+              gitOutput(gitMod.blame(cwd, restArgs[1]), raw);
+              break;
+            }
+            case 'branch-info': {
+              gitOutput(gitMod.branchInfo(cwd), raw);
+              break;
+            }
+            case 'rewind': {
+              const refIdx = restArgs.indexOf('--ref');
+              const rwConfirm = restArgs.includes('--confirm');
+              const rwDryRun = restArgs.includes('--dry-run');
+              gitOutput(gitMod.selectiveRewind(cwd, {
+                ref: refIdx !== -1 ? restArgs[refIdx + 1] : undefined,
+                confirm: rwConfirm,
+                dryRun: rwDryRun,
+              }), raw);
+              break;
+            }
+            case 'trajectory-branch': {
+              const tbPhaseIdx = restArgs.indexOf('--phase');
+              const tbSlugIdx = restArgs.indexOf('--slug');
+              const tbPush = restArgs.includes('--push');
+              gitOutput(gitMod.trajectoryBranch(cwd, {
+                phase: tbPhaseIdx !== -1 ? restArgs[tbPhaseIdx + 1] : undefined,
+                slug: tbSlugIdx !== -1 ? restArgs[tbSlugIdx + 1] : undefined,
+                push: tbPush,
+              }), raw);
+              break;
+            }
+            default:
+              error('Unknown git subcommand: ' + gitSub + '. Available: log, diff-summary, blame, branch-info, rewind, trajectory-branch');
+          }
+        } else if (subcommand === 'profiler') {
+          const profSub = restArgs[0];
+          if (profSub === 'compare') {
+            lazyProfiler().cmdProfilerCompare(restArgs.slice(1));
+          } else if (profSub === 'cache-speedup') {
+            await lazyProfiler().cmdProfilerCacheSpeedup(restArgs.slice(1));
+          } else if (!profSub || profSub === '--help' || profSub === '-h') {
+            process.stderr.write(`Usage: gsd-tools util:profiler <subcommand> [options]
+
+Performance profiler commands.
+
+Subcommands:
+  compare            Compare two baseline profiles and show timing deltas
+  cache-speedup      Measure cache speedup by running commands with/without cache
+
+Examples:
+  gsd-tools util:profiler compare --before baseline.json --after current.json
+  gsd-tools util:profiler cache-speedup --runs 3 --command "state validate"
+`);
+          } else {
+            error(`Unknown profiler subcommand: ${profSub}. Available: compare, cache-speedup`);
+          }
         } else {
-          error(`Unknown util subcommand: ${subcommand}. Available: config-get, config-set, env, current-timestamp, list-todos, todo, memory, mcp, classify, frontmatter, progress, websearch, history-digest, trace-requirement, codebase, cache, agent`);
+          error(`Unknown util subcommand: ${subcommand}. Available: config-get, config-set, env, current-timestamp, list-todos, todo, memory, mcp, classify, frontmatter, progress, websearch, history-digest, trace-requirement, codebase, cache, agent, resolve-model, template, generate-slug, verify-path-exists, config-ensure-section, config-migrate, scaffold, phase-plan-index, state-snapshot, summary-extract, quick-summary, extract-sections, git, profiler`);
         }
         break;
       }
