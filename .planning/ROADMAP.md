@@ -182,7 +182,10 @@ Full details: `.planning/milestones/v8.1-ROADMAP.md`
   Plans:
   - [ ] 64-01-PLAN.md — Router namespace completion + backward-compat block removal
   - [ ] 64-02-PLAN.md — Reference migration + test fixes + internal cleanup
-- [ ] **Phase 65: Performance Tuning** - Profile hot paths, optimize bottlenecks, reduce bundle size, improve init times
+- [ ] **Phase 65: Performance Tuning** - Profile hot paths, optimize bottlenecks, reduce bundle size, improve init times (2 plans)
+  Plans:
+  - [ ] 65-01-PLAN.md — Bundle size reduction via acorn lazy-loading & composition audit
+  - [ ] 65-02-PLAN.md — Init hot path optimization & file I/O reduction
 - [ ] **Phase 66: Agent Architecture Refinement** - Re-validate RACI, tighten manifests, document handoff contracts, evaluate merges
 
 ## Phase Details
@@ -252,7 +255,10 @@ Plans:
   2. Bundle size is measurably reduced compared to v8.1 baseline (~1216KB)
   3. Init commands complete in <100ms with cache layer (vs current baseline)
   4. Redundant file reads and parsing in hot paths are identified and reduced
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+- [ ] 65-01-PLAN.md — Bundle size reduction via acorn lazy-loading & composition audit
+- [ ] 65-02-PLAN.md — Init hot path optimization & file I/O reduction
 
 ### Phase 66: Agent Architecture Refinement
 **Goal**: Sharpen agent boundaries, validate manifests against actual usage, document handoff contracts, and evaluate merge opportunities — based on stable command surface from prior phases
@@ -286,5 +292,5 @@ Plans:
 | 62. Audit & Discovery | 2/2 | Complete    | 2026-03-07 | - |
 | 63. Dead Code Removal | 3/3 | Complete    | 2026-03-07 | - |
 | 64. Command & Workflow Cleanup | 2/2 | Complete   | 2026-03-07 | - |
-| 65. Performance Tuning | v8.2 | 0/0 | Not started | - |
+| 65. Performance Tuning | v8.2 | 0/2 | Planned | - |
 | 66. Agent Architecture Refinement | v8.2 | 0/0 | Not started | - |
