@@ -165,7 +165,10 @@ Full details: `.planning/milestones/v8.1-ROADMAP.md`
 
 </details>
 
-- [ ] **Phase 61: Tooling & Safety Net** - Install audit tools, enable metafile, harden deploy.sh, capture performance baselines
+- [ ] **Phase 61: Tooling & Safety Net** - Install audit tools, enable metafile, harden deploy.sh, capture performance baselines (2 plans)
+  Plans:
+  - [ ] 61-01-PLAN.md — Build metafile analysis & dev tool installation (knip, madge)
+  - [ ] 61-02-PLAN.md — Manifest-based deploy sync & performance baseline capture
 - [ ] **Phase 62: Audit & Discovery** - Run dead code detection, circular dependency check, build command reference map
 - [ ] **Phase 63: Dead Code Removal** - Remove confirmed dead exports, unused files, stale constants and config
 - [ ] **Phase 64: Command & Workflow Cleanup** - Remove stale commands, hide internals, consolidate subgroups, migrate references
@@ -183,7 +186,7 @@ Full details: `.planning/milestones/v8.1-ROADMAP.md`
   2. Deploy script uses manifest-based sync that removes files from deploy target when they no longer exist in source
   3. Performance baselines (init timing, bundle size, file I/O counts) are captured and stored for before/after comparison
   4. Dev tools (knip, madge) are installed and configured with working invocation commands
-**Plans**: TBD
+**Plans**: 2 plans
 
 ### Phase 62: Audit & Discovery
 **Goal**: Produce a complete inventory of dead code, circular dependencies, and command references — reports only, no deletions
