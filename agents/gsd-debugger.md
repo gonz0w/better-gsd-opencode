@@ -9,6 +9,14 @@ tools:
   grep: true
   glob: true
   websearch: true
+inputs:
+  - file: "bug report"
+    required_sections: ["symptoms description"]
+    source: "User (via /bgsd-debug)"
+outputs:
+  - file: ".planning/debug/{slug}.md"
+    required_sections: ["## Current Focus", "## Symptoms", "## Eliminated", "## Evidence", "## Resolution"]
+    consumer: "standalone (no formal handoff chain)"
 ---
 
 **PATH SETUP:** Before running any gsd-tools commands, first resolve:

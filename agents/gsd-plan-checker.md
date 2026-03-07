@@ -6,6 +6,14 @@ tools:
   bash: true
   glob: true
   grep: true
+inputs:
+  - file: "{phase}-{plan}-PLAN.md"
+    required_sections: ["frontmatter (phase, plan, type, wave, depends_on, files_modified, autonomous, requirements, must_haves)", "<objective>", "<tasks>", "<verification>", "<success_criteria>"]
+    source: "gsd-planner"
+outputs:
+  - file: "structured issues (inline to orchestrator)"
+    required_sections: ["plan, dimension, severity, description, fix_hint per issue"]
+    consumer: "gsd-planner (revision mode)"
 ---
 
 **PATH SETUP:** Before running any gsd-tools commands, first resolve:
