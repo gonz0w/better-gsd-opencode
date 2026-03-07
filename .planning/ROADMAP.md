@@ -262,7 +262,7 @@ Full details: `.planning/milestones/v8.1-ROADMAP.md`
 | 45-50 | v7.1 | 12/12 | Complete | 2026-03-02 |
 | 51-55 | v8.0 | 14/14 | Complete | 2026-03-03 |
 | 56-60 | v8.1 | 10/10 | Complete | 2026-03-03 |
-| 61. Tooling & Safety Net | 2/2 | Complete   | 2026-03-07 | - |
+| 61. Tooling & Safety Net | 2/2 | Complete    | 2026-03-07 | - |
 | 62. Audit & Discovery | v8.2 | 0/0 | Not started | - |
 | 63. Dead Code Removal | v8.2 | 0/0 | Not started | - |
 | 64. Command & Workflow Cleanup | v8.2 | 0/0 | Not started | - |
