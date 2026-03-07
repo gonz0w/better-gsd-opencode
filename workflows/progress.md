@@ -41,7 +41,7 @@ If missing both ROADMAP.md and PROJECT.md: suggest `/bgsd-new-project`.
 
 ```bash
 ROADMAP=$(node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs plan:roadmap analyze)
-STATE=$(node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs state-snapshot)
+STATE=$(node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs util:state-snapshot)
 ```
 
 `ROADMAP` returns: phases with disk status, goals, deps, plan/summary counts, progress percent, current/next phase.

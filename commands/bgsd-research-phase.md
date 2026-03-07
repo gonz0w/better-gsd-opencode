@@ -40,7 +40,7 @@ Extract from init JSON: `phase_dir`, `phase_number`, `phase_name`, `phase_found`
 
 Resolve researcher model:
 ```bash
-RESEARCHER_MODEL=$(node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs resolve-model gsd-phase-researcher --raw)
+RESEARCHER_MODEL=$(node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs util:resolve-model gsd-phase-researcher --raw)
 ```
 
 ## 1. Validate Phase

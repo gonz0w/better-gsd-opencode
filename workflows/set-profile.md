@@ -23,7 +23,7 @@ if $ARGUMENTS.profile not in ["quality", "balanced", "budget"]:
 Ensure config exists and load current state:
 
 ```bash
-node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs config-ensure-section
+node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs util:config-ensure-section
 INIT=$(node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs verify:state load)
 ```
 

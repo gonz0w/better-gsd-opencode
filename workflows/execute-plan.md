@@ -34,7 +34,7 @@ PLAN_START_EPOCH=$(date +%s)
 
 <step name="context_budget_check">
 ```bash
-BUDGET=$(node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs context-budget "${PLAN_PATH}" 2>/dev/null)
+BUDGET=$(node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs verify:context-budget "${PLAN_PATH}" 2>/dev/null)
 ```
 
 If `warning` truthy: yolo → log and continue. Interactive → ask proceed/stop.
@@ -126,7 +126,7 @@ After each file modification during task execution (not just at task end), for A
 
 2. Run auto-test:
    ```bash
-   AUTOTEST=$(node {config_path}/bin/gsd-tools.cjs tdd auto-test --test-cmd "<test_command>")
+   AUTOTEST=$(node {config_path}/bin/gsd-tools.cjs execute:tdd auto-test --test-cmd "<test_command>")
    ```
 
 3. If test fails:
@@ -146,7 +146,7 @@ Types: feat, fix, test, refactor, perf, docs, style, chore.
 
 After committing task work, save a bookmark:
 ```bash
-node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs memory write --store bookmarks --entry '{"phase":"${PHASE}","plan":"${PLAN}","task":${TASK_NUM},"total_tasks":${TOTAL_TASKS},"git_head":"'$(git rev-parse --short HEAD)'"}'
+node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs util:memory write --store bookmarks --entry '{"phase":"${PHASE}","plan":"${PLAN}","task":${TASK_NUM},"total_tasks":${TOTAL_TASKS},"git_head":"'$(git rev-parse --short HEAD)'"}'
 ```
 </task_commit>
 
@@ -190,7 +190,7 @@ After plan execution completes (all tasks committed, before SUMMARY creation):
 
 2. Assemble review context:
 ```bash
-REVIEW_CTX=$(node {config_path}/bin/gsd-tools.cjs review ${PHASE_NUM} ${PLAN_NUM} --raw 2>/dev/null)
+REVIEW_CTX=$(node {config_path}/bin/gsd-tools.cjs verify:review ${PHASE_NUM} ${PLAN_NUM} --raw 2>/dev/null)
 ```
 
 3. If review context available (non-empty, valid JSON), perform review:

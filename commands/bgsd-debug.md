@@ -35,7 +35,7 @@ INIT=$(node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs verify:state loa
 
 Extract `commit_docs` from init JSON. Resolve debugger model:
 ```bash
-DEBUGGER_MODEL=$(node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs resolve-model gsd-debugger --raw)
+DEBUGGER_MODEL=$(node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs util:resolve-model gsd-debugger --raw)
 ```
 
 ## 1. Check Active Sessions

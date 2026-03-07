@@ -58,7 +58,7 @@ Report: "Found {plan_count} plans in {phase_dir} ({incomplete_count} incomplete)
 
 <step name="preflight_dependency_check">
 ```bash
-DEPS=$(node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs validate-dependencies "${PHASE_NUMBER}" 2>/dev/null)
+DEPS=$(node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs verify:validate-dependencies "${PHASE_NUMBER}" 2>/dev/null)
 ```
 
 Parse for `valid` (bool) and `issues` (array). If valid or command fails: continue silently.
@@ -138,7 +138,7 @@ Advisory naming convention check (never blocks execution).
 
 <step name="discover_and_group_plans">
 ```bash
-PLAN_INDEX=$(node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs phase-plan-index "${PHASE_NUMBER}")
+PLAN_INDEX=$(node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs util:phase-plan-index "${PHASE_NUMBER}")
 ```
 
 Parse: `plans[]` (id, wave, autonomous, objective, task_count, has_summary), `waves`, `incomplete`, `has_checkpoints`.
@@ -387,7 +387,7 @@ Read status from VERIFICATION.md:
 
 <step name="update_roadmap">
 ```bash
-node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs validate roadmap --repair 2>/dev/null
+node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs verify:validate roadmap --repair 2>/dev/null
 COMPLETION=$(node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs plan:phase complete "${PHASE_NUMBER}")
 ```
 

@@ -18,7 +18,7 @@ Extract from init JSON: `milestone_version`, `milestone_name`, `phase_count`, `c
 
 Resolve verifier model:
 ```bash
-CHECKER_MODEL=$(node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs resolve-model gsd-verifier)
+CHECKER_MODEL=$(node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs util:resolve-model gsd-verifier)
 ```
 
 ## 1. Determine Milestone Scope
@@ -104,7 +104,7 @@ For each phase's VERIFICATION.md, extract the expanded requirements table:
 For each phase's SUMMARY.md, extract `requirements-completed` from YAML frontmatter:
 ```bash
 for summary in .planning/phases/*-*/*-SUMMARY.md; do
-  node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs summary-extract "$summary" --fields requirements_completed | jq -r '.requirements_completed'
+  node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs util:summary-extract "$summary" --fields requirements_completed | jq -r '.requirements_completed'
 done
 ```
 

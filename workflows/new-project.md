@@ -239,7 +239,7 @@ If ROADMAP CREATED: present inline (phases table + details).
 - **Interactive:** ask approve/adjust/review. If adjust → re-spawn with feedback. Loop until approved.
 
 ```bash
-node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs validate roadmap --repair 2>/dev/null
+node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs verify:validate roadmap --repair 2>/dev/null
 node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs execute:commit "docs: create roadmap ([N] phases)" --files .planning/ROADMAP.md .planning/STATE.md .planning/REQUIREMENTS.md
 ```
 

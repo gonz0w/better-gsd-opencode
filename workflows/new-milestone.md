@@ -381,7 +381,7 @@ Success criteria:
 
 **Validate roadmap parity** (before commit):
 ```bash
-ROADMAP_CHECK=$(node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs validate roadmap --repair 2>/dev/null)
+ROADMAP_CHECK=$(node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs verify:validate roadmap --repair 2>/dev/null)
 ```
 If errors found: auto-repair adds missing checklist entries. If repair fails: warn user.
 

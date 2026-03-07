@@ -81,7 +81,7 @@ Check for `.planning/ASSERTIONS.md` existence. If present, set `assertions_path`
 ## 8. Surface Relevant Lessons
 
 ```bash
-LESSONS=$(node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs search-lessons "${PHASE_NAME}" 2>/dev/null)
+LESSONS=$(node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs verify:search-lessons "${PHASE_NAME}" 2>/dev/null)
 ```
 If found: display and include in planner context. If not: skip silently.
 
@@ -89,7 +89,7 @@ If found: display and include in planner context. If not: skip silently.
 
 If `assertions_path` exists:
 ```bash
-ASSERTIONS=$(node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs assertions list --req ${PHASE_REQ_IDS} 2>/dev/null)
+ASSERTIONS=$(node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs verify:assertions list --req ${PHASE_REQ_IDS} 2>/dev/null)
 ```
 Display assertion count and coverage. If none found: note "No assertions for {req_ids} — planner will derive must_haves from requirement text."
 

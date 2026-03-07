@@ -27,7 +27,7 @@ Exit.
 Run the search-decisions command:
 
 ```bash
-RESULT=$(node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs search-decisions "$QUERY" 2>/dev/null)
+RESULT=$(node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs verify:search-decisions "$QUERY" 2>/dev/null)
 ```
 
 Parse the JSON output which includes:

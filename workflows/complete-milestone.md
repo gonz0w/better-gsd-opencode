@@ -35,7 +35,7 @@ Present: phases, plans, tasks, files, LOC, timeline, git range.
 <step name="extract_accomplishments">
 ```bash
 for summary in .planning/phases/*-*/*-SUMMARY.md; do
-  node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs summary-extract "$summary" --fields one_liner | jq -r '.one_liner'
+  node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs util:summary-extract "$summary" --fields one_liner | jq -r '.one_liner'
 done
 ```
 Extract 4-6 key accomplishments.
@@ -153,7 +153,7 @@ This automation ensures every milestone has complete documentation with:
 
 <step name="archive_milestone">
 ```bash
-ARCHIVE=$(node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs milestone complete "v[X.Y]" --name "[Name]")
+ARCHIVE=$(node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs plan:milestone complete "v[X.Y]" --name "[Name]")
 ```
 
 CLI handles: milestones dir, ROADMAP archive, REQUIREMENTS archive, MILESTONES.md entry, STATE.md update.
