@@ -25,7 +25,7 @@ const stripShebangPlugin = {
 async function build() {
   const start = Date.now();
 
-  await esbuild.build({
+  const result = await esbuild.build({
     entryPoints: ['src/index.js'],
     outfile: 'bin/gsd-tools.cjs',
     bundle: true,
@@ -39,6 +39,7 @@ async function build() {
     minify: false,  // Keep readable for debugging
     sourcemap: false,
     plugins: [stripShebangPlugin],
+    metafile: true,
   });
 
   const elapsed = Date.now() - start;
@@ -85,6 +86,103 @@ async function build() {
   if (!withinBudget) {
     console.error(`ERROR: Bundle size ${sizeKB}KB exceeds budget of ${BUNDLE_BUDGET_KB}KB`);
     process.exit(1);
+  }
+
+  // --- Metafile analysis: per-module byte attribution ---
+  const outputKey = Object.keys(result.metafile.outputs).find(k => k.endsWith('bin/gsd-tools.cjs'));
+  if (outputKey && result.metafile.outputs[outputKey].inputs) {
+    const inputs = result.metafile.outputs[outputKey].inputs;
+
+    // Build per-module map
+    const modules = {};
+    for (const [filePath, info] of Object.entries(inputs)) {
+      modules[filePath] = {
+        bytes: info.bytesInOutput,
+        kb: Math.round(info.bytesInOutput / 1024),
+      };
+    }
+
+    // Group by directory prefix
+    const groups = {};
+    for (const [filePath, info] of Object.entries(inputs)) {
+      // Determine group: for node_modules use package name, for src use first two segments
+      let group;
+      if (filePath.startsWith('node_modules/')) {
+        const parts = filePath.split('/');
+        // Handle scoped packages (@org/pkg)
+        group = parts[1].startsWith('@')
+          ? `node_modules/${parts[1]}/${parts[2]}/`
+          : `node_modules/${parts[1]}/`;
+      } else if (filePath.startsWith('src/')) {
+        const parts = filePath.split('/');
+        group = parts.length > 2 ? `${parts[0]}/${parts[1]}/` : 'src/';
+      } else {
+        group = 'other/';
+      }
+
+      if (!groups[group]) {
+        groups[group] = { bytes: 0, file_count: 0 };
+      }
+      groups[group].bytes += info.bytesInOutput;
+      groups[group].file_count += 1;
+    }
+
+    // Add KB to groups
+    for (const g of Object.values(groups)) {
+      g.kb = Math.round(g.bytes / 1024);
+    }
+
+    // Sort groups by total size descending
+    const sortedGroups = Object.entries(groups).sort((a, b) => b[1].bytes - a[1].bytes);
+
+    // Sort modules by size descending for per-group display
+    const sortedModules = Object.entries(modules).sort((a, b) => b[1].bytes - a[1].bytes);
+
+    // Console output
+    console.log('\nModule analysis:');
+    for (const [groupName, groupInfo] of sortedGroups) {
+      console.log(`  ${groupName.padEnd(30)} ${groupInfo.kb}KB (${groupInfo.file_count} files)`);
+      // Show files in this group, sorted by size
+      const groupFiles = sortedModules
+        .filter(([fp]) => {
+          if (groupName === 'other/') {
+            return !fp.startsWith('src/') && !fp.startsWith('node_modules/');
+          }
+          if (groupName === 'src/') {
+            // Root src files only (e.g., src/index.js, src/router.js) — not subdirectories
+            return fp.startsWith('src/') && fp.split('/').length === 2;
+          }
+          return fp.startsWith(groupName);
+        });
+      for (const [fp, info] of groupFiles) {
+        const shortName = fp.split('/').pop();
+        console.log(`    ${shortName.padEnd(28)} ${info.kb}KB`);
+      }
+    }
+
+    // Warn about large source files
+    for (const [fp, info] of sortedModules) {
+      if (info.bytes > 50 * 1024) {
+        console.warn(`⚠ Large source file: ${fp} (${info.kb}KB in output)`);
+      }
+    }
+
+    // Write build-analysis.json
+    const analysisData = {
+      timestamp: new Date().toISOString(),
+      bundle_size_kb: sizeKB,
+      modules,
+      groups: Object.fromEntries(sortedGroups.map(([name, info]) => [name, { bytes: info.bytes, kb: info.kb, file_count: info.file_count }])),
+    };
+    fs.writeFileSync(
+      `${baselinesDir}/build-analysis.json`,
+      JSON.stringify(analysisData, null, 2) + '\n'
+    );
+    console.log(`\nWrote ${baselinesDir}/build-analysis.json`);
+
+    // Write raw metafile for ad-hoc analysis
+    fs.writeFileSync('/tmp/gsd-metafile.json', JSON.stringify(result.metafile, null, 2));
+    console.log('Wrote /tmp/gsd-metafile.json');
   }
 }
 
