@@ -21796,7 +21796,8 @@ var require_init = __commonJS({
       const milestone = getMilestoneInfo(cwd);
       let rawConfig = {};
       try {
-        rawConfig = JSON.parse(fs.readFileSync(path.join(cwd, ".planning", "config.json"), "utf-8"));
+        const rawConfigContent = cachedReadFile(path.join(cwd, ".planning", "config.json"));
+        if (rawConfigContent) rawConfig = JSON.parse(rawConfigContent);
       } catch (e) {
         debugLog("init.executePhase", "raw config read failed", e);
       }

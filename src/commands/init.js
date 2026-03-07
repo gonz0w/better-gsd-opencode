@@ -146,10 +146,11 @@ function cmdInitExecutePhase(cwd, phase, raw) {
   const phaseInfo = findPhaseInternal(cwd, phase);
   const milestone = getMilestoneInfo(cwd);
 
-  // Read raw config for gates (not in CONFIG_SCHEMA)
+  // Read raw config for gates (not in CONFIG_SCHEMA) — use cachedReadFile to avoid redundant I/O
   let rawConfig = {};
   try {
-    rawConfig = JSON.parse(fs.readFileSync(path.join(cwd, '.planning', 'config.json'), 'utf-8'));
+    const rawConfigContent = cachedReadFile(path.join(cwd, '.planning', 'config.json'));
+    if (rawConfigContent) rawConfig = JSON.parse(rawConfigContent);
   } catch (e) { debugLog('init.executePhase', 'raw config read failed', e); }
 
   const result = {
