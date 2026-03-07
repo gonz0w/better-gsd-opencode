@@ -14,6 +14,8 @@
     "audit:dead-code": "npx knip --include exports,files --workspace .",
     "audit:exports": "node audit-exports.js",
     "audit:circular": "npx madge --circular src/",
+    "audit:commands": "node audit-commands.js",
+    "audit:all": "npm run audit:exports && npm run audit:circular && npm run audit:commands",
     "baseline": "node baseline.js"
   },
   "devDependencies": {
