@@ -1,5 +1,5 @@
 {
-  "generated": "2026-03-07T17:33:37.311Z",
+  "generated": "2026-03-07T18:22:28.205Z",
   "files": [
     "VERSION",
     "agents/gsd-codebase-mapper.md",
@@ -55,6 +55,7 @@
     "commands/bgsd-validate-deps.md",
     "commands/bgsd-velocity.md",
     "commands/bgsd-verify-work.md",
+    "references/RACI.md",
     "references/checkpoints.md",
     "references/continuation-format.md",
     "references/git-integration.md",

@@ -569,8 +569,9 @@ Subcommands:
 Agent management.
 
 Subcommands:
-  audit                    Audit agent coverage
-  list                     List all agents`,
+  audit                                Audit agent lifecycle coverage against RACI matrix
+  list                                 List all agents
+  validate-contracts [--phase N]       Check agent outputs match declared contracts`,
 
   // research namespace
   'research': `Usage: gsd-tools research <subcommand> [options]

@@ -568,8 +568,9 @@ Subcommands:
 Agent management.
 
 Subcommands:
-  audit                    Audit agent coverage
-  list                     List all agents`,
+  audit                                Audit agent lifecycle coverage against RACI matrix
+  list                                 List all agents
+  validate-contracts [--phase N]       Check agent outputs match declared contracts`,
       // research namespace
       "research": `Usage: gsd-tools research <subcommand> [options]
 
@@ -27217,6 +27218,75 @@ var require_agent = __commonJS({
     var { loadConfig } = require_config();
     var { safeReadFile } = require_helpers();
     var { extractFrontmatter } = require_frontmatter();
+    function resolveGsdPaths() {
+      const GSD_HOME = process.env.GSD_HOME || (process.env.HOME ? path.join(process.env.HOME, ".config", "oc", "get-shit-done") : "/home/cam/.config/oc/get-shit-done");
+      const agentsDir = path.join(path.dirname(GSD_HOME), "agents");
+      return { GSD_HOME, agentsDir };
+    }
+    function parseContractArrays(rawYaml) {
+      const result = { inputs: [], outputs: [] };
+      if (!rawYaml) return result;
+      const lines = rawYaml.split("\n");
+      let currentField = null;
+      let currentItem = null;
+      let fieldIndent = -1;
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        const trimmed = line.trim();
+        if (trimmed === "" || trimmed.startsWith("#")) continue;
+        const indent = line.search(/\S/);
+        if (indent === 0 && (trimmed === "inputs:" || trimmed === "outputs:")) {
+          if (currentItem && currentField) {
+            result[currentField].push(currentItem);
+          }
+          currentField = trimmed.replace(":", "");
+          currentItem = null;
+          fieldIndent = indent;
+          continue;
+        }
+        if (indent === 0 && trimmed.match(/^[a-zA-Z0-9_-]+:/)) {
+          if (currentItem && currentField) {
+            result[currentField].push(currentItem);
+            currentItem = null;
+          }
+          currentField = null;
+          continue;
+        }
+        if (!currentField) continue;
+        if (trimmed.startsWith("- ")) {
+          if (currentItem) {
+            result[currentField].push(currentItem);
+          }
+          currentItem = {};
+          const kvMatch = trimmed.slice(2).match(/^([a-zA-Z0-9_-]+):\s*(.*)/);
+          if (kvMatch) {
+            currentItem[kvMatch[1]] = parseYamlValue(kvMatch[2]);
+          }
+          continue;
+        }
+        if (currentItem && indent > fieldIndent) {
+          const kvMatch = trimmed.match(/^([a-zA-Z0-9_-]+):\s*(.*)/);
+          if (kvMatch) {
+            currentItem[kvMatch[1]] = parseYamlValue(kvMatch[2]);
+          }
+        }
+      }
+      if (currentItem && currentField) {
+        result[currentField].push(currentItem);
+      }
+      return result;
+    }
+    function parseYamlValue(val) {
+      const trimmed = val.trim();
+      if (!trimmed) return "";
+      if (trimmed.startsWith("[") && trimmed.endsWith("]")) {
+        return trimmed.slice(1, -1).split(",").map((s) => s.trim().replace(/^["']|["']$/g, "")).filter(Boolean);
+      }
+      if (trimmed.startsWith('"') && trimmed.endsWith('"') || trimmed.startsWith("'") && trimmed.endsWith("'")) {
+        return trimmed.slice(1, -1);
+      }
+      return trimmed;
+    }
     function scanAgents(agentsDir) {
       const agents = [];
       if (!fs.existsSync(agentsDir)) {
@@ -27229,21 +27299,35 @@ var require_agent = __commonJS({
         if (!content) continue;
         const frontmatter = extractFrontmatter(content);
         if (frontmatter && frontmatter.description) {
+          const fmMatch = content.match(/^---\n([\s\S]+?)\n---/);
+          const contracts = fmMatch ? parseContractArrays(fmMatch[1]) : { inputs: [], outputs: [] };
           agents.push({
             name: file.replace(".md", ""),
             description: frontmatter.description,
             color: frontmatter.color || null,
-            tools: frontmatter.tools || {}
+            tools: frontmatter.tools || {},
+            inputs: contracts.inputs,
+            outputs: contracts.outputs
           });
         }
       }
       return agents;
     }
+    function resolveRaciPath(GSD_HOME, agentsDir) {
+      const refPath = path.join(GSD_HOME, "references", "RACI.md");
+      if (fs.existsSync(refPath)) return refPath;
+      const cwdPath = path.join(process.cwd(), "references", "RACI.md");
+      if (fs.existsSync(cwdPath)) return cwdPath;
+      const agentPath = path.join(agentsDir, "RACI.md");
+      if (fs.existsSync(agentPath)) return agentPath;
+      return null;
+    }
     function parseRaciMatrix(raciPath) {
       const content = safeReadFile(raciPath);
-      if (!content) return {};
+      if (!content) return { stepMapping: {}, lifecycleSteps: [] };
       const lines = content.split("\n");
       const stepMapping = {};
+      const lifecycleSteps = [];
       let inRaciTable = false;
       for (const line of lines) {
         if (line.includes("| Step |") && line.includes("Responsible")) {
@@ -27255,24 +27339,24 @@ var require_agent = __commonJS({
         }
         if (!inRaciTable) continue;
         if (line.match(/^\|[\s\-]+\|/)) continue;
-        const match = line.match(/^\|\s*(\w+)\s*\|\s*([^|]+?)\s*\|/);
+        const match = line.match(/^\|\s*([\w-]+)\s*\|\s*([^|]+?)\s*\|/);
         if (match) {
           const step = match[1];
           const responsible = match[2].trim();
           if (step === "Step") continue;
+          lifecycleSteps.push(step);
           if (responsible && responsible !== "Responsible (R)") {
             stepMapping[step] = [responsible];
           }
         }
       }
-      return stepMapping;
+      return { stepMapping, lifecycleSteps };
     }
     function cmdAgentAudit(cwd, raw) {
-      const GSD_HOME = process.env.GSD_HOME || (process.env.HOME ? path.join(process.env.HOME, ".config", "oc", "get-shit-done") : "/home/cam/.config/oc/get-shit-done");
-      const agentsDir = path.join(path.dirname(GSD_HOME), "agents");
-      const raciPath = path.join(agentsDir, "RACI.md");
-      if (!fs.existsSync(raciPath)) {
-        error("RACI.md not found at " + raciPath);
+      const { GSD_HOME, agentsDir } = resolveGsdPaths();
+      const raciPath = resolveRaciPath(GSD_HOME, agentsDir);
+      if (!raciPath) {
+        error("RACI.md not found. Checked: references/RACI.md, agents/RACI.md");
         process.exit(1);
       }
       const agents = scanAgents(agentsDir);
@@ -27280,22 +27364,12 @@ var require_agent = __commonJS({
         error("No agent files found in " + agentsDir);
         process.exit(1);
       }
-      const stepMapping = parseRaciMatrix(raciPath);
-      const lifecycleSteps = ["Init", "Discuss", "Research", "Plan", "Execute", "Verify", "Complete"];
+      const { stepMapping, lifecycleSteps: dynamicSteps } = parseRaciMatrix(raciPath);
+      const FALLBACK_STEPS = ["Init", "Discuss", "Research", "Plan", "Execute", "Verify", "Complete"];
+      const lifecycleSteps = dynamicSteps.length > 0 ? dynamicSteps : FALLBACK_STEPS;
       const agentNames = new Set(agents.map((a) => a.name));
       const gaps = [];
       const overlaps = [];
-      const validAgentNames = /* @__PURE__ */ new Set([
-        "gsd-executor",
-        "gsd-planner",
-        "gsd-verifier",
-        "gsd-roadmapper",
-        "gsd-phase-researcher",
-        "gsd-project-researcher",
-        "gsd-codebase-mapper",
-        "gsd-debugger",
-        "gsd-plan-checker"
-      ]);
       for (const step of lifecycleSteps) {
         const responsible = stepMapping[step] || [];
         if (responsible.length === 0) {
@@ -27307,7 +27381,7 @@ var require_agent = __commonJS({
       const invalidRefs = [];
       for (const step of Object.keys(stepMapping)) {
         for (const agent of stepMapping[step]) {
-          if (!agentNames.has(agent) && agent !== "User") {
+          if (!agentNames.has(agent) && agent !== "User" && agent !== "reviewer-agent") {
             invalidRefs.push({ step, agent });
           }
         }
@@ -27315,29 +27389,195 @@ var require_agent = __commonJS({
       const result = {
         agents_found: agents.length,
         lifecycle_steps: lifecycleSteps,
+        lifecycle_steps_count: lifecycleSteps.length,
         step_mapping: stepMapping,
         gaps,
         overlaps,
         invalid_references: invalidRefs,
+        raci_source: raciPath,
         status: gaps.length === 0 && overlaps.length === 0 && invalidRefs.length === 0 ? "pass" : "fail"
       };
       output2(result, raw, null, {
-        pass: "All lifecycle steps have exactly one responsible agent",
+        pass: `All ${lifecycleSteps.length} lifecycle steps have exactly one responsible agent`,
         fail: `Found ${gaps.length} gap(s), ${overlaps.length} overlap(s), ${invalidRefs.length} invalid reference(s)`
       });
       if (result.status === "fail") {
         process.exit(1);
       }
     }
+    function cmdAgentValidateContracts(cwd, raw, args) {
+      const { GSD_HOME, agentsDir } = resolveGsdPaths();
+      const phaseIdx = (args || []).indexOf("--phase");
+      const phaseNum = phaseIdx !== -1 ? args[phaseIdx + 1] : null;
+      const agents = scanAgents(agentsDir);
+      if (agents.length === 0) {
+        error("No agent files found in " + agentsDir);
+        process.exit(1);
+      }
+      const errors = [];
+      const warnings = [];
+      let contractsValid = 0;
+      let contractsInvalid = 0;
+      for (const agent of agents) {
+        if (!agent.outputs || !Array.isArray(agent.outputs) || agent.outputs.length === 0) {
+          warnings.push({
+            agent: agent.name,
+            issue: "No outputs declared in frontmatter",
+            severity: "warning"
+          });
+          continue;
+        }
+        let agentValid = true;
+        for (const out of agent.outputs) {
+          if (!out.file) {
+            errors.push({
+              agent: agent.name,
+              output: "(unknown)",
+              issue: 'Output declaration missing "file" field',
+              severity: "error"
+            });
+            agentValid = false;
+            continue;
+          }
+          if (!out.required_sections || !Array.isArray(out.required_sections) || out.required_sections.length === 0) {
+            errors.push({
+              agent: agent.name,
+              output: out.file,
+              issue: 'Output declaration missing "required_sections"',
+              severity: "error"
+            });
+            agentValid = false;
+            continue;
+          }
+          if (phaseNum) {
+            const resolvedFiles = resolveOutputFile(cwd, out.file, phaseNum);
+            for (const resolvedFile of resolvedFiles) {
+              if (!fs.existsSync(resolvedFile)) {
+                warnings.push({
+                  agent: agent.name,
+                  output: out.file,
+                  resolved_path: resolvedFile,
+                  issue: "Output file not found",
+                  severity: "warning"
+                });
+                continue;
+              }
+              const content = safeReadFile(resolvedFile);
+              if (!content) continue;
+              const missingSections = [];
+              for (const section of out.required_sections) {
+                if (!contentHasSection(content, section)) {
+                  missingSections.push(section);
+                }
+              }
+              if (missingSections.length > 0) {
+                errors.push({
+                  agent: agent.name,
+                  output: out.file,
+                  resolved_path: resolvedFile,
+                  missing_sections: missingSections,
+                  severity: "error"
+                });
+                agentValid = false;
+              }
+            }
+          }
+        }
+        if (agent.inputs && Array.isArray(agent.inputs)) {
+          for (const inp of agent.inputs) {
+            if (!inp.file) {
+              errors.push({
+                agent: agent.name,
+                input: "(unknown)",
+                issue: 'Input declaration missing "file" field',
+                severity: "error"
+              });
+              agentValid = false;
+            }
+          }
+        }
+        if (agentValid) {
+          contractsValid++;
+        } else {
+          contractsInvalid++;
+        }
+      }
+      const result = {
+        agents_checked: agents.length,
+        contracts_valid: contractsValid,
+        contracts_invalid: contractsInvalid,
+        phase_checked: phaseNum || null,
+        errors,
+        warnings,
+        status: errors.length === 0 ? "pass" : "fail"
+      };
+      output2(result, raw, null, {
+        pass: `All ${agents.length} agent contracts valid`,
+        fail: `${contractsInvalid} agent(s) with contract errors: ${errors.length} error(s), ${warnings.length} warning(s)`
+      });
+      if (result.status === "fail") {
+        process.exit(1);
+      }
+    }
+    function resolveOutputFile(cwd, filePattern, phaseNum) {
+      const planningDir = path.join(cwd, ".planning", "phases");
+      if (!fs.existsSync(planningDir)) return [];
+      const phaseDirs = fs.readdirSync(planningDir).filter((d) => d.match(new RegExp(`^${phaseNum}[.-]`)));
+      if (phaseDirs.length === 0) return [];
+      const results = [];
+      for (const phaseDir of phaseDirs) {
+        const fullPhaseDir = path.join(planningDir, phaseDir);
+        if (filePattern.includes("{phase}") || filePattern.includes("{plan}")) {
+          const files = fs.readdirSync(fullPhaseDir);
+          const suffix = filePattern.replace(/\{phase\}/g, "").replace(/\{plan\}/g, "").replace(/^-+/, "");
+          for (const f of files) {
+            if (f.endsWith(suffix)) {
+              results.push(path.join(fullPhaseDir, f));
+            }
+          }
+        } else if (filePattern.startsWith(".planning/")) {
+          const absPath = path.join(cwd, filePattern);
+          if (fs.existsSync(absPath)) {
+            results.push(absPath);
+          }
+        } else {
+          const directPath = path.join(fullPhaseDir, filePattern);
+          if (fs.existsSync(directPath)) {
+            results.push(directPath);
+          }
+        }
+      }
+      return results;
+    }
+    function contentHasSection(content, section) {
+      const trimmed = section.trim();
+      if (trimmed.startsWith("#")) {
+        const headingPattern = new RegExp("^" + escapeRegex(trimmed), "im");
+        return headingPattern.test(content);
+      }
+      if (trimmed.startsWith("frontmatter")) {
+        return content.startsWith("---\n");
+      }
+      if (trimmed.startsWith("<") && trimmed.endsWith(">")) {
+        return content.includes(trimmed);
+      }
+      const genericPattern = new RegExp("^#{1,6}\\s+" + escapeRegex(trimmed), "im");
+      return genericPattern.test(content);
+    }
+    function escapeRegex(str) {
+      return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    }
     function cmdAgentList(cwd, raw) {
-      const GSD_HOME = process.env.GSD_HOME || (process.env.HOME ? path.join(process.env.HOME, ".config", "oc", "get-shit-done") : "/home/cam/.config/oc/get-shit-done");
-      const agentsDir = path.join(path.dirname(GSD_HOME), "agents");
+      const { agentsDir } = resolveGsdPaths();
       const agents = scanAgents(agentsDir);
       output2({ agents }, raw);
     }
     module2.exports = {
       cmdAgentAudit,
-      cmdAgentList
+      cmdAgentList,
+      cmdAgentValidateContracts,
+      // Exported for testing
+      parseRaciMatrix
     };
   }
 });
@@ -28368,8 +28608,10 @@ Available: execute-phase, plan-phase, new-project, new-milestone, quick, resume,
                 lazyAgent().cmdAgentAudit(cwd, raw);
               } else if (agentSub === "list") {
                 lazyAgent().cmdAgentList(cwd, raw);
+              } else if (agentSub === "validate-contracts") {
+                lazyAgent().cmdAgentValidateContracts(cwd, raw, restArgs.slice(1));
               } else {
-                error("Unknown agent subcommand. Available: audit, list");
+                error("Unknown agent subcommand. Available: audit, list, validate-contracts");
               }
             } else if (subcommand === "resolve-model") {
               lazyMisc().cmdResolveModel(cwd, restArgs[0], raw);

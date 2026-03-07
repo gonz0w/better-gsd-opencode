@@ -721,8 +721,10 @@ async function main() {
             lazyAgent().cmdAgentAudit(cwd, raw);
           } else if (agentSub === 'list') {
             lazyAgent().cmdAgentList(cwd, raw);
+          } else if (agentSub === 'validate-contracts') {
+            lazyAgent().cmdAgentValidateContracts(cwd, raw, restArgs.slice(1));
           } else {
-            error('Unknown agent subcommand. Available: audit, list');
+            error('Unknown agent subcommand. Available: audit, list, validate-contracts');
           }
         } else if (subcommand === 'resolve-model') {
           lazyMisc().cmdResolveModel(cwd, restArgs[0], raw);
