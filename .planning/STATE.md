@@ -10,9 +10,9 @@ See: .planning/PROJECT.md (updated 2026-03-03)
 ## Current Position
 
 Phase: 65 of 66 (Performance Tuning)
-Plan: 1 of 2 in current phase ✓
-Status: In progress
-Last activity: 2026-03-07 — Completed 65-01 (Lazy-Load Acorn)
+Plan: 2 of 2 in current phase ✓
+Status: Phase complete
+Last activity: 2026-03-07 — Completed 65-02 (Init Hot Path Optimization)
 
 Progress: [█████████_______________________________] 23% (v8.2)
 
@@ -58,6 +58,7 @@ Progress: [█████████_______________________________] 23% (v8.2
 | Phase 64 P01 | 29 min | 2 tasks | 5 files |
 | Phase 64 P02 | 83 min | 2 tasks | 34 files |
 | Phase 65-01 P01 | 27 min | 2 tasks | 2 files |
+| Phase 65 P02 | 12 min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -115,6 +116,8 @@ All v1.0-v8.0 decisions recorded in PROJECT.md Key Decisions table with outcomes
 - [Phase 64]: COMMAND_HELP cleaned to namespaced-only keys; init:* internal entries removed, util:config-migrate restored as user-facing
 - [Phase 65-01]: Lazy-load acorn inside parseWithAcorn() — single entry point for all 4 public AST functions
 - [Phase 65-01]: Bundle file size stays 1153KB (esbuild can't tree-shake dynamic require) but effective cold-start reduced 230KB
+- [Phase 65-02]: Replace autoTriggerCodebaseIntel with readCodebaseIntel in init fast paths — stale-but-fast acceptable per CONTEXT.md
+- [Phase 65-02]: Cache getGitInfo per invocation and combine rev-parse calls — eliminates 3 redundant git subprocess spawns
 
 ### Pending Todos
 
@@ -129,5 +132,5 @@ None — milestone starting fresh.
 ## Session Continuity
 
 Last session: 2026-03-07
-Stopped at: Completed 65-01-PLAN.md
-Next step: Execute 65-02-PLAN.md (init optimization and I/O reduction)
+Stopped at: Completed 65-02-PLAN.md
+Next step: Phase 65 complete — proceed to Phase 66 or milestone verification
