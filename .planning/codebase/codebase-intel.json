@@ -3869,7 +3869,9 @@
         "src/lib/context.js",
         "src/lib/helpers.js",
         "src/lib/deps.js",
-        "src/lib/lifecycle.js"
+        "src/lib/lifecycle.js",
+        "src/lib/recovery/stuck-detector.js",
+        "src/commands/agent.js"
       ],
       "src/commands/codebase.js": [
         "src/lib/output.js",
@@ -3880,7 +3882,8 @@
         "src/lib/deps.js",
         "src/lib/lifecycle.js",
         "src/lib/frontmatter.js",
-        "src/lib/context.js"
+        "src/lib/context.js",
+        "src/lib/ast.js"
       ],
       "src/commands/env.js": [
         "src/lib/output.js"
@@ -3913,6 +3916,9 @@
         "src/commands/codebase.js",
         "src/commands/worktree.js",
         "src/lib/codebase-intel.js",
+        "src/commands/research.js",
+        "src/commands/trajectory.js",
+        "src/lib/orchestration.js",
         "src/lib/context.js"
       ],
       "src/commands/intent.js": [
@@ -3984,18 +3990,23 @@
       ],
       "src/lib/context.js": [
         "src/lib/output.js",
+        "src/lib/profiler.js",
         "src/lib/codebase-intel.js",
         "src/lib/deps.js",
-        "src/lib/git.js"
+        "src/lib/git.js",
+        "src/lib/ast.js"
       ],
       "src/lib/git.js": [
-        "src/lib/output.js"
+        "src/lib/output.js",
+        "src/lib/profiler.js"
       ],
       "src/lib/helpers.js": [
         "src/lib/output.js",
         "src/lib/config.js",
         "src/lib/constants.js",
         "src/lib/regex-cache.js",
+        "src/lib/profiler.js",
+        "src/lib/cache.js",
         "src/lib/frontmatter.js"
       ],
       "src/router.js": [
@@ -4014,7 +4025,14 @@
         "src/commands/mcp.js",
         "src/commands/worktree.js",
         "src/commands/codebase.js",
-        "src/lib/git.js"
+        "src/commands/trajectory.js",
+        "src/lib/git.js",
+        "src/lib/orchestration.js",
+        "src/commands/cache.js",
+        "src/commands/agent.js",
+        "src/commands/profiler.js",
+        "src/commands/research.js",
+        "src/lib/profiler.js"
       ],
       "src/lib/conventions.js": [
         "src/lib/codebase-intel.js"
@@ -4029,6 +4047,45 @@
       ],
       "bin/format.test.cjs": [
         "src/lib/format.js"
+      ],
+      "src/commands/agent.js": [
+        "src/lib/output.js",
+        "src/lib/config.js",
+        "src/lib/helpers.js",
+        "src/lib/frontmatter.js"
+      ],
+      "src/commands/cache.js": [
+        "src/lib/output.js",
+        "src/lib/cache.js"
+      ],
+      "src/commands/research.js": [
+        "src/commands/env.js",
+        "src/lib/config.js",
+        "src/lib/output.js",
+        "src/lib/format.js",
+        "src/lib/cache.js"
+      ],
+      "src/commands/trajectory.js": [
+        "src/lib/output.js",
+        "src/lib/git.js",
+        "src/lib/format.js",
+        "src/lib/constants.js"
+      ],
+      "src/lib/ast.js": [
+        "src/lib/codebase-intel.js",
+        "src/lib/profiler.js"
+      ],
+      "src/lib/orchestration.js": [
+        "src/lib/output.js",
+        "src/lib/frontmatter.js",
+        "src/lib/format.js",
+        "src/lib/codebase-intel.js",
+        "src/lib/deps.js",
+        "src/lib/constants.js",
+        "src/lib/helpers.js"
+      ],
+      "src/lib/recovery/stuck-detector.js": [
+        "src/lib/review/severity.js"
       ]
     },
     "reverse": {
@@ -4054,7 +4111,12 @@
         "src/lib/helpers.js",
         "src/router.js",
         "src/lib/deps.js",
-        "src/lib/lifecycle.js"
+        "src/lib/lifecycle.js",
+        "src/commands/agent.js",
+        "src/commands/cache.js",
+        "src/commands/research.js",
+        "src/commands/trajectory.js",
+        "src/lib/orchestration.js"
       ],
       "src/lib/context.js": [
         "bin/gsd-tools.test.cjs",
@@ -4072,18 +4134,28 @@
         "src/commands/roadmap.js",
         "src/commands/state.js",
         "src/commands/verify.js",
-        "src/lib/codebase-intel.js"
+        "src/lib/codebase-intel.js",
+        "src/commands/agent.js",
+        "src/lib/orchestration.js"
       ],
       "src/lib/deps.js": [
         "bin/gsd-tools.test.cjs",
         "src/commands/codebase.js",
         "src/commands/features.js",
         "src/lib/context.js",
-        "src/lib/lifecycle.js"
+        "src/lib/lifecycle.js",
+        "src/lib/orchestration.js"
       ],
       "src/lib/lifecycle.js": [
         "bin/gsd-tools.test.cjs",
         "src/commands/codebase.js"
+      ],
+      "src/lib/recovery/stuck-detector.js": [
+        "bin/gsd-tools.test.cjs"
+      ],
+      "src/commands/agent.js": [
+        "bin/gsd-tools.test.cjs",
+        "src/router.js"
       ],
       "src/lib/codebase-intel.js": [
         "src/commands/codebase.js",
@@ -4092,7 +4164,9 @@
         "src/commands/misc.js",
         "src/lib/context.js",
         "src/lib/conventions.js",
-        "src/lib/deps.js"
+        "src/lib/deps.js",
+        "src/lib/ast.js",
+        "src/lib/orchestration.js"
       ],
       "src/lib/format.js": [
         "src/commands/codebase.js",
@@ -4101,7 +4175,10 @@
         "src/commands/intent.js",
         "src/commands/state.js",
         "src/commands/verify.js",
-        "bin/format.test.cjs"
+        "bin/format.test.cjs",
+        "src/commands/research.js",
+        "src/commands/trajectory.js",
+        "src/lib/orchestration.js"
       ],
       "src/lib/git.js": [
         "src/commands/codebase.js",
@@ -4115,7 +4192,8 @@
         "src/commands/worktree.js",
         "src/lib/codebase-intel.js",
         "src/lib/context.js",
-        "src/router.js"
+        "src/router.js",
+        "src/commands/trajectory.js"
       ],
       "src/lib/conventions.js": [
         "src/commands/codebase.js"
@@ -4130,7 +4208,13 @@
         "src/commands/roadmap.js",
         "src/commands/verify.js",
         "src/commands/worktree.js",
-        "src/lib/helpers.js"
+        "src/lib/helpers.js",
+        "src/commands/agent.js",
+        "src/lib/orchestration.js"
+      ],
+      "src/lib/ast.js": [
+        "src/commands/codebase.js",
+        "src/lib/context.js"
       ],
       "src/lib/config.js": [
         "src/commands/features.js",
@@ -4140,14 +4224,18 @@
         "src/commands/state.js",
         "src/commands/verify.js",
         "src/commands/worktree.js",
-        "src/lib/helpers.js"
+        "src/lib/helpers.js",
+        "src/commands/agent.js",
+        "src/commands/research.js"
       ],
       "src/lib/constants.js": [
         "src/commands/features.js",
         "src/commands/misc.js",
         "src/lib/config.js",
         "src/lib/helpers.js",
-        "src/router.js"
+        "src/router.js",
+        "src/commands/trajectory.js",
+        "src/lib/orchestration.js"
       ],
       "src/commands/verify.js": [
         "src/commands/features.js",
@@ -4171,7 +4259,8 @@
       ],
       "src/commands/env.js": [
         "src/commands/init.js",
-        "src/router.js"
+        "src/router.js",
+        "src/commands/research.js"
       ],
       "src/commands/codebase.js": [
         "src/commands/init.js",
@@ -4181,8 +4270,32 @@
         "src/commands/init.js",
         "src/router.js"
       ],
+      "src/commands/research.js": [
+        "src/commands/init.js",
+        "src/router.js"
+      ],
+      "src/commands/trajectory.js": [
+        "src/commands/init.js",
+        "src/router.js"
+      ],
+      "src/lib/orchestration.js": [
+        "src/commands/init.js",
+        "src/router.js"
+      ],
       "src/router.js": [
         "src/index.js"
+      ],
+      "src/lib/profiler.js": [
+        "src/lib/context.js",
+        "src/lib/git.js",
+        "src/lib/helpers.js",
+        "src/router.js",
+        "src/lib/ast.js"
+      ],
+      "src/lib/cache.js": [
+        "src/lib/helpers.js",
+        "src/commands/cache.js",
+        "src/commands/research.js"
       ],
       "src/commands/state.js": [
         "src/router.js"
@@ -4201,16 +4314,25 @@
       ],
       "src/commands/mcp.js": [
         "src/router.js"
+      ],
+      "src/commands/cache.js": [
+        "src/router.js"
+      ],
+      "src/commands/profiler.js": [
+        "src/router.js"
+      ],
+      "src/lib/review/severity.js": [
+        "src/lib/recovery/stuck-detector.js"
       ]
     },
     "stats": {
-      "total_files_parsed": 32,
-      "total_edges": 116,
+      "total_files_parsed": 46,
+      "total_edges": 159,
       "languages_parsed": [
         "javascript"
       ],
-      "parse_errors": 0
+      "parse_errors": 4
     },
-    "built_at": "2026-03-07T20:24:29.494Z"
+    "built_at": "2026-03-07T21:29:26.980Z"
   }
 }
