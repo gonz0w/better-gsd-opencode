@@ -35,6 +35,14 @@ GAPS_ONLY="false"
 if [[ "$PHASE_ARG" == *"--gaps-only"* ]]; then
   GAPS_ONLY="true"
 fi
+
+# CI quality gate flag: --ci forces CI, --no-ci skips it, otherwise check config
+CI_FLAG=""
+if [[ "$PHASE_ARG" == *"--ci"* ]] && [[ "$PHASE_ARG" != *"--no-ci"* ]]; then
+  CI_FLAG="force"
+elif [[ "$PHASE_ARG" == *"--no-ci"* ]]; then
+  CI_FLAG="skip"
+fi
 ```
 
 INIT=$(node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs init:execute-phase "${PHASE_NUMBER}" --compact)
@@ -362,6 +370,58 @@ After all waves, report:
 4. If all gaps resolved: update UAT frontmatter status + timestamp
 5. Move resolved debug sessions to `.planning/debug/resolved/`
 6. Commit updated artifacts
+</step>
+
+<step name="ci_quality_gate">
+**Optional CI quality gate — push, PR, code scanning, fix loop, auto-merge.**
+
+Determine if CI gate should run using `CI_FLAG` from initialize step:
+- `CI_FLAG="force"` → run CI regardless of config
+- `CI_FLAG="skip"` → skip CI regardless of config
+- `CI_FLAG=""` → check config:
+
+```bash
+CI_ENABLED=$(node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs util:config-get workflow.ci_gate 2>/dev/null || echo "false")
+```
+
+**If CI enabled:**
+
+```
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ bGSD ► CI QUALITY GATE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+◆ Pushing branch, creating PR, running code scanning...
+```
+
+```
+Task(
+  prompt="
+Run the GitHub CI quality gate.
+
+<ci_parameters>
+BRANCH_NAME: ci/phase-${PHASE_NUMBER}
+BASE_BRANCH: ${BASE_BRANCH:-main}
+AUTO_MERGE: true
+SCOPE: phase-${PHASE_NUMBER}
+</ci_parameters>
+
+<files_to_read>
+- .planning/STATE.md
+- ./AGENTS.md (if exists)
+</files_to_read>
+",
+  subagent_type="gsd-github-ci",
+  model="{executor_model}",
+  description="GitHub CI: phase-${PHASE_NUMBER}"
+)
+```
+
+**Handle CI result:**
+- `## CI COMPLETE` with `Status: merged` → continue to verify_phase_goal (code is now on base branch)
+- `## CHECKPOINT REACHED` with `human-action` → present to user, wait for resolution, then continue
+- `## CHECKPOINT REACHED` with `human-verify` → present remaining alerts, offer: 1) Dismiss and merge, 2) Abort CI (continue without merge)
+
+**If CI disabled:** Skip silently, continue to verify_phase_goal.
 </step>
 
 <step name="verify_phase_goal">
