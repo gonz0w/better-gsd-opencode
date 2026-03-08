@@ -213,7 +213,10 @@ Full details: `.planning/milestones/v8.2-ROADMAP.md`
   1. All 10 agent definition files contain a `<project_context>` discovery block (verifiable via grep across agents/gsd-*.md)
   2. All 10 agent definition files contain a PATH SETUP block for GSD_HOME resolution
   3. codebase-mapper agent has a `<structured_returns>` section matching the format patterns used by other agents
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+- [ ] 68-01-PLAN.md — Add PATH SETUP, project_context, structured_returns to codebase-mapper/verifier/executor
+- [ ] 68-02-PLAN.md — Add project_context to debugger, project-researcher, roadmapper + validate all 10
 
 ### Phase 69: Skills Architecture
 **Goal**: Shared agent content (references, common patterns, protocols) extracted into OpenCode skills — reducing duplication across agent definitions and enabling lazy-loading of domain knowledge
