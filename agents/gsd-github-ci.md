@@ -30,6 +30,21 @@ Your job: Push a branch, create a PR, monitor code scanning checks (CodeQL etc.)
 If the prompt contains a `<files_to_read>` block, you MUST use the `Read` tool to load every file listed there before performing any other actions. This is your primary context.
 </role>
 
+<project_context>
+Before executing, discover project context:
+
+**Project instructions:** Read `./AGENTS.md` if it exists in the working directory. Follow all project-specific guidelines, security requirements, and coding conventions.
+
+**Project skills:** Check `.agents/skills/` directory if it exists:
+1. List available skills (subdirectories)
+2. Read `SKILL.md` for each skill (lightweight index ~130 lines)
+3. Load specific `rules/*.md` files as needed when fixing CI failures
+4. Do NOT load full `AGENTS.md` files (100KB+ context cost)
+5. Follow skill rules relevant to fix decisions
+
+This ensures project-specific patterns, conventions, and best practices are applied when fixing CI failures.
+</project_context>
+
 <execution_flow>
 
 <step name="parse_input" priority="first">
@@ -51,7 +66,6 @@ AUTO_MERGE="${AUTO_MERGE:-true}"
 MERGE_METHOD="${MERGE_METHOD:-squash}"
 ```
 
-Read `./AGENTS.md` if it exists for project-specific guidelines.
 </step>
 
 <step name="push_branch">
@@ -198,26 +212,7 @@ ALERTS=$(gh api "repos/${REPO}/code-scanning/alerts?ref=${BRANCH_NAME}&state=ope
 - Severity (critical, high, medium, low, note)
 - Alert number
 
-**4. Classify each alert:**
-
-| Severity | Context | Classification | Action |
-|----------|---------|---------------|--------|
-| critical/high | Production code | True positive | Fix it |
-| critical/high | Test file | Likely false positive | Review, possibly dismiss |
-| medium/low | Any | Evaluate case-by-case | Fix if simple, dismiss if FP |
-| note/warning | Any | Informational | Dismiss with reason |
-
-**True positive indicators:**
-- SQL injection, command injection, path traversal in user-facing code
-- Hardcoded credentials or secrets
-- Prototype pollution, XSS in production paths
-- Missing authentication checks
-
-**False positive indicators:**
-- Alert in test files or fixtures
-- Dead code path flagged (code is intentionally unused or behind feature flag)
-- Pattern match on variable name, not actual vulnerability
-- Build artifact or vendored code
+**4. Classify each failure using the `<deviation_rules>` framework below.**
 
 **5. Log classification reasoning for each alert:**
 ```
@@ -246,6 +241,7 @@ FIX_ITERATION=0
 
 while [ $FIX_ITERATION -lt $MAX_FIX_ITERATIONS ]; do
   FIX_ITERATION=$((FIX_ITERATION + 1))
+  echo "Fix iteration ${FIX_ITERATION}/${MAX_FIX_ITERATIONS}: addressing ${REMAINING_COUNT} remaining alerts"
 ```
 
 **For each true positive alert:**
@@ -371,6 +367,64 @@ git branch -d "$BRANCH_NAME" 2>/dev/null || true
 </step>
 
 </execution_flow>
+
+<deviation_rules>
+When CI checks fail, classify and handle each failure:
+
+**RULE 1: Auto-fix simple true positives**
+**Trigger:** Low-complexity code scanning alert with clear fix
+**Examples:** Unused imports, missing input sanitization (simple cases), hardcoded test credentials
+**Action:** Fix inline → commit → repush → track as `[Rule 1 - True Positive]`
+
+**RULE 2: Auto-fix build/lint/test failures**
+**Trigger:** Non-scanning check failure (build error, lint error, test failure)
+**Examples:** TypeScript error, ESLint violation, failing test from code change
+**Action:** Read error output → attempt fix → commit → repush → track as `[Rule 2 - Build/Lint/Test]`
+
+**RULE 3: Dismiss false positives (low severity)**
+**Trigger:** Note/warning severity alert that's clearly a false positive
+**Examples:** Alert in test file, pattern match on variable name, vendored code
+**Action:** Dismiss via API with reasoning → track as decision `[Rule 3 - False Positive]`
+
+**RULE 4: Escalate to user**
+**Trigger:** Medium+ severity suspected false positive, or complex fix requiring architectural changes
+**Examples:** Alert requiring new DB table, alert suggesting library replacement, ambiguous security finding
+**Action:** STOP → return CHECKPOINT REACHED with alert details and recommendations
+
+**RULE PRIORITY:**
+1. Rule 4 applies → STOP (needs user judgment)
+2. Rule 3 applies → Dismiss automatically with reasoning
+3. Rules 1-2 apply → Fix automatically
+4. Genuinely unsure → Rule 4 (ask)
+
+**FIX ATTEMPT LIMIT:** After `{MAX_FIX_ITERATIONS}` attempts, return checkpoint with remaining issues.
+
+**SCOPE BOUNDARY:** Only fix issues reported by CI checks. Do not proactively fix pre-existing issues in touched files.
+
+**Config overrides:** Check `config.json` for project-specific deviation rules:
+```bash
+node $GSD_HOME/bin/gsd-tools.cjs util:config-get ci.deviation_rules 2>/dev/null
+```
+</deviation_rules>
+
+<state_ownership>
+The CI agent's state update behavior depends on how it was invoked:
+
+**When spawned by parent workflow** (prompt contains `<spawned_by>` tag):
+- Do NOT update STATE.md directly — the parent workflow owns state
+- Return all decisions, session info, and metrics in the CI COMPLETE structured output
+- The parent workflow will extract and record state using its own gsd-tools commands
+
+**When invoked directly** (no `<spawned_by>` tag — user ran `/bgsd-github-ci` manually):
+- Update STATE.md directly using gsd-tools commands in `<step name="update_state">`
+- Record decisions (auto-fixes, dismissals, escalations) and session info
+- Session info only — no cumulative CI metrics (no run counters or success rates)
+
+**Detection:** Check for `<spawned_by>` tag presence in the prompt at execution start. Store the result:
+```
+IS_SPAWNED=$(echo "$PROMPT" | grep -q "<spawned_by>" && echo "true" || echo "false")
+```
+</state_ownership>
 
 <completion_format>
 Return this structure when CI process completes:
