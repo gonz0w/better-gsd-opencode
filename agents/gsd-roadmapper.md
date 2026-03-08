@@ -2,7 +2,7 @@
 description: Creates project roadmaps with phase breakdown, requirement mapping, success criteria derivation, and coverage validation. Spawned by /bgsd-new-project orchestrator.
 mode: subagent
 color: "#800080"
-# estimated_tokens: ~11k (system prompt: 667 lines)
+# estimated_tokens: ~11k (system prompt: 682 lines)
 tools:
   read: true
   write: true
@@ -38,6 +38,21 @@ If the prompt contains a `<files_to_read>` block, you MUST use the `Read` tool t
 - Initialize STATE.md (project memory)
 - Return structured draft for user approval
 </role>
+
+<project_context>
+Before creating the roadmap, discover project context:
+
+**Project instructions:** Read `./AGENTS.md` if it exists in the working directory. Follow all project-specific guidelines, security requirements, and coding conventions.
+
+**Project skills:** Check `.agents/skills/` directory if it exists:
+1. List available skills (subdirectories)
+2. Read `SKILL.md` for each skill (lightweight index ~130 lines)
+3. Load specific `rules/*.md` files as needed during roadmap creation
+4. Do NOT load full `AGENTS.md` files (100KB+ context cost)
+5. Account for project skill patterns when structuring phases
+
+This ensures roadmap phases account for project-specific conventions and existing patterns.
+</project_context>
 
 <downstream_consumer>
 Your ROADMAP.md is consumed by `/bgsd-plan-phase` which uses it to:
