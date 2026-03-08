@@ -1,280 +1,300 @@
-# Technology Stack: v8.2 Cleanup, Performance & Validation
+# Technology Stack: v8.3 Agent Quality & OpenCode Skills Architecture
 
 **Project:** bGSD Plugin
-**Researched:** 2026-03-06
-**Focus:** Dead code detection, bundle size analysis, performance profiling, architecture validation tooling
-**Overall confidence:** HIGH (all tools verified via Context7, npm registry, and official docs)
+**Researched:** 2026-03-08
+**Focus:** OpenCode skills system mechanics, agent quality tooling, skills migration viability
+**Overall confidence:** HIGH (verified via OpenCode official docs, Context7, opencode-skills plugin source, live system inspection)
 
 ## Executive Summary
 
-v8.2 is a hardening milestone. No new runtime dependencies should be added to the bundle. All tools recommended here are **dev-only** (installed as devDependencies) or **already built-in** to Node.js and esbuild. The existing project already has the most critical piece — a custom profiler (`src/lib/profiler.js`) using `node:perf_hooks` with opt-in `GSD_PROFILE=1` gating. The goal is to complement it with external tools for one-time audits, not to add permanent runtime infrastructure.
+OpenCode's native skills system (since v1.0.190) provides **lazy-loaded, on-demand instruction packages** that agents can discover and load via a built-in `skill` tool. Skills use a simple directory-per-skill layout with `SKILL.md` files containing YAML frontmatter (name + description required) and markdown instructions. The key architectural insight: **skills are progressive disclosure** — only skill names/descriptions are injected into agent system prompts; full content loads only when the agent calls `skill({ name: "..." })`.
 
-**Key architectural constraint:** This is a single-file CJS bundle (~1216KB, 37 source files) deployed via file copy. No new runtime dependencies. All tooling is for development/CI analysis only.
+**For bGSD**, the skills system is directly relevant for migrating shared agent metadata (references, common patterns) out of monolithic agent definitions. Currently, bGSD agents embed or inline-reference 12 reference docs and duplicated `<project_context>` blocks across 9+ agents. Skills can hold these as reusable, lazy-loaded packages.
 
-**Critical finding: esbuild already has `metafile: true` and `analyzeMetafile()` built in.** The project's `build.js` tracks bundle size but doesn't use metafile analysis. Adding `metafile: true` to the existing build gives per-module byte attribution for free — no new tool needed.
+**No new runtime dependencies required.** Skills are pure markdown files with YAML frontmatter — no code, no build tooling, no npm packages. The bGSD deploy.sh would need minor updates to copy skills directories to the host editor config.
 
-**Knip is the right tool for dead code detection** in this CommonJS codebase. It explicitly supports CJS `require()`/`module.exports` without TypeScript, has 100+ plugins, and can auto-fix unused exports with `--fix`. Version 5.85.0, actively maintained (weekly releases), 1.7M weekly downloads.
+**Critical distinction:** OpenCode has three complementary extensibility systems (rules/AGENTS.md, skills, commands). bGSD already uses all three in its own way (references/, agent .md files, commands/*.md). The migration is about **restructuring existing content** into OpenCode's native skill format, not adding new technology.
 
-**Madge is the right tool for architecture validation** — circular dependency detection and dependency graph visualization for CJS/ESM. Version 8.0.0, 1.7M weekly downloads, zero-config for CommonJS.
+## OpenCode Skills System Mechanics
 
-**Node.js built-in `--cpu-prof` is sufficient for CLI profiling.** No external profiling tool needed for a short-lived CLI process. The existing `GSD_PROFILE=1` custom profiler handles operational timing; `--cpu-prof` covers V8-level CPU analysis when deeper investigation is needed.
+### How Skills Work — The Complete Flow
 
-## Recommended Stack
+**Confidence: HIGH** (verified via official docs at opencode.ai/docs/skills, Context7 /anomalyco/opencode, and /malhashemi/opencode-skills)
 
-### Dead Code Detection
+1. **Discovery at startup:** OpenCode scans multiple directories for `skills/*/SKILL.md` files
+2. **Index injection:** Discovered skill names and descriptions are injected into the `skill` tool's description as XML, visible to all agents:
+   ```xml
+   <available_skills>
+     <skill>
+       <name>git-release</name>
+       <description>Create consistent releases and changelogs</description>
+     </skill>
+   </available_skills>
+   ```
+3. **On-demand loading:** When an agent decides it needs a skill, it calls `skill({ name: "git-release" })` — this returns the full SKILL.md content
+4. **No eager loading:** Full skill content is NOT loaded at startup — only metadata is indexed. This is the key token-saving feature.
 
-| Technology | Version | Purpose | Why |
-|---|---|---|---|
-| knip | ^5.85.0 | Find unused files, exports, dependencies | Understands CJS `require()`/`module.exports`, project-wide analysis (not file-level like ESLint), auto-fix with `--fix`, 100+ framework plugins, no TypeScript required |
+### Discovery Paths (Priority Order)
 
-**Configuration for this project:**
+OpenCode searches these paths for `skills/*/SKILL.md`:
+
+| Priority | Path | Scope |
+|----------|------|-------|
+| 1 | `.opencode/skills/<name>/SKILL.md` | Project-local (OpenCode native) |
+| 2 | `.agents/skills/<name>/SKILL.md` | Project-local (agent-compatible) |
+| 3 | `.claude/skills/<name>/SKILL.md` | Project-local (Claude-compatible) |
+| 4 | `~/.config/opencode/skills/<name>/SKILL.md` | Global (OpenCode native) |
+| 5 | `~/.agents/skills/<name>/SKILL.md` | Global (agent-compatible) |
+| 6 | `~/.claude/skills/<name>/SKILL.md` | Global (Claude-compatible) |
+
+**Project-local walks up** from CWD to git worktree root, checking each directory.
+
+**For bGSD deployment:** Global skills at `~/.config/opencode/skills/` is the correct target — bGSD is a global plugin, not project-local.
+
+### SKILL.md Frontmatter Schema
+
+```yaml
+---
+name: skill-name          # REQUIRED — 1-64 chars, lowercase alphanumeric + single hyphens
+description: What it does  # REQUIRED — 1-1024 chars, specific enough for agent selection
+license: MIT               # OPTIONAL
+compatibility: opencode    # OPTIONAL
+metadata:                  # OPTIONAL — string-to-string map only
+  audience: maintainers
+  workflow: github
+---
+```
+
+**Validation rules:**
+- `name` regex: `^[a-z0-9]+(-[a-z0-9]+)*$`
+- `name` MUST match the containing directory name exactly
+- `description` min length: 1 char (native), 20 chars (opencode-skills plugin legacy)
+- Unknown frontmatter fields are silently ignored
+- The `allowed-tools` field is parsed but NOT enforced by native OpenCode — use permissions config instead
+
+### Skill Directory Structure
+
+```
+my-skill/
+├── SKILL.md              # Required — frontmatter + markdown instructions
+├── scripts/              # Optional — executable code (bash, python, etc.)
+│   └── helper.sh
+├── references/           # Optional — documentation to load as needed
+│   └── api-docs.md
+└── assets/               # Optional — templates, configs, etc.
+    └── template.html
+```
+
+**Key:** When a skill is loaded, the agent receives base directory context:
+```
+Base directory for this skill: /path/to/skills/my-skill/
+```
+This enables relative path resolution for `scripts/`, `references/`, and `assets/`.
+
+### Tool Name Generation
+
+- Native OpenCode: single `skill` tool, takes `name` parameter
+- Legacy plugin: each skill becomes `skills_<name>` with hyphens→underscores (e.g., `skills_git_release`)
+
+### Permissions and Access Control
 
 ```json
+// opencode.json — permission-based control (native v1.0.190+)
 {
-  "$schema": "https://unpkg.com/knip@5/schema.json",
-  "entry": ["src/index.js", "build.js", "test/**/*.cjs"],
-  "project": ["src/**/*.js"],
-  "ignore": ["bin/gsd-tools.cjs", "bin/gsd-tools.test.cjs"],
-  "ignoreDependencies": ["esbuild"]
-}
-```
-
-**Why knip over alternatives:**
-
-| Alternative | Verdict | Why Not |
-|---|---|---|
-| ESLint `no-unused-vars` | Insufficient | File-level only — can't detect cross-module dead exports |
-| ts-prune | Wrong tool | TypeScript-only, maintenance mode, superseded by knip |
-| depcheck | Partial overlap | Finds unused npm deps but not unused exports/files — knip does both |
-| Manual grep for unused exports | Error-prone | Static analysis requires import graph traversal, not text search |
-
-**Usage pattern (dev-only, not CI-gated initially):**
-
-```bash
-# Full audit — find all unused code
-npx knip
-
-# Production mode — ignore test files
-npx knip --production
-
-# Auto-fix unused exports (review first!)
-npx knip --fix --dry-run
-npx knip --fix
-```
-
-**Confidence:** HIGH — verified via Context7 docs, npm registry (5.85.0, Feb 2026), and knip.dev official documentation. CJS support explicitly documented with examples.
-
-### Bundle Size Analysis
-
-| Technology | Version | Purpose | Why |
-|---|---|---|---|
-| esbuild (existing) | 0.27.3 | Per-module byte attribution via metafile | Already a devDependency; `metafile: true` + `analyzeMetafile()` gives complete bundle composition at zero cost |
-
-**No new tool needed.** The existing `build.js` should be enhanced to:
-
-1. Add `metafile: true` to the esbuild config
-2. Call `esbuild.analyzeMetafile(result.metafile)` after build
-3. Write metafile JSON for historical tracking
-
-**Current bundle composition (measured):**
-
-| Component | Size | % of Bundle | Notes |
-|---|---|---|---|
-| acorn (npm dep) | 230.2KB | 18.9% | JS parser for AST intelligence — largest single module |
-| tokenx (npm dep) | 6.1KB | 0.5% | BPE token estimation — minimal |
-| src/ (37 files) | ~978KB | 80.6% | Application code |
-| **Total** | **~1216KB** | **100%** | Budget: 1500KB |
-
-**Top source modules by size (optimization targets):**
-
-| Module | Size | % | Potential Action |
-|---|---|---|---|
-| src/commands/verify.js | 74.6KB | 6.1% | Audit for dead code paths |
-| src/router.js | 72.0KB | 5.9% | 100+ command routes — review for stale entries |
-| src/lib/constants.js | 71.9KB | 5.9% | Large regex/constant blocks — audit for unused patterns |
-| src/commands/features.js | 71.8KB | 5.9% | Audit for dead code |
-| src/commands/init.js | 70.1KB | 5.8% | 20 imports — review for unused |
-| src/commands/research.js | 56.9KB | 4.7% | v8.1 RAG — likely has dead paths |
-| src/commands/intent.js | 54.8KB | 4.5% | Audit for unused command handlers |
-
-**Visualization (optional, for one-time deep analysis):**
-
-```bash
-# Upload metafile to esbuild's official analyzer
-# https://esbuild.github.io/analyze/
-
-# Or use CLI analysis
-node -e "
-const esbuild = require('esbuild');
-esbuild.build({ ...config, metafile: true }).then(async r => {
-  console.log(await esbuild.analyzeMetafile(r.metafile, { verbose: true }));
-});
-"
-```
-
-**Confidence:** HIGH — esbuild metafile API verified via Context7 (`/evanw/esbuild`). `analyzeMetafile()` available since esbuild 0.12.26 (2021). No additional dependency needed.
-
-### Performance Profiling
-
-| Technology | Version | Purpose | Why |
-|---|---|---|---|
-| `node:perf_hooks` (existing) | Node.js 22.5+ | Operational timing (command-level) | Already integrated as `GSD_PROFILE=1` — zero-cost when disabled |
-| `node --cpu-prof` (built-in) | Node.js 22.5+ | V8 CPU profiling for hot path analysis | Generates `.cpuprofile` files viewable in Chrome DevTools — no install needed |
-
-**No external profiler needed.** This is a short-lived CLI process (<5s typical execution). The two profiling layers are:
-
-1. **Operational profiling** (existing `GSD_PROFILE=1`): Measures labeled spans (e.g., "parse ROADMAP.md", "read config"). Writes JSON baselines to `.planning/baselines/`. Already has comparison tooling in `src/commands/profiler.js`.
-
-2. **V8 CPU profiling** (built-in, for deep dives only):
-```bash
-# Generate V8 CPU profile
-node --cpu-prof --cpu-prof-dir=.planning/baselines bin/gsd-tools.cjs init --raw
-
-# Analyze in Chrome DevTools:
-# 1. Open chrome://inspect → "Open dedicated DevTools for Node"
-# 2. Performance tab → Load profile → select .cpuprofile file
-```
-
-**Why NOT external profiling tools:**
-
-| Tool | Verdict | Why Not |
-|---|---|---|
-| clinic.js | Overkill | Designed for long-running servers, not CLI tools (<5s). Requires global install. Adds complexity for a one-time investigation. |
-| @platformatic/flame | Wrong fit | Requires Node.js >= 22.6, designed for server profiling with start/stop toggle. CLI processes exit too fast for flamegraph collection. |
-| 0x | Marginal value | Flamegraph wrapper around V8 profiling — `--cpu-prof` gives the same data without a dependency. 0x adds startup overhead that distorts CLI profiling. |
-| N|Solid | Wrong tier | Enterprise APM — wrong scale for a dev tool CLI. |
-
-**What to actually profile (hot paths identified from existing baselines):**
-
-- `init` command startup (parses ROADMAP.md, STATE.md, PLAN.md, config)
-- `constants.js` loading (71.9KB of regex patterns — compilation cost)
-- `router.js` command dispatch (100+ route registrations on every invocation)
-- File cache hit rates (`src/lib/cache.js` L1/L2 cache effectiveness)
-
-**Confidence:** HIGH — Node.js `--cpu-prof` verified via official Node.js docs and `node --help` output on this system. Existing profiler code reviewed (`src/lib/profiler.js`).
-
-### Architecture Validation
-
-| Technology | Version | Purpose | Why |
-|---|---|---|---|
-| madge | ^8.0.0 | Circular dependency detection, dependency graph | 1.7M weekly downloads, supports CJS, visual SVG graph output via Graphviz, JSON export for scripting |
-
-**Usage pattern:**
-
-```bash
-# Find circular dependencies
-npx madge --circular src/
-
-# Generate dependency graph (requires graphviz)
-npx madge --image .planning/research/dependency-graph.svg src/index.js
-
-# JSON output for scripting
-npx madge --json src/ > .planning/research/dependency-tree.json
-
-# Check specific module's dependants (who imports this?)
-npx madge --depends src/lib/helpers.js src/
-```
-
-**Architecture validation script (suggested):**
-
-```bash
-#!/bin/bash
-# .planning/scripts/validate-architecture.sh
-
-echo "=== Circular Dependencies ==="
-npx madge --circular src/
-CIRCULAR=$?
-
-echo "=== Dependency Count per Module ==="
-npx madge --json src/ | node -e "
-const data = JSON.parse(require('fs').readFileSync('/dev/stdin', 'utf8'));
-Object.entries(data)
-  .map(([f,deps]) => [f, deps.length])
-  .sort((a,b) => b[1] - a[1])
-  .slice(0, 15)
-  .forEach(([f,n]) => console.log(n + ' deps: ' + f));
-"
-
-exit $CIRCULAR
-```
-
-**Why madge over alternatives:**
-
-| Alternative | Verdict | Why Not |
-|---|---|---|
-| dependency-cruiser | Overpowered | Full rule engine for dependency policies — useful for large teams with CI enforcement, overkill for a single-developer CLI tool. 100+ config options. |
-| eslint-plugin-import `no-cycle` | Slow | O(n^2) analysis per file — too slow for ongoing use. Good for CI but madge is faster for ad-hoc audits. |
-| Custom acorn-based analysis | Already exists | `src/lib/ast.js` has export/import analysis but doesn't do cycle detection. Extending it would duplicate madge's well-tested graph traversal. |
-| Built-in `src/lib/deps.js` | Different scope | Analyzes target project dependencies (6 languages), not self-analysis of gsd-tools source. |
-
-**Confidence:** HIGH — verified via Context7 (`/pahen/madge`), npm registry (v8.0.0), and official GitHub README. CJS support is a primary feature.
-
-## What NOT to Add
-
-These tools were considered and explicitly rejected for this milestone:
-
-| Tool | Category | Why Not |
-|---|---|---|
-| size-limit | Bundle budget | `build.js` already tracks bundle size with a 1500KB budget and fails on overage. Adding size-limit would duplicate existing functionality. |
-| bundlewatch | Bundle CI | Same — existing `bundle-size.json` baseline tracking is sufficient. |
-| webpack-bundle-analyzer | Visualization | Wrong bundler. esbuild's built-in `analyzeMetafile()` serves the same purpose. |
-| @viz-kit/esbuild-analyzer | Visualization | Interactive treemap is nice for exploration but esbuild's text analysis + official web analyzer (esbuild.github.io/analyze/) is sufficient. |
-| depcheck | Unused deps | knip already detects unused dependencies AND unused exports. depcheck would be redundant. |
-| eslint-plugin-unused-imports | Dead imports | knip catches these project-wide. ESLint rule is file-scoped. |
-| ts-morph / jscodeshift | AST transforms | Automated large-scale refactoring — wrong tool for a 37-file project where changes should be manual and reviewed. |
-| c8 / nyc | Code coverage | Test coverage ≠ dead code detection. High coverage doesn't mean all exports are used. knip solves the actual problem. |
-| TypeScript `noUnusedLocals` | Dead local vars | This is a plain JS project. Also file-scoped, not project-scoped. |
-
-## Installation
-
-```bash
-# Dev dependencies only — nothing enters the bundle
-npm install -D knip madge
-```
-
-**Total new devDependencies: 2** (knip + madge). Both are dev-only and never touch the production bundle.
-
-**No changes to runtime dependencies.** The existing `dependencies` (acorn, tokenx) and `devDependencies` (esbuild) are unchanged.
-
-## Integration with Existing Tooling
-
-| Existing Tool | Integration Point |
-|---|---|
-| `build.js` (esbuild) | Add `metafile: true`, call `analyzeMetafile()`, write metafile JSON |
-| `GSD_PROFILE=1` profiler | No change — continues to provide operational timing |
-| `src/commands/profiler.js` compare | No change — continues to compare baselines |
-| `npm test` (762+ tests) | No change — knip is run separately, not as part of test suite |
-| `deploy.sh` | No change — knip/madge are dev tools, not deployment concerns |
-
-## Recommended npm Scripts
-
-```json
-{
-  "scripts": {
-    "build": "node build.js",
-    "test": "node --test bin/gsd-tools.test.cjs",
-    "lint:dead-code": "knip",
-    "lint:dead-code:fix": "knip --fix",
-    "lint:circular": "madge --circular src/",
-    "lint:deps": "madge --json src/ | node -e \"const d=JSON.parse(require('fs').readFileSync('/dev/stdin','utf8'));Object.entries(d).map(([f,deps])=>[f,deps.length]).sort((a,b)=>b[1]-a[1]).slice(0,10).forEach(([f,n])=>console.log(n+' deps: '+f))\"",
-    "analyze": "node build.js && echo '--- Bundle Analysis ---' && node -e \"const e=require('esbuild');const fs=require('fs');const m=JSON.parse(fs.readFileSync('.planning/baselines/metafile.json','utf8'));e.analyzeMetafile(m,{verbose:true}).then(console.log)\""
+  "permission": {
+    "skill": {
+      "*": "allow",
+      "internal-*": "deny",
+      "experimental-*": "ask"
+    }
   }
 }
 ```
 
+**Per-agent override** in opencode.json:
+```json
+{
+  "agent": {
+    "plan": {
+      "permission": {
+        "skill": {
+          "internal-*": "allow"
+        }
+      }
+    }
+  }
+}
+```
+
+**Per-agent override** in agent markdown frontmatter:
+```yaml
+---
+permission:
+  skill:
+    "documents-*": "allow"
+---
+```
+
+**Disabling skills entirely** for an agent:
+```yaml
+---
+tools:
+  skill: false
+---
+```
+
+## OpenCode Extensibility Architecture (Three Systems)
+
+### 1. Rules (AGENTS.md / instructions)
+- **What:** Static instructions injected into ALL agent conversations at startup
+- **When loaded:** Always, immediately, into system prompt
+- **bGSD equivalent:** `AGENTS.md` in project root, `references/*.md` loaded by agents
+- **Cost:** Full token cost always paid upfront
+- **Config:** `instructions` array in opencode.json supports globs and URLs
+
+### 2. Skills (SKILL.md)
+- **What:** Modular instruction packages loaded on-demand by agents
+- **When loaded:** Only when agent explicitly calls `skill()` tool
+- **bGSD equivalent:** `references/*.md` (partial), shared agent patterns (duplicated)
+- **Cost:** Only metadata (name+description) paid upfront; full content only when needed
+- **Config:** Permission-based access control per agent
+
+### 3. Commands (commands/*.md)
+- **What:** User-invokable prompts with argument substitution
+- **When loaded:** On user `/command` invocation
+- **bGSD equivalent:** `commands/bgsd-*.md` (exact match — bGSD already uses this)
+- **Config:** Can specify agent, model, subtask mode
+
+### Key Insight for bGSD Migration
+
+bGSD currently duplicates shared patterns across agent definitions:
+- `<project_context>` block (skill/AGENTS.md discovery) — duplicated in 9 agents
+- `PATH SETUP` block — duplicated in 10 agents
+- References like RACI.md, verification-patterns.md — loaded by multiple agents
+
+Skills can consolidate these into lazy-loaded packages:
+- `gsd-project-context` skill — shared project discovery logic
+- `gsd-raci` skill — RACI matrix and handoff contracts
+- `gsd-verification` skill — verification patterns
+- `gsd-tdd` skill — TDD execution patterns
+
+## Recommended Stack Changes for v8.3
+
+### No New Runtime Dependencies
+
+| Category | Decision | Rationale |
+|----------|----------|-----------|
+| Skills format | SKILL.md (markdown + YAML frontmatter) | Native OpenCode format, no parsing library needed |
+| Skills validation | None at build time | OpenCode validates at startup; bGSD deploy.sh can add basic checks |
+| Frontmatter parsing | Not needed in gsd-tools.cjs | Skills are consumed by OpenCode, not by gsd-tools |
+| Directory structure | `skills/<name>/SKILL.md` | Standard OpenCode convention |
+
+### Deploy Infrastructure Changes
+
+| Change | What | Why |
+|--------|------|-----|
+| deploy.sh update | Copy `skills/` to `~/.config/opencode/skills/` | Deploy skills alongside agents and commands |
+| manifest.json update | Include `skills/*/SKILL.md` and supporting files | Track deployed skills for cleanup |
+| build.cjs | No changes needed | Skills are not compiled/bundled |
+
+### Skills to Create (Migration Candidates)
+
+| Skill Name | Source Content | Current Location | Estimated Tokens Saved |
+|------------|---------------|------------------|----------------------|
+| `gsd-project-context` | `<project_context>` block | Duplicated in 9 agent .md files | ~200 tokens × 9 = 1800 |
+| `gsd-raci` | RACI matrix reference | `references/RACI.md` (291 lines) | Loaded only when needed |
+| `gsd-verification` | Verification patterns | `references/verification-patterns.md` | Loaded only when needed |
+| `gsd-tdd` | TDD execution patterns | `references/tdd.md` | Loaded only when needed |
+| `gsd-git-integration` | Git conventions | `references/git-integration.md` | Loaded only when needed |
+| `gsd-ui-brand` | Formatting/branding | `references/ui-brand.md` | Loaded only when needed |
+| `gsd-model-profiles` | Model selection guide | `references/model-profiles.md` + `model-profile-resolution.md` | Loaded only when needed |
+| `gsd-checkpoints` | Checkpoint/trajectory | `references/checkpoints.md` | Loaded only when needed |
+| `gsd-continuation` | Continuation format | `references/continuation-format.md` | Loaded only when needed |
+| `gsd-questioning` | Questioning patterns | `references/questioning.md` | Loaded only when needed |
+
+### What Cannot Be Skills
+
+| Content | Reason |
+|---------|--------|
+| Agent system prompts | These ARE the agent definition — they must be in agent .md files |
+| Workflow orchestration | Workflows invoke agents, not the other way around |
+| CLI tool (gsd-tools.cjs) | Binary, not an instruction package |
+| Commands (commands/*.md) | Already using OpenCode's native command system |
+| PATH SETUP block | Must be in agent definition (needed before any tool calls) |
+
+## Integration Points with Existing bGSD Architecture
+
+### Agent Manifest System
+bGSD agents declare what they need in their frontmatter. Skills complement this:
+- **Agent frontmatter** → tool access, model, token budgets
+- **Skill loading** → domain knowledge, reference documentation, patterns
+
+### Deploy Pipeline
+Current: `deploy.sh` copies agents/, commands/, bin/, references/, workflows/
+New: Also copies `skills/*/` to `~/.config/opencode/skills/`
+
+### Agent Definition Changes
+Each agent currently has a `<project_context>` block instructing it to check `.agents/skills/`. This can be:
+1. **Kept as-is** for project-level skills (user's project context)
+2. **Supplemented** with bGSD-level skills for shared reference docs
+
+The bGSD skills would live at the global level (`~/.config/opencode/skills/`) and provide GSD-specific knowledge. Project skills stay project-local.
+
+### Token Budget Impact
+- **Current:** References loaded eagerly by agents that declare them (~60-80K token budgets)
+- **With skills:** Only skill names/descriptions in system prompt (~50 tokens per skill × 10 skills = 500 tokens)
+- **Savings:** References load only when needed, not upfront. Estimated 20-40% reduction in baseline agent context for agents that load multiple references.
+
+## Constraints and Limitations
+
+### 1. No Conditional Skill Discovery
+Skills are discovered at startup and cached. You cannot dynamically register or unregister skills mid-session. Restart required after adding/modifying skills.
+
+### 2. Agent Must Decide to Load
+Skills are **passive** — the agent must recognize it needs a skill and call `skill()`. If the description is vague, agents may not load it when they should. Good descriptions are critical.
+
+### 3. No Skill Composition
+Skills cannot import or reference other skills. Each skill is standalone. If a skill needs content from another, it must duplicate or reference the file path.
+
+### 4. Name Uniqueness Across All Paths
+Skill names must be unique across ALL discovery paths. A project-local `gsd-raci` would conflict with a global `gsd-raci`. Use a consistent prefix convention (e.g., `gsd-*` for bGSD skills).
+
+### 5. Description Length Matters
+The description is what agents see to decide whether to load a skill. Too short = missed loads. Too long = wasted tokens in every agent's system prompt. Target 50-150 characters.
+
+### 6. File-Based Only
+Skills cannot contain executable logic that OpenCode runs. They're instruction documents. Scripts in `scripts/` are referenced by the skill content but executed by the agent via bash tool, not by the skill system itself.
+
+### 7. No Version Pinning
+Skills don't have built-in versioning. The `metadata.version` field is informational only — OpenCode doesn't enforce compatibility.
+
+### 8. Claude Code Compatibility
+OpenCode reads `.claude/skills/` as a fallback path. If bGSD ever needs cross-editor compatibility, skills placed in `.agents/skills/` would be recognized by OpenCode (via the agent-compatible path).
+
+## Alternatives Considered
+
+| Approach | Recommended | Alternative | Why Not |
+|----------|-------------|-------------|---------|
+| Shared agent content | OpenCode skills | Inline in each agent .md | Duplication, token waste, maintenance burden |
+| Reference loading | Skills with `references/` subdirs | Current manual `Read` tool calls | Skills provide base directory context, cleaner UX |
+| Project context | Keep `<project_context>` in agents | Move to skill | Project context detection must happen at agent startup, not on-demand |
+| Deploy mechanism | Extend deploy.sh | Separate skills installer | Keep single deploy pipeline |
+| Skill placement | Global `~/.config/opencode/skills/` | Project-local `.opencode/skills/` | bGSD is a global plugin, not project-specific |
+
 ## Sources
 
-| Source | Type | Confidence |
-|---|---|---|
-| Context7 `/evanw/esbuild` — metafile/analyzeMetafile API | Official docs | HIGH |
-| Context7 `/webpro-nl/knip` — CJS configuration, entry points | Official docs | HIGH |
-| Context7 `/pahen/madge` — circular detection, CLI usage | Official docs | HIGH |
-| npm registry — knip@5.85.0 (Feb 2026) | Version verification | HIGH |
-| npm registry — madge@8.0.0 | Version verification | HIGH |
-| npm registry — esbuild@0.27.3 (installed) | Version verification | HIGH |
-| knip.dev/guides/working-with-commonjs | Official docs | HIGH |
-| esbuild.github.io/api/#metafile | Official docs | HIGH |
-| nodejs.org/en/learn/diagnostics | Official docs | HIGH |
-| push-based.io/article/advanced-cpu-profiling-in-node | Community (verified) | MEDIUM |
-| Direct measurement: `esbuild.analyzeMetafile()` on this project | Empirical | HIGH |
-| Direct measurement: `node --help` on Node.js 22.5+ | Empirical | HIGH |
+- OpenCode Official Skills Docs — https://opencode.ai/docs/skills (last updated Mar 7, 2026) — **HIGH confidence**
+- OpenCode Agents Docs — https://opencode.ai/docs/agents — **HIGH confidence**
+- OpenCode Tools Docs — https://opencode.ai/docs/tools — **HIGH confidence**
+- OpenCode Rules Docs — https://opencode.ai/docs/rules — **HIGH confidence**
+- OpenCode Commands Docs — https://opencode.ai/docs/commands — **HIGH confidence**
+- OpenCode Custom Tools Docs — https://opencode.ai/docs/custom-tools — **HIGH confidence**
+- Context7 /anomalyco/opencode (939 snippets, High reputation) — **HIGH confidence**
+- Context7 /malhashemi/opencode-skills (77 snippets, High reputation) — **HIGH confidence**
+- malhashemi/opencode-skills GitHub README (archived, graduated to native) — **MEDIUM confidence** (historical, but skill format unchanged)
+- Live system inspection of `~/.config/oc/` directory structure — **HIGH confidence**
+- bGSD agent .md files (gsd-executor.md, gsd-planner.md, gsd-github-ci.md) — **HIGH confidence** (primary source)
+- bGSD deploy.sh and plugin.js — **HIGH confidence** (primary source)
+
+---
+*Last updated: 2026-03-08*
