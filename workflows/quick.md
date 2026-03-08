@@ -9,7 +9,12 @@ Read all execution_context files before starting.
 <process>
 **Step 1: Parse arguments and get task description**
 
-Parse `$ARGUMENTS` for `--full` flag → `$FULL_MODE` (true/false). Remaining text → `$DESCRIPTION`.
+Parse `$ARGUMENTS` for flags:
+- `--full` → `$FULL_MODE` (true/false)
+- `--ci` → force CI quality gate after execution
+- `--no-ci` → skip CI quality gate even if configured
+
+Remaining text → `$DESCRIPTION`.
 
 If `$DESCRIPTION` empty, prompt:
 ```
@@ -183,6 +188,55 @@ Execute quick task ${next_num}.
 ```
 
 Verify summary exists. If executor reports "failed" with `classifyHandoffIfNeeded` error — check summary file + git log; if present, treat as successful.
+
+---
+
+**Step 5.25: CI quality gate (optional)**
+
+Check if CI gate should run:
+```bash
+CI_ENABLED=$(node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs util:config-get workflow.ci_gate 2>/dev/null || echo "false")
+```
+
+Also run if `--ci` flag was passed in `$ARGUMENTS`. Skip if `--no-ci` flag present.
+
+**If CI enabled:**
+
+```
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ bGSD ► CI QUALITY GATE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+◆ Pushing branch, creating PR, running code scanning...
+```
+
+```
+Task(
+  prompt="
+Run the GitHub CI quality gate.
+
+<ci_parameters>
+BRANCH_NAME: ci/quick-${next_num}
+BASE_BRANCH: main
+AUTO_MERGE: true
+SCOPE: quick-${next_num}
+</ci_parameters>
+
+<files_to_read>
+- .planning/STATE.md
+- ./AGENTS.md (if exists)
+</files_to_read>
+",
+  subagent_type="gsd-github-ci",
+  model="{executor_model}",
+  description="GitHub CI: quick-${next_num}"
+)
+```
+
+**Handle CI result:**
+- `## CI COMPLETE` with `Status: merged` → continue to next step
+- `## CHECKPOINT REACHED` → present to user, wait for resolution
+
+**If CI disabled:** Skip silently.
 
 ---
 
