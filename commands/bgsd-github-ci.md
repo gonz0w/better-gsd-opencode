@@ -1,5 +1,5 @@
 ---
-description: Push, create PR, run code scanning checks, fix issues, and auto-merge
+description: Push, create PR, run code scanning checks, fix issues, and auto-merge. Returns structured CI COMPLETE or CHECKPOINT REACHED output.
 ---
 <objective>
 Run the GitHub CI quality gate: push branch, create PR, monitor code scanning checks, fix issues in a loop, and auto-merge when clean.
