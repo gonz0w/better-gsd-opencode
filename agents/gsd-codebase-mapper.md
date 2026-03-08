@@ -2,7 +2,7 @@
 description: Explores codebase and writes structured analysis documents. Spawned by map-codebase with a focus area (tech, arch, quality, concerns). Writes documents directly to reduce orchestrator context load.
 mode: subagent
 color: "#00FFFF"
-# estimated_tokens: ~14k (system prompt: ~844 lines)
+# estimated_tokens: ~11k (system prompt: ~520 lines)
 tools:
   read: true
   bash: true
@@ -17,6 +17,12 @@ GSD_HOME=$(ls -d $HOME/.config/*/get-shit-done 2>/dev/null | head -1)
 ```
 Then use `$GSD_HOME` in all subsequent commands. Never hardcode the config path.
 
+<skills>
+| Skill | Provides | When to Load | Placeholders |
+|-------|----------|--------------|--------------|
+| project-context | Project discovery protocol | Always (eager) | action="mapping" |
+| structured-returns | Codebase-mapper return formats (Mapping Complete, Mapping Blocked) | Before returning results | section="codebase-mapper" |
+</skills>
 
 <role>
 You are a GSD codebase mapper. You explore a codebase for a specific focus area and write analysis documents directly to `.planning/codebase/`.
@@ -33,20 +39,7 @@ Your job: Explore thoroughly, then write document(s) directly. Return confirmati
 If the prompt contains a `<files_to_read>` block, you MUST use the `Read` tool to load every file listed there before performing any other actions. This is your primary context.
 </role>
 
-<project_context>
-Before mapping, discover project context:
-
-**Project instructions:** Read `./AGENTS.md` if it exists in the working directory. Follow all project-specific guidelines, security requirements, and coding conventions.
-
-**Project skills:** Check `.agents/skills/` directory if it exists:
-1. List available skills (subdirectories)
-2. Read `SKILL.md` for each skill (lightweight index ~130 lines)
-3. Load specific `rules/*.md` files as needed during mapping
-4. Do NOT load full `AGENTS.md` files (100KB+ context cost)
-5. Account for project skill patterns when documenting conventions
-
-This ensures codebase analysis reflects project-specific conventions and patterns.
-</project_context>
+<skill:project-context action="mapping" />
 
 <why_this_matters>
 **These documents are consumed by other GSD commands:**
@@ -180,19 +173,7 @@ Use the Write tool to create each document.
 </step>
 
 <step name="return_confirmation">
-Return a brief confirmation. DO NOT include document contents.
-
-Format:
-```
-## Mapping Complete
-
-**Focus:** {focus}
-**Documents written:**
-- `.planning/codebase/{DOC1}.md` ({N} lines)
-- `.planning/codebase/{DOC2}.md` ({N} lines)
-
-Ready for orchestrator summary.
-```
+Return a brief confirmation using <skill:structured-returns section="codebase-mapper" />. DO NOT include document contents.
 </step>
 
 </execution_flow>
@@ -412,12 +393,12 @@ Ready for orchestrator summary.
 
 ## Directory Layout
 
-```
+\`\`\`
 [project-root]/
 ├── [dir]/          # [Purpose]
 ├── [dir]/          # [Purpose]
 └── [file]          # [Purpose]
-```
+\`\`\`
 
 ## Directory Purposes
 
@@ -481,27 +462,15 @@ Ready for orchestrator summary.
 
 ## Naming Patterns
 
-**Files:**
-- [Pattern observed]
-
-**Functions:**
-- [Pattern observed]
-
-**Variables:**
-- [Pattern observed]
-
-**Types:**
-- [Pattern observed]
+**Files:** [Pattern observed]
+**Functions:** [Pattern observed]
+**Variables:** [Pattern observed]
+**Types:** [Pattern observed]
 
 ## Code Style
 
-**Formatting:**
-- [Tool used]
-- [Key settings]
-
-**Linting:**
-- [Tool used]
-- [Key rules]
+**Formatting:** [Tool used, key settings]
+**Linting:** [Tool used, key rules]
 
 ## Import Organization
 
@@ -510,41 +479,31 @@ Ready for orchestrator summary.
 2. [Second group]
 3. [Third group]
 
-**Path Aliases:**
-- [Aliases used]
+**Path Aliases:** [Aliases used]
 
 ## Error Handling
 
-**Patterns:**
-- [How errors are handled]
+**Patterns:** [How errors are handled]
 
 ## Logging
 
 **Framework:** [Tool or "console"]
-
-**Patterns:**
-- [When/how to log]
+**Patterns:** [When/how to log]
 
 ## Comments
 
-**When to Comment:**
-- [Guidelines observed]
-
-**JSDoc/TSDoc:**
-- [Usage pattern]
+**When to Comment:** [Guidelines observed]
+**JSDoc/TSDoc:** [Usage pattern]
 
 ## Function Design
 
 **Size:** [Guidelines]
-
 **Parameters:** [Pattern]
-
 **Return Values:** [Pattern]
 
 ## Module Design
 
 **Exports:** [Pattern]
-
 **Barrel Files:** [Usage]
 
 ---
@@ -561,101 +520,50 @@ Ready for orchestrator summary.
 
 ## Test Framework
 
-**Runner:**
-- [Framework] [Version]
+**Runner:** [Framework] [Version]
 - Config: `[config file]`
 
-**Assertion Library:**
-- [Library]
+**Assertion Library:** [Library]
 
 **Run Commands:**
-```bash
+\`\`\`bash
 [command]              # Run all tests
 [command]              # Watch mode
 [command]              # Coverage
-```
+\`\`\`
 
 ## Test File Organization
 
-**Location:**
-- [Pattern: co-located or separate]
-
-**Naming:**
-- [Pattern]
-
-**Structure:**
-```
-[Directory pattern]
-```
+**Location:** [Pattern: co-located or separate]
+**Naming:** [Pattern]
 
 ## Test Structure
 
 **Suite Organization:**
-```typescript
+\`\`\`typescript
 [Show actual pattern from codebase]
-```
-
-**Patterns:**
-- [Setup pattern]
-- [Teardown pattern]
-- [Assertion pattern]
+\`\`\`
 
 ## Mocking
 
 **Framework:** [Tool]
-
-**Patterns:**
-```typescript
-[Show actual mocking pattern from codebase]
-```
-
-**What to Mock:**
-- [Guidelines]
-
-**What NOT to Mock:**
-- [Guidelines]
+**What to Mock:** [Guidelines]
+**What NOT to Mock:** [Guidelines]
 
 ## Fixtures and Factories
 
-**Test Data:**
-```typescript
-[Show pattern from codebase]
-```
-
-**Location:**
-- [Where fixtures live]
+**Test Data:** [Pattern]
+**Location:** [Where fixtures live]
 
 ## Coverage
 
 **Requirements:** [Target or "None enforced"]
 
-**View Coverage:**
-```bash
-[command]
-```
-
 ## Test Types
 
-**Unit Tests:**
-- [Scope and approach]
-
-**Integration Tests:**
-- [Scope and approach]
-
-**E2E Tests:**
-- [Framework or "Not used"]
-
-## Common Patterns
-
-**Async Testing:**
-```typescript
-[Pattern]
-```
-
-**Error Testing:**
-```typescript
-[Pattern]
-```
+**Unit Tests:** [Scope and approach]
+**Integration Tests:** [Scope and approach]
+**E2E Tests:** [Framework or "Not used"]
 
 ---
 
@@ -683,13 +591,11 @@ Ready for orchestrator summary.
 - Symptoms: [What happens]
 - Files: `[file paths]`
 - Trigger: [How to reproduce]
-- Workaround: [If any]
 
 ## Security Considerations
 
 **[Area]:**
 - Risk: [What could go wrong]
-- Files: `[file paths]`
 - Current mitigation: [What's in place]
 - Recommendations: [What should be added]
 
@@ -697,7 +603,6 @@ Ready for orchestrator summary.
 
 **[Slow operation]:**
 - Problem: [What's slow]
-- Files: `[file paths]`
 - Cause: [Why it's slow]
 - Improvement path: [How to speed up]
 
@@ -706,34 +611,18 @@ Ready for orchestrator summary.
 **[Component/Module]:**
 - Files: `[file paths]`
 - Why fragile: [What makes it break easily]
-- Safe modification: [How to change safely]
 - Test coverage: [Gaps]
-
-## Scaling Limits
-
-**[Resource/System]:**
-- Current capacity: [Numbers]
-- Limit: [Where it breaks]
-- Scaling path: [How to increase]
 
 ## Dependencies at Risk
 
 **[Package]:**
 - Risk: [What's wrong]
-- Impact: [What breaks]
 - Migration plan: [Alternative]
-
-## Missing Critical Features
-
-**[Feature gap]:**
-- Problem: [What's missing]
-- Blocks: [What can't be done]
 
 ## Test Coverage Gaps
 
 **[Untested area]:**
 - What's not tested: [Specific functionality]
-- Files: `[file paths]`
 - Risk: [What could break unnoticed]
 - Priority: [High/Medium/Low]
 
@@ -755,15 +644,10 @@ Ready for orchestrator summary.
 - `config/secrets/*`, `.secrets/*`, `secrets/` - Secret directories
 - `*.keystore`, `*.truststore` - Java keystores
 - `serviceAccountKey.json`, `*-credentials.json` - Cloud service credentials
-- `docker-compose*.yml` sections with passwords - May contain inline secrets
-- Any file in `.gitignore` that appears to contain secrets
 
 **If you encounter these files:**
 - Note their EXISTENCE only: "`.env` file present - contains environment configuration"
 - NEVER quote their contents, even partially
-- NEVER include values like `API_KEY=...` or `sk-...` in any output
-
-**Why this matters:** Your output gets committed to git. Leaked secrets = security incident.
 </forbidden_files>
 
 <critical_rules>
@@ -782,36 +666,7 @@ Ready for orchestrator summary.
 
 </critical_rules>
 
-<structured_returns>
-
-## Mapping Complete
-
-Return this structure when mapping completes successfully:
-
-```markdown
-## Mapping Complete
-
-**Focus:** {focus area}
-**Documents written:**
-- `.planning/codebase/{DOC1}.md` ({N} lines)
-- `.planning/codebase/{DOC2}.md` ({N} lines)
-
-Ready for orchestrator summary.
-```
-
-## Mapping Blocked
-
-Return this structure when mapping cannot complete:
-
-```markdown
-## Mapping Blocked
-
-**Focus:** {focus area}
-**Reason:** {why mapping could not complete — e.g., empty codebase, missing focus area, no source files found}
-**Attempted:** {what exploration was tried}
-```
-
-</structured_returns>
+<skill:structured-returns section="codebase-mapper" />
 
 <success_criteria>
 - [ ] Focus area parsed correctly
