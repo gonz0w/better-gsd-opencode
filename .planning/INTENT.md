@@ -22,6 +22,8 @@ An intelligent agent orchestration engine for building large-scale software. Pro
 - DO-34 [P1]: Command surface area reduced — stale commands removed, overlapping commands consolidated, internal-only calls not exposed as slash commands
 - DO-35 [P1]: Agent boundaries validated — each agent has a precise manifest, minimal context load, and structured handoff contracts
 - DO-36 [P2]: Bundle size reduced — dead code removal and dependency pruning measurably shrink the output
+- DO-37 [P1]: Shared agent metadata (references, manifests, common workflows) extracted into reusable OpenCode skills — reducing duplication and context loading across agents
+- DO-38 [P1]: Test suite is fully green — zero pre-existing failures, all 762+ tests pass
 </outcomes>
 
 <criteria>
@@ -37,6 +39,9 @@ An intelligent agent orchestration engine for building large-scale software. Pro
 - SC-25: Every workflow, template, and reference file is reachable from at least one command or agent
 - SC-26: Bundle size measurably smaller than v8.1 baseline (~1216KB)
 - SC-27: Agent RACI audit passes with no overlap warnings and clear handoff contracts documented
+- SC-28: Agent metadata shared via OpenCode skills is loadable and reduces per-agent context size
+- SC-29: All 762+ tests pass with zero pre-existing failures (config-migrate, compact, codebase-impact, codebase ast fixed)
+- SC-30: GitHub CI agent uses structured todo tracking and proper workflow gates matching other agents
 </criteria>
 
 <constraints>
@@ -61,9 +66,13 @@ Orchestration should feel invisible — the right agent gets the right task with
 </health>
 
 <history>
-### v8.2 — 2026-03-08
-- **Modified** objective: An intelligent agent orchestration engine for building large-scale software. Provides structured planning, execution, verification, specialized agent coordination, and structured exploration — turning unstructured project ideas into executable plans with traceability from intent through requirements to delivered code. Optimized for minimal context loading, fast execution, clean agent boundaries, and reusable skills architecture — each agent does one thing well with exactly the context it needs, sharing common patterns through composable skills.
-  - Reason: Milestone v8.3: Added reusable skills architecture as a first-class architectural concern
+### v8.3 — 2026-03-08
+- **Modified** objective: Added reusable skills architecture as a first-class architectural concern alongside minimal context loading, fast execution, and clean agent boundaries.
+  - Reason: Milestone v8.3: Skills architecture for shared agent metadata
+- **Added** outcomes: DO-37 (skills-based agent metadata sharing), DO-38 (zero pre-existing test failures).
+  - Reason: Milestone v8.3: Agent quality, skills exploration, and test debt cleanup
+- **Added** criteria: SC-28 (skills reduce context size), SC-29 (all tests green), SC-30 (GitHub CI agent quality).
+  - Reason: Milestone v8.3: Success criteria for agent quality and skills work
 
 ### v8.2 — 2026-03-06
 - **Modified** outcomes: Marked DO-29, DO-31 as achieved v8.0. Added DO-33 (zero orphaned code), DO-34 (command surface reduction), DO-35 (agent boundary validation), DO-36 (bundle size reduction).
