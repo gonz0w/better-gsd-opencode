@@ -227,7 +227,13 @@ Plans:
   2. Agent definition files are measurably smaller (reduced line counts) because duplicated inline content has been replaced with skill load instructions
   3. Running `deploy.sh` copies skills/ directories alongside agents, commands, and workflows to the host editor config
   4. Skill descriptions are specific enough that agents load the right skills for their tasks — no false positives (loading unneeded skills) or false negatives (missing needed skills) observed during manual testing
-**Plans**: TBD
+**Plans**: 5 plans
+Plans:
+- [ ] 69-01-PLAN.md — Pipeline infrastructure (build.cjs validation/index, deploy.sh routing, install.js routing)
+- [ ] 69-02-PLAN.md — Create 9 shared protocol skills (project-context, commit-protocol, checkpoint-protocol, etc.)
+- [ ] 69-03-PLAN.md — Create agent-specific skills (planner-*, debugger-*, executor-*) + reference skills migration
+- [ ] 69-04-PLAN.md — Migrate all 10 agents to skill-based architecture, remove references/
+- [ ] 69-05-PLAN.md — End-to-end validation, description tuning, pipeline verification
 
 ### Phase 70: Test Debt Cleanup
 **Goal**: All 762+ tests pass with zero pre-existing failures — test suite is fully green and trustworthy as a regression safety net
@@ -263,5 +269,5 @@ Phases execute in numeric order: 67 → 68 → 69 → 70
 | 61-66 | v8.2 | 14/14 | Complete | 2026-03-07 |
 | 67. GitHub CI Agent Overhaul | 2/2 | Complete    | 2026-03-08 | - |
 | 68. Agent Consistency Audit | 2/2 | Complete    | 2026-03-08 | - |
-| 69. Skills Architecture | v8.3 | 0/TBD | Not started | - |
+| 69. Skills Architecture | v8.3 | 0/5 | Planning complete | - |
 | 70. Test Debt Cleanup | v8.3 | 0/TBD | Not started | - |
