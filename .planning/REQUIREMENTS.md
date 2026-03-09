@@ -1,0 +1,118 @@
+# Requirements: bGSD Plugin v9.0
+
+**Defined:** 2026-03-09
+**Core Value:** Manage and deliver high-quality software with high-quality documentation, while continuously reducing token usage and improving performance
+
+## v9.0 Requirements
+
+Requirements for v9.0 Embedded Plugin Experience milestone. Each maps to roadmap phases.
+
+### Plugin Foundation & Safety
+
+- [ ] **PFND-01**: Plugin source split into `src/plugin/` modules and bundled to single ESM file via esbuild (second build target alongside CJS CLI)
+- [ ] **PFND-02**: Every hook wrapped in `safeHook()` error boundary that catches, logs, and never crashes the host process
+- [ ] **PFND-03**: Shared parser module extracted from CLI (STATE.md, ROADMAP.md, config.json readers) for in-process use by plugin without spawning subprocesses
+- [ ] **PFND-04**: All custom tools use `bgsd_` prefix to avoid built-in tool name conflicts
+
+### Rebrand
+
+- [ ] **RBND-01**: Config/install folder renamed from `get-shit-done` to `bgsd-oc` (`~/.config/opencode/bgsd-oc/`)
+- [ ] **RBND-02**: Environment variable `GSD_HOME` renamed to `BGSD_HOME` across plugin, CLI, workflows, agents, and skills
+- [ ] **RBND-03**: Environment variable `GSD_DEBUG` renamed to `BGSD_DEBUG` across all 96+ catch blocks and debug logging paths
+- [ ] **RBND-04**: Environment variable `GSD_PROFILE` renamed to `BGSD_PROFILE` across profiler instrumentation
+- [ ] **RBND-05**: CLI binary renamed from `gsd-tools.cjs` to `bgsd-tools.cjs` (build output, deploy paths, workflow references, test file)
+- [ ] **RBND-06**: Agent definition files renamed from `gsd-*.md` to `bgsd-*.md` (all 9 agents + deploy.sh + install.js + build.cjs references)
+- [ ] **RBND-07**: install.js updated with migration logic to move existing `get-shit-done` installs to `bgsd-oc` and clean up old paths
+- [ ] **RBND-08**: All internal references (workflows, commands, skills, templates) updated to use new `bgsd-` naming consistently
+
+### Context Injection
+
+- [ ] **CINJ-01**: System prompt hook (`experimental.chat.system.transform`) injects current phase, plan, progress, and blockers into every LLM interaction
+- [ ] **CINJ-02**: System prompt injection stays within 500-token budget, measured and enforced
+- [ ] **CINJ-03**: Enhanced compaction preserves PROJECT.md context, INTENT.md summary, active decisions, blockers, and current task alongside STATE.md
+- [ ] **CINJ-04**: Slash commands auto-enriched with project context via `command.execute.before` hook
+
+### Custom LLM Tools
+
+- [ ] **TOOL-01**: `bgsd_status` tool registered — returns current phase, plan, progress, blockers (replaces `init:state` CLI call)
+- [ ] **TOOL-02**: `bgsd_progress` tool registered — updates plan progress, marks tasks complete (replaces `execute:commit` pattern)
+- [ ] **TOOL-03**: `bgsd_context` tool registered — returns task-scoped context with relevant files and conventions (replaces `codebase:context` CLI)
+- [ ] **TOOL-04**: `bgsd_plan` tool registered — analyzes roadmap, returns phase details and dependencies (replaces `plan:roadmap` CLI calls)
+- [ ] **TOOL-05**: `bgsd_validate` tool registered — runs state/roadmap validation checks (replaces `verify:validate` CLI calls)
+- [ ] **TOOL-06**: All custom tools have typed Zod argument schemas and return structured JSON strings
+
+### Event-Driven State Sync
+
+- [ ] **EVNT-01**: Session idle handler auto-validates STATE.md consistency (debounced, 5s minimum cooldown)
+- [ ] **EVNT-02**: File watcher invalidates in-memory state cache when `.planning/` files change
+- [ ] **EVNT-03**: Toast notifications fire on phase completion events
+- [ ] **EVNT-04**: Toast notifications fire on stuck/loop detection (3+ repeated failures)
+
+### Advisory Guardrails
+
+- [ ] **GARD-01**: Advisory warning via `tool.execute.after` when file writes don't match project conventions
+- [ ] **GARD-02**: Advisory warning when PLAN.md, ROADMAP.md, or STATE.md are edited outside bGSD workflow patterns
+- [ ] **GARD-03**: Advisory suggestion to run tests after source file modifications detected via tool interception
+
+## Future Requirements
+
+### Plugin Enhancements
+
+- **PENH-01**: Permission auto-approve for known-safe bGSD operations (`permission.ask` hook)
+- **PENH-02**: Background agent delegation for long-running operations
+- **PENH-03**: Multi-session state coordination for parallel worktrees
+- **PENH-04**: Plugin tool analytics (usage frequency, latency tracking)
+
+## Out of Scope
+
+| Feature | Reason |
+|---------|--------|
+| Backward compatibility with `gsd-*` / `get-shit-done` names | Clean break at v9.0 major version — install.js handles migration |
+| Replacing ALL CLI commands with tools | Only hot-path commands; long-tail stays as CLI |
+| Blocking guardrails (hard enforcement) | Advisory first; blocking deferred to future milestone |
+| Custom UI widgets / statusline | OpenCode has no statusline hook in plugin API |
+| Plugin tool for every CLI command | Cap at 5-6 tools; LLM performance degrades with too many |
+| Async I/O rewrite of CLI core | Plugin reads are async; CLI mutations stay sync via subprocess |
+
+## Traceability
+
+| Requirement | Phase | Status | Test Command |
+|-------------|-------|--------|--------------|
+| PFND-01 | TBD | Pending | npm run build (ESM target produces plugin bundle) |
+| PFND-02 | TBD | Pending | node -e "test safeHook catches and logs" |
+| PFND-03 | TBD | Pending | import parsers from plugin bundle |
+| PFND-04 | TBD | Pending | grep bgsd_ plugin tools |
+| RBND-01 | TBD | Pending | ls ~/.config/opencode/bgsd-oc/ |
+| RBND-02 | TBD | Pending | grep BGSD_HOME plugin.js |
+| RBND-03 | TBD | Pending | grep BGSD_DEBUG src/ |
+| RBND-04 | TBD | Pending | grep BGSD_PROFILE src/ |
+| RBND-05 | TBD | Pending | ls bin/bgsd-tools.cjs |
+| RBND-06 | TBD | Pending | ls agents/bgsd-*.md |
+| RBND-07 | TBD | Pending | node install.js (migrates old paths) |
+| RBND-08 | TBD | Pending | grep -r gsd-tools (zero matches outside milestones) |
+| CINJ-01 | TBD | Pending | system.transform hook registered |
+| CINJ-02 | TBD | Pending | token count < 500 |
+| CINJ-03 | TBD | Pending | compaction includes decisions + blockers |
+| CINJ-04 | TBD | Pending | command.execute.before hook registered |
+| TOOL-01 | TBD | Pending | bgsd_status tool callable by LLM |
+| TOOL-02 | TBD | Pending | bgsd_progress tool callable by LLM |
+| TOOL-03 | TBD | Pending | bgsd_context tool callable by LLM |
+| TOOL-04 | TBD | Pending | bgsd_plan tool callable by LLM |
+| TOOL-05 | TBD | Pending | bgsd_validate tool callable by LLM |
+| TOOL-06 | TBD | Pending | all tools have Zod schemas |
+| EVNT-01 | TBD | Pending | session idle triggers validation |
+| EVNT-02 | TBD | Pending | file change invalidates cache |
+| EVNT-03 | TBD | Pending | toast on phase complete |
+| EVNT-04 | TBD | Pending | toast on stuck detection |
+| GARD-01 | TBD | Pending | convention warning after file write |
+| GARD-02 | TBD | Pending | plan file protection warning |
+| GARD-03 | TBD | Pending | test suggestion after edit |
+
+**Coverage:**
+- v9.0 requirements: 29 total
+- Mapped to phases: 0 (pending roadmap)
+- Unmapped: 29
+
+---
+*Requirements defined: 2026-03-09*
+*Last updated: 2026-03-09 after initial definition*
