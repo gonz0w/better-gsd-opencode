@@ -9,6 +9,7 @@ import { createNotifier } from './notification.js';
 import { createFileWatcher } from './file-watcher.js';
 import { createIdleValidator } from './idle-validator.js';
 import { createStuckDetector } from './stuck-detector.js';
+import { createAdvisoryGuardrails } from './advisory-guardrails.js';
 import { parseConfig } from './parsers/config.js';
 
 // Re-export parsers, tool registry, and safeHook for external consumption
@@ -28,6 +29,7 @@ export { createNotifier } from './notification.js';
 export { createFileWatcher } from './file-watcher.js';
 export { createIdleValidator } from './idle-validator.js';
 export { createStuckDetector } from './stuck-detector.js';
+export { createAdvisoryGuardrails } from './advisory-guardrails.js';
 
 /**
  * bGSD (Get Stuff Done) — Plugin Entry Point
@@ -43,6 +45,7 @@ export { createStuckDetector } from './stuck-detector.js';
  * - Tool registry with bgsd_ prefix enforcement
  * - Event-driven state sync: idle validation, file watching, stuck detection (Phase 75)
  * - Notification system with dual-channel routing (OS + context injection)
+ * - Advisory guardrails: convention, planning file, test suggestion warnings (Phase 76)
  *
  * Hooks registered (7 total):
  * 1. session.created — greeting
@@ -75,6 +78,7 @@ export const BgsdPlugin = async ({ directory, $ }) => {
   });
   const idleValidator = createIdleValidator(projectDir, notifier, fileWatcher, config);
   const stuckDetector = createStuckDetector(notifier, config);
+  const guardrails = createAdvisoryGuardrails(projectDir, notifier, config);
 
   // Start file watcher for .planning/ directory
   fileWatcher.start();
@@ -119,6 +123,10 @@ export const BgsdPlugin = async ({ directory, $ }) => {
   // Prepends <bgsd-context> JSON block to output.parts before workflow execution
   const commandEnrich = safeHook('command.enrich', async (input, output) => {
     const cmdDir = directory || process.cwd();
+    // Set guardrails flag for bGSD commands — suppresses planning file warnings
+    if (input?.command && input.command.startsWith('bgsd-')) {
+      guardrails.setBgsdCommandActive();
+    }
     enrichCommand(input, output, cmdDir);
   });
 
@@ -126,6 +134,7 @@ export const BgsdPlugin = async ({ directory, $ }) => {
   const eventHandler = safeHook('event', async ({ event }) => {
     if (event.type === 'session.idle') {
       await idleValidator.onIdle();
+      guardrails.clearBgsdCommandActive();
     }
     if (event.type === 'file.watcher.updated') {
       const { invalidateAll } = await import('./parsers/index.js');
@@ -133,9 +142,10 @@ export const BgsdPlugin = async ({ directory, $ }) => {
     }
   });
 
-  // Tool execution tracking for stuck/loop detection
+  // Tool execution tracking for stuck/loop detection + advisory guardrails
   const toolAfter = safeHook('tool.execute.after', async (input) => {
     stuckDetector.trackToolCall(input);
+    await guardrails.onToolAfter(input);
   });
 
   return {
