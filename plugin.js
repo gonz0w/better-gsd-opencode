@@ -1,6 +1,5 @@
 // src/plugin/index.js
-import { readFileSync as readFileSync7 } from "fs";
-import { join as join9 } from "path";
+import { join as join10 } from "path";
 import { homedir as homedir2 } from "os";
 
 // src/plugin/safe-hook.js
@@ -838,6 +837,111 @@ Phase ${phaseNum}: ${phaseName}${planInfo}${milestoneInfo}${goalLine}${blockerLi
   }
   return prompt;
 }
+function buildCompactionContext(cwd) {
+  let projectState;
+  try {
+    projectState = getProjectState(cwd);
+  } catch {
+    return "<project-error>Failed to load project state for compaction. Run /bgsd-health to diagnose.</project-error>";
+  }
+  if (!projectState) {
+    return null;
+  }
+  const { state, project, intent, plans, currentPhase } = projectState;
+  const blocks = [];
+  try {
+    if (project) {
+      const parts = [];
+      if (project.coreValue) parts.push(`Core value: ${project.coreValue}`);
+      if (project.techStack) parts.push(`Tech: ${project.techStack}`);
+      if (parts.length > 0) {
+        blocks.push(`<project>
+${parts.join("\n")}
+</project>`);
+      }
+    }
+  } catch {
+  }
+  try {
+    if (state && state.phase) {
+      const phaseMatch = state.phase.match(/^(\d+)\s*(?:—|-|–)\s*(.+)/);
+      const phaseNum = phaseMatch ? phaseMatch[1] : state.phase;
+      const phaseName = phaseMatch ? phaseMatch[2].trim() : "";
+      let taskLine = `Phase ${phaseNum}: ${phaseName}`;
+      if (state.currentPlan && plans && plans.length > 0) {
+        const planNumMatch = state.currentPlan.match(/(\d+)/);
+        const planNum = planNumMatch ? planNumMatch[1].padStart(2, "0") : null;
+        if (planNum) {
+          const plan = plans.find((p) => p.frontmatter && p.frontmatter.plan === planNum);
+          if (plan && plan.tasks && plan.tasks.length > 0) {
+            const totalTasks = plan.tasks.length;
+            taskLine += ` \u2014 Plan P${planNum}, ${totalTasks} tasks`;
+            const firstTask = plan.tasks[0];
+            if (firstTask.name) {
+              taskLine += `
+Current: ${firstTask.name}`;
+            }
+            if (firstTask.files && firstTask.files.length > 0) {
+              taskLine += `
+Files: ${firstTask.files.join(", ")}`;
+            }
+          } else {
+            taskLine += ` \u2014 Plan P${planNum}`;
+          }
+        }
+      }
+      blocks.push(`<task-state>
+${taskLine}
+</task-state>`);
+    }
+  } catch {
+  }
+  try {
+    if (state && state.raw) {
+      const decisionsSection = state.getSection("Decisions");
+      if (decisionsSection) {
+        const decisionLines = decisionsSection.split("\n").map((l) => l.trim()).filter((l) => l.startsWith("- "));
+        if (decisionLines.length > 0) {
+          const last3 = decisionLines.slice(-3);
+          blocks.push(`<decisions>
+${last3.join("\n")}
+</decisions>`);
+        }
+      }
+    }
+  } catch {
+  }
+  try {
+    if (intent && intent.objective) {
+      blocks.push(`<intent>
+Objective: ${intent.objective}
+</intent>`);
+    }
+  } catch {
+  }
+  try {
+    if (state && state.raw) {
+      const sessionSection = state.getSection("Session Continuity");
+      if (sessionSection) {
+        const stoppedAt = sessionSection.match(/\*\*Stopped at:\*\*\s*(.+)/i);
+        const nextStep = sessionSection.match(/\*\*Next step:\*\*\s*(.+)/i);
+        const parts = [];
+        if (stoppedAt) parts.push(`Stopped at: ${stoppedAt[1].trim()}`);
+        if (nextStep) parts.push(`Next step: ${nextStep[1].trim()}`);
+        if (parts.length > 0) {
+          blocks.push(`<session>
+${parts.join("\n")}
+</session>`);
+        }
+      }
+    }
+  } catch {
+  }
+  if (blocks.length === 0) {
+    return null;
+  }
+  return blocks.join("\n\n");
+}
 
 // src/plugin/parsers/index.js
 function invalidateAll(cwd) {
@@ -849,9 +953,143 @@ function invalidateAll(cwd) {
   invalidateIntent(cwd);
 }
 
+// src/plugin/command-enricher.js
+import { readdirSync as readdirSync2, existsSync as existsSync2 } from "fs";
+import { join as join9 } from "path";
+function enrichCommand(input, output, cwd) {
+  if (!input || !output) return;
+  const command = input.command || input.parts && input.parts[0] || "";
+  if (!command.startsWith("bgsd-")) return;
+  const resolvedCwd = cwd || process.cwd();
+  let projectState;
+  try {
+    projectState = getProjectState(resolvedCwd);
+  } catch (err) {
+    if (output.parts) {
+      output.parts.unshift(
+        '<bgsd-context>\n{"error": "Failed to load project state. Run /bgsd-health to diagnose."}\n</bgsd-context>'
+      );
+    }
+    return;
+  }
+  if (!projectState) {
+    if (command !== "bgsd-new-project" && command !== "bgsd-help") {
+      if (output.parts) {
+        output.parts.unshift(
+          '<bgsd-context>\n{"error": "No .planning/ directory found. Run /bgsd-new-project to initialize."}\n</bgsd-context>'
+        );
+      }
+    }
+    return;
+  }
+  const { state, config, roadmap, currentPhase, currentMilestone } = projectState;
+  const enrichment = {
+    // Paths
+    planning_dir: ".planning",
+    state_path: ".planning/STATE.md",
+    roadmap_path: ".planning/ROADMAP.md",
+    config_path: ".planning/config.json",
+    // Config flags
+    commit_docs: config ? config.commit_docs : true,
+    branching_strategy: config ? config.branching_strategy || "none" : "none",
+    verifier_enabled: config ? config.verifier : true,
+    research_enabled: config ? config.research : true,
+    // Milestone
+    milestone: currentMilestone ? currentMilestone.version : null,
+    milestone_name: currentMilestone ? currentMilestone.name : null
+  };
+  const phaseNum = detectPhaseArg(input.parts);
+  if (phaseNum) {
+    const phaseDir = resolvePhaseDir(phaseNum, resolvedCwd);
+    if (phaseDir) {
+      enrichment.phase_dir = phaseDir;
+      enrichment.phase_number = String(phaseNum);
+      if (roadmap) {
+        const phase = roadmap.getPhase(phaseNum);
+        if (phase) {
+          enrichment.phase_name = phase.name;
+          enrichment.phase_slug = `${String(phaseNum).padStart(2, "0")}-${toSlug(phase.name)}`;
+          if (phase.goal) enrichment.phase_goal = phase.goal;
+        }
+      }
+      try {
+        const plans = parsePlans(phaseNum, resolvedCwd);
+        if (plans && plans.length > 0) {
+          enrichment.plans = plans.map((p) => p.path ? p.path.split("/").pop() : null).filter(Boolean);
+          const phaseDirFull = join9(resolvedCwd, phaseDir);
+          const summaryFiles = listSummaryFiles(phaseDirFull);
+          enrichment.incomplete_plans = enrichment.plans.filter((planFile) => {
+            const summaryFile = planFile.replace("-PLAN.md", "-SUMMARY.md");
+            return !summaryFiles.includes(summaryFile);
+          });
+        }
+      } catch {
+      }
+    }
+  } else if (state && state.phase) {
+    const currentPhaseMatch = state.phase.match(/^(\d+)/);
+    if (currentPhaseMatch) {
+      const curPhaseNum = parseInt(currentPhaseMatch[1], 10);
+      enrichment.phase_number = String(curPhaseNum);
+      if (currentPhase) {
+        enrichment.phase_name = currentPhase.name;
+      }
+      const phaseDir = resolvePhaseDir(curPhaseNum, resolvedCwd);
+      if (phaseDir) {
+        enrichment.phase_dir = phaseDir;
+      }
+    }
+  }
+  if (output.parts) {
+    output.parts.unshift(
+      `<bgsd-context>
+${JSON.stringify(enrichment, null, 2)}
+</bgsd-context>`
+    );
+  }
+}
+function detectPhaseArg(parts) {
+  if (!parts || !Array.isArray(parts)) return null;
+  for (let i = 1; i < parts.length; i++) {
+    const part = parts[i];
+    if (typeof part === "string") {
+      const match = part.match(/^(\d{1,3})$/);
+      if (match) {
+        return parseInt(match[1], 10);
+      }
+    }
+  }
+  return null;
+}
+function resolvePhaseDir(phaseNum, cwd) {
+  const numStr = String(phaseNum).padStart(2, "0");
+  const phasesDir = join9(cwd, ".planning", "phases");
+  try {
+    const entries = readdirSync2(phasesDir);
+    const dirName = entries.find((d) => d.startsWith(numStr + "-") || d === numStr);
+    if (dirName) {
+      return `.planning/phases/${dirName}`;
+    }
+  } catch {
+  }
+  return null;
+}
+function listSummaryFiles(phaseDir) {
+  try {
+    if (!existsSync2(phaseDir)) return [];
+    const files = readdirSync2(phaseDir);
+    return files.filter((f) => f.endsWith("-SUMMARY.md"));
+  } catch {
+    return [];
+  }
+}
+function toSlug(name) {
+  return name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+}
+
 // src/plugin/index.js
 var BgsdPlugin = async ({ directory }) => {
-  const bgsdHome = join9(homedir2(), ".config", "opencode", "bgsd-oc");
+  const bgsdHome = join10(homedir2(), ".config", "opencode", "bgsd-oc");
   const registry = createToolRegistry(safeHook);
   const sessionCreated = safeHook("session.created", async (input, output) => {
     console.log("[bGSD] Planning plugin available. Use /bgsd-help to get started.");
@@ -861,14 +1099,10 @@ var BgsdPlugin = async ({ directory }) => {
     output.env.BGSD_HOME = bgsdHome;
   });
   const compacting = safeHook("compacting", async (input, output) => {
-    const projectDir = directory || input?.cwd;
-    const statePath = join9(projectDir, ".planning", "STATE.md");
-    const stateContent = readFileSync7(statePath, "utf-8");
-    if (output && output.context) {
-      output.context.push(
-        `## bGSD Project State (preserved across compaction)
-${stateContent}`
-      );
+    const projectDir = directory || process.cwd();
+    const ctx = buildCompactionContext(projectDir);
+    if (ctx && output && output.context) {
+      output.context.push(ctx);
     }
   });
   const systemTransform = safeHook("system.transform", async (input, output) => {
@@ -878,18 +1112,25 @@ ${stateContent}`
       output.system.push(prompt);
     }
   });
+  const commandEnrich = safeHook("command.enrich", async (input, output) => {
+    const projectDir = directory || process.cwd();
+    enrichCommand(input, output, projectDir);
+  });
   return {
     "session.created": sessionCreated,
     "shell.env": shellEnv,
     "experimental.session.compacting": compacting,
-    "experimental.chat.system.transform": systemTransform
+    "experimental.chat.system.transform": systemTransform,
+    "command.execute.before": commandEnrich
     // tool: registry.getTools(),  // Uncomment in Phase 74 when tools exist
   };
 };
 export {
   BgsdPlugin,
+  buildCompactionContext,
   buildSystemPrompt,
   createToolRegistry,
+  enrichCommand,
   getProjectState,
   invalidateAll,
   invalidateConfig,
