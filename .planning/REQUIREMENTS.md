@@ -78,40 +78,40 @@ Requirements for v9.0 Embedded Plugin Experience milestone. Each maps to roadmap
 
 | Requirement | Phase | Status | Test Command |
 |-------------|-------|--------|--------------|
-| PFND-01 | TBD | Pending | npm run build (ESM target produces plugin bundle) |
-| PFND-02 | TBD | Pending | node -e "test safeHook catches and logs" |
-| PFND-03 | TBD | Pending | import parsers from plugin bundle |
-| PFND-04 | TBD | Pending | grep bgsd_ plugin tools |
-| RBND-01 | TBD | Pending | ls ~/.config/opencode/bgsd-oc/ |
-| RBND-02 | TBD | Pending | grep BGSD_HOME plugin.js |
-| RBND-03 | TBD | Pending | grep BGSD_DEBUG src/ |
-| RBND-04 | TBD | Pending | grep BGSD_PROFILE src/ |
-| RBND-05 | TBD | Pending | ls bin/bgsd-tools.cjs |
-| RBND-06 | TBD | Pending | ls agents/bgsd-*.md |
-| RBND-07 | TBD | Pending | node install.js (migrates old paths) |
-| RBND-08 | TBD | Pending | grep -r gsd-tools (zero matches outside milestones) |
-| CINJ-01 | TBD | Pending | system.transform hook registered |
-| CINJ-02 | TBD | Pending | token count < 500 |
-| CINJ-03 | TBD | Pending | compaction includes decisions + blockers |
-| CINJ-04 | TBD | Pending | command.execute.before hook registered |
-| TOOL-01 | TBD | Pending | bgsd_status tool callable by LLM |
-| TOOL-02 | TBD | Pending | bgsd_progress tool callable by LLM |
-| TOOL-03 | TBD | Pending | bgsd_context tool callable by LLM |
-| TOOL-04 | TBD | Pending | bgsd_plan tool callable by LLM |
-| TOOL-05 | TBD | Pending | bgsd_validate tool callable by LLM |
-| TOOL-06 | TBD | Pending | all tools have Zod schemas |
-| EVNT-01 | TBD | Pending | session idle triggers validation |
-| EVNT-02 | TBD | Pending | file change invalidates cache |
-| EVNT-03 | TBD | Pending | toast on phase complete |
-| EVNT-04 | TBD | Pending | toast on stuck detection |
-| GARD-01 | TBD | Pending | convention warning after file write |
-| GARD-02 | TBD | Pending | plan file protection warning |
-| GARD-03 | TBD | Pending | test suggestion after edit |
+| PFND-01 | Phase 71 | Pending | npm run build (ESM target produces plugin bundle) |
+| PFND-02 | Phase 71 | Pending | node -e "test safeHook catches and logs" |
+| PFND-03 | Phase 71 | Pending | import parsers from plugin bundle |
+| PFND-04 | Phase 71 | Pending | grep bgsd_ plugin tools |
+| RBND-01 | Phase 72 | Pending | ls ~/.config/opencode/bgsd-oc/ |
+| RBND-02 | Phase 72 | Pending | grep BGSD_HOME plugin.js |
+| RBND-03 | Phase 72 | Pending | grep BGSD_DEBUG src/ |
+| RBND-04 | Phase 72 | Pending | grep BGSD_PROFILE src/ |
+| RBND-05 | Phase 72 | Pending | ls bin/bgsd-tools.cjs |
+| RBND-06 | Phase 72 | Pending | ls agents/bgsd-*.md |
+| RBND-07 | Phase 72 | Pending | node install.js (migrates old paths) |
+| RBND-08 | Phase 72 | Pending | grep -r gsd-tools (zero matches outside milestones) |
+| CINJ-01 | Phase 73 | Pending | system.transform hook registered |
+| CINJ-02 | Phase 73 | Pending | token count < 500 |
+| CINJ-03 | Phase 73 | Pending | compaction includes decisions + blockers |
+| CINJ-04 | Phase 73 | Pending | command.execute.before hook registered |
+| TOOL-01 | Phase 74 | Pending | bgsd_status tool callable by LLM |
+| TOOL-02 | Phase 74 | Pending | bgsd_progress tool callable by LLM |
+| TOOL-03 | Phase 74 | Pending | bgsd_context tool callable by LLM |
+| TOOL-04 | Phase 74 | Pending | bgsd_plan tool callable by LLM |
+| TOOL-05 | Phase 74 | Pending | bgsd_validate tool callable by LLM |
+| TOOL-06 | Phase 74 | Pending | all tools have Zod schemas |
+| EVNT-01 | Phase 75 | Pending | session idle triggers validation |
+| EVNT-02 | Phase 75 | Pending | file change invalidates cache |
+| EVNT-03 | Phase 75 | Pending | toast on phase complete |
+| EVNT-04 | Phase 75 | Pending | toast on stuck detection |
+| GARD-01 | Phase 76 | Pending | convention warning after file write |
+| GARD-02 | Phase 76 | Pending | plan file protection warning |
+| GARD-03 | Phase 76 | Pending | test suggestion after edit |
 
 **Coverage:**
 - v9.0 requirements: 29 total
-- Mapped to phases: 0 (pending roadmap)
-- Unmapped: 29
+- Mapped to phases: 29/29 ✓
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-03-09*

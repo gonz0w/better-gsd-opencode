@@ -5,14 +5,14 @@
 See: .planning/PROJECT.md (updated 2026-03-09)
 
 **Core value:** Manage and deliver high-quality software with high-quality documentation, while continuously reducing token usage and improving performance
-**Current focus:** Defining requirements for v9.0 Embedded Plugin Experience
+**Current focus:** v9.0 Embedded Plugin Experience — Plugin Architecture & Safety
 
 ## Current Position
 
-**Phase:** Not started (defining requirements)
+**Phase:** 71 — Plugin Architecture & Safety
 **Current Plan:** —
-**Status:** Defining requirements
-**Last Activity:** 2026-03-09 — Milestone v9.0 started
+**Status:** Not started
+**Last Activity:** 2026-03-09 — Roadmap created for v9.0
 
 **Progress:** [░░░░░░░░░░] 0%
 
@@ -55,9 +55,12 @@ None — milestone starting fresh.
 
 - Bundle at 1153KB (acorn 230KB now lazy-loaded, effective cold-start 923KB)
 - Plugin hooks prefixed with `experimental.` may change without notice (system.transform, compacting, messages.transform, text.complete)
+- Plugin.js is ESM, gsd-tools.cjs is CJS — two separate esbuild targets required
+- Custom tool names must use `bgsd_` prefix to avoid shadowing built-in tools
+- Rebrand is a clean break — no backward compatibility with old `gsd-*` naming
 
 ## Session Continuity
 
 **Last session:** 2026-03-09
-**Stopped at:** Starting v9.0 milestone — defining requirements
-**Next step:** Define REQUIREMENTS.md, then create roadmap
+**Stopped at:** Roadmap created — 6 phases (71-76), 29 requirements mapped
+**Next step:** Plan Phase 71 (Plugin Architecture & Safety) — `/bgsd-plan-phase 71`
