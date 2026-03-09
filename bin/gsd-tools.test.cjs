@@ -7920,6 +7920,109 @@ describe('ESM plugin build', () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Plugin Parsers & Tool Registry (Phase 71, Plan 02)
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('plugin parsers and tool registry', () => {
+  const pluginPath = path.join(__dirname, '..', 'plugin.js');
+
+  test('plugin.js exports parseState', () => {
+    const content = fs.readFileSync(pluginPath, 'utf-8');
+    assert.ok(content.includes('parseState'), 'plugin.js should contain parseState');
+  });
+
+  test('plugin.js exports parseRoadmap', () => {
+    const content = fs.readFileSync(pluginPath, 'utf-8');
+    assert.ok(content.includes('parseRoadmap'), 'plugin.js should contain parseRoadmap');
+  });
+
+  test('plugin.js exports parsePlan', () => {
+    const content = fs.readFileSync(pluginPath, 'utf-8');
+    assert.ok(content.includes('parsePlan'), 'plugin.js should contain parsePlan');
+  });
+
+  test('plugin.js exports createToolRegistry', () => {
+    const content = fs.readFileSync(pluginPath, 'utf-8');
+    assert.ok(content.includes('createToolRegistry'), 'plugin.js should contain createToolRegistry');
+  });
+
+  test('plugin.js exports safeHook', () => {
+    const content = fs.readFileSync(pluginPath, 'utf-8');
+    assert.ok(content.includes('safeHook'), 'plugin.js should export safeHook');
+  });
+
+  test('plugin bundle size under 100KB', () => {
+    const stat = fs.statSync(pluginPath);
+    const sizeKB = Math.round(stat.size / 1024);
+    assert.ok(sizeKB < 100, `plugin.js is ${sizeKB}KB — should be under 100KB`);
+  });
+
+  test('parseState returns structured data from live STATE.md', async () => {
+    const mod = await import(pluginPath);
+    assert.strictEqual(typeof mod.parseState, 'function', 'parseState should be a function');
+    const state = mod.parseState();
+    if (state) {
+      assert.strictEqual(typeof state.raw, 'string', 'state.raw should be a string');
+      assert.strictEqual(typeof state.getField, 'function', 'state.getField should be a function');
+      assert.strictEqual(typeof state.getSection, 'function', 'state.getSection should be a function');
+      // Verify immutability via Object.isFrozen
+      assert.ok(Object.isFrozen(state), 'state should be frozen');
+    }
+  });
+
+  test('parseRoadmap returns structured data from live ROADMAP.md', async () => {
+    const mod = await import(pluginPath);
+    assert.strictEqual(typeof mod.parseRoadmap, 'function', 'parseRoadmap should be a function');
+    const roadmap = mod.parseRoadmap();
+    if (roadmap) {
+      assert.ok(Array.isArray(roadmap.phases), 'roadmap.phases should be an array');
+      assert.ok(roadmap.phases.length > 0, 'roadmap should have phases');
+      assert.strictEqual(typeof roadmap.getPhase, 'function', 'roadmap.getPhase should be a function');
+      // Verify immutability via Object.isFrozen
+      assert.ok(Object.isFrozen(roadmap), 'roadmap should be frozen');
+    }
+  });
+
+  test('parseConfig returns config with defaults', async () => {
+    const mod = await import(pluginPath);
+    assert.strictEqual(typeof mod.parseConfig, 'function', 'parseConfig should be a function');
+    const config = mod.parseConfig();
+    assert.ok(config, 'parseConfig should return a non-null config');
+    assert.strictEqual(typeof config.model_profile, 'string', 'config should have model_profile');
+    assert.strictEqual(typeof config.commit_docs, 'boolean', 'config should have commit_docs as boolean');
+    // Verify immutability via Object.isFrozen
+    assert.ok(Object.isFrozen(config), 'config should be frozen');
+  });
+
+  test('createToolRegistry enforces bgsd_ prefix', async () => {
+    const mod = await import(pluginPath);
+    assert.strictEqual(typeof mod.createToolRegistry, 'function', 'createToolRegistry should be a function');
+    const identity = (name, fn) => fn; // Simple passthrough for testing
+    const reg = mod.createToolRegistry(identity);
+    const name = reg.registerTool('status', { description: 'test', execute: async () => '{}' });
+    assert.strictEqual(name, 'bgsd_status', 'should auto-prefix with bgsd_');
+  });
+
+  test('createToolRegistry rejects invalid names', async () => {
+    const mod = await import(pluginPath);
+    const identity = (name, fn) => fn;
+    const reg = mod.createToolRegistry(identity);
+    assert.throws(
+      () => reg.registerTool('Bad-Name', { execute: async () => '{}' }),
+      /snake_case/i,
+      'should reject non-snake_case names'
+    );
+  });
+
+  test('invalidateAll clears all parser caches', async () => {
+    const mod = await import(pluginPath);
+    assert.strictEqual(typeof mod.invalidateAll, 'function', 'invalidateAll should be a function');
+    // Should not throw
+    mod.invalidateAll();
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Token Budget (Phase 13, Plan 03)
 // ─────────────────────────────────────────────────────────────────────────────
 

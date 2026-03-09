@@ -2,6 +2,16 @@ import { readFileSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
 import { safeHook } from './safe-hook.js';
+import { createToolRegistry } from './tool-registry.js';
+
+// Re-export parsers, tool registry, and safeHook for external consumption
+export { parseState, invalidateState } from './parsers/state.js';
+export { parseRoadmap, invalidateRoadmap } from './parsers/roadmap.js';
+export { parsePlan, parsePlans, invalidatePlans } from './parsers/plan.js';
+export { parseConfig, invalidateConfig } from './parsers/config.js';
+export { invalidateAll } from './parsers/index.js';
+export { createToolRegistry } from './tool-registry.js';
+export { safeHook } from './safe-hook.js';
 
 /**
  * bGSD (Get Stuff Done) — Plugin Entry Point
@@ -10,6 +20,8 @@ import { safeHook } from './safe-hook.js';
  * - Session greeting with plugin availability notice
  * - GSD_HOME environment variable injection for workflow resolution
  * - State preservation across session compaction
+ * - In-process parsers for STATE.md, ROADMAP.md, PLAN.md, config.json
+ * - Tool registry with bgsd_ prefix enforcement
  *
  * All hooks are wrapped in safeHook for universal error boundary protection:
  * retry, timeout, circuit breaker, correlation-ID logging.
@@ -19,6 +31,9 @@ import { safeHook } from './safe-hook.js';
  */
 export const BgsdPlugin = async ({ directory }) => {
   const gsdHome = join(homedir(), '.config', 'opencode', 'get-shit-done');
+
+  // Initialize tool registry — Phase 74 will add custom tools
+  const registry = createToolRegistry(safeHook);
 
   const sessionCreated = safeHook('session.created', async (input, output) => {
     console.log('[bGSD] Planning plugin available. Use /bgsd-help to get started.');
@@ -44,5 +59,6 @@ export const BgsdPlugin = async ({ directory }) => {
     'session.created': sessionCreated,
     'shell.env': shellEnv,
     'experimental.session.compacting': compacting,
+    // tool: registry.getTools(),  // Uncomment in Phase 74 when tools exist
   };
 };

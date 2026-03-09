@@ -72,6 +72,16 @@ async function build() {
   }
   console.log('ESM validation passed: 0 require() calls');
 
+  // Verify critical exports exist in ESM output
+  const requiredExports = ['BgsdPlugin', 'parseState', 'parseRoadmap', 'parsePlan', 'createToolRegistry', 'safeHook'];
+  for (const exp of requiredExports) {
+    if (!pluginContent.includes(exp)) {
+      console.error(`ERROR: ESM plugin missing export: ${exp}`);
+      process.exit(1);
+    }
+  }
+  console.log(`ESM export validation passed: ${requiredExports.length} critical exports verified`);
+
   // Plugin bundle size
   const pluginStat = fs.statSync('plugin.js');
   const pluginSizeKB = Math.round(pluginStat.size / 1024);
