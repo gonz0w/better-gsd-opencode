@@ -9,12 +9,12 @@ See: .planning/PROJECT.md (updated 2026-03-09)
 
 ## Current Position
 
-**Phase:** 72 — Rebrand
-**Current Plan:** Not started
-**Status:** Ready to plan
+**Phase:** 73 — Context Injection
+**Current Plan:** Plan 02 of 3
+**Status:** In Progress
 **Last Activity:** 2026-03-09
 
-**Progress:** [██████████] 100%
+**Progress:** [████████░░] 78%
 
 ## Performance Metrics
 
@@ -46,6 +46,7 @@ See: .planning/PROJECT.md (updated 2026-03-09)
 | Phase 72 P02 | 9 min | 2 tasks | 12 files |
 | Phase 72 P03 | 8 min | 2 tasks | 100 files |
 | Phase 72 P04 | 11 min | 2 tasks | 7 files |
+| Phase 73 P01 | 12 min | 2 tasks | 10 files |
 
 ## Accumulated Context
 
@@ -58,6 +59,7 @@ All v1.0-v8.3 decisions recorded in PROJECT.md Key Decisions table with outcomes
 - [Phase 72]: All 10 agent files renamed gsd-*.md -> bgsd-*.md with BGSD_HOME path setup; install.js migration copies get-shit-done to bgsd-oc and cleans up old agent files
 - [Phase 72]: Bulk renamed gsd-* to bgsd-* across 100 markdown files (workflows, commands, templates, skills, AGENTS.md) — Completes rebrand of user-facing and agent-facing markdown interface files
 - [Phase 72]: Updated source agent scope/routing keys gsd-* → bgsd-* alongside test file rename — fixes model resolution fallback bug from Plan 01 partial rename — MODEL_PROFILES keys were already bgsd-* but AGENT_MANIFESTS and resolveModelInternal calls still used gsd-*, causing silent fallback to sonnet defaults
+- [Phase 73]: System prompt injection via chars/4 token estimator (not tokenx) — 70 tokens, well under 500-token budget — tokenx is bundled in CLI but not ESM plugin; chars/4 sufficient for budget enforcement
 
 ### Pending Todos
 
@@ -73,6 +75,6 @@ None — milestone starting fresh.
 
 ## Session Continuity
 
-**Last session:** 2026-03-09T11:26:28.655Z
-**Stopped at:** Phase 73 context gathered
+**Last session:** 2026-03-09T11:55:10.171Z
+**Stopped at:** Completed 73-P01-PLAN.md
 **Next step:** Execute Plan 03 — `/bgsd-execute-phase 72` (workflow/command/template/skill updates)
