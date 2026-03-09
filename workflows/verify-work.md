@@ -7,14 +7,14 @@ Show expected, ask if reality matches. "yes"/"pass"/"next" → pass. Anything el
 </philosophy>
 
 <template>
-@__OPENCODE_CONFIG__/get-shit-done/templates/UAT.md
+@__OPENCODE_CONFIG__/bgsd-oc/templates/UAT.md
 </template>
 
 <process>
 
 <step name="initialize" priority="first">
 ```bash
-INIT=$(node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs init:verify-work "${PHASE_ARG}" --compact)
+INIT=$(node __OPENCODE_CONFIG__/bgsd-oc/bin/bgsd-tools.cjs init:verify-work "${PHASE_ARG}" --compact)
 ```
 Parse: `planner_model`, `checker_model`, `commit_docs`, `phase_found`, `phase_dir`, `phase_number`, `phase_name`, `has_verification`.
 </step>
@@ -87,7 +87,7 @@ Task(
 Read: {phase_dir}/{phase_num}-UAT.md, .planning/STATE.md, .planning/ROADMAP.md
 Requirements: {phase_req_ids}. Read ./AGENTS.md and .agents/skills/ if they exist.
 Output: Gap closure PLAN.md files.",
-  subagent_type="gsd-planner", model="{planner_model}", description="Plan gap closure"
+  subagent_type="bgsd-planner", model="{planner_model}", description="Plan gap closure"
 )
 ```
 PLANNING COMPLETE → verify_gap_plans. INCONCLUSIVE → report, offer manual.
@@ -98,7 +98,7 @@ PLANNING COMPLETE → verify_gap_plans. INCONCLUSIVE → report, offer manual.
 Task(
   prompt="Phase {phase_number}, goal: close diagnosed gaps.
 Read: {phase_dir}/*-PLAN.md. Verify coverage + must_haves.",
-  subagent_type="gsd-plan-checker", model="{checker_model}", description="Check gap plans"
+  subagent_type="bgsd-plan-checker", model="{checker_model}", description="Check gap plans"
 )
 ```
 PASSED → present_ready. ISSUES → revision_loop.
@@ -108,7 +108,7 @@ PASSED → present_ready. ISSUES → revision_loop.
 Max 3 iterations:
 ```
 Task(
-  prompt="Read __OPENCODE_CONFIG__/agents/bgsd-planner.md for instructions.
+  prompt="Read __OPENCODE_CONFIG__/agents/bbgsd-planner.md for instructions.
 Revision mode. Read: {phase_dir}/*-PLAN.md. Checker issues: {issues}.
 Make targeted updates, return what changed.",
   subagent_type="general", model="{planner_model}", description="Revise gap plans"

@@ -86,18 +86,18 @@ Be specific enough for a fresh agent to understand immediately.
 
 Use `current-timestamp` for last_updated field. You can use init todos (which provides timestamps) or call directly:
 ```bash
-timestamp=$(node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs util:current-timestamp full)
+timestamp=$(node __OPENCODE_CONFIG__/bgsd-oc/bin/bgsd-tools.cjs util:current-timestamp full)
 ```
 </step>
 
 <step name="commit">
 Save a bookmark before committing:
 ```bash
-node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs util:memory write --store bookmarks --entry '{"phase":"${PHASE}","plan":"${PLAN}","task":${TASK_NUM},"total_tasks":${TOTAL_TASKS},"paused":true,"notes":"${PAUSE_REASON}","blockers":"${BLOCKERS}","git_head":"'$(git rev-parse --short HEAD)'"}'
+node __OPENCODE_CONFIG__/bgsd-oc/bin/bgsd-tools.cjs util:memory write --store bookmarks --entry '{"phase":"${PHASE}","plan":"${PLAN}","task":${TASK_NUM},"total_tasks":${TOTAL_TASKS},"paused":true,"notes":"${PAUSE_REASON}","blockers":"${BLOCKERS}","git_head":"'$(git rev-parse --short HEAD)'"}'
 ```
 
 ```bash
-node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs execute:commit "wip: [phase-name] paused at task [X]/[Y]" --files .planning/phases/*/.continue-here.md
+node __OPENCODE_CONFIG__/bgsd-oc/bin/bgsd-tools.cjs execute:commit "wip: [phase-name] paused at task [X]/[Y]" --files .planning/phases/*/.continue-here.md
 ```
 </step>
 

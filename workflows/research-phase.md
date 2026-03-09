@@ -1,5 +1,5 @@
 <purpose>
-Research how to implement a phase. Spawns gsd-phase-researcher with phase context.
+Research how to implement a phase. Spawns bgsd-phase-researcher with phase context.
 
 Standalone research command. For most workflows, use `/bgsd-plan-phase` which integrates research automatically.
 </purpose>
@@ -8,17 +8,17 @@ Standalone research command. For most workflows, use `/bgsd-plan-phase` which in
 
 ## Step 0: Resolve Model Profile
 
-@__OPENCODE_CONFIG__/get-shit-done/references/model-profile-resolution.md
+@__OPENCODE_CONFIG__/bgsd-oc/references/model-profile-resolution.md
 
 Resolve model for:
-- `gsd-phase-researcher`
+- `bgsd-phase-researcher`
 
 ## Step 1: Normalize and Validate Phase
 
-@__OPENCODE_CONFIG__/get-shit-done/references/phase-argument-parsing.md
+@__OPENCODE_CONFIG__/bgsd-oc/references/phase-argument-parsing.md
 
 ```bash
-PHASE_INFO=$(node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs plan:roadmap get-phase "${PHASE}")
+PHASE_INFO=$(node __OPENCODE_CONFIG__/bgsd-oc/bin/bgsd-tools.cjs plan:roadmap get-phase "${PHASE}")
 ```
 
 If `found` is false: Error and exit.
@@ -36,7 +36,7 @@ If doesn't exist: Continue.
 ## Step 3: Gather Phase Context
 
 ```bash
-INIT=$(node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs init:phase-op "${PHASE}")
+INIT=$(node __OPENCODE_CONFIG__/bgsd-oc/bin/bgsd-tools.cjs init:phase-op "${PHASE}")
 # Extract: phase_dir, padded_phase, phase_number, commit_docs, state_path, requirements_path, context_path, research_path
 ```
 
@@ -58,7 +58,7 @@ if [[ "$*" == *"--quick"* ]]; then
   QUICK_FLAG="--quick"
 fi
 
-COLLECT_OUTPUT=$(node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs research:collect "${PHASE_DESCRIPTION}" ${QUICK_FLAG} 2>/dev/null)
+COLLECT_OUTPUT=$(node __OPENCODE_CONFIG__/bgsd-oc/bin/bgsd-tools.cjs research:collect "${PHASE_DESCRIPTION}" ${QUICK_FLAG} 2>/dev/null)
 ```
 
 Extract tier and agent_context from the JSON output:
@@ -144,7 +144,7 @@ Before declaring complete, verify:
 <output>
 Write to: .planning/phases/${PHASE}-{slug}/${PHASE}-RESEARCH.md
 </output>",
-  subagent_type="gsd-phase-researcher",
+  subagent_type="bgsd-phase-researcher",
   model="{researcher_model}",
   description="Research Phase {phase}"
 )
@@ -179,7 +179,7 @@ Continue research for Phase {phase_number}: {phase_name}
 
 ```
 Task(
-  prompt="First, read __OPENCODE_CONFIG__/agents/bgsd-phase-researcher.md for your role and instructions.\n\n" + continuation_prompt,
+  prompt="First, read __OPENCODE_CONFIG__/agents/bbgsd-phase-researcher.md for your role and instructions.\n\n" + continuation_prompt,
   subagent_type="general",
   model="{researcher_model}",
   description="Continue research Phase {phase}"
@@ -191,7 +191,7 @@ Task(
 <success_criteria>
 - [ ] Phase validated against roadmap
 - [ ] Existing research checked
-- [ ] gsd-phase-researcher spawned with context
+- [ ] bgsd-phase-researcher spawned with context
 - [ ] Checkpoints handled correctly
 - [ ] User knows next steps
 </success_criteria>

@@ -45,7 +45,7 @@ elif [[ "$PHASE_ARG" == *"--no-ci"* ]]; then
 fi
 ```
 
-INIT=$(node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs init:execute-phase "${PHASE_NUMBER}" --compact)
+INIT=$(node __OPENCODE_CONFIG__/bgsd-oc/bin/bgsd-tools.cjs init:execute-phase "${PHASE_NUMBER}" --compact)
 
 Parse JSON for: `phase_found`, `phase_dir`, `phase_number`, `phase_name`, `plans`, `incomplete_plans`, `plan_count`, `incomplete_count`, `parallelization`, `branching_strategy`, `branch_name`, `executor_model`, `verifier_model`, `commit_docs`, `pre_flight_validation`, `worktree_enabled`, `worktree_config`, `worktree_active`, `file_overlaps`.
 
@@ -66,7 +66,7 @@ Report: "Found {plan_count} plans in {phase_dir} ({incomplete_count} incomplete)
 
 <step name="preflight_dependency_check">
 ```bash
-DEPS=$(node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs verify:validate-dependencies "${PHASE_NUMBER}" 2>/dev/null)
+DEPS=$(node __OPENCODE_CONFIG__/bgsd-oc/bin/bgsd-tools.cjs verify:validate-dependencies "${PHASE_NUMBER}" 2>/dev/null)
 ```
 
 Parse for `valid` (bool) and `issues` (array). If valid or command fails: continue silently.
@@ -81,9 +81,9 @@ Otherwise, run auto-fix first, then validate:
 
 ```bash
 # Auto-fix what we can
-FIX_RESULT=$(node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs verify:state validate --fix 2>/dev/null)
+FIX_RESULT=$(node __OPENCODE_CONFIG__/bgsd-oc/bin/bgsd-tools.cjs verify:state validate --fix 2>/dev/null)
 # Then check for remaining issues
-VALIDATE_RESULT=$(node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs verify:state validate 2>/dev/null)
+VALIDATE_RESULT=$(node __OPENCODE_CONFIG__/bgsd-oc/bin/bgsd-tools.cjs verify:state validate 2>/dev/null)
 ```
 
 Parse `FIX_RESULT` for `fixes_applied` array. If non-empty: display "Pre-flight auto-fixed: {count} issue(s)".
@@ -146,7 +146,7 @@ Advisory naming convention check (never blocks execution).
 
 <step name="discover_and_group_plans">
 ```bash
-PLAN_INDEX=$(node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs util:phase-plan-index "${PHASE_NUMBER}")
+PLAN_INDEX=$(node __OPENCODE_CONFIG__/bgsd-oc/bin/bgsd-tools.cjs util:phase-plan-index "${PHASE_NUMBER}")
 ```
 
 Parse: `plans[]` (id, wave, autonomous, objective, task_count, has_summary), `waves`, `incomplete`, `has_checkpoints`.
@@ -186,16 +186,16 @@ Execute each wave in sequence. Within a wave: parallel if `PARALLELIZATION=true`
 
    a. **Create worktrees** for each plan in wave:
       ```bash
-      node gsd-tools.cjs execute:worktree create {plan_id}
+      node bgsd-tools.cjs execute:worktree create {plan_id}
       ```
       Record each worktree path from output. If create fails (e.g., max_concurrent), fall back to sequential.
       If setup_status is `failed`: skip that plan, mark as setup-failed, continue with remaining.
 
    b. **Inject codebase context** (same as Mode B):
       ```bash
-PLAN_FILES=$(node gsd-tools.cjs util:frontmatter "${PLAN_PATH}" --field files_modified 2>/dev/null)
+PLAN_FILES=$(node bgsd-tools.cjs util:frontmatter "${PLAN_PATH}" --field files_modified 2>/dev/null)
 if [ -n "$PLAN_FILES" ]; then
-  CODEBASE_CTX=$(node gsd-tools.cjs util:codebase context --files ${PLAN_FILES} --plan ${PLAN_PATH} 2>/dev/null)
+  CODEBASE_CTX=$(node bgsd-tools.cjs util:codebase context --files ${PLAN_FILES} --plan ${PLAN_PATH} 2>/dev/null)
       fi
       ```
       If `CODEBASE_CTX` is non-empty, include the `<codebase_context>` block in the spawn prompt. If commands fail or return empty, omit the block entirely (graceful no-op).
@@ -203,7 +203,7 @@ if [ -n "$PLAN_FILES" ]; then
    c. **Spawn executor agents** in worktree directories:
       ```
       Task(
-        subagent_type="gsd-executor",
+        subagent_type="bgsd-executor",
         model="{executor_model}",
         workdir="{worktree_path}",
         prompt="
@@ -242,7 +242,7 @@ if [ -n "$PLAN_FILES" ]; then
 
    f. **Sequential merge** — for each completed plan (in plan-number order, smallest first):
       ```bash
-      node gsd-tools.cjs execute:worktree merge {plan_id}
+      node bgsd-tools.cjs execute:worktree merge {plan_id}
       ```
       After EACH merge: run test command if configured in config.json (`test_command` field).
       If merge fails (real conflicts): offer options:
@@ -253,7 +253,7 @@ if [ -n "$PLAN_FILES" ]; then
 
    g. **Cleanup** — after all merges (or failure handling):
       ```bash
-      node gsd-tools.cjs execute:worktree cleanup
+      node bgsd-tools.cjs execute:worktree cleanup
       ```
 
    h. **Continue** to next wave.
@@ -262,9 +262,9 @@ if [ -n "$PLAN_FILES" ]; then
 
    **Before spawning each executor**, inject codebase context if available:
    ```bash
-   PLAN_FILES=$(node gsd-tools.cjs util:frontmatter "${PLAN_PATH}" --field files_modified 2>/dev/null)
+   PLAN_FILES=$(node bgsd-tools.cjs util:frontmatter "${PLAN_PATH}" --field files_modified 2>/dev/null)
    if [ -n "$PLAN_FILES" ]; then
-     CODEBASE_CTX=$(node gsd-tools.cjs util:codebase context --files ${PLAN_FILES} --plan ${PLAN_PATH} 2>/dev/null)
+     CODEBASE_CTX=$(node bgsd-tools.cjs util:codebase context --files ${PLAN_FILES} --plan ${PLAN_PATH} 2>/dev/null)
    fi
    ```
    If `CODEBASE_CTX` is non-empty, include the `<codebase_context>` block below. If the commands fail or return empty, omit the block entirely (graceful no-op).
@@ -273,7 +273,7 @@ if [ -n "$PLAN_FILES" ]; then
 
    ```
    Task(
-     subagent_type="gsd-executor",
+     subagent_type="bgsd-executor",
      model="{executor_model}",
      prompt="
        <objective>
@@ -282,8 +282,8 @@ if [ -n "$PLAN_FILES" ]; then
        </objective>
 
        <execution_context>
-       @__OPENCODE_CONFIG__/get-shit-done/workflows/execute-plan.md
-       @__OPENCODE_CONFIG__/get-shit-done/templates/summary.md
+       @__OPENCODE_CONFIG__/bgsd-oc/workflows/execute-plan.md
+       @__OPENCODE_CONFIG__/bgsd-oc/templates/summary.md
        Load checkpoints.md sections 'types' and 'guidelines' via extract-sections if plan has autonomous: false.
        Load tdd.md only if plan type is 'tdd'.
        </execution_context>
@@ -381,7 +381,7 @@ Determine if CI gate should run using `CI_FLAG` from initialize step:
 - `CI_FLAG=""` → check config:
 
 ```bash
-CI_ENABLED=$(node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs util:config-get workflow.ci_gate 2>/dev/null || echo "false")
+CI_ENABLED=$(node __OPENCODE_CONFIG__/bgsd-oc/bin/bgsd-tools.cjs util:config-get workflow.ci_gate 2>/dev/null || echo "false")
 ```
 
 **If CI enabled:**
@@ -410,7 +410,7 @@ SCOPE: phase-${PHASE_NUMBER}
 - ./AGENTS.md (if exists)
 </files_to_read>
 ",
-  subagent_type="gsd-github-ci",
+  subagent_type="bgsd-github-ci",
   model="{executor_model}",
   description="GitHub CI: phase-${PHASE_NUMBER}"
 )
@@ -434,7 +434,7 @@ Phase requirement IDs: {phase_req_ids}
 Check must_haves against actual codebase.
 Cross-reference requirement IDs from PLAN frontmatter against REQUIREMENTS.md.
 Create VERIFICATION.md.",
-  subagent_type="gsd-verifier",
+  subagent_type="bgsd-verifier",
   model="{verifier_model}"
 )
 ```
@@ -447,15 +447,15 @@ Read status from VERIFICATION.md:
 
 <step name="update_roadmap">
 ```bash
-node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs verify:validate roadmap --repair 2>/dev/null
-COMPLETION=$(node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs plan:phase complete "${PHASE_NUMBER}")
+node __OPENCODE_CONFIG__/bgsd-oc/bin/bgsd-tools.cjs verify:validate roadmap --repair 2>/dev/null
+COMPLETION=$(node __OPENCODE_CONFIG__/bgsd-oc/bin/bgsd-tools.cjs plan:phase complete "${PHASE_NUMBER}")
 ```
 
 CLI handles: phase checkbox, Progress table, plan count, STATE.md advance, REQUIREMENTS.md traceability.
 Note: `validate roadmap --repair` ensures checklist/section parity before phase completion, preventing false `is_last_phase` detection.
 
 ```bash
-node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs execute:commit "docs(phase-{X}): complete phase execution" --files .planning/ROADMAP.md .planning/STATE.md .planning/REQUIREMENTS.md {phase_dir}/*-VERIFICATION.md
+node __OPENCODE_CONFIG__/bgsd-oc/bin/bgsd-tools.cjs execute:commit "docs(phase-{X}): complete phase execution" --files .planning/ROADMAP.md .planning/STATE.md .planning/REQUIREMENTS.md {phase_dir}/*-VERIFICATION.md
 ```
 </step>
 

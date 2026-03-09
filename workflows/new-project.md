@@ -20,7 +20,7 @@ If `--auto` flag present:
 ## 1. Setup
 
 ```bash
-INIT=$(node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs init:new-project --compact)
+INIT=$(node __OPENCODE_CONFIG__/bgsd-oc/bin/bgsd-tools.cjs init:new-project --compact)
 ```
 
 Parse: `researcher_model`, `synthesizer_model`, `roadmapper_model`, `commit_docs`, `project_exists`, `needs_codebase_map`, `has_git`, `project_path`.
@@ -60,7 +60,7 @@ Write `.planning/PROJECT.md` using templates/project.md. For greenfield: require
 
 ```bash
 mkdir -p .planning
-node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs execute:commit "docs: initialize project" --files .planning/PROJECT.md
+node __OPENCODE_CONFIG__/bgsd-oc/bin/bgsd-tools.cjs execute:commit "docs: initialize project" --files .planning/PROJECT.md
 ```
 
 ## 4.5. Capture Project Intent
@@ -101,13 +101,13 @@ Also derive:
 Write INTENT.md using `intent create` with the structured data from answers:
 
 ```bash
-node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs plan:intent create
+node __OPENCODE_CONFIG__/bgsd-oc/bin/bgsd-tools.cjs plan:intent create
 ```
 
 Note: `intent create` reads from stdin when no arguments provided — pipe the structured intent data to it. Alternatively, write INTENT.md directly using the Write tool following the INTENT.md template format, then commit.
 
 ```bash
-node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs execute:commit "docs: capture project intent" --files .planning/INTENT.md
+node __OPENCODE_CONFIG__/bgsd-oc/bin/bgsd-tools.cjs execute:commit "docs: capture project intent" --files .planning/INTENT.md
 ```
 
 Present intent summary:
@@ -131,7 +131,7 @@ Check `~/.gsd/defaults.json` — if exists, offer to use saved defaults (skip qu
 Create config.json. If commit_docs=No: add `.planning/` to `.gitignore`.
 
 ```bash
-node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs execute:commit "chore: add project config" --files .planning/config.json
+node __OPENCODE_CONFIG__/bgsd-oc/bin/bgsd-tools.cjs execute:commit "chore: add project config" --files .planning/config.json
 ```
 
 ## 5.5. Resolve Model Profile
@@ -147,28 +147,28 @@ Ask: "Research domain ecosystem?" → Yes/No.
 **If yes:** Create `.planning/research/`, spawn 4 parallel researchers:
 
 ```
-Task(prompt="Read __OPENCODE_CONFIG__/agents/bgsd-project-researcher.md for instructions.
+Task(prompt="Read __OPENCODE_CONFIG__/agents/bbgsd-project-researcher.md for instructions.
 Research: Stack dimension for [domain]. [greenfield|subsequent] context.
 Question: What's the standard 2025 stack for [domain]?
 Read: {project_path}
 Write to: .planning/research/STACK.md (use template research-project/STACK.md)
 ", subagent_type="general", model="{researcher_model}", description="Stack research")
 
-Task(prompt="Read __OPENCODE_CONFIG__/agents/bgsd-project-researcher.md for instructions.
+Task(prompt="Read __OPENCODE_CONFIG__/agents/bbgsd-project-researcher.md for instructions.
 Research: Features dimension for [domain]. [greenfield|subsequent] context.
 Question: What features do [domain] products have? Table stakes vs differentiating?
 Read: {project_path}
 Write to: .planning/research/FEATURES.md (use template research-project/FEATURES.md)
 ", subagent_type="general", model="{researcher_model}", description="Features research")
 
-Task(prompt="Read __OPENCODE_CONFIG__/agents/bgsd-project-researcher.md for instructions.
+Task(prompt="Read __OPENCODE_CONFIG__/agents/bbgsd-project-researcher.md for instructions.
 Research: Architecture dimension for [domain]. [greenfield|subsequent] context.
 Question: How are [domain] systems typically structured?
 Read: {project_path}
 Write to: .planning/research/ARCHITECTURE.md (use template research-project/ARCHITECTURE.md)
 ", subagent_type="general", model="{researcher_model}", description="Architecture research")
 
-Task(prompt="Read __OPENCODE_CONFIG__/agents/bgsd-project-researcher.md for instructions.
+Task(prompt="Read __OPENCODE_CONFIG__/agents/bbgsd-project-researcher.md for instructions.
 Research: Pitfalls dimension for [domain]. [greenfield|subsequent] context.
 Question: What do [domain] projects commonly get wrong?
 Read: {project_path}
@@ -183,7 +183,7 @@ Task(prompt="Synthesize research into SUMMARY.md.
 Read: .planning/research/STACK.md, FEATURES.md, ARCHITECTURE.md, PITFALLS.md
 Write to: .planning/research/SUMMARY.md (use template research-project/SUMMARY.md)
 Commit after writing.
-", subagent_type="gsd-roadmapper", model="{roadmapper_model}", description="Synthesize research")
+", subagent_type="bgsd-roadmapper", model="{roadmapper_model}", description="Synthesize research")
 ```
 
 Display key findings from SUMMARY.md.
@@ -213,7 +213,7 @@ Requirements must be specific, testable, user-centric, and atomic.
 Present full list for confirmation. If "adjust" → loop.
 
 ```bash
-node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs execute:commit "docs: define v1 requirements" --files .planning/REQUIREMENTS.md
+node __OPENCODE_CONFIG__/bgsd-oc/bin/bgsd-tools.cjs execute:commit "docs: define v1 requirements" --files .planning/REQUIREMENTS.md
 ```
 
 ## 8. Create Roadmap
@@ -229,7 +229,7 @@ Task(prompt="
 </files_to_read>
 
 Create roadmap: derive phases from requirements, map every v1 requirement, derive 2-5 success criteria per phase, validate 100% coverage. Write ROADMAP.md, STATE.md, update REQUIREMENTS.md traceability. Return ROADMAP CREATED with summary.
-", subagent_type="gsd-roadmapper", model="{roadmapper_model}", description="Create roadmap")
+", subagent_type="bgsd-roadmapper", model="{roadmapper_model}", description="Create roadmap")
 ```
 
 If ROADMAP BLOCKED: resolve with user, re-spawn.
@@ -239,8 +239,8 @@ If ROADMAP CREATED: present inline (phases table + details).
 - **Interactive:** ask approve/adjust/review. If adjust → re-spawn with feedback. Loop until approved.
 
 ```bash
-node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs verify:validate roadmap --repair 2>/dev/null
-node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs execute:commit "docs: create roadmap ([N] phases)" --files .planning/ROADMAP.md .planning/STATE.md .planning/REQUIREMENTS.md
+node __OPENCODE_CONFIG__/bgsd-oc/bin/bgsd-tools.cjs verify:validate roadmap --repair 2>/dev/null
+node __OPENCODE_CONFIG__/bgsd-oc/bin/bgsd-tools.cjs execute:commit "docs: create roadmap ([N] phases)" --files .planning/ROADMAP.md .planning/STATE.md .planning/REQUIREMENTS.md
 ```
 
 ## 9. Done

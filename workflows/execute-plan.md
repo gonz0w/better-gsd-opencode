@@ -11,7 +11,7 @@ Load git-integration.md sections as needed via extract-sections.
 
 <step name="init_context" priority="first">
 ```bash
-INIT=$(node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs init:execute-phase "${PHASE}" --compact)
+INIT=$(node __OPENCODE_CONFIG__/bgsd-oc/bin/bgsd-tools.cjs init:execute-phase "${PHASE}" --compact)
 ```
 
 Parse: `executor_model`, `commit_docs`, `phase_dir`, `phase_number`, `plans`, `summaries`, `incomplete_plans`.
@@ -34,7 +34,7 @@ PLAN_START_EPOCH=$(date +%s)
 
 <step name="context_budget_check">
 ```bash
-BUDGET=$(node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs verify:context-budget "${PLAN_PATH}" 2>/dev/null)
+BUDGET=$(node __OPENCODE_CONFIG__/bgsd-oc/bin/bgsd-tools.cjs verify:context-budget "${PLAN_PATH}" 2>/dev/null)
 ```
 
 If `warning` truthy: yolo → log and continue. Interactive → ask proceed/stop.
@@ -52,7 +52,7 @@ grep -n "type=\"checkpoint" .planning/phases/XX-name/{phase}-{plan}-PLAN.md
 | Verify-only | B (segmented) | Segments between checkpoints |
 | Decision | C (main) | Execute in main context |
 
-**Pattern A:** init_agent_tracking → spawn Task(subagent_type="gsd-executor", model=executor_model) with plan path, autonomous execution, all tasks + SUMMARY + commit → track → wait → report.
+**Pattern A:** init_agent_tracking → spawn Task(subagent_type="bgsd-executor", model=executor_model) with plan path, autonomous execution, all tasks + SUMMARY + commit → track → wait → report.
 **Pattern B:** Segment-by-segment. Autonomous segments: subagent. Checkpoints: main. After all: aggregate → SUMMARY → commit → self-check.
 **Pattern C:** Execute using standard flow (step execute).
 </step>
@@ -111,7 +111,7 @@ Document in SUMMARY: per deviation with rule/category/task/issue/fix/files/commi
 
 <tdd_plan_execution>
 For `type: tdd` plans, follow the dedicated TDD workflow:
-@__OPENCODE_CONFIG__/get-shit-done/workflows/tdd.md
+@__OPENCODE_CONFIG__/bgsd-oc/workflows/tdd.md
 
 The TDD workflow enforces RED→GREEN→REFACTOR gates via CLI validation commands. Do NOT use the standard task execution flow for TDD plans.
 </tdd_plan_execution>
@@ -126,7 +126,7 @@ After each file modification during task execution (not just at task end), for A
 
 2. Run auto-test:
    ```bash
-   AUTOTEST=$(node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs execute:tdd auto-test --test-cmd "<test_command>")
+   AUTOTEST=$(node __OPENCODE_CONFIG__/bgsd-oc/bin/bgsd-tools.cjs execute:tdd auto-test --test-cmd "<test_command>")
    ```
 
 3. If test fails:
@@ -152,7 +152,7 @@ Types: feat, fix, test, refactor, perf, docs, style, chore.
 
 After committing task work, save a bookmark:
 ```bash
-node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs util:memory write --store bookmarks --entry '{"phase":"${PHASE}","plan":"${PLAN}","task":${TASK_NUM},"total_tasks":${TOTAL_TASKS},"git_head":"'$(git rev-parse --short HEAD)'"}'
+node __OPENCODE_CONFIG__/bgsd-oc/bin/bgsd-tools.cjs util:memory write --store bookmarks --entry '{"phase":"${PHASE}","plan":"${PLAN}","task":${TASK_NUM},"total_tasks":${TOTAL_TASKS},"git_head":"'$(git rev-parse --short HEAD)'"}'
 ```
 </task_commit>
 
@@ -196,7 +196,7 @@ After plan execution completes (all tasks committed, before SUMMARY creation):
 
 2. Assemble review context:
 ```bash
-REVIEW_CTX=$(node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs verify:review ${PHASE_NUM} ${PLAN_NUM} --raw 2>/dev/null)
+REVIEW_CTX=$(node __OPENCODE_CONFIG__/bgsd-oc/bin/bgsd-tools.cjs verify:review ${PHASE_NUM} ${PLAN_NUM} --raw 2>/dev/null)
 ```
 
 3. If review context available (non-empty, valid JSON), perform review:
@@ -242,9 +242,9 @@ If no review was performed (gap closure, skipped, etc.): omit this section entir
 
 <step name="update_current_position">
 ```bash
-node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs verify:state advance-plan
-node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs verify:state update-progress
-node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs verify:state record-metric \
+node __OPENCODE_CONFIG__/bgsd-oc/bin/bgsd-tools.cjs verify:state advance-plan
+node __OPENCODE_CONFIG__/bgsd-oc/bin/bgsd-tools.cjs verify:state update-progress
+node __OPENCODE_CONFIG__/bgsd-oc/bin/bgsd-tools.cjs verify:state record-metric \
   --phase "${PHASE}" --plan "${PLAN}" --duration "${DURATION}" \
   --tasks "${TASK_COUNT}" --files "${FILE_COUNT}"
 ```
@@ -252,14 +252,14 @@ node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs verify:state record-met
 
 <step name="extract_decisions_and_issues">
 ```bash
-node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs verify:state add-decision \
+node __OPENCODE_CONFIG__/bgsd-oc/bin/bgsd-tools.cjs verify:state add-decision \
   --phase "${PHASE}" --summary "${DECISION_TEXT}" --rationale "${RATIONALE}"
 ```
 </step>
 
 <step name="update_session_continuity">
 ```bash
-node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs verify:state record-session \
+node __OPENCODE_CONFIG__/bgsd-oc/bin/bgsd-tools.cjs verify:state record-session \
   --stopped-at "Completed ${PHASE}-${PLAN}-PLAN.md" --resume-file "None"
 ```
 </step>
@@ -270,20 +270,20 @@ If SUMMARY issues ≠ "None": yolo → log. Interactive → present, wait.
 
 <step name="update_roadmap">
 ```bash
-node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs plan:roadmap update-plan-progress "${PHASE}"
+node __OPENCODE_CONFIG__/bgsd-oc/bin/bgsd-tools.cjs plan:roadmap update-plan-progress "${PHASE}"
 ```
 </step>
 
 <step name="update_requirements">
 ```bash
-node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs plan:requirements mark-complete ${REQ_IDS}
+node __OPENCODE_CONFIG__/bgsd-oc/bin/bgsd-tools.cjs plan:requirements mark-complete ${REQ_IDS}
 ```
 Extract from plan frontmatter `requirements:` field. Skip if absent.
 </step>
 
 <step name="git_commit_metadata">
 ```bash
-node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs execute:commit "docs({phase}-{plan}): complete [plan-name] plan" --files .planning/phases/XX-name/{phase}-{plan}-SUMMARY.md .planning/STATE.md .planning/ROADMAP.md .planning/REQUIREMENTS.md
+node __OPENCODE_CONFIG__/bgsd-oc/bin/bgsd-tools.cjs execute:commit "docs({phase}-{plan}): complete [plan-name] plan" --files .planning/phases/XX-name/{phase}-{plan}-SUMMARY.md .planning/STATE.md .planning/ROADMAP.md .planning/REQUIREMENTS.md
 ```
 </step>
 

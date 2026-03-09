@@ -5,7 +5,7 @@ description: Execute a quick task with GSD guarantees (atomic commits, state tra
 Execute small, ad-hoc tasks with GSD guarantees (atomic commits, STATE.md tracking).
 
 Quick mode is the same system with a shorter path:
-- Spawns gsd-planner (quick mode) + gsd-executor(s)
+- Spawns bgsd-planner (quick mode) + bgsd-executor(s)
 - Quick tasks live in `.planning/quick/` separate from planned phases
 - Updates STATE.md "Quick Tasks Completed" table (NOT ROADMAP.md)
 
@@ -15,7 +15,7 @@ Quick mode is the same system with a shorter path:
 </objective>
 
 <execution_context>
-@__OPENCODE_CONFIG__/get-shit-done/workflows/quick.md
+@__OPENCODE_CONFIG__/bgsd-oc/workflows/quick.md
 </execution_context>
 
 <context>
@@ -25,6 +25,6 @@ Context files are resolved inside the workflow (`init quick`) and delegated via 
 </context>
 
 <process>
-Execute the quick workflow from @__OPENCODE_CONFIG__/get-shit-done/workflows/quick.md end-to-end.
+Execute the quick workflow from @__OPENCODE_CONFIG__/bgsd-oc/workflows/quick.md end-to-end.
 Preserve all workflow gates (validation, task description, planning, execution, state updates, commits).
 </process>

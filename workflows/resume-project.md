@@ -7,7 +7,7 @@ Restore full project context — instant answer to "Where were we?"
 </purpose>
 
 <required_reading>
-@__OPENCODE_CONFIG__/get-shit-done/references/continuation-format.md
+@__OPENCODE_CONFIG__/bgsd-oc/references/continuation-format.md
 </required_reading>
 
 <process>
@@ -16,7 +16,7 @@ Restore full project context — instant answer to "Where were we?"
 Load all context in one call:
 
 ```bash
-INIT=$(node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs init:resume)
+INIT=$(node __OPENCODE_CONFIG__/bgsd-oc/bin/bgsd-tools.cjs init:resume)
 ```
 
 Parse JSON for: `state_exists`, `roadmap_exists`, `project_exists`, `planning_exists`, `has_interrupted_agent`, `interrupted_agent_id`, `commit_docs`.

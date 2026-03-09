@@ -14,7 +14,7 @@ Callable standalone or as a post-execution step from execute-phase or quick work
 </objective>
 
 <execution_context>
-@__OPENCODE_CONFIG__/get-shit-done/workflows/github-ci.md
+@__OPENCODE_CONFIG__/bgsd-oc/workflows/github-ci.md
 </execution_context>
 
 <context>
@@ -24,6 +24,6 @@ Context files are resolved inside the workflow and delegated via `<files_to_read
 </context>
 
 <process>
-Execute the github-ci workflow from @__OPENCODE_CONFIG__/get-shit-done/workflows/github-ci.md end-to-end.
+Execute the github-ci workflow from @__OPENCODE_CONFIG__/bgsd-oc/workflows/github-ci.md end-to-end.
 Preserve all workflow gates (prerequisite validation, agent spawn, result reporting).
 </process>

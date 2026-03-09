@@ -5,13 +5,13 @@ description: Systematic debugging with persistent state across context resets
 <objective>
 Debug issues using scientific method with subagent isolation.
 
-**Orchestrator role:** Gather symptoms, spawn gsd-debugger agent, handle checkpoints, spawn continuations.
+**Orchestrator role:** Gather symptoms, spawn bgsd-debugger agent, handle checkpoints, spawn continuations.
 
 **Why subagent:** Investigation burns context fast (reading files, forming hypotheses, testing). Fresh 200k context per investigation. Main context stays lean for user interaction.
 </objective>
 
 <execution_context>
-@__OPENCODE_CONFIG__/get-shit-done/workflows/debug.md
+@__OPENCODE_CONFIG__/bgsd-oc/workflows/debug.md
 </execution_context>
 
 <context>

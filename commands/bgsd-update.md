@@ -15,11 +15,11 @@ Routes to the update workflow which handles:
 </objective>
 
 <execution_context>
-@__OPENCODE_CONFIG__/get-shit-done/workflows/update.md
+@__OPENCODE_CONFIG__/bgsd-oc/workflows/update.md
 </execution_context>
 
 <process>
-**Follow the update workflow** from `@__OPENCODE_CONFIG__/get-shit-done/workflows/update.md`.
+**Follow the update workflow** from `@__OPENCODE_CONFIG__/bgsd-oc/workflows/update.md`.
 
 The workflow handles all logic including:
 1. Installed version detection (local/global)

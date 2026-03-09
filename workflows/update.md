@@ -14,11 +14,11 @@ Detect whether bGSD is installed locally or globally:
 ```bash
 # Check local first (takes priority)
 # Paths templated at install time for runtime compatibility
-if [ -f ./.OC/get-shit-done/VERSION ]; then
-  cat ./.OC/get-shit-done/VERSION
+if [ -f ./.OC/bgsd-oc/VERSION ]; then
+  cat ./.OC/bgsd-oc/VERSION
   echo "LOCAL"
-elif [ -f __OPENCODE_CONFIG__/get-shit-done/VERSION ]; then
-  cat __OPENCODE_CONFIG__/get-shit-done/VERSION
+elif [ -f __OPENCODE_CONFIG__/bgsd-oc/VERSION ]; then
+  cat __OPENCODE_CONFIG__/bgsd-oc/VERSION
   echo "GLOBAL"
 else
   echo "UNKNOWN"
@@ -44,7 +44,7 @@ Proceed to install step (treat as version 0.0.0 for comparison).
 Check npm for latest version:
 
 ```bash
-npm view get-shit-done version 2>/dev/null
+npm view bgsd-oc version 2>/dev/null
 ```
 
 **If npm check fails:**
@@ -109,7 +109,7 @@ Exit.
 
 ⚠️  **Note:** The installer performs a clean install of bGSD folders:
 - `commands/gsd/` will be wiped and replaced
-- `get-shit-done/` will be wiped and replaced
+- `bgsd-oc/` will be wiped and replaced
 - `agents/bgsd-*` files will be replaced
 
 (Paths are relative to your install location: `__OPENCODE_CONFIG__/` for global, `./.OC/` for local)
@@ -165,7 +165,7 @@ Format completion message (changelog was already shown in confirmation step):
 
 ⚠️  Restart the editor to pick up the new commands.
 
-[View full changelog](https://github.com/glittercowboy/get-shit-done/blob/main/CHANGELOG.md)
+[View full changelog](https://github.com/glittercowboy/bgsd-oc/blob/main/CHANGELOG.md)
 ```
 </step>
 

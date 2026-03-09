@@ -1,7 +1,7 @@
 <purpose>
 Debug issues using scientific method with subagent isolation.
 
-Standalone debug command. Gathers symptoms, spawns gsd-debugger, handles checkpoints and continuations.
+Standalone debug command. Gathers symptoms, spawns bgsd-debugger, handles checkpoints and continuations.
 </purpose>
 
 <process>
@@ -9,12 +9,12 @@ Standalone debug command. Gathers symptoms, spawns gsd-debugger, handles checkpo
 ## 0. Initialize Context
 
 ```bash
-INIT=$(node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs verify:state load)
+INIT=$(node __OPENCODE_CONFIG__/bgsd-oc/bin/bgsd-tools.cjs verify:state load)
 ```
 
 Extract `commit_docs` from init JSON. Resolve debugger model:
 ```bash
-DEBUGGER_MODEL=$(node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs util:resolve-model gsd-debugger --raw)
+DEBUGGER_MODEL=$(node __OPENCODE_CONFIG__/bgsd-oc/bin/bgsd-tools.cjs util:resolve-model bgsd-debugger --raw)
 ```
 
 ## 1. Check Active Sessions
@@ -38,7 +38,7 @@ Use question for each:
 
 After all gathered, confirm ready to investigate.
 
-## 3. Spawn gsd-debugger Agent
+## 3. Spawn bgsd-debugger Agent
 
 Fill prompt and spawn:
 
@@ -70,7 +70,7 @@ Create: .planning/debug/{slug}.md
 ```
 Task(
   prompt=filled_prompt,
-  subagent_type="gsd-debugger",
+  subagent_type="bgsd-debugger",
   model="{debugger_model}",
   description="Debug {slug}"
 )
@@ -125,7 +125,7 @@ goal: find_and_fix
 ```
 Task(
   prompt=continuation_prompt,
-  subagent_type="gsd-debugger",
+  subagent_type="bgsd-debugger",
   model="{debugger_model}",
   description="Continue debug {slug}"
 )
@@ -136,7 +136,7 @@ Task(
 <success_criteria>
 - [ ] Active sessions checked
 - [ ] Symptoms gathered (if new)
-- [ ] gsd-debugger spawned with context
+- [ ] bgsd-debugger spawned with context
 - [ ] Checkpoints handled correctly
 - [ ] Root cause confirmed before fixing
 </success_criteria>

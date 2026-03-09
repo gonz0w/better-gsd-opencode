@@ -6,7 +6,7 @@ Estimate token usage for a plan file. Warns when plan content exceeds the config
 </objective>
 
 <execution_context>
-@__OPENCODE_CONFIG__/get-shit-done/workflows/cmd-context-budget.md
+@__OPENCODE_CONFIG__/bgsd-oc/workflows/cmd-context-budget.md
 </execution_context>
 
 <process>

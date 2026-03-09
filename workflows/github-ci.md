@@ -44,7 +44,7 @@ If not authenticated, error with instructions:
 ```
 ERROR: GitHub CLI not authenticated.
 Run: gh auth login
-Then retry: /bgsd-github-ci
+Then retry: /bbgsd-github-ci
 ```
 
 ```bash
@@ -103,7 +103,7 @@ Report:
 **Step 4: Spawn CI agent**
 
 ```bash
-INIT=$(node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs init:execute-phase 2>/dev/null || echo '{"executor_model":"default"}')
+INIT=$(node __OPENCODE_CONFIG__/bgsd-oc/bin/bgsd-tools.cjs init:execute-phase 2>/dev/null || echo '{"executor_model":"default"}')
 ```
 
 Parse `executor_model` from init JSON.
@@ -127,7 +127,7 @@ SCOPE: ${SCOPE}
 - ./AGENTS.md (if exists)
 </files_to_read>
 ",
-  subagent_type="gsd-github-ci",
+  subagent_type="bgsd-github-ci",
   model="{executor_model}",
   description="GitHub CI: ${SCOPE}"
 )
@@ -184,7 +184,7 @@ Display checkpoint details and present options to user.
 
 Options:
 1. Dismiss remaining alerts as acceptable risk
-2. Apply manual fixes and re-run: /bgsd-github-ci --branch ${BRANCH_NAME}
+2. Apply manual fixes and re-run: /bbgsd-github-ci --branch ${BRANCH_NAME}
 3. Close PR without merging
 ```
 
@@ -192,18 +192,18 @@ Options:
 
 **Step 6: Record state (direct invocation only)**
 
-If this workflow was invoked directly via `/bgsd-github-ci` (not spawned by execute-phase):
+If this workflow was invoked directly via `/bbgsd-github-ci` (not spawned by execute-phase):
 
 Record CI decisions and session from agent's return:
 ```bash
-GSD_HOME=$(ls -d $HOME/.config/*/get-shit-done 2>/dev/null | head -1)
+BGSD_HOME=$(ls -d $HOME/.config/*/bgsd-oc 2>/dev/null | head -1)
 
 # Record key decisions from CI COMPLETE
-node $GSD_HOME/bin/gsd-tools.cjs verify:state add-decision \
+node $BGSD_HOME/bin/bgsd-tools.cjs verify:state add-decision \
   --phase "ci" --summary "CI: ${STATUS} - ${PASSED} passed, ${FIXED} fixed, ${DISMISSED} dismissed"
 
 # Update session
-node $GSD_HOME/bin/gsd-tools.cjs verify:state record-session \
+node $BGSD_HOME/bin/bgsd-tools.cjs verify:state record-session \
   --stopped-at "CI: ${STATUS} - PR ${PR_URL}"
 ```
 

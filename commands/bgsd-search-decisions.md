@@ -6,7 +6,7 @@ Search STATE.md and archived states for decisions matching a query. Useful for u
 </objective>
 
 <execution_context>
-@__OPENCODE_CONFIG__/get-shit-done/workflows/cmd-search-decisions.md
+@__OPENCODE_CONFIG__/bgsd-oc/workflows/cmd-search-decisions.md
 </execution_context>
 
 <process>

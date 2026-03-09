@@ -29,7 +29,7 @@ Exit.
 Load phase operation context:
 
 ```bash
-INIT=$(node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs init:phase-op "${target}")
+INIT=$(node __OPENCODE_CONFIG__/bgsd-oc/bin/bgsd-tools.cjs init:phase-op "${target}")
 ```
 
 Extract: `phase_found`, `phase_dir`, `phase_number`, `commit_docs`, `roadmap_exists`.
@@ -76,16 +76,16 @@ Wait for confirmation.
 </step>
 
 <step name="execute_removal">
-**Delegate the entire removal operation to gsd-tools:**
+**Delegate the entire removal operation to bgsd-tools:**
 
 ```bash
-RESULT=$(node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs plan:phase remove "${target}")
+RESULT=$(node __OPENCODE_CONFIG__/bgsd-oc/bin/bgsd-tools.cjs plan:phase remove "${target}")
 ```
 
-If the phase has executed plans (SUMMARY.md files), gsd-tools will error. Use `--force` only if the user confirms:
+If the phase has executed plans (SUMMARY.md files), bgsd-tools will error. Use `--force` only if the user confirms:
 
 ```bash
-RESULT=$(node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs plan:phase remove "${target}" --force)
+RESULT=$(node __OPENCODE_CONFIG__/bgsd-oc/bin/bgsd-tools.cjs plan:phase remove "${target}" --force)
 ```
 
 The CLI handles:
@@ -102,7 +102,7 @@ Extract from result: `removed`, `directory_deleted`, `renamed_directories`, `ren
 Stage and commit the removal:
 
 ```bash
-node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs execute:commit "chore: remove phase {target} ({original-phase-name})" --files .planning/
+node __OPENCODE_CONFIG__/bgsd-oc/bin/bgsd-tools.cjs execute:commit "chore: remove phase {target} ({original-phase-name})" --files .planning/
 ```
 
 The commit message preserves the historical record of what was removed.
@@ -139,7 +139,7 @@ Would you like to:
 
 - Don't remove completed phases (have SUMMARY.md files) without --force
 - Don't remove current or past phases
-- Don't manually renumber — use `gsd-tools phase remove` which handles all renumbering
+- Don't manually renumber — use `bgsd-tools phase remove` which handles all renumbering
 - Don't add "removed phase" notes to STATE.md — git commit is the record
 - Don't modify completed phase directories
 </anti_patterns>
@@ -148,7 +148,7 @@ Would you like to:
 Phase removal is complete when:
 
 - [ ] Target phase validated as future/unstarted
-- [ ] `gsd-tools phase remove` executed successfully
+- [ ] `bgsd-tools phase remove` executed successfully
 - [ ] Changes committed with descriptive message
 - [ ] User informed of changes
 </success_criteria>

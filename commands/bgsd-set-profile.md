@@ -13,11 +13,11 @@ Routes to the set-profile workflow which handles:
 </objective>
 
 <execution_context>
-@__OPENCODE_CONFIG__/get-shit-done/workflows/set-profile.md
+@__OPENCODE_CONFIG__/bgsd-oc/workflows/set-profile.md
 </execution_context>
 
 <process>
-**Follow the set-profile workflow** from `@__OPENCODE_CONFIG__/get-shit-done/workflows/set-profile.md`.
+**Follow the set-profile workflow** from `@__OPENCODE_CONFIG__/bgsd-oc/workflows/set-profile.md`.
 
 The workflow handles all logic including:
 1. Profile argument validation

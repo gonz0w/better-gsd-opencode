@@ -12,7 +12,7 @@ Read all execution_context files before starting.
 **Load progress context (paths only):**
 
 ```bash
-INIT=$(node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs init:progress)
+INIT=$(node __OPENCODE_CONFIG__/bgsd-oc/bin/bgsd-tools.cjs init:progress)
 ```
 
 Extract from init JSON: `project_exists`, `roadmap_exists`, `state_exists`, `phases`, `current_phase`, `next_phase`, `milestone_version`, `completed_count`, `phase_count`, `paused_at`, `state_path`, `roadmap_path`, `project_path`, `config_path`.
@@ -40,8 +40,8 @@ If missing both ROADMAP.md and PROJECT.md: suggest `/bgsd-new-project`.
 **Load structured data:**
 
 ```bash
-ROADMAP=$(node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs plan:roadmap analyze)
-STATE=$(node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs util:state-snapshot)
+ROADMAP=$(node __OPENCODE_CONFIG__/bgsd-oc/bin/bgsd-tools.cjs plan:roadmap analyze)
+STATE=$(node __OPENCODE_CONFIG__/bgsd-oc/bin/bgsd-tools.cjs util:state-snapshot)
 ```
 
 `ROADMAP` returns: phases with disk status, goals, deps, plan/summary counts, progress percent, current/next phase.
@@ -56,11 +56,11 @@ STATE=$(node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs util:state-snap
 </step>
 
 <step name="report">
-**Generate progress bar from gsd-tools, then present rich status report:**
+**Generate progress bar from bgsd-tools, then present rich status report:**
 
 ```bash
 # Get formatted progress bar
-PROGRESS_BAR=$(node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs util:progress bar)
+PROGRESS_BAR=$(node __OPENCODE_CONFIG__/bgsd-oc/bin/bgsd-tools.cjs util:progress bar)
 ```
 
 Present:
