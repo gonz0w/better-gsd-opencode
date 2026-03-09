@@ -691,11 +691,11 @@ async function main() {
           } else if (cbSub === 'lifecycle') {
             lazyCodebase().cmdCodebaseLifecycle(cwd, restArgs.slice(1), raw);
           } else if (cbSub === 'ast') {
-            lazyCodebase().cmdCodebaseAst(cwd, restArgs[1], raw);
+            lazyCodebase().cmdCodebaseAst(cwd, restArgs.slice(1), raw);
           } else if (cbSub === 'exports') {
-            lazyCodebase().cmdCodebaseExports(cwd, restArgs[1], raw);
+            lazyCodebase().cmdCodebaseExports(cwd, restArgs.slice(1), raw);
           } else if (cbSub === 'complexity') {
-            lazyCodebase().cmdCodebaseComplexity(cwd, restArgs[1], raw);
+            lazyCodebase().cmdCodebaseComplexity(cwd, restArgs.slice(1), raw);
           } else if (cbSub === 'repo-map') {
             lazyCodebase().cmdCodebaseRepoMap(cwd, restArgs.slice(1), raw);
           } else {
