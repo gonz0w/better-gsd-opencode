@@ -10,9 +10,9 @@ See: .planning/PROJECT.md (updated 2026-03-09)
 ## Current Position
 
 **Phase:** 71 — Plugin Architecture & Safety
-**Current Plan:** 2 of 2
-**Status:** Phase complete — ready for verification
-**Last Activity:** 2026-03-09 — Completed 71-02 (Shared Parsers & Tool Registry)
+**Current Plan:** Not started
+**Status:** Ready to plan
+**Last Activity:** 2026-03-09
 
 **Progress:** [██████████] 100%
 
