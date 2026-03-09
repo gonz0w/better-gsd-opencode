@@ -142,6 +142,12 @@ Purpose: Catch compounding errors early. A test failure after editing file A is 
 <task_commit>
 After each task: `git status --short` → stage individually (NEVER `git add .`) → commit as `{type}({phase}-{plan}): {description}` → record hash.
 
+**Pre-commit test gate:** Before committing, run the project's test suite if available:
+1. Check config.json `test_commands` or `package.json` scripts.test for a test command
+2. Run `timeout 180 npm test` (or equivalent) — full suite must pass
+3. If tests fail: the task is NOT complete — fix the regression before committing
+4. If no test command exists: skip the gate and commit directly
+
 Types: feat, fix, test, refactor, perf, docs, style, chore.
 
 After committing task work, save a bookmark:
