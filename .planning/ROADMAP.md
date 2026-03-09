@@ -195,7 +195,7 @@ Full details: `.planning/milestones/v8.3-ROADMAP.md`
 
 ### v9.0 Embedded Plugin Experience (Phases 71-76)
 
-- [ ] **Phase 71: Plugin Architecture & Safety** (0/2 plans) — ESM plugin build pipeline, safeHook error boundary, shared parsers, bgsd_ prefix convention
+- [x] **Phase 71: Plugin Architecture & Safety** (0/2 plans) — ESM plugin build pipeline, safeHook error boundary, shared parsers, bgsd_ prefix convention (completed 2026-03-09)
 - [ ] **Phase 72: Rebrand** — Config folder, env vars, CLI binary, agent files, migration logic, and all internal references renamed from gsd to bgsd
 - [ ] **Phase 73: Context Injection** — Always-on system prompt hook, 500-token budget enforcement, enhanced compaction, slash command enrichment
 - [ ] **Phase 74: Custom LLM Tools** — Five native LLM-callable tools (status, progress, context, plan, validate) with Zod schemas
@@ -214,7 +214,7 @@ Full details: `.planning/milestones/v8.3-ROADMAP.md`
   3. STATE.md, ROADMAP.md, and PLAN.md can be parsed by importing shared parsers from the plugin bundle (no subprocess spawn needed for reads)
   4. Custom tool registration rejects any tool name not prefixed with `bgsd_`
 **Plans:**
-  1/2 plans executed
+  2/2 plans complete
   - Plan 02 (Wave 2): Shared parsers + tool registry [PFND-03, PFND-04]
 
 ### Phase 72: Rebrand
