@@ -50,6 +50,16 @@ const CONFIG_DEFAULTS = Object.freeze({
     debounce_ms: 200,
     max_watched_paths: 500,
   }),
+  // Phase 76: Advisory guardrails settings
+  advisory_guardrails: Object.freeze({
+    enabled: true,
+    conventions: true,
+    planning_protection: true,
+    test_suggestions: true,
+    convention_confidence_threshold: 70,
+    dedup_threshold: 3,
+    test_debounce_ms: 500,
+  }),
 });
 
 /**
@@ -57,7 +67,7 @@ const CONFIG_DEFAULTS = Object.freeze({
  * so user can override individual sub-keys while preserving other defaults.
  */
 const NESTED_OBJECT_KEYS = new Set([
-  'idle_validation', 'notifications', 'stuck_detection', 'file_watcher',
+  'idle_validation', 'notifications', 'stuck_detection', 'file_watcher', 'advisory_guardrails',
 ]);
 
 /**
