@@ -9,9 +9,9 @@ See: .planning/PROJECT.md (updated 2026-03-09)
 
 ## Current Position
 
-**Phase:** 75 — Event-Driven State Sync
-**Current Plan:** Not started
-**Status:** Ready to plan
+**Phase:** 76 — Advisory Guardrails
+**Current Plan:** Plan 01 complete, Plan 02 pending
+**Status:** In progress
 **Last Activity:** 2026-03-09
 
 **Progress:** [██████████] 100%
@@ -53,6 +53,7 @@ See: .planning/PROJECT.md (updated 2026-03-09)
 | Phase 74 P02 | 16 min | 3 tasks | 7 files |
 | Phase 75 P01 | 11 min | 3 tasks | 3 files |
 | Phase 75 P02 | 42 min | 3 tasks | 7 files |
+| Phase 76 P01 | 14 min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -75,6 +76,8 @@ All v1.0-v8.3 decisions recorded in PROJECT.md Key Decisions table with outcomes
 - [Phase 75]: Config parser extended with NESTED_OBJECT_KEYS shallow merge — user overrides individual sub-keys while preserving other defaults
 - [Phase 75]: Idle validator uses execSync git log for stale progress detection with 3s timeout — acceptable for idle-time operation, auto-fix loop prevention via lastAutoFix/lastValidation comparison
 - [Phase 75]: Plugin factory signature extended from ({directory}) to ({directory, $}) for shell API access — enables OS notifications via osascript/notify-send
+- [Phase 76]: Advisory guardrails module uses inline naming classifiers (CJS→ESM boundary) — NAMING_PATTERNS and classifyName copied from conventions.js rather than importing across module boundaries
+- [Phase 76]: Convention detection priority: AGENTS.md keyword scan first, codebase-intel.json fallback with configurable confidence threshold (default 70%)
 
 ### Pending Todos
 
@@ -90,6 +93,6 @@ None — milestone starting fresh.
 
 ## Session Continuity
 
-**Last session:** 2026-03-09T16:14:54.315Z
-**Stopped at:** Phase 76 context gathered
-**Next step:** Plan Phase 76 (Advisory Guardrails) or run /bgsd-verify-work
+**Last session:** 2026-03-09T17:30:45Z
+**Stopped at:** Completed 76-01-PLAN.md
+**Next step:** Execute Phase 76 Plan 02 (wire guardrails into plugin index.js)

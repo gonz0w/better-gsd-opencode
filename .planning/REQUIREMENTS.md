@@ -50,9 +50,9 @@ Requirements for v9.0 Embedded Plugin Experience milestone. Each maps to roadmap
 
 ### Advisory Guardrails
 
-- [ ] **GARD-01**: Advisory warning via `tool.execute.after` when file writes don't match project conventions
-- [ ] **GARD-02**: Advisory warning when PLAN.md, ROADMAP.md, or STATE.md are edited outside bGSD workflow patterns
-- [ ] **GARD-03**: Advisory suggestion to run tests after source file modifications detected via tool interception
+- [x] **GARD-01**: Advisory warning via `tool.execute.after` when file writes don't match project conventions
+- [x] **GARD-02**: Advisory warning when PLAN.md, ROADMAP.md, or STATE.md are edited outside bGSD workflow patterns
+- [x] **GARD-03**: Advisory suggestion to run tests after source file modifications detected via tool interception
 
 ## Future Requirements
 
@@ -104,9 +104,9 @@ Requirements for v9.0 Embedded Plugin Experience milestone. Each maps to roadmap
 | EVNT-02 | Phase 75 | Complete | file change invalidates cache |
 | EVNT-03 | Phase 75 | Complete | toast on phase complete |
 | EVNT-04 | Phase 75 | Complete | toast on stuck detection |
-| GARD-01 | Phase 76 | Pending | convention warning after file write |
-| GARD-02 | Phase 76 | Pending | plan file protection warning |
-| GARD-03 | Phase 76 | Pending | test suggestion after edit |
+| GARD-01 | Phase 76 | Complete | convention warning after file write |
+| GARD-02 | Phase 76 | Complete | plan file protection warning |
+| GARD-03 | Phase 76 | Complete | test suggestion after edit |
 
 **Coverage:**
 - v9.0 requirements: 29 total
