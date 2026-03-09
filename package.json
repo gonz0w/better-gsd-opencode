@@ -1,16 +1,16 @@
 {
-  "name": "get-shit-done-oc",
+  "name": "bgsd-oc",
   "version": "1.0.0",
   "description": "AI project planning and execution plugin for OpenCode — structured milestones, 40 slash commands, 9 specialized agents",
   "type": "module",
   "bin": {
-    "get-shit-done-oc": "./install.js"
+    "bgsd-oc": "./install.js"
   },
   "engines": {
     "node": ">=18"
   },
   "scripts": {
-    "test": "node --test bin/gsd-tools.test.cjs",
+    "test": "node --test bin/bgsd-tools.test.cjs",
     "build": "node build.cjs",
     "audit:dead-code": "npx knip --include exports,files --workspace .",
     "audit:exports": "node audit-exports.cjs",
@@ -20,7 +20,7 @@
     "baseline": "node baseline.cjs"
   },
   "files": [
-    "bin/gsd-tools.cjs",
+    "bin/bgsd-tools.cjs",
     "bin/manifest.json",
     "commands/",
     "agents/",

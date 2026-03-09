@@ -8,9 +8,9 @@ const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
 
-const TOOLS_PATH = path.join(__dirname, 'gsd-tools.cjs');
+const TOOLS_PATH = path.join(__dirname, 'bgsd-tools.cjs');
 
-// Helper to run gsd-tools command
+// Helper to run bgsd-tools command
 function runGsdTools(args, cwd = process.cwd()) {
   try {
     const result = execSync(`node "${TOOLS_PATH}" ${args}`, {
@@ -3259,7 +3259,7 @@ describe('frontmatter edge cases', () => {
       '      contains: "engines"',
       '  key_links:',
       '    - from: "package.json"',
-      '      to: "bin/gsd-tools.test.cjs"',
+      '      to: "bin/bgsd-tools.test.cjs"',
       '      via: "scripts.test"',
       '      pattern: "node --test"',
       '---',
@@ -3407,43 +3407,43 @@ describe('debug logging', () => {
     };
   }
 
-  test('produces debug output on stderr when GSD_DEBUG=1', () => {
+  test('produces debug output on stderr when BGSD_DEBUG=1', () => {
     // Use a command that triggers catch blocks (e.g., state read with no .planning)
     const tmpDir = fs.mkdtempSync(path.join(require('os').tmpdir(), 'gsd-debug-'));
     try {
       const result = runWithStderr('init:progress', {
         cwd: tmpDir,
-        env: { ...process.env, GSD_DEBUG: '1' },
+        env: { ...process.env, BGSD_DEBUG: '1' },
       });
       // The command may fail (no .planning), but stderr should have debug lines
-      const debugLines = (result.stderr || '').split('\n').filter(l => l.includes('[GSD_DEBUG]'));
+      const debugLines = (result.stderr || '').split('\n').filter(l => l.includes('[BGSD_DEBUG]'));
       assert.ok(debugLines.length > 0, `Expected debug output on stderr, got: ${result.stderr.slice(0, 200)}`);
     } finally {
       fs.rmSync(tmpDir, { recursive: true, force: true });
     }
   });
 
-  test('no debug output when GSD_DEBUG is unset', () => {
+  test('no debug output when BGSD_DEBUG is unset', () => {
     const tmpDir = fs.mkdtempSync(path.join(require('os').tmpdir(), 'gsd-debug-'));
     try {
-      // Explicitly remove GSD_DEBUG from env
+      // Explicitly remove BGSD_DEBUG from env
       const cleanEnv = { ...process.env };
-      delete cleanEnv.GSD_DEBUG;
+      delete cleanEnv.BGSD_DEBUG;
       const result = runWithStderr('init:progress', {
         cwd: tmpDir,
         env: cleanEnv,
       });
-      const debugLines = (result.stderr || '').split('\n').filter(l => l.includes('[GSD_DEBUG]'));
+      const debugLines = (result.stderr || '').split('\n').filter(l => l.includes('[BGSD_DEBUG]'));
       assert.strictEqual(debugLines.length, 0, `Expected no debug output, but got: ${debugLines.join('; ')}`);
     } finally {
       fs.rmSync(tmpDir, { recursive: true, force: true });
     }
   });
 
-  test('stdout JSON remains valid when GSD_DEBUG=1', () => {
+  test('stdout JSON remains valid when BGSD_DEBUG=1', () => {
     // current-timestamp (without --raw) always succeeds and returns JSON
     const result = runWithStderr('util:current-timestamp', {
-      env: { ...process.env, GSD_DEBUG: '1' },
+      env: { ...process.env, BGSD_DEBUG: '1' },
     });
     assert.ok(result.success, `Command should succeed: ${result.error}`);
     // stdout must be valid JSON (no debug pollution)
@@ -3454,17 +3454,17 @@ describe('debug logging', () => {
     assert.ok(parsed.timestamp, 'Parsed JSON should contain a timestamp field');
   });
 
-  test('debug output includes context strings with [GSD_DEBUG] prefix', () => {
+  test('debug output includes context strings with [BGSD_DEBUG] prefix', () => {
     const tmpDir = fs.mkdtempSync(path.join(require('os').tmpdir(), 'gsd-debug-'));
     try {
       const result = runWithStderr('init:progress', {
         cwd: tmpDir,
-        env: { ...process.env, GSD_DEBUG: '1' },
+        env: { ...process.env, BGSD_DEBUG: '1' },
       });
-      const debugLines = (result.stderr || '').split('\n').filter(l => l.includes('[GSD_DEBUG]'));
-      // Each debug line should match the format: [GSD_DEBUG] context.subcontext: message
+      const debugLines = (result.stderr || '').split('\n').filter(l => l.includes('[BGSD_DEBUG]'));
+      // Each debug line should match the format: [BGSD_DEBUG] context.subcontext: message
       for (const line of debugLines) {
-        assert.match(line, /\[GSD_DEBUG\] [\w.-]+:/, `Debug line should have context format: ${line}`);
+        assert.match(line, /\[BGSD_DEBUG\] [\w.-]+:/, `Debug line should have context format: ${line}`);
       }
     } finally {
       fs.rmSync(tmpDir, { recursive: true, force: true });
@@ -3568,16 +3568,16 @@ describe('shell sanitization', () => {
 
 describe('temp file cleanup', () => {
   test('process exit handler is registered for temp file cleanup', () => {
-    // Verify that gsd-tools.cjs registers a process.on("exit") handler
+    // Verify that bgsd-tools.cjs registers a process.on("exit") handler
     // by checking the source code directly (the handler is at module level)
     const source = fs.readFileSync(TOOLS_PATH, 'utf-8');
     assert.ok(
       source.includes("process.on('exit'") || source.includes('process.on("exit"'),
-      'gsd-tools.cjs should register a process.on(exit) handler'
+      'bgsd-tools.cjs should register a process.on(exit) handler'
     );
     assert.ok(
       source.includes('_tmpFiles'),
-      'gsd-tools.cjs should track temp files in _tmpFiles array'
+      'bgsd-tools.cjs should track temp files in _tmpFiles array'
     );
   });
 
@@ -3614,7 +3614,7 @@ describe('temp file cleanup', () => {
   });
 
   test('exit handler cleans up tracked files', () => {
-    // Create a temp file that mimics what gsd-tools would create,
+    // Create a temp file that mimics what bgsd-tools would create,
     // then verify the cleanup pattern works
     const tmpPath = path.join(require('os').tmpdir(), `gsd-test-cleanup-${Date.now()}.json`);
     fs.writeFileSync(tmpPath, '{}', 'utf-8');
@@ -3654,7 +3654,7 @@ describe('--help flag', () => {
       encoding: 'utf-8',
       stdio: ['pipe', 'pipe', 'pipe'],
     }).trim();
-    assert.ok(result.includes('Usage: gsd-tools'), `Expected state help, got: ${result.slice(0, 80)}`);
+    assert.ok(result.includes('Usage: bgsd-tools'), `Expected state help, got: ${result.slice(0, 80)}`);
     assert.ok(result.includes('Subcommands:'), 'Should list subcommands');
   });
 
@@ -3799,7 +3799,7 @@ describe('config-migrate command', () => {
       encoding: 'utf-8',
       stdio: ['pipe', 'pipe', 'pipe'],
     }).trim();
-    assert.ok(result.includes('Usage: gsd-tools'), `Expected config-migrate help, got: ${result.slice(0, 80)}`);
+    assert.ok(result.includes('Usage: bgsd-tools'), `Expected config-migrate help, got: ${result.slice(0, 80)}`);
     assert.ok(result.includes('CONFIG_SCHEMA'), 'Should mention CONFIG_SCHEMA');
   });
 });
@@ -3808,8 +3808,8 @@ describe('config-migrate command', () => {
 // Build System Tests (Phase 4, Plan 01)
 // ============================================================
 
-// Build output is now bin/gsd-tools.cjs (same as TOOLS_PATH) — built from src/index.js
-const BUILD_OUTPUT_PATH = TOOLS_PATH;  // bin/gsd-tools.cjs is now the build artifact
+// Build output is now bin/bgsd-tools.cjs (same as TOOLS_PATH) — built from src/index.js
+const BUILD_OUTPUT_PATH = TOOLS_PATH;  // bin/bgsd-tools.cjs is now the build artifact
 
 describe('build system', () => {
   test('npm run build succeeds with exit code 0', () => {
@@ -3818,11 +3818,11 @@ describe('build system', () => {
       encoding: 'utf-8',
       timeout: 15000,
     });
-    assert.ok(result.includes('Built bin/gsd-tools.cjs'), `Expected build output, got: ${result.slice(0, 200)}`);
+    assert.ok(result.includes('Built bin/bgsd-tools.cjs'), `Expected build output, got: ${result.slice(0, 200)}`);
     assert.ok(result.includes('Smoke test passed'), `Expected smoke test pass, got: ${result.slice(0, 200)}`);
   });
 
-  test('build produces bin/gsd-tools.cjs from src/', () => {
+  test('build produces bin/bgsd-tools.cjs from src/', () => {
     execSync('npm run build', {
       cwd: path.join(__dirname, '..'),
       encoding: 'utf-8',
@@ -14528,14 +14528,14 @@ describe('commit --agent attribution', () => {
 /**
  * Compare actual output against a stored snapshot fixture.
  * On mismatch, produces diff-style output showing expected vs actual for each differing field.
- * If GSD_UPDATE_SNAPSHOTS=1, writes actual as new fixture instead of failing.
+ * If BGSD_UPDATE_SNAPSHOTS=1, writes actual as new fixture instead of failing.
  *
  * @param {object} actual - The actual output to compare
  * @param {string} fixturePath - Path to the snapshot JSON file
  * @returns {{ pass: boolean, message: string }}
  */
 function snapshotCompare(actual, fixturePath) {
-  if (process.env.GSD_UPDATE_SNAPSHOTS === '1' || !fs.existsSync(fixturePath)) {
+  if (process.env.BGSD_UPDATE_SNAPSHOTS === '1' || !fs.existsSync(fixturePath)) {
     fs.mkdirSync(path.dirname(fixturePath), { recursive: true });
     fs.writeFileSync(fixturePath, JSON.stringify(actual, null, 2) + '\n', 'utf-8');
     return { pass: true, message: 'Snapshot written (bootstrap mode)' };
@@ -14596,7 +14596,7 @@ function snapshotCompare(actual, fixturePath) {
 
   return {
     pass: false,
-    message: `Snapshot mismatch (${path.basename(fixturePath)}):\n${diffs.join('\n')}\n\nRun with GSD_UPDATE_SNAPSHOTS=1 to update.`,
+    message: `Snapshot mismatch (${path.basename(fixturePath)}):\n${diffs.join('\n')}\n\nRun with BGSD_UPDATE_SNAPSHOTS=1 to update.`,
   };
 }
 
@@ -14996,9 +14996,9 @@ describe('profiler', () => {
   afterEach(() => { cleanup(tmpDir); });
 
   test('profiler disabled by default — no baselines created', () => {
-    // Run a command without GSD_PROFILE
+    // Run a command without BGSD_PROFILE
     const env = { ...process.env };
-    delete env.GSD_PROFILE;
+    delete env.BGSD_PROFILE;
     try {
       execSync(`node "${TOOLS_PATH}" init progress`, {
         cwd: tmpDir,
@@ -15014,12 +15014,12 @@ describe('profiler', () => {
     const exists = fs.existsSync(baselinesDir);
     if (exists) {
       const files = fs.readdirSync(baselinesDir).filter(f => f.startsWith('init-'));
-      assert.strictEqual(files.length, 0, 'No profiler baselines should exist when GSD_PROFILE is not set');
+      assert.strictEqual(files.length, 0, 'No profiler baselines should exist when BGSD_PROFILE is not set');
     }
   });
 
   test('profiler enabled writes baseline', () => {
-    const env = { ...process.env, GSD_PROFILE: '1' };
+    const env = { ...process.env, BGSD_PROFILE: '1' };
     try {
       execSync(`node "${TOOLS_PATH}" init progress`, {
         cwd: tmpDir,
@@ -15044,7 +15044,7 @@ describe('profiler', () => {
   });
 
   test('profiler baseline JSON structure', () => {
-    const env = { ...process.env, GSD_PROFILE: '1' };
+    const env = { ...process.env, BGSD_PROFILE: '1' };
     try {
       execSync(`node "${TOOLS_PATH}" init progress`, {
         cwd: tmpDir,
@@ -15072,21 +15072,21 @@ describe('profiler', () => {
 
   test('profiler zero-cost when disabled', () => {
     // Direct module test — require profiler and check isProfilingEnabled
-    // Since we're not setting GSD_PROFILE in this test process, it should be false
+    // Since we're not setting BGSD_PROFILE in this test process, it should be false
     // But since the module caches the env at load time, we test the built bundle's behavior
     // by running a separate process
     const env = { ...process.env };
-    delete env.GSD_PROFILE;
+    delete env.BGSD_PROFILE;
 
     // Measure time: run command twice — once with profiler, once without.
     // The disabled path should not be significantly slower (zero-cost assertion).
-    // We just verify the function returns false when GSD_PROFILE is unset.
+    // We just verify the function returns false when BGSD_PROFILE is unset.
     const checkResult = execSync(
-      `node -e "delete process.env.GSD_PROFILE; const p = require('./src/lib/profiler'); console.log(JSON.stringify({ enabled: p.isProfilingEnabled(), timings: p.getTimings() }))"`,
+      `node -e "delete process.env.BGSD_PROFILE; const p = require('./src/lib/profiler'); console.log(JSON.stringify({ enabled: p.isProfilingEnabled(), timings: p.getTimings() }))"`,
       { cwd: path.join(__dirname, '..'), encoding: 'utf-8', env }
     ).trim();
     const check = JSON.parse(checkResult);
-    assert.strictEqual(check.enabled, false, 'isProfilingEnabled should return false when GSD_PROFILE unset');
+    assert.strictEqual(check.enabled, false, 'isProfilingEnabled should return false when BGSD_PROFILE unset');
     assert.deepStrictEqual(check.timings, [], 'getTimings should return empty array when disabled');
   });
 });
@@ -15541,7 +15541,7 @@ module.exports = { formatDate, parseQuery };
 
 
 describe('codebase repo-map integration', () => {
-  test('repo-map on gsd-tools project produces valid JSON with files > 0', () => {
+  test('repo-map on bgsd-tools project produces valid JSON with files > 0', () => {
     const result = runGsdTools('util:codebase repo-map --raw');
     assert.ok(result.success, `Command failed: ${result.error}`);
 
@@ -18241,10 +18241,10 @@ Some performance data.
 Some accomplishments.
 `);
 
-    // Run validate-contracts against phase 01 with GSD_HOME pointing to tmpDir
-    // We can't easily override GSD_HOME for the CLI, so test the module directly
+    // Run validate-contracts against phase 01 with BGSD_HOME pointing to tmpDir
+    // We can't easily override BGSD_HOME for the CLI, so test the module directly
     const agentModule = require('../src/commands/agent');
-    // The module uses resolveGsdPaths which reads GSD_HOME env
+    // The module uses resolveBgsdPaths which reads BGSD_HOME env
     // For this test, we verify the parseContractArrays and contentHasSection logic
     assert.ok(agentModule.parseRaciMatrix, 'parseRaciMatrix should be exported');
   });

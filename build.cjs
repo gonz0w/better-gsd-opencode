@@ -27,7 +27,7 @@ async function build() {
 
   const result = await esbuild.build({
     entryPoints: ['src/index.js'],
-    outfile: 'bin/gsd-tools.cjs',
+    outfile: 'bin/bgsd-tools.cjs',
     bundle: true,
     platform: 'node',
     format: 'cjs',
@@ -43,7 +43,7 @@ async function build() {
   });
 
   const elapsed = Date.now() - start;
-  console.log(`Built bin/gsd-tools.cjs in ${elapsed}ms`);
+  console.log(`Built bin/bgsd-tools.cjs in ${elapsed}ms`);
 
   // --- ESM Plugin Build ---
   const pluginStart = Date.now();
@@ -89,7 +89,7 @@ async function build() {
 
   // Smoke test
   try {
-    const result = execSync('node bin/gsd-tools.cjs util:current-timestamp --raw', {
+    const result = execSync('node bin/bgsd-tools.cjs util:current-timestamp --raw', {
       encoding: 'utf-8',
       timeout: 5000,
     });
@@ -101,7 +101,7 @@ async function build() {
 
   // Bundle size tracking
   const BUNDLE_BUDGET_KB = 1500;
-  const bundlePath = 'bin/gsd-tools.cjs';
+  const bundlePath = 'bin/bgsd-tools.cjs';
   const stat = fs.statSync(bundlePath);
   const sizeKB = Math.round(stat.size / 1024);
   const withinBudget = sizeKB <= BUNDLE_BUDGET_KB;
@@ -131,7 +131,7 @@ async function build() {
   }
 
   // --- Metafile analysis: per-module byte attribution ---
-  const outputKey = Object.keys(result.metafile.outputs).find(k => k.endsWith('bin/gsd-tools.cjs'));
+  const outputKey = Object.keys(result.metafile.outputs).find(k => k.endsWith('bin/bgsd-tools.cjs'));
   if (outputKey && result.metafile.outputs[outputKey].inputs) {
     const inputs = result.metafile.outputs[outputKey].inputs;
 
@@ -224,8 +224,8 @@ async function build() {
     console.log(`\nWrote ${baselinesDir}/build-analysis.json`);
 
     // Write raw metafile for ad-hoc analysis
-    fs.writeFileSync('/tmp/gsd-metafile.json', JSON.stringify(result.metafile, null, 2));
-    console.log('Wrote /tmp/gsd-metafile.json');
+    fs.writeFileSync('/tmp/bgsd-metafile.json', JSON.stringify(result.metafile, null, 2));
+    console.log('Wrote /tmp/bgsd-metafile.json');
   }
 
   // --- Manifest generation: list all deployable files ---
@@ -263,8 +263,8 @@ async function build() {
   collectFiles('skills', () => true);
   // commands/ — bgsd-*.md files
   collectFiles('commands', (name) => name.startsWith('bgsd-') && name.endsWith('.md'));
-  // agents/ — gsd-*.md files
-  collectFiles('agents', (name) => name.startsWith('gsd-') && name.endsWith('.md'));
+  // agents/ — bgsd-*.md files
+  collectFiles('agents', (name) => name.startsWith('bgsd-') && name.endsWith('.md'));
   // VERSION file
   if (fs.existsSync('VERSION')) {
     manifestFiles.push('VERSION');

@@ -635,14 +635,14 @@ function invalidateAll(cwd) {
 
 // src/plugin/index.js
 var BgsdPlugin = async ({ directory }) => {
-  const gsdHome = join7(homedir2(), ".config", "opencode", "get-shit-done");
+  const bgsdHome = join7(homedir2(), ".config", "opencode", "bgsd-oc");
   const registry = createToolRegistry(safeHook);
   const sessionCreated = safeHook("session.created", async (input, output) => {
     console.log("[bGSD] Planning plugin available. Use /bgsd-help to get started.");
   });
   const shellEnv = safeHook("shell.env", async (input, output) => {
     if (!output || !output.env) return;
-    output.env.GSD_HOME = gsdHome;
+    output.env.BGSD_HOME = bgsdHome;
   });
   const compacting = safeHook("compacting", async (input, output) => {
     const projectDir = directory || input?.cwd;
