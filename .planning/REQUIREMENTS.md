@@ -9,8 +9,8 @@ Requirements for v9.0 Embedded Plugin Experience milestone. Each maps to roadmap
 
 ### Plugin Foundation & Safety
 
-- [ ] **PFND-01**: Plugin source split into `src/plugin/` modules and bundled to single ESM file via esbuild (second build target alongside CJS CLI)
-- [ ] **PFND-02**: Every hook wrapped in `safeHook()` error boundary that catches, logs, and never crashes the host process
+- [x] **PFND-01**: Plugin source split into `src/plugin/` modules and bundled to single ESM file via esbuild (second build target alongside CJS CLI)
+- [x] **PFND-02**: Every hook wrapped in `safeHook()` error boundary that catches, logs, and never crashes the host process
 - [ ] **PFND-03**: Shared parser module extracted from CLI (STATE.md, ROADMAP.md, config.json readers) for in-process use by plugin without spawning subprocesses
 - [ ] **PFND-04**: All custom tools use `bgsd_` prefix to avoid built-in tool name conflicts
 
@@ -78,8 +78,8 @@ Requirements for v9.0 Embedded Plugin Experience milestone. Each maps to roadmap
 
 | Requirement | Phase | Status | Test Command |
 |-------------|-------|--------|--------------|
-| PFND-01 | Phase 71 | Pending | npm run build (ESM target produces plugin bundle) |
-| PFND-02 | Phase 71 | Pending | node -e "test safeHook catches and logs" |
+| PFND-01 | Phase 71 | Complete | npm run build (ESM target produces plugin bundle) |
+| PFND-02 | Phase 71 | Complete | node -e "test safeHook catches and logs" |
 | PFND-03 | Phase 71 | Pending | import parsers from plugin bundle |
 | PFND-04 | Phase 71 | Pending | grep bgsd_ plugin tools |
 | RBND-01 | Phase 72 | Pending | ls ~/.config/opencode/bgsd-oc/ |

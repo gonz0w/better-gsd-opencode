@@ -214,7 +214,7 @@ Full details: `.planning/milestones/v8.3-ROADMAP.md`
   3. STATE.md, ROADMAP.md, and PLAN.md can be parsed by importing shared parsers from the plugin bundle (no subprocess spawn needed for reads)
   4. Custom tool registration rejects any tool name not prefixed with `bgsd_`
 **Plans:**
-  - Plan 01 (Wave 1): Build pipeline + safeHook error boundary [PFND-01, PFND-02]
+  1/2 plans executed
   - Plan 02 (Wave 2): Shared parsers + tool registry [PFND-03, PFND-04]
 
 ### Phase 72: Rebrand
