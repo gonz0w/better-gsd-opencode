@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-03-09)
 ## Current Position
 
 **Phase:** 72 — Rebrand
-**Current Plan:** 72-03 complete, 72-04 next
-**Status:** Executing
+**Current Plan:** 72-04 complete (phase complete)
+**Status:** Phase Complete
 **Last Activity:** 2026-03-09
 
-**Progress:** [████████░░] 83%
+**Progress:** [██████████] 100%
 
 ## Performance Metrics
 
@@ -45,6 +45,7 @@ See: .planning/PROJECT.md (updated 2026-03-09)
 | Phase 72 P01 | 19 min | 2 tasks | 17 files |
 | Phase 72 P02 | 9 min | 2 tasks | 12 files |
 | Phase 72 P03 | 8 min | 2 tasks | 100 files |
+| Phase 72 P04 | 11 min | 2 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -56,6 +57,7 @@ All v1.0-v8.3 decisions recorded in PROJECT.md Key Decisions table with outcomes
 - [Phase 72]: Renamed all GSD_ env vars to BGSD_ prefix, config paths from get-shit-done to bgsd-oc, CLI binary from gsd-tools to bgsd-tools — clean break, no backward compat with old naming in source
 - [Phase 72]: All 10 agent files renamed gsd-*.md -> bgsd-*.md with BGSD_HOME path setup; install.js migration copies get-shit-done to bgsd-oc and cleans up old agent files
 - [Phase 72]: Bulk renamed gsd-* to bgsd-* across 100 markdown files (workflows, commands, templates, skills, AGENTS.md) — Completes rebrand of user-facing and agent-facing markdown interface files
+- [Phase 72]: Updated source agent scope/routing keys gsd-* → bgsd-* alongside test file rename — fixes model resolution fallback bug from Plan 01 partial rename — MODEL_PROFILES keys were already bgsd-* but AGENT_MANIFESTS and resolveModelInternal calls still used gsd-*, causing silent fallback to sonnet defaults
 
 ### Pending Todos
 
@@ -71,6 +73,6 @@ None — milestone starting fresh.
 
 ## Session Continuity
 
-**Last session:** 2026-03-09T04:32:49.380Z
-**Stopped at:** Completed 72-03-PLAN.md (Workflow/Command/Template/Skill Rename)
+**Last session:** 2026-03-09T04:47:21.592Z
+**Stopped at:** Completed 72-04-PLAN.md (Test File Rename & Validation Sweep)
 **Next step:** Execute Plan 03 — `/bgsd-execute-phase 72` (workflow/command/template/skill updates)

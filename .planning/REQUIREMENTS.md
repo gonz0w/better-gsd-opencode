@@ -18,12 +18,12 @@ Requirements for v9.0 Embedded Plugin Experience milestone. Each maps to roadmap
 
 - [ ] **RBND-01**: Config/install folder renamed from `get-shit-done` to `bgsd-oc` (`~/.config/opencode/bgsd-oc/`)
 - [ ] **RBND-02**: Environment variable `GSD_HOME` renamed to `BGSD_HOME` across plugin, CLI, workflows, agents, and skills
-- [ ] **RBND-03**: Environment variable `GSD_DEBUG` renamed to `BGSD_DEBUG` across all 96+ catch blocks and debug logging paths
-- [ ] **RBND-04**: Environment variable `GSD_PROFILE` renamed to `BGSD_PROFILE` across profiler instrumentation
-- [ ] **RBND-05**: CLI binary renamed from `gsd-tools.cjs` to `bgsd-tools.cjs` (build output, deploy paths, workflow references, test file)
+- [x] **RBND-03**: Environment variable `GSD_DEBUG` renamed to `BGSD_DEBUG` across all 96+ catch blocks and debug logging paths
+- [x] **RBND-04**: Environment variable `GSD_PROFILE` renamed to `BGSD_PROFILE` across profiler instrumentation
+- [x] **RBND-05**: CLI binary renamed from `gsd-tools.cjs` to `bgsd-tools.cjs` (build output, deploy paths, workflow references, test file)
 - [x] **RBND-06**: Agent definition files renamed from `gsd-*.md` to `bgsd-*.md` (all 9 agents + deploy.sh + install.js + build.cjs references)
 - [x] **RBND-07**: install.js updated with migration logic to move existing `get-shit-done` installs to `bgsd-oc` and clean up old paths
-- [ ] **RBND-08**: All internal references (workflows, commands, skills, templates) updated to use new `bgsd-` naming consistently
+- [x] **RBND-08**: All internal references (workflows, commands, skills, templates) updated to use new `bgsd-` naming consistently
 
 ### Context Injection
 
@@ -84,12 +84,12 @@ Requirements for v9.0 Embedded Plugin Experience milestone. Each maps to roadmap
 | PFND-04 | Phase 71 | Complete | grep bgsd_ plugin tools |
 | RBND-01 | Phase 72 | Pending | ls ~/.config/opencode/bgsd-oc/ |
 | RBND-02 | Phase 72 | Pending | grep BGSD_HOME plugin.js |
-| RBND-03 | Phase 72 | Pending | grep BGSD_DEBUG src/ |
-| RBND-04 | Phase 72 | Pending | grep BGSD_PROFILE src/ |
-| RBND-05 | Phase 72 | Pending | ls bin/bgsd-tools.cjs |
+| RBND-03 | Phase 72 | Complete | grep BGSD_DEBUG src/ |
+| RBND-04 | Phase 72 | Complete | grep BGSD_PROFILE src/ |
+| RBND-05 | Phase 72 | Complete | ls bin/bgsd-tools.cjs |
 | RBND-06 | Phase 72 | Complete | ls agents/bgsd-*.md |
 | RBND-07 | Phase 72 | Complete | node install.js (migrates old paths) |
-| RBND-08 | Phase 72 | Pending | grep -r gsd-tools (zero matches outside milestones) |
+| RBND-08 | Phase 72 | Complete | grep -r gsd-tools (zero matches outside milestones) |
 | CINJ-01 | Phase 73 | Pending | system.transform hook registered |
 | CINJ-02 | Phase 73 | Pending | token count < 500 |
 | CINJ-03 | Phase 73 | Pending | compaction includes decisions + blockers |
