@@ -34,12 +34,12 @@ Requirements for v9.0 Embedded Plugin Experience milestone. Each maps to roadmap
 
 ### Custom LLM Tools
 
-- [ ] **TOOL-01**: `bgsd_status` tool registered — returns current phase, plan, progress, blockers (replaces `init:state` CLI call)
+- [x] **TOOL-01**: `bgsd_status` tool registered — returns current phase, plan, progress, blockers (replaces `init:state` CLI call)
 - [ ] **TOOL-02**: `bgsd_progress` tool registered — updates plan progress, marks tasks complete (replaces `execute:commit` pattern)
-- [ ] **TOOL-03**: `bgsd_context` tool registered — returns task-scoped context with relevant files and conventions (replaces `codebase:context` CLI)
-- [ ] **TOOL-04**: `bgsd_plan` tool registered — analyzes roadmap, returns phase details and dependencies (replaces `plan:roadmap` CLI calls)
+- [x] **TOOL-03**: `bgsd_context` tool registered — returns task-scoped context with relevant files and conventions (replaces `codebase:context` CLI)
+- [x] **TOOL-04**: `bgsd_plan` tool registered — analyzes roadmap, returns phase details and dependencies (replaces `plan:roadmap` CLI calls)
 - [ ] **TOOL-05**: `bgsd_validate` tool registered — runs state/roadmap validation checks (replaces `verify:validate` CLI calls)
-- [ ] **TOOL-06**: All custom tools have typed Zod argument schemas and return structured JSON strings
+- [x] **TOOL-06**: All custom tools have typed Zod argument schemas and return structured JSON strings
 
 ### Event-Driven State Sync
 
@@ -94,12 +94,12 @@ Requirements for v9.0 Embedded Plugin Experience milestone. Each maps to roadmap
 | CINJ-02 | Phase 73 | Complete | token count < 500 |
 | CINJ-03 | Phase 73 | Complete | compaction includes decisions + blockers |
 | CINJ-04 | Phase 73 | Complete | command.execute.before hook registered |
-| TOOL-01 | Phase 74 | Pending | bgsd_status tool callable by LLM |
+| TOOL-01 | Phase 74 | Complete | bgsd_status tool callable by LLM |
 | TOOL-02 | Phase 74 | Pending | bgsd_progress tool callable by LLM |
-| TOOL-03 | Phase 74 | Pending | bgsd_context tool callable by LLM |
-| TOOL-04 | Phase 74 | Pending | bgsd_plan tool callable by LLM |
+| TOOL-03 | Phase 74 | Complete | bgsd_context tool callable by LLM |
+| TOOL-04 | Phase 74 | Complete | bgsd_plan tool callable by LLM |
 | TOOL-05 | Phase 74 | Pending | bgsd_validate tool callable by LLM |
-| TOOL-06 | Phase 74 | Pending | all tools have Zod schemas |
+| TOOL-06 | Phase 74 | Complete | all tools have Zod schemas |
 | EVNT-01 | Phase 75 | Pending | session idle triggers validation |
 | EVNT-02 | Phase 75 | Pending | file change invalidates cache |
 | EVNT-03 | Phase 75 | Pending | toast on phase complete |

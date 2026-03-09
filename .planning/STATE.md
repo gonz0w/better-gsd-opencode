@@ -9,12 +9,12 @@ See: .planning/PROJECT.md (updated 2026-03-09)
 
 ## Current Position
 
-**Phase:** 73 — Context Injection
-**Current Plan:** Not started
-**Status:** Ready to plan
+**Phase:** 74 — Custom LLM Tools
+**Current Plan:** Plan 01 complete, Plan 02 pending
+**Status:** In progress
 **Last Activity:** 2026-03-09
 
-**Progress:** [██████████] 100%
+**Progress:** [█████░░░░░] 50%
 
 ## Performance Metrics
 
@@ -49,6 +49,7 @@ See: .planning/PROJECT.md (updated 2026-03-09)
 | Phase 73 P01 | 12 min | 2 tasks | 10 files |
 | Phase 73 P02 | 11 min | 2 tasks | 6 files |
 | Phase 73 P03 | 11 min | 2 tasks | 21 files |
+| Phase 74 P01 | 10 min | 2 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -64,6 +65,7 @@ All v1.0-v8.3 decisions recorded in PROJECT.md Key Decisions table with outcomes
 - [Phase 73]: System prompt injection via chars/4 token estimator (not tokenx) — 70 tokens, well under 500-token budget — tokenx is bundled in CLI but not ESM plugin; chars/4 sufficient for budget enforcement
 - [Phase 73]: Enhanced compaction uses task-state (not task) XML tag to avoid conflicts with PLAN.md task tags; each block independently failable — PLAN.md files contain <task> elements that would conflict with compaction <task> tags; independent failure means partial context is preserved even if one parser fails
 - [Phase 73]: All 19 workflows migrated from init:* subprocess calls to plugin-injected <bgsd-context> — plugin is mandatory for v9.0, no fallback — Completing the transition from subprocess-based to plugin-based context injection makes init:* calls obsolete
+- [Phase 74]: Three read-only LLM tools (bgsd_status, bgsd_plan, bgsd_context) with Zod schemas, tool barrel registration, JSON.stringify returns — Zod v4 bundled into plugin.js (39KB→548KB), CONTEXT.md anticipated size growth
 
 ### Pending Todos
 
@@ -79,6 +81,6 @@ None — milestone starting fresh.
 
 ## Session Continuity
 
-**Last session:** 2026-03-09T12:54:53.713Z
-**Stopped at:** Phase 74 context gathered
-**Next step:** Execute Plan 03 — `/bgsd-execute-phase 73` (remove init:* calls from 19 workflow files)
+**Last session:** 2026-03-09T13:33:44Z
+**Stopped at:** Completed 74-01-PLAN.md
+**Next step:** Execute Plan 02 — `/bgsd-execute-phase 74` (bgsd_validate, bgsd_progress, build pipeline, tests)

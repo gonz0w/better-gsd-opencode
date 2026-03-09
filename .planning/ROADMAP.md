@@ -260,7 +260,7 @@ Full details: `.planning/milestones/v8.3-ROADMAP.md`
   4. Every custom tool has a typed Zod argument schema and returns a JSON string (never `[object Object]`)
   5. All 5 tools appear in the LLM's tool list and are callable during a conversation
 **Plans:**
-  2 plans
+  1/2 plans executed
   - Plan 01 (Wave 1): Tool infrastructure + 3 read-only tools (status, plan, context) [TOOL-01, TOOL-03, TOOL-04, TOOL-06]
   - Plan 02 (Wave 2): Validate + progress tools, build pipeline, tests [TOOL-02, TOOL-05, TOOL-06]
 
