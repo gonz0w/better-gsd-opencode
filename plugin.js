@@ -119,7 +119,7 @@ function safeHook(name, fn, options = {}) {
     let lastError = null;
     for (let attempt = 1; attempt <= 2; attempt++) {
       try {
-        await withTimeout(fn(input, output), timeout);
+        const result = await withTimeout(fn(input, output), timeout);
         consecutiveFailures = 0;
         const elapsed = Date.now() - startTime;
         if (elapsed > 500) {
@@ -128,7 +128,7 @@ function safeHook(name, fn, options = {}) {
             elapsed
           });
         }
-        return;
+        return result;
       } catch (err) {
         lastError = err;
       }

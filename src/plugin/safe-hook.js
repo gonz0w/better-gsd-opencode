@@ -83,7 +83,7 @@ export function safeHook(name, fn, options = {}) {
     let lastError = null;
     for (let attempt = 1; attempt <= 2; attempt++) {
       try {
-        await withTimeout(fn(input, output), timeout);
+        const result = await withTimeout(fn(input, output), timeout);
 
         // Success — reset failure count
         consecutiveFailures = 0;
@@ -97,7 +97,7 @@ export function safeHook(name, fn, options = {}) {
           });
         }
 
-        return; // Hook succeeded
+        return result; // Hook/tool succeeded — pass through return value
       } catch (err) {
         lastError = err;
         // Attempt 1: silent retry — continue to attempt 2

@@ -18257,9 +18257,218 @@ Some accomplishments.
       assert.ok(Array.isArray(parsed.agents), 'agents should be an array');
       if (parsed.agents.length > 0) {
         const agent = parsed.agents[0];
-        assert.ok('name' in agent, 'Each agent should have a name');
+         assert.ok('name' in agent, 'Each agent should have a name');
         assert.ok('description' in agent, 'Each agent should have a description');
       }
     }
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Plugin Tools — bgsd_status, bgsd_plan, bgsd_context, bgsd_validate, bgsd_progress
+// (Phase 74, Plan 02)
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('Plugin Tools', () => {
+  const pluginPath = path.join(__dirname, '..', 'plugin.js');
+  let pluginModule;
+
+  // Load plugin module once for all tool tests
+  test('load plugin module', async () => {
+    pluginModule = await import(pluginPath);
+    assert.ok(pluginModule, 'plugin module should load');
+  });
+
+  // --- Tool definition shape tests ---
+
+  test('bgsd_status has correct definition shape', async () => {
+    const mod = pluginModule || await import(pluginPath);
+    const identity = (name, fn) => fn;
+    const reg = mod.createToolRegistry(identity);
+    // We can't access individual tools directly, but we can test via BgsdPlugin
+    const plugin = await mod.BgsdPlugin({ directory: process.cwd() });
+    const tool = plugin.tool.bgsd_status;
+    assert.ok(tool, 'bgsd_status should be registered');
+    assert.strictEqual(typeof tool.description, 'string', 'description should be a string');
+    assert.strictEqual(typeof tool.args, 'object', 'args should be an object');
+    assert.strictEqual(typeof tool.execute, 'function', 'execute should be a function');
+  });
+
+  test('bgsd_plan has correct definition shape', async () => {
+    const mod = pluginModule || await import(pluginPath);
+    const plugin = await mod.BgsdPlugin({ directory: process.cwd() });
+    const tool = plugin.tool.bgsd_plan;
+    assert.ok(tool, 'bgsd_plan should be registered');
+    assert.strictEqual(typeof tool.description, 'string', 'description should be a string');
+    assert.ok(tool.args.phase, 'args should have phase parameter');
+    assert.strictEqual(typeof tool.execute, 'function', 'execute should be a function');
+  });
+
+  test('bgsd_context has correct definition shape', async () => {
+    const mod = pluginModule || await import(pluginPath);
+    const plugin = await mod.BgsdPlugin({ directory: process.cwd() });
+    const tool = plugin.tool.bgsd_context;
+    assert.ok(tool, 'bgsd_context should be registered');
+    assert.strictEqual(typeof tool.description, 'string', 'description should be a string');
+    assert.ok(tool.args.task, 'args should have task parameter');
+    assert.strictEqual(typeof tool.execute, 'function', 'execute should be a function');
+  });
+
+  test('bgsd_validate has correct definition shape', async () => {
+    const mod = pluginModule || await import(pluginPath);
+    const plugin = await mod.BgsdPlugin({ directory: process.cwd() });
+    const tool = plugin.tool.bgsd_validate;
+    assert.ok(tool, 'bgsd_validate should be registered');
+    assert.strictEqual(typeof tool.description, 'string', 'description should be a string');
+    assert.strictEqual(typeof tool.args, 'object', 'args should be an object');
+    assert.strictEqual(typeof tool.execute, 'function', 'execute should be a function');
+  });
+
+  test('bgsd_progress has correct definition shape', async () => {
+    const mod = pluginModule || await import(pluginPath);
+    const plugin = await mod.BgsdPlugin({ directory: process.cwd() });
+    const tool = plugin.tool.bgsd_progress;
+    assert.ok(tool, 'bgsd_progress should be registered');
+    assert.strictEqual(typeof tool.description, 'string', 'description should be a string');
+    assert.ok(tool.args.action, 'args should have action parameter');
+    assert.ok(tool.args.value, 'args should have value parameter');
+    assert.strictEqual(typeof tool.execute, 'function', 'execute should be a function');
+  });
+
+  // --- JSON return tests (each tool returns valid JSON for nonexistent project) ---
+
+  test('bgsd_status returns valid JSON for nonexistent project', async () => {
+    const mod = pluginModule || await import(pluginPath);
+    const plugin = await mod.BgsdPlugin({ directory: process.cwd() });
+    const result = await plugin.tool.bgsd_status.execute({}, { directory: '/tmp/nonexistent-gsd-test' });
+    assert.strictEqual(typeof result, 'string', 'result should be a string');
+    const parsed = JSON.parse(result);
+    assert.strictEqual(parsed.status, 'no_project', 'should return no_project status');
+  });
+
+  test('bgsd_plan returns valid JSON for nonexistent project', async () => {
+    const mod = pluginModule || await import(pluginPath);
+    const plugin = await mod.BgsdPlugin({ directory: process.cwd() });
+    const result = await plugin.tool.bgsd_plan.execute({}, { directory: '/tmp/nonexistent-gsd-test' });
+    assert.strictEqual(typeof result, 'string', 'result should be a string');
+    const parsed = JSON.parse(result);
+    assert.strictEqual(parsed.status, 'no_project', 'should return no_project status');
+  });
+
+  test('bgsd_context returns valid JSON for nonexistent project', async () => {
+    const mod = pluginModule || await import(pluginPath);
+    const plugin = await mod.BgsdPlugin({ directory: process.cwd() });
+    const result = await plugin.tool.bgsd_context.execute({}, { directory: '/tmp/nonexistent-gsd-test' });
+    assert.strictEqual(typeof result, 'string', 'result should be a string');
+    const parsed = JSON.parse(result);
+    assert.strictEqual(parsed.status, 'no_project', 'should return no_project status');
+  });
+
+  test('bgsd_validate returns valid JSON for nonexistent project', async () => {
+    const mod = pluginModule || await import(pluginPath);
+    const plugin = await mod.BgsdPlugin({ directory: process.cwd() });
+    const result = await plugin.tool.bgsd_validate.execute({}, { directory: '/tmp/nonexistent-gsd-test' });
+    assert.strictEqual(typeof result, 'string', 'result should be a string');
+    const parsed = JSON.parse(result);
+    assert.strictEqual(parsed.status, 'no_project', 'should return no_project status');
+  });
+
+  test('bgsd_progress returns valid JSON for nonexistent project', async () => {
+    const mod = pluginModule || await import(pluginPath);
+    const plugin = await mod.BgsdPlugin({ directory: process.cwd() });
+    const result = await plugin.tool.bgsd_progress.execute({ action: 'complete-task' }, { directory: '/tmp/nonexistent-gsd-test' });
+    assert.strictEqual(typeof result, 'string', 'result should be a string');
+    const parsed = JSON.parse(result);
+    assert.strictEqual(parsed.status, 'no_project', 'should return no_project status');
+  });
+
+  // --- Tool registration integration test ---
+
+  test('BgsdPlugin returns tool object with all 5 tools', async () => {
+    const mod = pluginModule || await import(pluginPath);
+    const plugin = await mod.BgsdPlugin({ directory: process.cwd() });
+    assert.ok(plugin.tool, 'plugin should have tool key');
+    const expectedTools = ['bgsd_status', 'bgsd_plan', 'bgsd_context', 'bgsd_validate', 'bgsd_progress'];
+    for (const name of expectedTools) {
+      assert.ok(plugin.tool[name], `tool object should contain ${name}`);
+      assert.strictEqual(typeof plugin.tool[name].execute, 'function', `${name} should have execute function`);
+    }
+  });
+
+  // --- bgsd_status response shape test (with real .planning/) ---
+
+  test('bgsd_status returns structured data from live project', async () => {
+    const mod = pluginModule || await import(pluginPath);
+    const plugin = await mod.BgsdPlugin({ directory: process.cwd() });
+    const result = await plugin.tool.bgsd_status.execute({}, { directory: process.cwd() });
+    const parsed = JSON.parse(result);
+    // Should not be no_project since this project has .planning/
+    assert.ok(parsed.phase, 'result should have phase');
+    assert.strictEqual(typeof parsed.phase.number, 'string', 'phase.number should be a string');
+    assert.ok(Array.isArray(parsed.tasks), 'tasks should be an array');
+    assert.ok(Array.isArray(parsed.blockers), 'blockers should be an array');
+  });
+
+  // --- bgsd_plan dual-mode test ---
+
+  test('bgsd_plan no-args returns phases array', async () => {
+    const mod = pluginModule || await import(pluginPath);
+    const plugin = await mod.BgsdPlugin({ directory: process.cwd() });
+    const result = await plugin.tool.bgsd_plan.execute({}, { directory: process.cwd() });
+    const parsed = JSON.parse(result);
+    assert.ok(Array.isArray(parsed.phases), 'should return phases array');
+    assert.ok(parsed.phases.length > 0, 'should have at least one phase');
+  });
+
+  test('bgsd_plan with phase number returns phase details', async () => {
+    const mod = pluginModule || await import(pluginPath);
+    const plugin = await mod.BgsdPlugin({ directory: process.cwd() });
+    const result = await plugin.tool.bgsd_plan.execute({ phase: 74 }, { directory: process.cwd() });
+    const parsed = JSON.parse(result);
+    assert.ok(parsed.phase, 'should return phase object');
+    assert.ok(parsed.phase.number, 'phase should have number');
+    assert.ok(parsed.phase.name, 'phase should have name');
+    assert.ok(parsed.phase.goal, 'phase should have goal');
+  });
+
+  test('bgsd_plan with invalid phase returns validation_error', async () => {
+    const mod = pluginModule || await import(pluginPath);
+    const plugin = await mod.BgsdPlugin({ directory: process.cwd() });
+    const result = await plugin.tool.bgsd_plan.execute({ phase: 999 }, { directory: process.cwd() });
+    const parsed = JSON.parse(result);
+    assert.strictEqual(parsed.error, 'validation_error', 'should return validation_error');
+  });
+
+  // --- bgsd_validate response test ---
+
+  test('bgsd_validate returns structured validation from live project', async () => {
+    const mod = pluginModule || await import(pluginPath);
+    const plugin = await mod.BgsdPlugin({ directory: process.cwd() });
+    const result = await plugin.tool.bgsd_validate.execute({}, { directory: process.cwd() });
+    const parsed = JSON.parse(result);
+    assert.strictEqual(typeof parsed.valid, 'boolean', 'should have valid boolean');
+    assert.ok(Array.isArray(parsed.issues), 'should have issues array');
+    assert.ok(parsed.summary, 'should have summary object');
+    assert.strictEqual(typeof parsed.summary.errors, 'number', 'summary.errors should be a number');
+    assert.strictEqual(typeof parsed.summary.warnings, 'number', 'summary.warnings should be a number');
+    assert.strictEqual(typeof parsed.summary.info, 'number', 'summary.info should be a number');
+  });
+
+  // --- bgsd_progress validation tests ---
+
+  test('bgsd_progress rejects add-blocker without value', async () => {
+    const mod = pluginModule || await import(pluginPath);
+    const plugin = await mod.BgsdPlugin({ directory: process.cwd() });
+    const result = await plugin.tool.bgsd_progress.execute({ action: 'add-blocker' }, { directory: process.cwd() });
+    const parsed = JSON.parse(result);
+    assert.strictEqual(parsed.error, 'validation_error', 'should return validation_error for missing value');
+  });
+
+  test('bgsd_progress rejects record-decision without value', async () => {
+    const mod = pluginModule || await import(pluginPath);
+    const plugin = await mod.BgsdPlugin({ directory: process.cwd() });
+    const result = await plugin.tool.bgsd_progress.execute({ action: 'record-decision' }, { directory: process.cwd() });
+    const parsed = JSON.parse(result);
+    assert.strictEqual(parsed.error, 'validation_error', 'should return validation_error for missing value');
   });
 });
