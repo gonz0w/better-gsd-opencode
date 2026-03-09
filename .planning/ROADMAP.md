@@ -259,7 +259,10 @@ Full details: `.planning/milestones/v8.3-ROADMAP.md`
   3. An agent can call `bgsd_context`, `bgsd_plan`, and `bgsd_validate` to get task-scoped context, phase details, and validation results respectively
   4. Every custom tool has a typed Zod argument schema and returns a JSON string (never `[object Object]`)
   5. All 5 tools appear in the LLM's tool list and are callable during a conversation
-**Plans:** TBD
+**Plans:**
+  2 plans
+  - Plan 01 (Wave 1): Tool infrastructure + 3 read-only tools (status, plan, context) [TOOL-01, TOOL-03, TOOL-04, TOOL-06]
+  - Plan 02 (Wave 2): Validate + progress tools, build pipeline, tests [TOOL-02, TOOL-05, TOOL-06]
 
 ### Phase 75: Event-Driven State Sync
 **Goal:** Project state stays synchronized automatically — validation on idle, cache invalidation on file changes, and visible notifications for important events
