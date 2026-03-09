@@ -14,7 +14,7 @@ See: .planning/PROJECT.md (updated 2026-03-09)
 **Status:** In Progress
 **Last Activity:** 2026-03-09
 
-**Progress:** [█████████░] 89%
+**Progress:** [██████████] 100%
 
 ## Performance Metrics
 
@@ -48,6 +48,7 @@ See: .planning/PROJECT.md (updated 2026-03-09)
 | Phase 72 P04 | 11 min | 2 tasks | 7 files |
 | Phase 73 P01 | 12 min | 2 tasks | 10 files |
 | Phase 73 P02 | 11 min | 2 tasks | 6 files |
+| Phase 73 P03 | 11 min | 2 tasks | 21 files |
 
 ## Accumulated Context
 
@@ -62,6 +63,7 @@ All v1.0-v8.3 decisions recorded in PROJECT.md Key Decisions table with outcomes
 - [Phase 72]: Updated source agent scope/routing keys gsd-* → bgsd-* alongside test file rename — fixes model resolution fallback bug from Plan 01 partial rename — MODEL_PROFILES keys were already bgsd-* but AGENT_MANIFESTS and resolveModelInternal calls still used gsd-*, causing silent fallback to sonnet defaults
 - [Phase 73]: System prompt injection via chars/4 token estimator (not tokenx) — 70 tokens, well under 500-token budget — tokenx is bundled in CLI but not ESM plugin; chars/4 sufficient for budget enforcement
 - [Phase 73]: Enhanced compaction uses task-state (not task) XML tag to avoid conflicts with PLAN.md task tags; each block independently failable — PLAN.md files contain <task> elements that would conflict with compaction <task> tags; independent failure means partial context is preserved even if one parser fails
+- [Phase 73]: All 19 workflows migrated from init:* subprocess calls to plugin-injected <bgsd-context> — plugin is mandatory for v9.0, no fallback — Completing the transition from subprocess-based to plugin-based context injection makes init:* calls obsolete
 
 ### Pending Todos
 
@@ -77,6 +79,6 @@ None — milestone starting fresh.
 
 ## Session Continuity
 
-**Last session:** 2026-03-09T12:10:12.640Z
-**Stopped at:** Completed 73-P02-PLAN.md
+**Last session:** 2026-03-09T12:24:20.122Z
+**Stopped at:** Completed 73-P03-PLAN.md
 **Next step:** Execute Plan 03 — `/bgsd-execute-phase 73` (remove init:* calls from 19 workflow files)
