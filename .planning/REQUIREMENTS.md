@@ -21,8 +21,8 @@ Requirements for v9.0 Embedded Plugin Experience milestone. Each maps to roadmap
 - [ ] **RBND-03**: Environment variable `GSD_DEBUG` renamed to `BGSD_DEBUG` across all 96+ catch blocks and debug logging paths
 - [ ] **RBND-04**: Environment variable `GSD_PROFILE` renamed to `BGSD_PROFILE` across profiler instrumentation
 - [ ] **RBND-05**: CLI binary renamed from `gsd-tools.cjs` to `bgsd-tools.cjs` (build output, deploy paths, workflow references, test file)
-- [ ] **RBND-06**: Agent definition files renamed from `gsd-*.md` to `bgsd-*.md` (all 9 agents + deploy.sh + install.js + build.cjs references)
-- [ ] **RBND-07**: install.js updated with migration logic to move existing `get-shit-done` installs to `bgsd-oc` and clean up old paths
+- [x] **RBND-06**: Agent definition files renamed from `gsd-*.md` to `bgsd-*.md` (all 9 agents + deploy.sh + install.js + build.cjs references)
+- [x] **RBND-07**: install.js updated with migration logic to move existing `get-shit-done` installs to `bgsd-oc` and clean up old paths
 - [ ] **RBND-08**: All internal references (workflows, commands, skills, templates) updated to use new `bgsd-` naming consistently
 
 ### Context Injection
@@ -87,8 +87,8 @@ Requirements for v9.0 Embedded Plugin Experience milestone. Each maps to roadmap
 | RBND-03 | Phase 72 | Pending | grep BGSD_DEBUG src/ |
 | RBND-04 | Phase 72 | Pending | grep BGSD_PROFILE src/ |
 | RBND-05 | Phase 72 | Pending | ls bin/bgsd-tools.cjs |
-| RBND-06 | Phase 72 | Pending | ls agents/bgsd-*.md |
-| RBND-07 | Phase 72 | Pending | node install.js (migrates old paths) |
+| RBND-06 | Phase 72 | Complete | ls agents/bgsd-*.md |
+| RBND-07 | Phase 72 | Complete | node install.js (migrates old paths) |
 | RBND-08 | Phase 72 | Pending | grep -r gsd-tools (zero matches outside milestones) |
 | CINJ-01 | Phase 73 | Pending | system.transform hook registered |
 | CINJ-02 | Phase 73 | Pending | token count < 500 |
