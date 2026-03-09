@@ -4326,11 +4326,17 @@ describe('context-budget baseline', () => {
   });
 
   test('baseline file is created in .planning/baselines/', () => {
-    // Clean up any existing baselines first
+    // Clean up any existing baselines first (handles both files and directories)
     const baselinesDir = path.join(process.cwd(), '.planning', 'baselines');
     if (fs.existsSync(baselinesDir)) {
       for (const f of fs.readdirSync(baselinesDir)) {
-        fs.unlinkSync(path.join(baselinesDir, f));
+        const p = path.join(baselinesDir, f);
+        const stat = fs.statSync(p);
+        if (stat.isDirectory()) {
+          fs.rmSync(p, { recursive: true, force: true });
+        } else {
+          fs.unlinkSync(p);
+        }
       }
     }
 
@@ -4608,38 +4614,38 @@ describe('extract-sections command', () => {
     assert.ok(!data.content.includes('Beta content'), 'should not include Beta (not requested)');
   });
 
-  test('extract-sections works on real reference files', () => {
-    // Run against actual references/checkpoints.md in the project root
+  test('extract-sections works on real skill files with section markers', () => {
+    // Run against skills/verification-reference/SKILL.md which has <!-- section: --> markers
     const projectRoot = path.join(__dirname, '..');
-    const result = runGsdTools('util:extract-sections references/checkpoints.md', projectRoot);
+    const result = runGsdTools('util:extract-sections skills/verification-reference/SKILL.md', projectRoot);
     assert.ok(result.success, `Discovery failed: ${result.error}`);
 
     const discData = JSON.parse(result.output);
-    assert.ok(discData.available_sections.includes('types'), 'checkpoints.md should have types section');
-    assert.ok(discData.available_sections.includes('guidelines'), 'checkpoints.md should have guidelines section');
-    assert.ok(discData.available_sections.includes('authentication'), 'checkpoints.md should have authentication section');
+    assert.ok(discData.available_sections.includes('core-principle'), 'SKILL.md should have core-principle section');
+    assert.ok(discData.available_sections.includes('stub-detection'), 'SKILL.md should have stub-detection section');
+    assert.ok(discData.available_sections.includes('wiring-verification'), 'SKILL.md should have wiring-verification section');
 
-    // Extract types section — should be much shorter than full file
-    const extractResult = runGsdTools('util:extract-sections references/checkpoints.md "types"', projectRoot);
+    // Extract core-principle section — should be much shorter than full file
+    const extractResult = runGsdTools('util:extract-sections skills/verification-reference/SKILL.md "core-principle"', projectRoot);
     assert.ok(extractResult.success, `Extract failed: ${extractResult.error}`);
 
     const data = JSON.parse(extractResult.output);
-    assert.deepStrictEqual(data.sections_found, ['types'], 'should find types section');
+    assert.deepStrictEqual(data.sections_found, ['core-principle'], 'should find core-principle section');
     const sectionLines = data.content.split('\n').length;
-    const fullFile = fs.readFileSync(path.join(projectRoot, 'references', 'checkpoints.md'), 'utf-8');
+    const fullFile = fs.readFileSync(path.join(projectRoot, 'skills', 'verification-reference', 'SKILL.md'), 'utf-8');
     const fullLines = fullFile.split('\n').length;
-    assert.ok(sectionLines < fullLines, `types section (${sectionLines} lines) should be shorter than full file (${fullLines} lines)`);
-    assert.ok(sectionLines > 10, `types section should have substantial content (got ${sectionLines} lines)`);
+    assert.ok(sectionLines < fullLines, `core-principle section (${sectionLines} lines) should be shorter than full file (${fullLines} lines)`);
+    assert.ok(sectionLines > 3, `core-principle section should have substantial content (got ${sectionLines} lines)`);
   });
 
   test('extract-sections command is registered and responds', () => {
-    // Verify extract-sections command exists and works by running discovery on a real file
+    // Verify extract-sections command exists and works by running discovery on a skill file
     const projectRoot = path.join(__dirname, '..');
-    const result = runGsdTools('util:extract-sections references/checkpoints.md', projectRoot);
+    const result = runGsdTools('util:extract-sections skills/verification-reference/SKILL.md', projectRoot);
     assert.ok(result.success, `extract-sections discovery should succeed: ${result.error}`);
     const data = JSON.parse(result.output);
     assert.ok(Array.isArray(data.available_sections), 'should return available_sections array');
-    assert.ok(data.available_sections.length > 0, 'should find sections in checkpoints.md');
+    assert.ok(data.available_sections.length > 0, 'should find sections in SKILL.md');
   });
 });
 
@@ -7601,13 +7607,16 @@ describe('integration: config migration', () => {
       test_gate: true,
       context_window: 200000,
       context_target_percent: 50,
+      ytdlp_path: '',
+      nlm_path: '',
+      mcp_config_path: '',
       planning: { commit_docs: true, search_gitignored: false },
       git: {
         branching_strategy: 'phase-branch',
         phase_branch_template: 'gsd/phase-{phase}-{slug}',
         milestone_branch_template: 'gsd/{milestone}-{slug}'
       },
-      workflow: { research: true, plan_check: true, verifier: true }
+      workflow: { research: true, plan_check: true, verifier: true, rag: true, rag_timeout: 30 }
     };
     fs.writeFileSync(
       path.join(tmpDir, '.planning', 'config.json'),
