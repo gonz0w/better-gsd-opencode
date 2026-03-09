@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-03-09)
 ## Current Position
 
 **Phase:** 75 — Event-Driven State Sync
-**Current Plan:** Plan 01 complete (1 of 2)
-**Status:** In progress
+**Current Plan:** Plan 02 complete (2 of 2)
+**Status:** Phase complete
 **Last Activity:** 2026-03-09
 
-**Progress:** [█████░░░░░] 50%
+**Progress:** [██████████] 100%
 
 ## Performance Metrics
 
@@ -52,6 +52,7 @@ See: .planning/PROJECT.md (updated 2026-03-09)
 | Phase 74 P01 | 10 min | 2 tasks | 6 files |
 | Phase 74 P02 | 16 min | 3 tasks | 7 files |
 | Phase 75 P01 | 11 min | 3 tasks | 3 files |
+| Phase 75 P02 | 42 min | 3 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -72,6 +73,8 @@ All v1.0-v8.3 decisions recorded in PROJECT.md Key Decisions table with outcomes
 - [Phase 75]: Notification system uses dual-channel routing (OS for critical/warning, context injection for all) with sliding-window rate limiting, deduplication, DND mode, and ring buffer history
 - [Phase 75]: File watcher uses native fs.watch with recursive option and AbortController — self-write tracking prevents feedback loops between auto-fix and cache invalidation
 - [Phase 75]: Config parser extended with NESTED_OBJECT_KEYS shallow merge — user overrides individual sub-keys while preserving other defaults
+- [Phase 75]: Idle validator uses execSync git log for stale progress detection with 3s timeout — acceptable for idle-time operation, auto-fix loop prevention via lastAutoFix/lastValidation comparison
+- [Phase 75]: Plugin factory signature extended from ({directory}) to ({directory, $}) for shell API access — enables OS notifications via osascript/notify-send
 
 ### Pending Todos
 
@@ -87,6 +90,6 @@ None — milestone starting fresh.
 
 ## Session Continuity
 
-**Last session:** 2026-03-09T15:07:23Z
-**Stopped at:** Completed 75-01-PLAN.md
-**Next step:** Execute 75-02-PLAN.md (idle validator, stuck detector, plugin wiring, build validation)
+**Last session:** 2026-03-09T15:51:58Z
+**Stopped at:** Completed 75-02-PLAN.md — Phase 75 complete
+**Next step:** Plan Phase 76 (Advisory Guardrails) or run /bgsd-verify-work

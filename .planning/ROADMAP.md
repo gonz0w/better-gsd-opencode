@@ -199,7 +199,7 @@ Full details: `.planning/milestones/v8.3-ROADMAP.md`
 - [x] **Phase 72: Rebrand** (1/4 plans) — Config folder, env vars, CLI binary, agent files, migration logic, and all internal references renamed from gsd to bgsd (completed 2026-03-09)
 - [x] **Phase 73: Context Injection** — Always-on system prompt hook, 500-token budget enforcement, enhanced compaction, slash command enrichment (completed 2026-03-09)
 - [x] **Phase 74: Custom LLM Tools** — Five native LLM-callable tools (status, progress, context, plan, validate) with Zod schemas (completed 2026-03-09)
-- [ ] **Phase 75: Event-Driven State Sync** — Session idle validation, file watcher cache invalidation, toast notifications for phase completion and stuck detection
+- [x] **Phase 75: Event-Driven State Sync** — Session idle validation, file watcher cache invalidation, toast notifications for phase completion and stuck detection (completed 2026-03-09)
 - [ ] **Phase 76: Advisory Guardrails** — Convention violation warnings, planning file protection, test-after-edit suggestions via tool interception
 
 ## Phase Details
@@ -274,7 +274,7 @@ Full details: `.planning/milestones/v8.3-ROADMAP.md`
   3. When a phase is completed, a toast notification appears in the editor
   4. When stuck/loop detection fires (3+ repeated failures), a toast notification alerts the user
 **Plans:**
-  1/2 plans executed
+  2/2 plans complete
   - Plan 01 (Wave 1): Notification system + file watcher + config defaults [EVNT-02, EVNT-03]
   - Plan 02 (Wave 2): Idle validator + stuck detector + plugin wiring + build validation [EVNT-01, EVNT-02, EVNT-03, EVNT-04]
 
