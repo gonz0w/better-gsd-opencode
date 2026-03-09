@@ -243,7 +243,11 @@ Full details: `.planning/milestones/v8.3-ROADMAP.md`
   2. System prompt injection measures under 500 tokens (verified with tokenx)
   3. After compaction, the LLM retains awareness of PROJECT.md context, active decisions, blockers, and current task — not just STATE.md
   4. Slash commands receive auto-injected project context before their workflow executes
-**Plans:** TBD
+**Plans:**
+  0/3 plans complete
+  - Plan 01 (Wave 1): New parsers + ProjectState facade + system prompt hook [CINJ-01, CINJ-02]
+  - Plan 02 (Wave 2): Enhanced compaction + command enrichment [CINJ-03, CINJ-04]
+  - Plan 03 (Wave 3): Workflow init:* removal [CINJ-04]
 
 ### Phase 74: Custom LLM Tools
 **Goal:** Hot-path CLI operations are available as native LLM-callable tools — faster, typed, no shell overhead for the most common queries
