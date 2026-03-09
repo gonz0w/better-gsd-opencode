@@ -187,7 +187,7 @@ Full details: `.planning/milestones/v8.2-ROADMAP.md`
 - [x] **Phase 67: GitHub CI Agent Overhaul** - Bring GitHub CI agent to quality standard with structured returns, discovery, deviation rules, state tracking, and proper workflow gates (completed 2026-03-08)
 - [x] **Phase 68: Agent Consistency Audit** - Standardize project_context, PATH SETUP, and structured_returns blocks across all 10 agents (completed 2026-03-08)
 - [x] **Phase 69: Skills Architecture** - Extract shared agent content into OpenCode skills, slim agent definitions, update deploy pipeline (completed 2026-03-08)
-- [ ] **Phase 70: Test Debt Cleanup** - Fix all 31 pre-existing test failures across config-migrate, compact, codebase-impact, and codebase ast
+- [x] **Phase 70: Test Debt Cleanup** - Fix all 31 pre-existing test failures across config-migrate, compact, codebase-impact, and codebase ast (completed 2026-03-09)
 
 ## Phase Details
 
@@ -245,7 +245,7 @@ Plans:
   3. `npm test -- --grep codebase-impact` passes all tests with zero failures
   4. `npm test -- --grep "codebase ast"` CLI handler tests pass with zero failures
   5. `npm test` full suite runs green with zero pre-existing failures
-**Plans**: 1/2 plans executed
+**Plans**: 2/2 plans complete
 Plans:
 - [ ] 70-01-PLAN.md — Fix router bugs, codebase-impact output format, config-migrate/compact/init/test-coverage test assertions
 - [ ] 70-02-PLAN.md — Fix extract-sections, context-budget baseline, remaining failures, full suite validation
@@ -273,4 +273,4 @@ Phases execute in numeric order: 67 → 68 → 69 → 70
 | 67. GitHub CI Agent Overhaul | 2/2 | Complete    | 2026-03-08 | - |
 | 68. Agent Consistency Audit | 2/2 | Complete    | 2026-03-08 | - |
 | 69. Skills Architecture | 5/5 | Complete    | 2026-03-08 | - |
-| 70. Test Debt Cleanup | 1/2 | In Progress|  | - |
+| 70. Test Debt Cleanup | 2/2 | Complete   | 2026-03-09 | - |
