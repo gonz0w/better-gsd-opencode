@@ -196,7 +196,7 @@ Full details: `.planning/milestones/v8.3-ROADMAP.md`
 ### v9.0 Embedded Plugin Experience (Phases 71-76)
 
 - [x] **Phase 71: Plugin Architecture & Safety** (0/2 plans) — ESM plugin build pipeline, safeHook error boundary, shared parsers, bgsd_ prefix convention (completed 2026-03-09)
-- [ ] **Phase 72: Rebrand** — Config folder, env vars, CLI binary, agent files, migration logic, and all internal references renamed from gsd to bgsd
+- [ ] **Phase 72: Rebrand** (0/4 plans) — Config folder, env vars, CLI binary, agent files, migration logic, and all internal references renamed from gsd to bgsd
 - [ ] **Phase 73: Context Injection** — Always-on system prompt hook, 500-token budget enforcement, enhanced compaction, slash command enrichment
 - [ ] **Phase 74: Custom LLM Tools** — Five native LLM-callable tools (status, progress, context, plan, validate) with Zod schemas
 - [ ] **Phase 75: Event-Driven State Sync** — Session idle validation, file watcher cache invalidation, toast notifications for phase completion and stuck detection
@@ -227,7 +227,12 @@ Full details: `.planning/milestones/v8.3-ROADMAP.md`
   3. `install.js` detects an existing `get-shit-done` install, moves all contents to `bgsd-oc`, and removes old directory
   4. `grep -r 'gsd-tools\|get-shit-done\|GSD_HOME\|GSD_DEBUG\|GSD_PROFILE\|gsd-executor\|gsd-planner\|gsd-verifier' src/ commands/ workflows/ templates/ agents/ skills/` returns zero matches (excluding milestone archives and MILESTONES.md history)
   5. All 766+ tests pass with the new naming
-**Plans:** TBD
+**Plans:**
+  4 plans, 4 waves (strictly sequential — each wave depends on prior)
+  - Plan 01 (Wave 1): Source code env vars, config paths, usage strings, build pipeline [RBND-01, RBND-02, RBND-03, RBND-04, RBND-05]
+  - Plan 02 (Wave 2): Agent file renames, install.js migration, deploy.sh [RBND-06, RBND-07]
+  - Plan 03 (Wave 3): Workflows, commands, templates, skills, AGENTS.md [RBND-08]
+  - Plan 04 (Wave 4): Test file rename, full test suite, validation sweep [RBND-03, RBND-04, RBND-05, RBND-08]
 
 ### Phase 73: Context Injection
 **Goal:** The AI always knows current project state without manual init calls — context injected via system prompt, compaction preserves full project context, and slash commands auto-enrich
