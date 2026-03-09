@@ -1,9 +1,9 @@
-**Revision:** 11
+**Revision:** 12
 **Created:** 2026-02-25
 **Updated:** 2026-03-09
 
 <objective>
-An intelligent agent orchestration engine for building large-scale software. Provides structured planning, execution, verification, specialized agent coordination, and structured exploration — turning unstructured project ideas into executable plans with traceability from intent through requirements to delivered code. Optimized for minimal context loading, fast execution, clean agent boundaries, and reusable skills architecture — each agent does one thing well with exactly the context it needs, sharing common patterns through composable skills, and providing a deeply embedded editor experience through plugin hooks that make planning feel native to the development environment.
+An intelligent agent orchestration engine for building large-scale software with a deeply embedded plugin experience. This milestone emphasizes rigorous performance benchmarking against modern OpenCode plugins, targeted latency reduction, and selective adoption of dependencies/new technology where measurable speed gains justify complexity.
 </objective>
 
 <users>
@@ -86,6 +86,8 @@ Orchestration should feel invisible — the right agent gets the right task with
   - Reason: Milestone v9.0: Embedded Plugin Experience — full hook surface utilization
 - **Added** criteria: SC-31 through SC-36 for plugin integration verification.
   - Reason: Milestone v9.0: Measurable success criteria for each plugin capability
+- **Modified** objective: An intelligent agent orchestration engine for building large-scale software with a deeply embedded plugin experience. This milestone emphasizes rigorous performance benchmarking against modern OpenCode plugins, targeted latency reduction, and selective adoption of dependencies/new technology where measurable speed gains justify complexity.
+  - Reason: Milestone v9.1: prioritize plugin performance benchmarking and modernization
 
 ### v8.3 — 2026-03-08
 - **Modified** objective: Added reusable skills architecture as a first-class architectural concern alongside minimal context loading, fast execution, and clean agent boundaries.
