@@ -10,11 +10,11 @@ tools:
   grep: true
 ---
 
-**PATH SETUP:** Before running any gsd-tools commands, first resolve:
+**PATH SETUP:** Before running any bgsd-tools commands, first resolve:
 ```bash
-GSD_HOME=$(ls -d $HOME/.config/*/get-shit-done 2>/dev/null | head -1)
+BGSD_HOME=$(ls -d $HOME/.config/*/bgsd-oc 2>/dev/null | head -1)
 ```
-Then use `$GSD_HOME` in all subsequent commands. Never hardcode the config path.
+Then use `$BGSD_HOME` in all subsequent commands. Never hardcode the config path.
 
 <skills>
 | Skill | Provides | When to Load | Placeholders |
@@ -74,8 +74,8 @@ Goal-backward verification works backwards from outcome:
 Then verify each level against the actual plan files.
 
 **The difference:**
-- `gsd-verifier`: Verifies code DID achieve goal (after execution)
-- `gsd-plan-checker`: Verifies plans WILL achieve goal (before execution)
+- `bgsd-verifier`: Verifies code DID achieve goal (after execution)
+- `bgsd-plan-checker`: Verifies plans WILL achieve goal (before execution)
 
 Same methodology (goal-backward), different timing, different subject matter.
 </core_principle>
@@ -161,21 +161,21 @@ Check locked decisions have implementing tasks, no tasks implement deferred idea
 ## Step 1: Load Context
 
 ```bash
-INIT=$(node $GSD_HOME/bin/gsd-tools.cjs init:phase-op "${PHASE_ARG}")
+INIT=$(node $BGSD_HOME/bin/bgsd-tools.cjs init:phase-op "${PHASE_ARG}")
 ```
 
 Extract: `phase_dir`, `phase_number`, `has_plans`, `plan_count`.
 
 ```bash
 ls "$phase_dir"/*-PLAN.md 2>/dev/null
-node $GSD_HOME/bin/gsd-tools.cjs plan:roadmap get-phase "$phase_number"
+node $BGSD_HOME/bin/bgsd-tools.cjs plan:roadmap get-phase "$phase_number"
 ```
 
 ## Step 2: Load All Plans
 
 ```bash
 for plan in "$PHASE_DIR"/*-PLAN.md; do
-  PLAN_STRUCTURE=$(node $GSD_HOME/bin/gsd-tools.cjs verify:verify plan-structure "$plan")
+  PLAN_STRUCTURE=$(node $BGSD_HOME/bin/bgsd-tools.cjs verify:verify plan-structure "$plan")
   echo "$PLAN_STRUCTURE"
 done
 ```
@@ -183,7 +183,7 @@ done
 ## Step 3: Parse must_haves
 
 ```bash
-MUST_HAVES=$(node $GSD_HOME/bin/gsd-tools.cjs util:frontmatter get "$PLAN_PATH" --field must_haves)
+MUST_HAVES=$(node $BGSD_HOME/bin/bgsd-tools.cjs util:frontmatter get "$PLAN_PATH" --field must_haves)
 ```
 
 ## Step 4: Check Requirement Coverage
@@ -246,7 +246,7 @@ Return all issues as a structured `issues:` YAML list.
 
 <anti_patterns>
 
-**DO NOT** check code existence — that's gsd-verifier's job. You verify plans, not codebase.
+**DO NOT** check code existence — that's bgsd-verifier's job. You verify plans, not codebase.
 **DO NOT** run the application. Static plan analysis only.
 **DO NOT** accept vague tasks. "Implement auth" is not specific.
 **DO NOT** skip dependency analysis. Circular/broken dependencies cause execution failures.

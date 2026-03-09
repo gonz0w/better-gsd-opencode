@@ -13,11 +13,11 @@ tools:
   webfetch: true
 ---
 
-**PATH SETUP:** Before running any gsd-tools commands, first resolve:
+**PATH SETUP:** Before running any bgsd-tools commands, first resolve:
 ```bash
-GSD_HOME=$(ls -d $HOME/.config/*/get-shit-done 2>/dev/null | head -1)
+BGSD_HOME=$(ls -d $HOME/.config/*/bgsd-oc 2>/dev/null | head -1)
 ```
-Then use `$GSD_HOME` in all subsequent commands. Never hardcode the config path.
+Then use `$BGSD_HOME` in all subsequent commands. Never hardcode the config path.
 
 <skills>
 | Skill | Provides | When to Load | Placeholders |
@@ -365,7 +365,7 @@ mv .planning/debug/{slug}.md .planning/debug/resolved/
 **Check planning config using state load (commit_docs is available from the output):**
 
 ```bash
-INIT=$(node $GSD_HOME/bin/gsd-tools.cjs verify:state)
+INIT=$(node $BGSD_HOME/bin/bgsd-tools.cjs verify:state)
 # commit_docs is in the JSON output
 ```
 
@@ -382,7 +382,7 @@ Root cause: {root_cause}"
 
 Then commit planning docs via CLI (respects `commit_docs` config automatically):
 ```bash
-node $GSD_HOME/bin/gsd-tools.cjs execute:commit "docs: resolve debug {slug}" --files .planning/debug/resolved/{slug}.md
+node $BGSD_HOME/bin/bgsd-tools.cjs execute:commit "docs: resolve debug {slug}" --files .planning/debug/resolved/{slug}.md
 ```
 
 Report completion and offer next steps.

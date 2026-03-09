@@ -13,11 +13,11 @@ tools:
   mcp__context7__*: true
 ---
 
-**PATH SETUP:** Before running any gsd-tools commands, first resolve:
+**PATH SETUP:** Before running any bgsd-tools commands, first resolve:
 ```bash
-GSD_HOME=$(ls -d $HOME/.config/*/get-shit-done 2>/dev/null | head -1)
+BGSD_HOME=$(ls -d $HOME/.config/*/bgsd-oc 2>/dev/null | head -1)
 ```
-Then use `$GSD_HOME` in all subsequent commands. Never hardcode the config path.
+Then use `$BGSD_HOME` in all subsequent commands. Never hardcode the config path.
 
 <skills>
 | Skill | Provides | When to Load | Placeholders |
@@ -194,8 +194,8 @@ Output: [Artifacts created]
 </objective>
 
 <execution_context>
-@__OPENCODE_CONFIG__/get-shit-done/workflows/execute-plan.md
-@__OPENCODE_CONFIG__/get-shit-done/templates/summary.md
+@__OPENCODE_CONFIG__/bgsd-oc/workflows/execute-plan.md
+@__OPENCODE_CONFIG__/bgsd-oc/templates/summary.md
 </execution_context>
 
 <context>
@@ -342,7 +342,7 @@ Group by plan, dimension, severity.
 ### Step 6: Commit
 
 ```bash
-node $GSD_HOME/bin/gsd-tools.cjs execute:commit "fix($PHASE): revise plans based on checker feedback" --files .planning/phases/$PHASE-*/$PHASE-*-PLAN.md
+node $BGSD_HOME/bin/bgsd-tools.cjs execute:commit "fix($PHASE): revise plans based on checker feedback" --files .planning/phases/$PHASE-*/$PHASE-*-PLAN.md
 ```
 
 ### Step 7: Return Revision Summary
@@ -381,7 +381,7 @@ node $GSD_HOME/bin/gsd-tools.cjs execute:commit "fix($PHASE): revise plans based
 Load planning context:
 
 ```bash
-INIT=$(node $GSD_HOME/bin/gsd-tools.cjs init:plan-phase "${PHASE}")
+INIT=$(node $BGSD_HOME/bin/bgsd-tools.cjs init:plan-phase "${PHASE}")
 ```
 
 Extract from init JSON: `planner_model`, `researcher_model`, `checker_model`, `commit_docs`, `research_enabled`, `phase_dir`, `phase_number`, `has_research`, `has_context`.
@@ -437,7 +437,7 @@ Apply discovery level protocol (see discovery_levels section).
 
 **Step 1 — Generate digest index:**
 ```bash
-node $GSD_HOME/bin/gsd-tools.cjs util:history-digest
+node $BGSD_HOME/bin/bgsd-tools.cjs util:history-digest
 ```
 
 **Step 2 — Select relevant phases (typically 2-4):**
@@ -545,10 +545,10 @@ Include all frontmatter fields.
 </step>
 
 <step name="validate_plan">
-Validate each created PLAN.md using gsd-tools:
+Validate each created PLAN.md using bgsd-tools:
 
 ```bash
-VALID=$(node $GSD_HOME/bin/gsd-tools.cjs util:frontmatter validate "$PLAN_PATH" --schema plan)
+VALID=$(node $BGSD_HOME/bin/bgsd-tools.cjs util:frontmatter validate "$PLAN_PATH" --schema plan)
 ```
 
 Returns JSON: `{ valid, missing, present, schema }`
@@ -558,7 +558,7 @@ Returns JSON: `{ valid, missing, present, schema }`
 Also validate plan structure:
 
 ```bash
-STRUCTURE=$(node $GSD_HOME/bin/gsd-tools.cjs verify:verify plan-structure "$PLAN_PATH")
+STRUCTURE=$(node $BGSD_HOME/bin/bgsd-tools.cjs verify:verify plan-structure "$PLAN_PATH")
 ```
 
 Returns JSON: `{ valid, errors, warnings, task_count, tasks }`
@@ -572,7 +572,7 @@ Update ROADMAP.md to finalize phase placeholders.
 
 <step name="git_commit">
 ```bash
-node $GSD_HOME/bin/gsd-tools.cjs execute:commit "docs($PHASE): create phase plan" --files .planning/phases/$PHASE-*/$PHASE-*-PLAN.md .planning/ROADMAP.md
+node $BGSD_HOME/bin/bgsd-tools.cjs execute:commit "docs($PHASE): create phase plan" --files .planning/phases/$PHASE-*/$PHASE-*-PLAN.md .planning/ROADMAP.md
 ```
 </step>
 

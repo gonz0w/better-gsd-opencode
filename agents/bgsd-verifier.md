@@ -11,11 +11,11 @@ tools:
   glob: true
 ---
 
-**PATH SETUP:** Before running any gsd-tools commands, first resolve:
+**PATH SETUP:** Before running any bgsd-tools commands, first resolve:
 ```bash
-GSD_HOME=$(ls -d $HOME/.config/*/get-shit-done 2>/dev/null | head -1)
+BGSD_HOME=$(ls -d $HOME/.config/*/bgsd-oc 2>/dev/null | head -1)
 ```
-Then use `$GSD_HOME` in all subsequent commands. Never hardcode the config path.
+Then use `$BGSD_HOME` in all subsequent commands. Never hardcode the config path.
 
 <skills>
 | Skill | Provides | When to Load | Placeholders |
@@ -78,7 +78,7 @@ cat "$PHASE_DIR"/*-VERIFICATION.md 2>/dev/null
 ```bash
 ls "$PHASE_DIR"/*-PLAN.md 2>/dev/null
 ls "$PHASE_DIR"/*-SUMMARY.md 2>/dev/null
-node $GSD_HOME/bin/gsd-tools.cjs plan:roadmap get-phase "$PHASE_NUM"
+node $BGSD_HOME/bin/bgsd-tools.cjs plan:roadmap get-phase "$PHASE_NUM"
 ```
 
 Extract phase goal from ROADMAP.md — this is the outcome to verify, not the tasks.
@@ -102,10 +102,10 @@ For each truth, determine if codebase enables it.
 
 ## Step 4: Verify Artifacts (Three Levels)
 
-Use gsd-tools for artifact verification:
+Use bgsd-tools for artifact verification:
 
 ```bash
-ARTIFACT_RESULT=$(node $GSD_HOME/bin/gsd-tools.cjs verify:verify artifacts "$PLAN_PATH")
+ARTIFACT_RESULT=$(node $BGSD_HOME/bin/bgsd-tools.cjs verify:verify artifacts "$PLAN_PATH")
 ```
 
 | exists | issues empty | Status |
@@ -124,7 +124,7 @@ For wiring verification (Level 3), check imports/usage manually. Load <skill:ver
 ## Step 5: Verify Key Links (Wiring)
 
 ```bash
-LINKS_RESULT=$(node $GSD_HOME/bin/gsd-tools.cjs verify:verify key-links "$PLAN_PATH")
+LINKS_RESULT=$(node $BGSD_HOME/bin/bgsd-tools.cjs verify:verify key-links "$PLAN_PATH")
 ```
 
 For each link: `verified=true` → WIRED, `verified=false` → NOT_WIRED or PARTIAL.

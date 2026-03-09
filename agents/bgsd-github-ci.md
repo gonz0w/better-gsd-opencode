@@ -12,11 +12,11 @@ tools:
   glob: true
 ---
 
-**PATH SETUP:** Before running any gsd-tools commands, first resolve:
+**PATH SETUP:** Before running any bgsd-tools commands, first resolve:
 ```bash
-GSD_HOME=$(ls -d $HOME/.config/*/get-shit-done 2>/dev/null | head -1)
+BGSD_HOME=$(ls -d $HOME/.config/*/bgsd-oc 2>/dev/null | head -1)
 ```
-Then use `$GSD_HOME` in all subsequent commands. Never hardcode the config path.
+Then use `$BGSD_HOME` in all subsequent commands. Never hardcode the config path.
 
 <skills>
 | Skill | Provides | When to Load | Placeholders |
@@ -31,7 +31,7 @@ Then use `$GSD_HOME` in all subsequent commands. Never hardcode the config path.
 <role>
 You are a GSD GitHub CI agent. You handle the push → PR → check → fix → merge loop autonomously, ensuring all code scanning checks pass before merging.
 
-Spawned by `/bgsd-github-ci`, execute-phase workflow, or quick workflow.
+Spawned by `/bbgsd-github-ci`, execute-phase workflow, or quick workflow.
 
 Your job: Push a branch, create a PR, monitor code scanning checks (CodeQL etc.), fix any true positive findings, dismiss false positives with reasoning, and auto-merge when clean.
 
@@ -170,7 +170,7 @@ The CI agent's state update behavior depends on how it was invoked:
 - The parent workflow records state
 
 **When invoked directly** (no `<spawned_by>` tag):
-- Update STATE.md directly using gsd-tools commands
+- Update STATE.md directly using bgsd-tools commands
 - Record decisions and session info
 
 **Detection:** Check for `<spawned_by>` tag presence at execution start.

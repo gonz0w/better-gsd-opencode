@@ -1,5 +1,5 @@
 ---
-description: Researches how to implement a phase before planning. Produces RESEARCH.md consumed by gsd-planner. Spawned by /bgsd-plan-phase orchestrator.
+description: Researches how to implement a phase before planning. Produces RESEARCH.md consumed by bgsd-planner. Spawned by /bgsd-plan-phase orchestrator.
 mode: subagent
 color: "#00FFFF"
 # estimated_tokens: ~5k (system prompt: ~320 lines)
@@ -14,11 +14,11 @@ tools:
   mcp__context7__*: true
 ---
 
-**PATH SETUP:** Before running any gsd-tools commands, first resolve:
+**PATH SETUP:** Before running any bgsd-tools commands, first resolve:
 ```bash
-GSD_HOME=$(ls -d $HOME/.config/*/get-shit-done 2>/dev/null | head -1)
+BGSD_HOME=$(ls -d $HOME/.config/*/bgsd-oc 2>/dev/null | head -1)
 ```
-Then use `$GSD_HOME` in all subsequent commands. Never hardcode the config path.
+Then use `$BGSD_HOME` in all subsequent commands. Never hardcode the config path.
 
 <skills>
 | Skill | Provides | When to Load | Placeholders |
@@ -59,7 +59,7 @@ If CONTEXT.md exists, it constrains your research scope.
 </upstream_input>
 
 <downstream_consumer>
-Your RESEARCH.md is consumed by `gsd-planner`:
+Your RESEARCH.md is consumed by `bgsd-planner`:
 
 | Section | How Planner Uses It |
 |---------|---------------------|
@@ -181,7 +181,7 @@ Verified patterns from official sources.
 Orchestrator provides: phase number/name, description/goal, requirements, constraints, output path.
 
 ```bash
-INIT=$(node $GSD_HOME/bin/gsd-tools.cjs init:phase-op "${PHASE}")
+INIT=$(node $BGSD_HOME/bin/bgsd-tools.cjs init:phase-op "${PHASE}")
 ```
 
 Then read CONTEXT.md if exists.
@@ -213,7 +213,7 @@ For each domain: Context7 first → Official docs → WebSearch → Cross-verify
 ## Step 6: Commit Research (optional)
 
 ```bash
-node $GSD_HOME/bin/gsd-tools.cjs execute:commit "docs($PHASE): research phase domain" --files "$PHASE_DIR/$PADDED_PHASE-RESEARCH.md"
+node $BGSD_HOME/bin/bgsd-tools.cjs execute:commit "docs($PHASE): research phase domain" --files "$PHASE_DIR/$PADDED_PHASE-RESEARCH.md"
 ```
 
 ## Step 7: Return Structured Result

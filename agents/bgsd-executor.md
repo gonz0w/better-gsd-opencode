@@ -12,11 +12,11 @@ tools:
   glob: true
 ---
 
-**PATH SETUP:** Before running any gsd-tools commands, first resolve:
+**PATH SETUP:** Before running any bgsd-tools commands, first resolve:
 ```bash
-GSD_HOME=$(ls -d $HOME/.config/*/get-shit-done 2>/dev/null | head -1)
+BGSD_HOME=$(ls -d $HOME/.config/*/bgsd-oc 2>/dev/null | head -1)
 ```
-Then use `$GSD_HOME` in all subsequent commands. Never hardcode the config path.
+Then use `$BGSD_HOME` in all subsequent commands. Never hardcode the config path.
 
 <skills>
 | Skill | Provides | When to Load | Placeholders |
@@ -50,7 +50,7 @@ If the prompt contains a `<files_to_read>` block, you MUST use the `Read` tool t
 Load execution context:
 
 ```bash
-INIT=$(node $GSD_HOME/bin/gsd-tools.cjs init:execute-phase "${PHASE}")
+INIT=$(node $BGSD_HOME/bin/bgsd-tools.cjs init:execute-phase "${PHASE}")
 ```
 
 Extract from init JSON: `executor_model`, `commit_docs`, `phase_dir`, `plans`, `incomplete_plans`.
@@ -133,7 +133,7 @@ For each task:
 Check if auto mode is active at executor start:
 
 ```bash
-AUTO_CFG=$(node $GSD_HOME/bin/gsd-tools.cjs util:config-get workflow.auto_advance 2>/dev/null || echo "false")
+AUTO_CFG=$(node $BGSD_HOME/bin/bgsd-tools.cjs util:config-get workflow.auto_advance 2>/dev/null || echo "false")
 ```
 
 Store the result for checkpoint handling.
@@ -152,7 +152,7 @@ After all tasks complete, create `{phase}-{plan}-SUMMARY.md` at `.planning/phase
 
 **ALWAYS use the Write tool to create files** — never use `Bash(cat << 'EOF')` or heredoc commands for file creation.
 
-**Use template:** @__OPENCODE_CONFIG__/get-shit-done/templates/summary.md
+**Use template:** @__OPENCODE_CONFIG__/bgsd-oc/templates/summary.md
 
 **Frontmatter:** phase, plan, subsystem, tags, dependency graph (requires/provides/affects), tech-stack (added/patterns), key-files (created/modified), decisions, metrics (duration, completed date).
 
@@ -189,7 +189,7 @@ Do NOT skip. Do NOT proceed to state updates if self-check fails.
 
 <final_commit>
 ```bash
-node $GSD_HOME/bin/gsd-tools.cjs execute:commit "docs({phase}-{plan}): complete [plan-name] plan" --files .planning/phases/XX-name/{phase}-{plan}-SUMMARY.md .planning/STATE.md .planning/ROADMAP.md .planning/REQUIREMENTS.md
+node $BGSD_HOME/bin/bgsd-tools.cjs execute:commit "docs({phase}-{plan}): complete [plan-name] plan" --files .planning/phases/XX-name/{phase}-{plan}-SUMMARY.md .planning/STATE.md .planning/ROADMAP.md .planning/REQUIREMENTS.md
 ```
 
 Separate from per-task commits — captures execution results only.
