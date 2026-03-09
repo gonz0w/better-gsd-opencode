@@ -1,419 +1,560 @@
-# Feature Landscape: Agent Quality Standards & Skills Architecture
+# Feature Landscape: Embedded Plugin Experience (v9.0)
 
-**Domain:** AI agent definitions, shared metadata, skills-based architecture
+**Domain:** OpenCode plugin hooks, custom tools, event-driven state sync, context injection, guardrails, notifications, compaction
 **Researched:** 2026-03-08
-**Confidence:** HIGH (based on primary source analysis of 10 agents + Agent Skills specification + OpenCode docs)
+**Confidence:** HIGH (OpenCode official docs, Context7, 8+ community plugin repos, plugin development guides)
 
-## Category 1: Agent Quality Standards (Table Stakes)
+## Sources
 
-Features every well-structured agent definition needs. Missing = inconsistent behavior, context waste, debugging difficulty.
+| Source | URL | Trust |
+|--------|-----|-------|
+| OpenCode Plugin Docs (official) | https://opencode.ai/docs/plugins/ | HIGH |
+| OpenCode Custom Tools Docs (official) | https://opencode.ai/docs/custom-tools/ | HIGH |
+| OpenCode Ecosystem (official) | https://opencode.ai/docs/ecosystem/ | HIGH |
+| Context7: OpenCode Plugins | /websites/opencode_ai_plugins | HIGH |
+| Context7: OpenCode Core | /anomalyco/opencode | HIGH |
+| johnlindquist Plugin Guide (gist) | gist.github.com/johnlindquist/0adf... | HIGH |
+| opencode-dynamic-context-pruning (1.2k★) | github.com/Opencode-DCP/opencode-dynamic-context-pruning | HIGH |
+| opencode-supermemory (764★) | github.com/supermemoryai/opencode-supermemory | HIGH |
+| opencode-type-inject (73★) | github.com/nick-vi/opencode-type-inject | MEDIUM |
+| opencode-background-agents (106★) | github.com/kdcokenny/opencode-background-agents | MEDIUM |
+| rstacruz Plugin Development Guide (gist) | gist.github.com/rstacruz/946d... | MEDIUM |
+| @opencode-ai/plugin SDK issue #15916 | github.com/anomalyco/opencode/issues/15916 | HIGH |
 
-### Current State Across 10 Agents
+---
 
-| Quality Dimension | gsd-executor | gsd-planner | gsd-verifier | gsd-debugger | gsd-roadmapper | gsd-phase-researcher | gsd-project-researcher | gsd-plan-checker | gsd-codebase-mapper | gsd-github-ci |
-|---|---|---|---|---|---|---|---|---|---|---|
-| **YAML frontmatter** | description, mode, color, estimated_tokens, tools | Same pattern | Same | Same | Same | Same | Same | Same | Same | Same |
-| **PATH SETUP block** | Present | Present | Present | Present | Present | Present | Present | Present | **MISSING** | Present |
-| **`<role>` section** | Present | Present | Present | Present | Present | Present | Present | Present | Present (no tags) | Present |
-| **Mandatory Initial Read** | Present | Present | Present | Present | Present | Present | Present | Present | Present | Present |
-| **`<project_context>`** | Present (skills-aware) | Present (skills-aware) | **MISSING** | **MISSING** | **MISSING** | Present (skills-aware) | **MISSING** | Present (skills-aware) | **MISSING** | **MISSING** |
-| **`<execution_flow>` with steps** | Present (structured) | Present (structured) | Present (unstructured) | Present (structured) | Present (structured) | Present (structured) | Present (mixed) | Present (structured) | Present (structured) | Present (structured) |
-| **`<structured_returns>`** | Present (PLAN COMPLETE) | Present (PLANNING COMPLETE) | Present (Verification Complete) | Present (ROOT CAUSE / DEBUG COMPLETE) | Present (ROADMAP CREATED) | Present (RESEARCH COMPLETE) | Present (RESEARCH COMPLETE) | Present (VERIFICATION PASSED/ISSUES FOUND) | **MISSING** (returns confirmation only) | **MISSING** |
-| **`<success_criteria>` checklist** | Present (12 items) | Present (15 items) | Present (14 items) | Present (9 items) | Present (16 items) | Present (11 items) | Present (8 items) | Present (13 items) | Present (6 items) | Present (5 items) |
-| **Checkpoint handling** | Full protocol + auto-mode | Detailed (planner perspective) | N/A (no checkpoints) | Present (3 types) | N/A | N/A | N/A | N/A | N/A | Partial (ad-hoc) |
-| **State update protocol** | Full (advance-plan, record-metric) | Commit protocol | No commit (orchestrator handles) | Full (archive, commit) | Write files + return | Write + commit | Write + no commit | Returns issues to orchestrator | No commit | No state updates |
-| **Estimated line count** | 483 | 1197 | 571 | 1216 | 655 | 518 | 637 | 655 | 770 | 409 |
+## OpenCode Plugin Hook Surface (Complete Reference)
 
-### Table Stakes Features
+Before categorizing features, here is the verified hook surface available to plugins. All hooks confirmed via official docs and Context7.
 
-| Feature | Why Expected | Complexity | Status |
-|---------|--------------|------------|--------|
-| **Consistent frontmatter schema** | Every agent needs description, mode, color, estimated_tokens, tools | Low | 9/10 consistent (codebase-mapper lacks PATH SETUP) |
-| **PATH SETUP block** | Agents must resolve GSD_HOME before CLI commands | Low | 9/10 have it |
-| **Mandatory Initial Read protocol** | files_to_read must be read first for context | Low | 10/10 have it |
-| **`<project_context>` discovery** | Agents should check AGENTS.md and project skills | Low | 4/10 have it (executor, planner, phase-researcher, plan-checker) |
-| **`<structured_returns>` to orchestrator** | Orchestrators parse structured output for decisions | Med | 8/10 have it (codebase-mapper and github-ci lack it) |
-| **`<success_criteria>` checklist** | Defines what "done" means, prevents partial execution | Low | 10/10 have it, but quality varies (5-16 items) |
-| **Checkpoint protocol (where applicable)** | Consistent human-in-the-loop handling | Med | Inconsistent: executor has full protocol, github-ci has ad-hoc, debugger has own variant |
-| **Deviation rules (where applicable)** | Auto-fix vs ask boundaries | Med | Only executor has this; github-ci needs it |
-| **Authentication gate handling** | Push/API auth failures are gates, not errors | Low | Executor + github-ci have it, but github-ci's is ad-hoc |
-| **State update protocol** | Track progress, decisions, metrics | Med | Only executor has full protocol; others vary |
-| **GitHub CI agent overhaul** | Currently substandard vs other 8 agents | Med | Model from gsd-executor patterns |
-| **31 test failures fixed** | Test suite credibility — cannot ship with known failures | Med | 4 areas: config-migrate, compact, codebase-impact, codebase ast |
+### Hooks (Input/Output Pattern)
 
-### Quality Gaps Identified
+| Hook | Fires When | Mutates | Confidence |
+|------|-----------|---------|------------|
+| `event` | Any event fires (30+ event types) | Read-only | HIGH |
+| `stop` | Agent attempts to stop | Can re-prompt via `client.session.prompt()` | HIGH |
+| `shell.env` | Shell environment constructed | `output.env` (inject env vars) | HIGH |
+| `tool.execute.before` | Before any tool runs | `output.args` (modify args), throw to block | HIGH |
+| `tool.execute.after` | After any tool runs | Read-only (react to results) | HIGH |
+| `experimental.session.compacting` | Before LLM generates compaction summary | `output.context[]` (inject) or `output.prompt` (replace entirely) | HIGH |
+| `experimental.chat.system.transform` | System prompt being assembled | `output.system[]` (push additional context) | HIGH |
+| `experimental.chat.messages.transform` | Messages being sent to LLM | Transform message array | HIGH |
 
-**Critical gaps (gsd-github-ci):**
-1. No `<structured_returns>` section — completion format exists but lacks CHECKPOINT REACHED or error structured returns
-2. No `<project_context>` discovery — doesn't check project skills
-3. No deviation rules — when a check fails, no framework for auto-fix vs escalate
-4. No state updates — doesn't record metrics, decisions, or session info
-5. Checkpoint handling is ad-hoc — inline in step descriptions rather than a consistent protocol section
-6. Success criteria has only 5 items vs 9-16 for other agents
-7. No `<philosophy>` section explaining operational principles
+### Event Types (30+ confirmed)
 
-**Moderate gaps (multiple agents):**
-1. `<project_context>` missing from verifier, debugger, roadmapper, project-researcher, codebase-mapper, github-ci (6/10)
-2. Checkpoint protocol varies — executor uses `<checkpoint_protocol>` + `<checkpoint_return_format>`, debugger uses `<checkpoint_behavior>`, github-ci inlines it
-3. No shared definition of what "structured return" means — each agent invents its own format
+| Category | Events |
+|----------|--------|
+| **Session** | `session.created`, `session.idle`, `session.compacted`, `session.deleted`, `session.diff`, `session.error`, `session.status`, `session.updated` |
+| **Message** | `message.updated`, `message.removed`, `message.part.updated`, `message.part.removed` |
+| **Tool** | `tool.execute.before`, `tool.execute.after` |
+| **File** | `file.edited`, `file.watcher.updated` |
+| **Permission** | `permission.asked`, `permission.replied` |
+| **Command** | `command.executed` |
+| **TUI** | `tui.prompt.append`, `tui.command.execute`, `tui.toast.show` |
+| **LSP** | `lsp.client.diagnostics`, `lsp.updated` |
+| **Other** | `server.connected`, `installation.updated`, `todo.updated` |
 
-## Category 2: Shared Patterns (Skill Candidates)
+### Plugin Context Object
 
-Sections duplicated across multiple agents that could become shared skills or references, reducing per-agent context cost.
+| Property | Type | Description |
+|----------|------|-------------|
+| `client` | SDK Client | Full OpenCode SDK for API calls (session.prompt, app.log, etc.) |
+| `project` | Project | Current project info |
+| `directory` | string | Current working directory |
+| `worktree` | string | Git worktree root |
+| `$` | Shell | Bun's shell API for running commands |
 
-### Duplication Analysis
+### Custom Tool Registration
 
-| Shared Pattern | Agents Using It | Lines Per Agent | Total Lines | Potential Savings |
-|---|---|---|---|---|
-| **PATH SETUP block** | 9/10 agents | 4 lines | ~36 lines | Eliminate entirely via skill |
-| **Mandatory Initial Read** | 10/10 agents | 3 lines | ~30 lines | Standardize in skill |
-| **`<project_context>` block** | 4/10 agents (varies slightly) | 10-14 lines | ~48 lines | Standardize for all 10 agents |
-| **Checkpoint protocol** | 3 agents (executor, planner, debugger) | 40-90 lines each | ~180 lines | Shared reference; agents load when needed |
-| **Deviation rules** | 1 agent (executor) | 62 lines | 62 lines | Skill for all executing agents |
-| **Authentication gate handling** | 2 agents (executor, github-ci) | 14-20 lines each | ~34 lines | Part of checkpoint skill |
-| **Commit protocol** | 2 agents (executor, debugger) | 30-35 lines each | ~65 lines | Shared reference |
-| **State update commands** | 1 agent (executor) | 45 lines | 45 lines | Skill loaded by any state-updating agent |
-| **Research tool strategy** | 2 agents (phase-researcher, project-researcher) | 40-50 lines each | ~90 lines | Shared skill |
-| **Source hierarchy / confidence levels** | 2 agents (phase-researcher, project-researcher) | 20-30 lines each | ~50 lines | Part of research skill |
-| **Goal-backward methodology** | 3 agents (planner, verifier, plan-checker) | 50-100 lines each | ~250 lines | Shared reference |
+```typescript
+import { type Plugin, tool } from "@opencode-ai/plugin"
+tool({
+  description: "...",
+  args: { param: tool.schema.string().describe("...") },  // Zod schema
+  async execute(args, context) {
+    // context: { agent, sessionID, messageID, directory, worktree }
+    return "string result"
+  }
+})
+```
 
-**Total duplicated content:** ~890 lines across 7,111 total lines (12.5%)
+- **Schema:** `tool.schema` is Zod — supports `.string()`, `.number()`, `.boolean()`, `.optional()`, `.describe()`
+- **Naming:** Filename becomes tool name. Multiple exports: `<filename>_<exportname>`
+- **Override:** Custom tools with same name as built-in take precedence
+- **Location:** `.opencode/tools/` (project) or `~/.config/opencode/tools/` (global)
 
-### Concrete Skill Candidates
+---
 
-#### Skill 1: `gsd-common` (loaded by ALL agents)
-**What moves here:**
-- PATH SETUP block (4 lines)
-- Mandatory Initial Read protocol (3 lines)
-- Project context discovery (AGENTS.md + project skills) (12 lines)
+## Community Plugin Pattern Analysis
 
-**Impact:** ~19 lines removed from each of 10 agents = ~190 lines eliminated from system prompts. Every agent gets consistent project awareness.
-**Complexity:** Low
-**Risk:** Low — pure deduplication
+### Pattern 1: Context Management (DCP — 1.2k★)
 
-#### Skill 2: `gsd-checkpoints` (loaded by executor, planner, debugger, github-ci)
-**What moves here:**
-- Checkpoint types (human-verify, decision, human-action)
-- Checkpoint return format template
-- Auto-mode detection and handling
-- Authentication gate protocol
+**What it does:** Removes obsolete tool outputs from conversation history using zero-cost automatic strategies + LLM-driven pruning tools.
 
-**Impact:** ~120 lines removed from system prompts of agents that use checkpoints. Currently 180+ lines of overlapping checkpoint content.
-**Complexity:** Medium — checkpoint handling varies slightly per agent
-**Risk:** Medium — agents currently customize checkpoint behavior
+**Key patterns:**
+- **Automatic zero-cost strategies:** Deduplication, write-supersede, error-purge — run on every request, no LLM cost
+- **LLM-callable tools:** `distill`, `compress`, `prune` — AI decides when to use them
+- **Nudge frequency:** Configurable "every N tool results, remind AI about pruning" (default: 10)
+- **Context limit:** Token threshold that triggers the model to prune (default: 100K, supports % of model window)
+- **Protected tools:** Allow-list of tools never pruned (e.g., `task`, `todowrite`)
+- **Notification modes:** `"chat"` (in-conversation) vs `"toast"` (system), `"off"`, `"minimal"`, `"detailed"`
+- **Subagent awareness:** DCP disables itself for subagents
+- **Config cascade:** Defaults → Global → Project (JSON/JSONC with schema)
 
-#### Skill 3: `gsd-execution` (loaded by executor, github-ci)
-**What moves here:**
-- Deviation rules (auto-fix framework)
-- Commit protocol (type selection, staging, format)
-- State update commands
+**Lesson for bGSD:** Our compaction hook should similarly protect sacred context. The "nudge frequency" pattern (periodic system prompt injection) is clever for guiding AI behavior.
 
-**Impact:** ~140 lines available as on-demand reference. GitHub CI agent gains deviation framework it currently lacks.
-**Complexity:** Medium
-**Risk:** Low — executor already references external checkpoints.md
+### Pattern 2: Persistent Memory (Supermemory — 764★)
 
-#### Skill 4: `gsd-research` (loaded by phase-researcher, project-researcher)
-**What moves here:**
-- Tool priority (Context7 -> Official Docs -> WebSearch)
-- Source hierarchy and confidence levels
-- Verification protocol for web findings
-- Research pitfalls
+**What it does:** Cross-session, cross-project memory via external API. Agent remembers preferences, patterns, solutions.
 
-**Impact:** ~100 lines deduplicated. Both researchers get identical methodology.
-**Complexity:** Low
-**Risk:** Low — pure methodology deduplication
+**Key patterns:**
+- **Context injection on first message:** Invisible to user, injects user profile + project memories + semantic matches
+- **Keyword detection:** "remember", "save this", "don't forget" → auto-saves to memory
+- **Scoped storage:** User scope (cross-project) vs Project scope (this project only)
+- **Preemptive compaction:** At 80% context capacity, triggers summarization and saves summary as memory
+- **Multi-mode tool:** Single tool with `mode` parameter (`add`, `search`, `profile`, `list`, `forget`) — not 5 separate tools
+- **Confidence scores:** Shows similarity percentage in injected context
+- **Privacy tags:** `<private>content</private>` prevents storage
 
-#### Skill 5: `gsd-goal-backward` (loaded by planner, verifier, plan-checker)
-**What moves here:**
-- Goal-backward methodology (truths -> artifacts -> wiring -> key links)
-- Must-haves format
-- Common failures in goal-backward analysis
+**Lesson for bGSD:** Our memory.json dual-store already does local cross-session memory. The "inject on first message" via `experimental.chat.system.transform` pattern is directly applicable. The single-tool-with-modes pattern is worth considering.
 
-**Impact:** ~150 lines deduplicated. Consistent methodology across plan creation, plan checking, and verification.
-**Complexity:** Low
-**Risk:** Low — already used identically by all three agents
+### Pattern 3: Type Injection (type-inject — 73★)
 
-### Pattern: What DOESN'T Move to Skills
+**What it does:** Auto-injects TypeScript type signatures into file reads, reports type errors on writes.
 
-Agent-specific behavior must stay in the agent definition:
-- Role description and core responsibilities
-- Execution flow (step-by-step process specific to this agent)
-- Structured return formats (agent-specific output shapes)
-- Success criteria (agent-specific completion definition)
-- Domain philosophy (e.g., debugger's scientific method, planner's "plans are prompts")
+**Key patterns:**
+- **`tool.execute.after` on read:** Appends type context to file read results
+- **`tool.execute.after` on write:** Runs type checker, reports errors
+- **Lookup tools:** `lookup_type` and `list_types` for on-demand type information
+- **Dual deployment:** Plugin (full auto-injection) or MCP server (tools only)
 
-**Principle:** Skills hold shared operational knowledge. Agent definitions hold identity and specialized behavior.
+**Lesson for bGSD:** The "enrich after read" pattern via `tool.execute.after` could apply to our state/plan files — annotating reads with computed context.
 
-## Category 3: Skills Architecture Features
+### Pattern 4: Background Agents (opencode-background-agents — 106★)
 
-Features of the OpenCode skills system and Agent Skills specification relevant to the bGSD migration.
+**What it does:** Fire-and-forget research delegation with disk persistence.
 
-### How Skills Work (Three-Level Progressive Disclosure)
+**Key patterns:**
+- **Three tools:** `delegate(prompt, agent)`, `delegation_read(id)`, `delegation_list()`
+- **Persistence to disk:** Results saved as markdown in `~/.local/share/opencode/delegations/`
+- **Read-only constraint:** Only read-only agents can delegate (write agents must use native `task`)
+- **Auto-tagging:** Each delegation gets title + summary for later discovery
+- **15-minute timeout**
+- **Compaction-safe:** Results on disk, not in context
 
-| Level | When Loaded | Token Cost | Content |
-|-------|------------|------------|---------|
-| **Level 1: Metadata** | At startup, always | ~100 tokens per skill | `name` + `description` from YAML frontmatter |
-| **Level 2: Instructions** | When skill activated | <5000 tokens recommended | Full SKILL.md body |
-| **Level 3: References** | On demand during execution | Varies | Files in `scripts/`, `references/`, `assets/` |
+**Lesson for bGSD:** Our subagent architecture already handles delegation. The disk persistence pattern for surviving compaction is relevant to our state sync.
 
-**Key insight:** Level 1 costs ~100 tokens per skill. With 5 GSD skills, that's ~500 tokens always-on overhead. The instructions (Level 2) only load when the agent decides the skill is relevant. This is the context reduction mechanism.
+### Pattern 5: Notifications (opencode-notificator, opencode-notifier, opencode-notify)
 
-### OpenCode Skills Implementation
+**What it does:** Desktop notifications and sound alerts for various events.
 
-From Context7 analysis of `/malhashemi/opencode-skills`:
+**Key patterns:**
+- **Platform-specific:** `osascript` for macOS, `notify-send` for Linux, `powershell` for Windows
+- **Event triggers:** `session.idle`, `session.error`, `permission.asked`
+- **Debouncing:** Notifications grouped/throttled to prevent fatigue
+- **Desktop app note:** OpenCode desktop app handles notifications natively — plugins needed only for TUI
 
-**Discovery locations (checked in order):**
-1. `$XDG_CONFIG_HOME/<app>/skills/` — Global config skills
-2. `~/.opencode/skills/` — User global skills
-3. `<project>/.opencode/skills/` — Project-local skills
+---
 
-**For bGSD:** Skills would live in `~/.config/oc/skills/gsd-*/SKILL.md` (global) or optionally in project `.opencode/skills/` for project-specific overrides.
+## Feature Categories
 
-**Registration mechanism:** Each skill is registered as a dynamic tool. When called, it:
-1. Sends a "loading" message via `noReply: true` prompt
-2. Injects skill content + base directory path into conversation
-3. Agent can then reference files relative to skill base dir
+### Category 1: Always-On Context Injection
 
-**Permission model:**
-```json
-{
-  "permission": {
-    "skill": {
-      "*": "allow",
-      "gsd-*": "allow"
-    }
+Features that ensure the LLM always knows the project's current state via `experimental.chat.system.transform`.
+
+| Feature | Category | Complexity | Dependencies | Description |
+|---------|----------|------------|--------------|-------------|
+| **System prompt state injection** | TABLE STAKES | Medium | `gsd-tools init` output, STATE.md | Inject current phase, plan, blockers, velocity into every system prompt via `experimental.chat.system.transform`. LLM always knows where the project is. |
+| **Active plan context** | TABLE STAKES | Medium | `gsd-tools plan:active`, PLAN.md | Inject current task, completed tasks, next steps from active plan. Agent never asks "where was I?" |
+| **Blockers & decisions injection** | TABLE STAKES | Low | STATE.md blockers section, memory.json | Surface active blockers and recent decisions so agent doesn't repeat mistakes. |
+| **Conditional injection (bGSD projects only)** | TABLE STAKES | Low | `.planning/` directory detection | Only inject context when `.planning/` exists. Non-bGSD projects get zero overhead. |
+| **Token-budgeted injection** | DIFFERENTIATOR | Medium | tokenx token counting | Cap injected context at configurable token limit (e.g., 2K). Avoid bloating system prompt for large projects. |
+| **Stale state detection** | DIFFERENTIATOR | Medium | Git commit tracking, file mtimes | Detect when injected state is stale (e.g., STATE.md modified since last read) and re-read. |
+| **Phase-aware skill suggestions** | DIFFERENTIATOR | High | Phase metadata, skill index | Suggest relevant `/bgsd-*` commands based on current phase status (e.g., "Phase is planned but not executed — try `/bgsd-execute-phase`"). |
+| **Full project dashboard injection** | ANTI-FEATURE | — | — | Injecting everything (all phases, all plans, full roadmap) into system prompt. Wastes 5K+ tokens. Context injection must be surgical. |
+
+### Category 2: Custom LLM-Callable Tools
+
+Tools registered via `tool` property that replace CLI shell-out overhead on hot paths.
+
+| Feature | Category | Complexity | Dependencies | Description |
+|---------|----------|------------|--------------|-------------|
+| **`gsd_status` tool** | TABLE STAKES | Low | `gsd-tools init --compact` | Single tool call returns project status (phase, plan, progress, blockers). Replaces `bash("node gsd-tools init --compact")` with native tool — faster, typed, no shell overhead. |
+| **`gsd_state` tool (read/patch)** | TABLE STAKES | Medium | STATE.md read/write/patch | Read or update STATE.md fields. Multi-mode: `read`, `patch` (update position, add blocker, record metric). Replaces 3-4 CLI calls. |
+| **`gsd_plan` tool** | TABLE STAKES | Medium | Plan file parsing | Read active plan, get task details, mark task done. Replaces `plan:active`, `plan:read`, `execute:advance-task`. |
+| **`gsd_memory` tool** | DIFFERENTIATOR | Medium | memory.json dual-store | Read/write cross-session memory. Modes: `get`, `set`, `search`, `list`. Lets agent explicitly save decisions. |
+| **`gsd_velocity` tool** | DIFFERENTIATOR | Low | velocity calculations | Get execution velocity metrics. Quick data access without full CLI format overhead. |
+| **`gsd_context` tool** | DIFFERENTIATOR | High | Context builder, manifests | Build context for a specific agent/task. Returns relevant files, state, plan context. Replaces manual context assembly. |
+| **Tool naming convention** | TABLE STAKES | Low | — | All tools prefixed `gsd_` for namespace clarity. Matches community convention (e.g., `supermemory`, `distill`). Use snake_case per Zod schema conventions. |
+| **Zod schema with `.describe()`** | TABLE STAKES | Low | — | Every tool arg gets `.describe()` for LLM discoverability. Following DCP and type-inject patterns. |
+| **50+ tools** | ANTI-FEATURE | — | — | Registering every CLI command as a tool. LLMs perform worse with too many tools. Limit to 5-8 high-frequency tools. |
+| **Replacing all CLI commands** | ANTI-FEATURE | — | — | Tools should cover hot paths only. Infrequent operations (milestone init, deploy) stay as CLI commands via bash. |
+
+### Category 3: Event-Driven State Sync
+
+React to events to keep project state synchronized automatically.
+
+| Feature | Category | Complexity | Dependencies | Description |
+|---------|----------|------------|--------------|-------------|
+| **Session idle → state sync** | TABLE STAKES | Medium | `session.idle` event, STATE.md | When agent finishes responding, check if state needs updating (e.g., task completed but STATE.md not advanced). Prompt agent or auto-update. |
+| **File edit → plan tracking** | TABLE STAKES | Medium | `file.edited` event, active plan | Track which plan files have been modified. Correlate with task file lists. Surface "Task 2 files all modified — ready to verify?" |
+| **Session created → greeting** | TABLE STAKES | Low | `session.created` event | Replace current `console.log` greeting with proper context: current phase, active task, blockers. Injected via `experimental.chat.system.transform` instead. |
+| **Commit detection → task advance** | DIFFERENTIATOR | Medium | `tool.execute.after` on bash (git commit regex) | Detect when agent commits. Cross-reference with active task's expected commit. Surface "Task N appears complete — advance?" |
+| **Session compacted → state preservation** | TABLE STAKES | Medium | `session.compacted` event | Log that compaction occurred. Ensure next interaction re-injects full state context. |
+| **File watcher → plan invalidation** | DIFFERENTIATOR | High | `file.watcher.updated` event | Detect external file changes (user edited a plan file outside OpenCode). Invalidate cached state, re-read on next interaction. |
+| **Test result tracking** | DIFFERENTIATOR | Medium | `tool.execute.after` on bash (test runner regex) | Parse test output from bash tool results. Track pass/fail counts across session. Surface in context: "Tests: 762/766 passing (4 failing)". |
+| **Session-scoped state map** | TABLE STAKES | Low | In-memory Map keyed by sessionID | Track per-session state (files modified, tests run, commits made). Following community pattern from johnlindquist guide. Clean up on `session.deleted`. |
+| **Bidirectional git-to-state sync** | ANTI-FEATURE | — | — | Auto-committing or auto-pushing on state changes. Violates human-in-the-loop principle. |
+| **Real-time file polling** | ANTI-FEATURE | — | — | Polling filesystem for changes. Use `file.watcher.updated` event instead. |
+
+### Category 4: Smart Command Enrichment
+
+Enhance `/bgsd-*` slash commands with auto-injected context before execution.
+
+| Feature | Category | Complexity | Dependencies | Description |
+|---------|----------|------------|--------------|-------------|
+| **Command context injection** | TABLE STAKES | Medium | `tui.command.execute` event, state data | When user runs a `/bgsd-*` command, auto-inject current project context into the prompt. Agent doesn't need to re-discover state. |
+| **Phase argument auto-resolution** | DIFFERENTIATOR | Medium | `tui.command.execute` event, active phase | If user runs `/bgsd-execute-phase` without args, auto-detect current phase from STATE.md. Reduce friction. |
+| **Command validation** | DIFFERENTIATOR | Low | `tui.command.execute` event | Validate command makes sense in current state. Warning if running `/bgsd-execute-phase` when no plans exist yet. |
+| **Prompt append for context** | TABLE STAKES | Low | `tui.prompt.append` event | Append project context to user's prompt text before it reaches the LLM. Lighter-weight than full system prompt transform. |
+| **Command auto-completion** | ANTI-FEATURE | — | — | OpenCode handles its own command completion. Plugin shouldn't interfere with TUI input. |
+
+### Category 5: Advisory Guardrails
+
+Tool interception patterns that enforce conventions without blocking.
+
+| Feature | Category | Complexity | Dependencies | Description |
+|---------|----------|------------|--------------|-------------|
+| **Test-after-edit advisory** | TABLE STAKES | Medium | `tool.execute.after` on edit/write, test runner detection | Track file edits. After N edits without running tests, inject advisory: "You've modified 5 files without running tests. Consider running the test suite." |
+| **Convention enforcement** | DIFFERENTIATOR | High | Convention extraction, `tool.execute.before` on write | Check written files against project conventions (naming, structure). Advisory warning if conventions violated. |
+| **.env protection** | TABLE STAKES | Low | `tool.execute.before` on read | Block reading `.env` files. Following community standard pattern. |
+| **Dangerous command warning** | TABLE STAKES | Low | `tool.execute.before` on bash | Warn on `rm -rf`, `git push --force`, `git reset --hard`. Community-established pattern. |
+| **Commit message convention** | DIFFERENTIATOR | Medium | `tool.execute.before` on bash (git commit regex) | Validate commit messages follow project's conventional commit format. Advisory warning. |
+| **Plan file protection** | DIFFERENTIATOR | Low | `tool.execute.before` on write | Warn when agent attempts to modify ROADMAP.md, completed plans, or archived state. These should be immutable. |
+| **Blocking guardrails** | ANTI-FEATURE | — | — | Throwing errors to block tool execution should be rare and limited to security (.env). Advisory > blocking for conventions. |
+
+### Category 6: Toast / Notification UX
+
+Desktop and TUI notifications for important state transitions.
+
+| Feature | Category | Complexity | Dependencies | Description |
+|---------|----------|------------|--------------|-------------|
+| **Phase transition notifications** | TABLE STAKES | Low | State change detection, `$` shell API | Notify when a phase completes or a new phase begins. Platform-specific: `osascript` (macOS), `notify-send` (Linux). |
+| **Session idle notification** | TABLE STAKES | Low | `session.idle` event | "Task complete" notification when agent finishes. Following 3+ community plugin pattern. |
+| **Error/stuck notification** | DIFFERENTIATOR | Medium | `session.error` event, stuck detection | Notify when session errors or agent appears stuck (3+ failed attempts). |
+| **Permission request notification** | TABLE STAKES | Low | `permission.asked` event | Notify when agent is waiting for permission. User may be in another window. |
+| **Milestone completion celebration** | DIFFERENTIATOR | Low | Milestone detection | Special notification with summary when a milestone completes. |
+| **Notification frequency throttling** | TABLE STAKES | Low | Debounce logic | Max 1 notification per 30 seconds. Prevent notification fatigue. Community plugins all implement debouncing. |
+| **Platform detection** | TABLE STAKES | Low | `process.platform` check | Auto-detect macOS vs Linux vs WSL for notification command. |
+| **Sound alerts** | DIFFERENTIATOR | Low | Platform audio APIs | Optional sound on completion (following opencode-notificator pattern). Disabled by default. |
+| **TUI toast integration** | DIFFERENTIATOR | Medium | `tui.toast.show` event awareness | Surface bGSD status changes as TUI toasts rather than OS notifications when in TUI mode. |
+| **Notification spam** | ANTI-FEATURE | — | — | Notifying on every event. Only notify on state transitions and user-attention-needed moments. |
+
+### Category 7: Enhanced Compaction
+
+Preserve critical project context across session compaction.
+
+| Feature | Category | Complexity | Dependencies | Description |
+|---------|----------|------------|--------------|-------------|
+| **STATE.md preservation** | TABLE STAKES | Low | `experimental.session.compacting` hook | Already implemented. Inject full STATE.md content into compaction context. |
+| **Active plan preservation** | TABLE STAKES | Medium | Active plan detection, plan reading | Inject current plan with task status into compaction context. Agent resumes knowing exactly which task to work on. |
+| **Decision history preservation** | TABLE STAKES | Medium | memory.json decisions store | Inject recent decisions (last 5-10) into compaction context. Prevents agent from re-deciding settled questions. |
+| **Blocker preservation** | TABLE STAKES | Low | STATE.md blockers section | Ensure active blockers survive compaction. Already partially covered by STATE.md preservation. |
+| **Session metrics preservation** | DIFFERENTIATOR | Low | Session-scoped state map | Preserve session metrics (files modified, tests run, commits made) across compaction. |
+| **Custom compaction prompt** | DIFFERENTIATOR | High | `output.prompt` replacement | Replace default compaction prompt with bGSD-aware version that structures the summary around project phases, tasks, and decisions. Following DCP and swarm session patterns. |
+| **Roadmap context in compaction** | DIFFERENTIATOR | Medium | ROADMAP.md, phase summaries | Include abbreviated roadmap (phase names + status) so compacted context maintains big-picture awareness. |
+| **Files-in-progress tracking** | TABLE STAKES | Medium | `tool.execute.after` file tracking | Track which files are actively being modified. Include in compaction context so agent doesn't lose track of work-in-progress. |
+| **Full conversation replay** | ANTI-FEATURE | — | — | Trying to preserve the entire conversation. Compaction exists to reduce context. Preserve structure, not content. |
+| **Compacting all project files** | ANTI-FEATURE | — | — | Including full ROADMAP.md + all plans. Too much context defeats the purpose. Summaries only. |
+
+---
+
+## Feature Priority Matrix
+
+### Must-Have (Table Stakes) — 18 features
+
+These are expected by any serious planning plugin. Without them, the plugin feels disconnected.
+
+| # | Feature | Hook/Mechanism | Complexity | Existing Foundation |
+|---|---------|---------------|------------|---------------------|
+| 1 | System prompt state injection | `experimental.chat.system.transform` | Medium | `gsd-tools init --compact` output exists |
+| 2 | Active plan context injection | `experimental.chat.system.transform` | Medium | `gsd-tools plan:active` exists |
+| 3 | Blocker/decision injection | `experimental.chat.system.transform` | Low | STATE.md parsing exists |
+| 4 | Conditional injection (bGSD only) | `.planning/` check | Low | Directory detection exists |
+| 5 | `gsd_status` tool | `tool` registration | Low | `init --compact` CLI exists |
+| 6 | `gsd_state` tool | `tool` registration | Medium | STATE.md CRUD exists |
+| 7 | `gsd_plan` tool | `tool` registration | Medium | Plan parsing exists |
+| 8 | Tool naming convention (`gsd_*`) | Plugin architecture | Low | New |
+| 9 | Zod schema with `.describe()` | Plugin architecture | Low | New |
+| 10 | Session idle state sync | `event` handler | Medium | State validation exists |
+| 11 | File edit plan tracking | `event` handler | Medium | Plan file lists exist |
+| 12 | Session greeting with context | `experimental.chat.system.transform` | Low | Current `console.log` exists |
+| 13 | Session-scoped state map | In-memory Map | Low | Pattern from community |
+| 14 | Test-after-edit advisory | `tool.execute.after` | Medium | Anti-pattern detection exists |
+| 15 | .env protection | `tool.execute.before` | Low | Community standard |
+| 16 | Dangerous command warning | `tool.execute.before` | Low | Community standard |
+| 17 | STATE.md compaction preservation | `experimental.session.compacting` | Low | Already implemented |
+| 18 | Active plan compaction | `experimental.session.compacting` | Medium | Plan reading exists |
+
+### Should-Have (Differentiators) — 17 features
+
+These set bGSD apart from generic plugins. They demonstrate deep domain integration.
+
+| # | Feature | Hook/Mechanism | Complexity |
+|---|---------|---------------|------------|
+| 1 | Token-budgeted injection | `experimental.chat.system.transform` | Medium |
+| 2 | Stale state detection | File mtime tracking | Medium |
+| 3 | Phase-aware skill suggestions | `experimental.chat.system.transform` | High |
+| 4 | `gsd_memory` tool | `tool` registration | Medium |
+| 5 | `gsd_velocity` tool | `tool` registration | Low |
+| 6 | `gsd_context` tool | `tool` registration | High |
+| 7 | Commit detection → task advance | `tool.execute.after` | Medium |
+| 8 | File watcher plan invalidation | `event` handler | High |
+| 9 | Test result tracking | `tool.execute.after` | Medium |
+| 10 | Phase argument auto-resolution | `tui.command.execute` | Medium |
+| 11 | Command validation | `tui.command.execute` | Low |
+| 12 | Convention enforcement | `tool.execute.before` | High |
+| 13 | Commit message convention | `tool.execute.before` | Medium |
+| 14 | Plan file protection | `tool.execute.before` | Low |
+| 15 | Custom compaction prompt | `experimental.session.compacting` | High |
+| 16 | Error/stuck notification | `event` handler | Medium |
+| 17 | Session metrics preservation | `experimental.session.compacting` | Low |
+
+### Won't-Build (Anti-Features) — 9 items
+
+| # | Anti-Feature | Why Not |
+|---|-------------|---------|
+| 1 | Full project dashboard in system prompt | Wastes 5K+ tokens. Injection must be surgical — current phase/plan/blockers only. |
+| 2 | 50+ registered tools | LLMs degrade with too many tools. Community consensus: 5-8 tools max. DCP uses 3, Supermemory uses 1 (multi-mode). |
+| 3 | Replacing all CLI commands with tools | Only hot paths. Infrequent ops (milestone init, deploy) stay as bash CLI calls. |
+| 4 | Bidirectional git-to-state sync | Auto-committing violates human-in-the-loop. Agent should advise, not act autonomously on git. |
+| 5 | Real-time file polling | Events exist (`file.watcher.updated`). Polling wastes resources. |
+| 6 | Blocking guardrails (except security) | Advisory > blocking. Throwing errors disrupts agent flow. Only block for security (.env, rm -rf). |
+| 7 | Notification spam | Throttle to max 1 per 30s. Only notify on state transitions and attention-needed moments. |
+| 8 | Full conversation replay in compaction | Defeats the purpose of compaction. Preserve structure (phase, task, decisions), not raw conversation. |
+| 9 | Command auto-completion override | TUI handles its own completion. Don't fight the platform. |
+
+---
+
+## Dependency Analysis
+
+### What Already Exists (Build On Top Of)
+
+| Existing Feature | Used By | How |
+|-----------------|---------|-----|
+| `gsd-tools init --compact` | System prompt injection, `gsd_status` tool | Parse JSON output for current state |
+| `gsd-tools plan:active` | Active plan injection, `gsd_plan` tool | Get active plan/task data |
+| `gsd-tools state:read/patch` | `gsd_state` tool, state sync | Read/update STATE.md |
+| STATE.md parsing | Blocker injection, compaction | Extract sections from STATE.md |
+| memory.json dual-store | Decision preservation, `gsd_memory` tool | Cross-session memory |
+| Convention extraction | Convention enforcement guardrail | Extracted conventions from codebase-intel |
+| Token estimation (tokenx) | Token-budgeted injection | Count tokens before injecting |
+| File cache (cachedReadFile) | All file-reading operations | Avoid redundant reads within a session |
+| Stuck/loop detection | Error/stuck notification | 3-failure detection already exists |
+| Anti-pattern detection | Test-after-edit advisory | Pattern already exists in v7.0 |
+
+### New Infrastructure Needed
+
+| Component | Required By | Description |
+|-----------|-------------|-------------|
+| Plugin architecture (TypeScript) | All features | Current plugin.js is minimal JS. Need to expand with proper hook registration. |
+| Bun shell (`$`) integration | Notifications, shell commands | Current plugin uses `readFileSync`. Need `$` from context for platform commands. |
+| Session state manager | Event-driven features | In-memory Map<sessionID, SessionState> for tracking files modified, tests run, commits. |
+| CLI-to-tool bridge | All custom tools | Function that calls `gsd-tools` CLI internally and returns parsed JSON. Avoids duplicating logic. |
+| Platform detection | Notifications | `process.platform` check for notification commands. |
+
+---
+
+## Tool Design Recommendations
+
+Based on community analysis, here are the patterns that work:
+
+### Naming
+- **Prefix:** `gsd_` (not `bgsd_` — too long, not `gsd-` — tool names are identifiers)
+- **Convention:** `gsd_status`, `gsd_state`, `gsd_plan`, `gsd_memory`, `gsd_velocity`
+- **Count:** 5-6 core tools. DCP has 3. Supermemory has 1 (multi-mode). More is worse.
+
+### Schema Pattern
+```typescript
+// Single-mode tool (simple)
+tool({
+  description: "Get bGSD project status",
+  args: {},
+  async execute(args, context) { ... }
+})
+
+// Multi-mode tool (complex operations)
+tool({
+  description: "Manage bGSD project state",
+  args: {
+    mode: tool.schema.enum(["read", "patch"]).describe("Operation mode"),
+    field: tool.schema.string().optional().describe("Field to read/update"),
+    value: tool.schema.string().optional().describe("Value to set (patch mode)"),
+  },
+  async execute(args, context) { ... }
+})
+```
+
+### Supermemory's Single-Tool-Multi-Mode Pattern
+
+Supermemory (764★) uses ONE tool with a `mode` parameter for all operations. This works because:
+1. Fewer tools = better LLM tool selection
+2. Related operations grouped logically
+3. LLM learns "supermemory = memory ops" rather than 5 different tool names
+
+**Recommendation for bGSD:** Use 3-5 tools, not 1. Our operations span different domains (state, plan, memory) which are semantically distinct enough to warrant separate tools. But within a domain, use multi-mode (e.g., `gsd_state` with `read`/`patch` modes).
+
+### Context Available in Tool Execute
+
+```typescript
+context = {
+  agent: string,      // Which agent is calling
+  sessionID: string,   // Current session
+  messageID: string,   // Current message
+  directory: string,   // Working directory
+  worktree: string,    // Git worktree root
+  abort: AbortSignal,  // Cancellation signal
+}
+```
+
+---
+
+## Compaction Strategy Recommendations
+
+Based on DCP (1.2k★), Supermemory (764★), and official docs:
+
+### Current State (v8.3)
+Only preserves STATE.md content. Loses: active plan, decisions, blockers detail, files-in-progress.
+
+### Recommended Strategy (v9.0)
+```typescript
+"experimental.session.compacting": async (input, output) => {
+  // Layer 1: Project state (current)
+  output.context.push(stateContent)
+  
+  // Layer 2: Active plan with task status (NEW)
+  output.context.push(activePlanSummary)
+  
+  // Layer 3: Recent decisions from memory.json (NEW)
+  output.context.push(recentDecisions)
+  
+  // Layer 4: Files being actively modified (NEW)
+  output.context.push(filesInProgress)
+  
+  // Layer 5: Session metrics summary (NEW)
+  output.context.push(sessionMetrics)
+}
+```
+
+### Advanced: Custom Compaction Prompt (Differentiator)
+Replace the default compaction prompt entirely with a bGSD-aware version:
+```typescript
+output.prompt = `
+You are generating a continuation prompt for a bGSD planning session.
+
+Summarize:
+1. Current phase and active plan/task
+2. What was accomplished in this session
+3. Active blockers and recent decisions
+4. Files being modified and their status
+5. Next steps to continue the current task
+
+Format as a structured prompt that preserves project context.
+`
+```
+
+**Trade-off:** Setting `output.prompt` ignores `output.context[]`. Use one approach, not both. Recommend starting with `output.context[]` (additive) and graduating to `output.prompt` (replacement) after validating the approach.
+
+---
+
+## Notification Pattern Recommendations
+
+Based on 3 community notification plugins + DCP's notification system:
+
+### Event → Notification Mapping
+
+| Event | Notification | Priority | Platform |
+|-------|-------------|----------|----------|
+| `session.idle` (task complete) | "bGSD: Task complete" | Normal | OS notification |
+| `session.error` | "bGSD: Session error" | High | OS notification |
+| `permission.asked` | "bGSD: Permission needed" | High | OS notification |
+| Phase complete | "bGSD: Phase X complete!" | Normal | OS notification |
+| Stuck detection (3+ failures) | "bGSD: Agent may be stuck" | High | OS notification |
+
+### Throttling
+- **Minimum interval:** 30 seconds between notifications
+- **Batch notifications:** Group multiple events into one notification
+- **Quiet mode:** Configurable per-user. Some users prefer no notifications.
+
+### Platform Commands
+```javascript
+// macOS
+await $`osascript -e 'display notification "${message}" with title "bGSD"'`
+// Linux
+await $`notify-send "bGSD" "${message}"`
+// WSL  
+await $`powershell.exe -Command "New-BurntToastNotification -Text 'bGSD','${message}'" 2>/dev/null`
+```
+
+---
+
+## Guardrail Pattern Recommendations
+
+Based on community .env protection, DCP protected tools, and type-inject patterns:
+
+### Advisory vs Blocking
+
+| Pattern | Type | Action |
+|---------|------|--------|
+| .env file read | **BLOCKING** | `throw new Error("Do not read .env files")` |
+| `rm -rf /`, `git push --force` | **BLOCKING** | `throw new Error("Dangerous command blocked")` |
+| N edits without tests | **ADVISORY** | Inject reminder into next system prompt |
+| Non-conventional commit message | **ADVISORY** | Log warning, don't block |
+| Modifying completed plan files | **ADVISORY** | Log warning about immutable files |
+
+### Implementation Pattern
+```typescript
+"tool.execute.before": async (input, output) => {
+  // BLOCKING: Security
+  if (input.tool === "read" && output.args.filePath?.includes(".env")) {
+    throw new Error("Do not read .env files")
+  }
+  // ADVISORY: Track for later nudging
+  if (input.tool === "edit" || input.tool === "write") {
+    sessionState.editsSinceTest++
   }
 }
 ```
 
-### Agent Skills Specification (agentskills.io)
+---
 
-The Agent Skills Standard (open spec by Anthropic, adopted by 30+ tools) defines:
+## Risk Assessment
 
-| Feature | Spec Requirement | bGSD Implication |
-|---------|-----------------|------------------|
-| `SKILL.md` required | Every skill must have one | Each gsd-* skill needs a SKILL.md |
-| `name` field | lowercase alphanumeric + hyphens, max 64 chars | `gsd-common`, `gsd-checkpoints`, etc. |
-| `description` field | Max 1024 chars, must say what + when | Critical for triggering — description determines if agent loads skill |
-| Progressive disclosure | 3 levels: metadata -> instructions -> references | References dir for detailed docs (checkpoints.md, etc.) |
-| `allowed-tools` | Optional, experimental | Could restrict which tools a skill can invoke |
-| Directory structure | `SKILL.md` + optional `scripts/`, `references/`, `assets/` | References for existing .md files that agents currently @-reference |
-
-### Table Stakes vs Differentiators for Skills Migration
-
-| Feature | Category | Why |
-|---------|----------|-----|
-| SKILL.md with frontmatter for each shared pattern | Table Stakes | Without this, skills aren't discoverable |
-| Progressive disclosure (metadata -> body -> references) | Table Stakes | Core value proposition — context reduction |
-| Description quality (triggers correctly) | Table Stakes | Bad descriptions = skills never load or always load |
-| Relative file references from skill base dir | Table Stakes | Skills reference detailed docs without hardcoded paths |
-| `references/` directory for detailed docs | Table Stakes | Move existing @-referenced .md files here |
-| Skills in deploy.sh pipeline | Table Stakes | Skills must deploy alongside agents and commands |
-| Permission configuration in opencode.json | Differentiator | Fine-grained control, but all gsd-* skills should be allowed |
-| Cross-platform portability (agentskills.io spec) | Differentiator | Nice-to-have but not required for internal use |
-| Project-local skill overrides | Differentiator | Could customize GSD behavior per-project |
-| Skill versioning via metadata | Differentiator | Future-proofing for skill updates |
-
-## Category 4: Context Reduction Analysis
-
-Concrete token savings from skills migration.
-
-### Current Agent Context Costs
-
-| Agent | Lines | Est. Tokens (~4 tokens/line avg) | Shared Content (lines) | Unique Content (lines) |
-|-------|-------|----------------------------------|----------------------|----------------------|
-| gsd-executor | 483 | ~8K | ~135 | ~348 |
-| gsd-planner | 1197 | ~20K | ~200 | ~997 |
-| gsd-verifier | 571 | ~10K | ~65 | ~506 |
-| gsd-debugger | 1216 | ~20K | ~75 | ~1141 |
-| gsd-roadmapper | 655 | ~11K | ~35 | ~620 |
-| gsd-phase-researcher | 518 | ~9K | ~120 | ~398 |
-| gsd-project-researcher | 637 | ~11K | ~110 | ~527 |
-| gsd-plan-checker | 655 | ~11K | ~100 | ~555 |
-| gsd-codebase-mapper | 770 | ~13K | ~25 | ~745 |
-| gsd-github-ci | 409 | ~4K | ~25 | ~384 |
-
-### Projected Savings
-
-**With skills (5 skills, ~100 tokens metadata each = 500 tokens always-on):**
-
-When an agent loads, it pays:
-- ~500 tokens for skill metadata (Level 1, all skills)
-- Agent system prompt (reduced by shared content removal)
-- Skills loaded on-demand (Level 2, only relevant ones)
-
-**Net impact per agent spawn:**
-
-| Agent | Current | After Dedup | Skills Loaded On-Demand | Net Change |
-|-------|---------|-------------|-------------------------|------------|
-| gsd-executor | ~8K | ~5.5K | common + checkpoints + execution (~2K) | ~7.5K (-6%) |
-| gsd-planner | ~20K | ~17K | common + goal-backward + checkpoints (~1.5K) | ~18.5K (-7.5%) |
-| gsd-github-ci | ~4K | ~3.5K | common + checkpoints + execution (~2K) | ~5.5K (+37% quality gain) |
-| gsd-verifier | ~10K | ~9.5K | common + goal-backward (~1K) | ~10.5K (~same) |
-| gsd-debugger | ~20K | ~19.5K | common + checkpoints (~1K) | ~20.5K (~same) |
-
-**Key insight:** The primary value of skills is NOT token reduction (savings are modest 5-10%). The primary value is:
-1. **Consistency** — all agents get identical shared methodology
-2. **Quality uplift** — agents missing patterns (github-ci) gain them automatically
-3. **Maintainability** — change checkpoint protocol once, all agents get it
-4. **Progressive disclosure** — detailed references loaded only when needed, not baked into system prompt
-
-## Category 5: GitHub CI Agent Quality Gap Analysis
-
-Detailed comparison of gsd-github-ci vs the quality standard set by gsd-executor.
-
-### What gsd-executor Has That gsd-github-ci Lacks
-
-| Feature | gsd-executor | gsd-github-ci | Impact of Gap |
-|---------|-------------|---------------|---------------|
-| `<project_context>` | Reads AGENTS.md, checks project skills | Only reads AGENTS.md (line 54), no skills | CI fixes may violate project conventions |
-| `<deviation_rules>` | 4 rules with clear auto-fix vs escalate boundaries | None — all fix decisions are ad-hoc | No framework for "should I fix this or escalate?" |
-| `<authentication_gates>` | Full protocol with indicator list + checkpoint format | Partial — only git push auth, not API auth | API auth failures (gh auth) not properly handled |
-| `<checkpoint_protocol>` | Structured section with auto-mode handling | Inline in step descriptions | Inconsistent checkpoint behavior |
-| `<checkpoint_return_format>` | Standard template with progress table | Ad-hoc markdown in each step | Continuation agents can't parse reliably |
-| `<auto_mode_detection>` | Checks `workflow.auto_advance` config | None | Can't auto-advance past human-verify checkpoints |
-| `<continuation_handling>` | Explicit protocol for resumed agents | None | If context resets mid-CI, can't resume |
-| `<self_check>` | Verifies claims before proceeding | None | May report success when merge actually failed |
-| `<state_updates>` | Full state management (advance-plan, metrics, decisions) | None | CI results not tracked in project state |
-| `<summary_creation>` | Creates SUMMARY.md with deviations, metrics | None | No execution record persisted |
-| `<philosophy>` | Operational principles section | None | No guiding principles for edge cases |
-| **Structured returns** | `## PLAN COMPLETE` with commits, duration | `## CI COMPLETE` exists but no BLOCKED/CHECKPOINT returns | Orchestrator can't handle CI failures gracefully |
-| **Success criteria depth** | 12 items covering all lifecycle phases | 5 items covering only happy path | Edge cases (timeout, partial merge, auth failure) not covered |
-
-### What gsd-github-ci Does Well
-
-1. **Clear step structure** — parse_input -> push -> PR -> checks -> analyze -> fix -> merge is logical
-2. **Alert classification matrix** — severity + context -> true/false positive is well-designed
-3. **Iteration limit** — MAX_FIX_ITERATIONS prevents infinite loops
-4. **False positive dismissal** — structured API calls with reasoning
-5. **Merge fallback** — tries --auto first, then direct merge
-
-### Recommended Quality Standard Template
-
-Based on analysis of all 10 agents, the quality standard every agent should meet:
-
-```
-YAML frontmatter:
-  - description (descriptive, action-oriented)
-  - mode: subagent
-  - color (unique per agent)
-  - estimated_tokens (commented, realistic)
-  - tools (minimal required set)
-
-Structural sections (in order):
-  1. PATH SETUP block (or loaded via gsd-common skill)
-  2. <role> with core responsibilities + Mandatory Initial Read
-  3. <project_context> (or loaded via gsd-common skill)
-  4. <philosophy> (if agent has domain-specific principles)
-  5. <execution_flow> with named <step> elements
-  6. <structured_returns> with all return types (success, blocked, error)
-  7. <success_criteria> checklist (8+ items covering edge cases)
-
-Optional sections (by agent type):
-  - <checkpoint_protocol> (agents that interact with users)
-  - <deviation_rules> (agents that execute/modify code)
-  - <authentication_gates> (agents that call external APIs)
-  - <state_updates> (agents that modify .planning/ state)
-```
-
-## Feature Dependencies
-
-```
-Agent Quality Audit ──────────────────────────────────────────┐
-  │                                                            │
-  ├── Define quality standard template                         │
-  │     └── Requires: analysis of all 10 agents (DONE)         │
-  │                                                            │
-  ├── GitHub CI agent overhaul                                 │
-  │     └── Requires: quality standard template                │
-  │     └── Requires: deviation rules framework                │
-  │     └── Requires: checkpoint protocol                      │
-  │                                                            │
-  ├── Consistency audit (all 9 agents)                         │
-  │     └── Requires: quality standard template                │
-  │                                                            │
-  └── Skills migration ──────────────────────────────────────┐ │
-        │                                                    │ │
-        ├── Create gsd-common skill                          │ │
-        │     └── Requires: PATH SETUP, initial read,        │ │
-        │         project_context standardized                │ │
-        │                                                    │ │
-        ├── Create gsd-checkpoints skill                     │ │
-        │     └── Requires: checkpoint protocol unified      │ │
-        │                                                    │ │
-        ├── Create gsd-execution skill                       │ │
-        │     └── Requires: deviation rules, commit protocol │ │
-        │                                                    │ │
-        ├── Create gsd-research skill                        │ │
-        │     └── Requires: tool strategy unified            │ │
-        │                                                    │ │
-        └── Create gsd-goal-backward skill                   │ │
-              └── Requires: methodology unified              │ │
-                                                             │ │
-        Update all 10 agent definitions ─────────────────────┘ │
-              └── Requires: all skills created                 │
-              └── Requires: consistency audit complete ─────────┘
-
-Test debt (independent):
-  31 test failures → Fix config-migrate, compact, codebase-impact, codebase ast
-```
-
-## Anti-Features
-
-Features to explicitly NOT build.
-
-| Anti-Feature | Why Avoid | What to Do Instead |
-|--------------|-----------|-------------------|
-| Dynamic skill loading based on task classification | Over-engineering — all GSD skills are always relevant | Static skill list per agent; OpenCode handles discovery |
-| Custom skill loader in gsd-tools.cjs | OpenCode's native skill tool handles this | Use the built-in `skill` tool |
-| Skill versioning system | Skills change with bGSD versions; no independent lifecycle | Use git versioning of the bGSD repo |
-| Cross-platform skill portability | bGSD is OpenCode-specific; agentskills.io portability unnecessary | Follow spec for compatibility, but don't optimize for it |
-| Skill permission granularity per agent | All GSD agents should access all GSD skills | Use `"gsd-*": "allow"` globally |
-| Automated skill generation | Skills are curated shared methodology, not generated artifacts | Author skills manually based on duplication analysis |
-| Per-project skill overrides for GSD methodology | Project skills are for project conventions, not GSD behavior | Keep GSD skills global; project skills separate |
-| Moving PATH SETUP to skills | Needed before any tool calls, must be in system prompt | Keep inline in agent definitions |
-| Moving agent core logic to skills | Agent identity, role, execution flow must stay in agent .md | Only move shared/reference content |
-| New agent roles | Agent cap at 9 is a design decision | Improve existing agents, don't add new ones |
-
-## MVP Recommendation
-
-### Phase 1: Agent Quality (must do first)
-1. Define quality standard template from analysis above
-2. Overhaul gsd-github-ci to standard (biggest gap)
-3. Light audit of remaining 8 agents for critical gaps (`<project_context>`, `<structured_returns>`)
-
-### Phase 2: Skills Architecture (after quality)
-1. Create `gsd-common` skill (universal, lowest risk)
-2. Create `gsd-checkpoints` skill (benefits 4 agents)
-3. Create `gsd-goal-backward` skill (benefits 3 agents)
-4. Update agent definitions to reference skills instead of inline content
-5. Update deploy.sh to include skills directory
-6. Validate: deploy, test each agent, confirm behavior unchanged
-
-### Phase 3: Test Debt (independent)
-- Fix 31 pre-existing test failures across 4 areas
-
-### Deferred
-- `gsd-execution` skill (benefits 2 agents — lower priority)
-- `gsd-research` skill (benefits 2 agents — lower priority)
-- Token budget recalculation (measure after skills deployed)
-- Project-local skill overrides
-
-## Sources
-
-### Primary (HIGH confidence)
-- Context7: `/anomalyco/opencode` — agents, skills, permissions documentation
-- Context7: `/malhashemi/opencode-skills` — OpenCode Skills plugin implementation
-- agentskills.io/specification — Agent Skills open standard specification
-- Direct analysis of 10 agent .md files in `/home/cam/.config/oc/agents/`
-
-### Secondary (MEDIUM confidence)
-- anthropic.com/engineering/equipping-agents-for-the-real-world-with-agent-skills — Anthropic engineering blog
-- benjamin-abt.com/blog/2026/02/12/agent-skills-standard-github-copilot — Agent Skills quality analysis
-- andriifurmanets.com/blogs/ai-agents-2026-practical-architecture-tools-memory-evals-guardrails — Production agent architecture patterns
-
-### Tertiary (LOW confidence)
-- Various Medium/blog posts on Agent Skills specification (confirmed against primary sources)
+| Risk | Likelihood | Impact | Mitigation |
+|------|-----------|--------|------------|
+| System prompt injection too large | Medium | High (token waste) | Token budget cap, measure before/after |
+| Tool count degrading LLM performance | Low | High | Start with 3 tools, add incrementally with A/B testing |
+| Event handler performance impact | Low | Medium | All handlers must be async, non-blocking, with try/catch |
+| Compaction losing critical state | Medium | High | Structured `output.context[]`, not prose |
+| Notification fatigue | Medium | Low | 30s throttle, configurable quiet mode |
+| `experimental.*` hooks changing API | Medium | Medium | Prefix indicates instability. Abstract behind internal API. |
+| Plugin TypeScript vs current JS | Low | Low | Current plugin.js is already ESM. TypeScript supported natively by Bun. |
 
 ---
-*Last updated: 2026-03-08*
+
+## Implementation Sequence Recommendation
+
+Based on dependencies and value:
+
+1. **Foundation:** Plugin architecture, session state manager, CLI-to-tool bridge
+2. **Context injection:** `experimental.chat.system.transform` with state + plan + blockers
+3. **Core tools:** `gsd_status`, `gsd_state`, `gsd_plan` (3 tools)
+4. **Event handlers:** `session.idle` sync, file edit tracking, commit detection
+5. **Compaction enhancement:** Active plan + decisions + files-in-progress
+6. **Guardrails:** .env protection, dangerous command warning, test-after-edit advisory
+7. **Notifications:** Platform detection, phase transition, session idle, error
+8. **Differentiators:** Token budgeting, custom compaction prompt, convention enforcement, `gsd_memory` tool
+
+---
+
+*Research complete. 35 features categorized (18 table stakes, 17 differentiators, 9 anti-features). All based on verified OpenCode plugin API surface and community plugin patterns.*

@@ -1,300 +1,638 @@
-# Technology Stack: v8.3 Agent Quality & OpenCode Skills Architecture
+# Stack Research: OpenCode Plugin Hooks Integration
 
-**Project:** bGSD Plugin
-**Researched:** 2026-03-08
-**Focus:** OpenCode skills system mechanics, agent quality tooling, skills migration viability
-**Overall confidence:** HIGH (verified via OpenCode official docs, Context7, opencode-skills plugin source, live system inspection)
+> **Research Date:** 2026-03-08
+> **Mode:** Ecosystem (Stack-focused)
+> **Sources:** GitHub source code (PRIMARY), Official Docs (opencode.ai/docs), npm registry, Context7, community guides
+> **Overall Confidence:** HIGH — verified against actual source code in `packages/plugin/src/`
 
-## Executive Summary
-
-OpenCode's native skills system (since v1.0.190) provides **lazy-loaded, on-demand instruction packages** that agents can discover and load via a built-in `skill` tool. Skills use a simple directory-per-skill layout with `SKILL.md` files containing YAML frontmatter (name + description required) and markdown instructions. The key architectural insight: **skills are progressive disclosure** — only skill names/descriptions are injected into agent system prompts; full content loads only when the agent calls `skill({ name: "..." })`.
-
-**For bGSD**, the skills system is directly relevant for migrating shared agent metadata (references, common patterns) out of monolithic agent definitions. Currently, bGSD agents embed or inline-reference 12 reference docs and duplicated `<project_context>` blocks across 9+ agents. Skills can hold these as reusable, lazy-loaded packages.
-
-**No new runtime dependencies required.** Skills are pure markdown files with YAML frontmatter — no code, no build tooling, no npm packages. The bGSD deploy.sh would need minor updates to copy skills directories to the host editor config.
-
-**Critical distinction:** OpenCode has three complementary extensibility systems (rules/AGENTS.md, skills, commands). bGSD already uses all three in its own way (references/, agent .md files, commands/*.md). The migration is about **restructuring existing content** into OpenCode's native skill format, not adding new technology.
-
-## OpenCode Skills System Mechanics
-
-### How Skills Work — The Complete Flow
-
-**Confidence: HIGH** (verified via official docs at opencode.ai/docs/skills, Context7 /anomalyco/opencode, and /malhashemi/opencode-skills)
-
-1. **Discovery at startup:** OpenCode scans multiple directories for `skills/*/SKILL.md` files
-2. **Index injection:** Discovered skill names and descriptions are injected into the `skill` tool's description as XML, visible to all agents:
-   ```xml
-   <available_skills>
-     <skill>
-       <name>git-release</name>
-       <description>Create consistent releases and changelogs</description>
-     </skill>
-   </available_skills>
-   ```
-3. **On-demand loading:** When an agent decides it needs a skill, it calls `skill({ name: "git-release" })` — this returns the full SKILL.md content
-4. **No eager loading:** Full skill content is NOT loaded at startup — only metadata is indexed. This is the key token-saving feature.
-
-### Discovery Paths (Priority Order)
-
-OpenCode searches these paths for `skills/*/SKILL.md`:
-
-| Priority | Path | Scope |
-|----------|------|-------|
-| 1 | `.opencode/skills/<name>/SKILL.md` | Project-local (OpenCode native) |
-| 2 | `.agents/skills/<name>/SKILL.md` | Project-local (agent-compatible) |
-| 3 | `.claude/skills/<name>/SKILL.md` | Project-local (Claude-compatible) |
-| 4 | `~/.config/opencode/skills/<name>/SKILL.md` | Global (OpenCode native) |
-| 5 | `~/.agents/skills/<name>/SKILL.md` | Global (agent-compatible) |
-| 6 | `~/.claude/skills/<name>/SKILL.md` | Global (Claude-compatible) |
-
-**Project-local walks up** from CWD to git worktree root, checking each directory.
-
-**For bGSD deployment:** Global skills at `~/.config/opencode/skills/` is the correct target — bGSD is a global plugin, not project-local.
-
-### SKILL.md Frontmatter Schema
-
-```yaml
 ---
-name: skill-name          # REQUIRED — 1-64 chars, lowercase alphanumeric + single hyphens
-description: What it does  # REQUIRED — 1-1024 chars, specific enough for agent selection
-license: MIT               # OPTIONAL
-compatibility: opencode    # OPTIONAL
-metadata:                  # OPTIONAL — string-to-string map only
-  audience: maintainers
-  workflow: github
----
-```
 
-**Validation rules:**
-- `name` regex: `^[a-z0-9]+(-[a-z0-9]+)*$`
-- `name` MUST match the containing directory name exactly
-- `description` min length: 1 char (native), 20 chars (opencode-skills plugin legacy)
-- Unknown frontmatter fields are silently ignored
-- The `allowed-tools` field is parsed but NOT enforced by native OpenCode — use permissions config instead
+## 1. The @opencode-ai/plugin SDK
 
-### Skill Directory Structure
+### Package Identity
 
-```
-my-skill/
-├── SKILL.md              # Required — frontmatter + markdown instructions
-├── scripts/              # Optional — executable code (bash, python, etc.)
-│   └── helper.sh
-├── references/           # Optional — documentation to load as needed
-│   └── api-docs.md
-└── assets/               # Optional — templates, configs, etc.
-    └── template.html
-```
+| Property | Value | Confidence |
+|----------|-------|------------|
+| Package name | `@opencode-ai/plugin` | HIGH — npm registry |
+| Current version | `1.2.22` | HIGH — npm published 2026-03-08 |
+| License | MIT | HIGH — package.json |
+| Module type | ESM (`"type": "module"`) | HIGH — source |
+| Runtime | Bun (OpenCode runs on Bun) | HIGH — official docs |
+| Dependencies | `@opencode-ai/sdk` (workspace), `zod` (catalog) | HIGH — source package.json |
+| Weekly downloads | ~2.4M | HIGH — npm registry |
 
-**Key:** When a skill is loaded, the agent receives base directory context:
-```
-Base directory for this skill: /path/to/skills/my-skill/
-```
-This enables relative path resolution for `scripts/`, `references/`, and `assets/`.
+**Source:** https://github.com/anomalyco/opencode/blob/dev/packages/plugin/package.json
 
-### Tool Name Generation
-
-- Native OpenCode: single `skill` tool, takes `name` parameter
-- Legacy plugin: each skill becomes `skills_<name>` with hyphens→underscores (e.g., `skills_git_release`)
-
-### Permissions and Access Control
+### Export Map
 
 ```json
-// opencode.json — permission-based control (native v1.0.190+)
 {
-  "permission": {
-    "skill": {
-      "*": "allow",
-      "internal-*": "deny",
-      "experimental-*": "ask"
-    }
+  "exports": {
+    ".": "./src/index.ts",
+    "./tool": "./src/tool.ts"
   }
 }
 ```
 
-**Per-agent override** in opencode.json:
-```json
-{
-  "agent": {
-    "plan": {
-      "permission": {
-        "skill": {
-          "internal-*": "allow"
-        }
-      }
-    }
+**IMPORTANT:** The `exports` field points to `.ts` source files, not compiled JS. This works because **OpenCode uses Bun** which natively handles TypeScript. Published `dist/` is for npm consumers — local plugin files are loaded directly by Bun.
+
+### PluginInput Type (Context Object)
+
+```typescript
+// Source: packages/plugin/src/index.ts
+import type { createOpencodeClient, Project } from "@opencode-ai/sdk"
+import type { BunShell } from "./shell"
+
+export type PluginInput = {
+  client: ReturnType<typeof createOpencodeClient>  // SDK client for API calls
+  project: Project                                   // Current project info
+  directory: string                                  // Current working directory
+  worktree: string                                   // Git worktree path
+  serverUrl: URL                                     // OpenCode server URL
+  $: BunShell                                        // Bun's shell API
+}
+```
+
+**Confidence:** HIGH — extracted directly from source
+
+### Plugin Type Signature
+
+```typescript
+export type Plugin = (input: PluginInput) => Promise<Hooks>
+```
+
+A plugin is an async function that receives `PluginInput` and returns a `Hooks` object.
+
+---
+
+## 2. Complete Hooks Interface
+
+### Source of Truth
+
+Extracted from `packages/plugin/src/index.ts` (234 lines, 6.13 KB):
+
+```typescript
+export interface Hooks {
+  // --- EVENT SUBSCRIPTION ---
+  event?: (input: { event: Event }) => Promise<void>
+
+  // --- CONFIG HOOK ---
+  config?: (input: Config) => Promise<void>
+
+  // --- CUSTOM TOOLS ---
+  tool?: { [key: string]: ToolDefinition }
+
+  // --- AUTH PROVIDER ---
+  auth?: AuthHook
+
+  // --- CHAT MESSAGE HOOK ---
+  "chat.message"?: (
+    input: {
+      sessionID: string
+      agent?: string
+      model?: { providerID: string; modelID: string }
+      messageID?: string
+      variant?: string
+    },
+    output: { message: UserMessage; parts: Part[] },
+  ) => Promise<void>
+
+  // --- LLM PARAMETER MODIFICATION ---
+  "chat.params"?: (
+    input: {
+      sessionID: string
+      agent: string
+      model: Model
+      provider: ProviderContext
+      message: UserMessage
+    },
+    output: { temperature: number; topP: number; topK: number; options: Record<string, any> },
+  ) => Promise<void>
+
+  // --- CUSTOM HEADERS ---
+  "chat.headers"?: (
+    input: {
+      sessionID: string
+      agent: string
+      model: Model
+      provider: ProviderContext
+      message: UserMessage
+    },
+    output: { headers: Record<string, string> },
+  ) => Promise<void>
+
+  // --- PERMISSION INTERCEPTION ---
+  "permission.ask"?: (
+    input: Permission,
+    output: { status: "ask" | "deny" | "allow" },
+  ) => Promise<void>
+
+  // --- COMMAND ENRICHMENT ---
+  "command.execute.before"?: (
+    input: { command: string; sessionID: string; arguments: string },
+    output: { parts: Part[] },
+  ) => Promise<void>
+
+  // --- TOOL INTERCEPTION (BEFORE) ---
+  "tool.execute.before"?: (
+    input: { tool: string; sessionID: string; callID: string },
+    output: { args: any },
+  ) => Promise<void>
+
+  // --- SHELL ENV INJECTION ---
+  "shell.env"?: (
+    input: { cwd: string; sessionID?: string; callID?: string },
+    output: { env: Record<string, string> },
+  ) => Promise<void>
+
+  // --- TOOL INTERCEPTION (AFTER) ---
+  "tool.execute.after"?: (
+    input: { tool: string; sessionID: string; callID: string; args: any },
+    output: { title: string; output: string; metadata: any },
+  ) => Promise<void>
+
+  // --- TOOL DEFINITION MODIFICATION ---
+  "tool.definition"?: (
+    input: { toolID: string },
+    output: { description: string; parameters: any },
+  ) => Promise<void>
+
+  // --- EXPERIMENTAL: MESSAGE TRANSFORM ---
+  "experimental.chat.messages.transform"?: (
+    input: {},
+    output: { messages: { info: Message; parts: Part[] }[] },
+  ) => Promise<void>
+
+  // --- EXPERIMENTAL: SYSTEM PROMPT INJECTION ---
+  "experimental.chat.system.transform"?: (
+    input: { sessionID?: string; model: Model },
+    output: { system: string[] },
+  ) => Promise<void>
+
+  // --- EXPERIMENTAL: COMPACTION CUSTOMIZATION ---
+  "experimental.session.compacting"?: (
+    input: { sessionID: string },
+    output: { context: string[]; prompt?: string },
+  ) => Promise<void>
+
+  // --- EXPERIMENTAL: TEXT COMPLETION ---
+  "experimental.text.complete"?: (
+    input: { sessionID: string; messageID: string; partID: string },
+    output: { text: string },
+  ) => Promise<void>
+}
+```
+
+**Confidence:** HIGH — complete verbatim extraction from source
+
+### Hook Pattern
+
+All hooks follow `(input, output) => Promise<void>`:
+- **`input`**: Read-only context about what triggered the hook
+- **`output`**: Mutable object — modify properties to affect behavior
+- **Exception**: `event` hook has `{ event }` only (no output to mutate)
+- **Exception**: `config` hook receives `Config` directly
+- Hooks can `throw new Error(...)` to block/reject operations (e.g., `tool.execute.before`)
+
+---
+
+## 3. Event Types and Payloads
+
+### Complete Event Type List
+
+From official docs (opencode.ai/docs/plugins, last updated Mar 7, 2026):
+
+| Category | Event Type | When Fired |
+|----------|-----------|------------|
+| **Command** | `command.executed` | After a command completes |
+| **File** | `file.edited` | File modified by tool |
+| **File** | `file.watcher.updated` | External file change detected |
+| **Installation** | `installation.updated` | Installation state changed |
+| **LSP** | `lsp.client.diagnostics` | New LSP diagnostics |
+| **LSP** | `lsp.updated` | LSP server state changed |
+| **Message** | `message.part.removed` | Message part removed |
+| **Message** | `message.part.updated` | Message part added/changed |
+| **Message** | `message.removed` | Message deleted |
+| **Message** | `message.updated` | Message added/changed |
+| **Permission** | `permission.asked` | Permission request raised |
+| **Permission** | `permission.replied` | Permission granted/denied |
+| **Server** | `server.connected` | Server connection established |
+| **Session** | `session.created` | New session started |
+| **Session** | `session.compacted` | Session was compacted |
+| **Session** | `session.deleted` | Session removed |
+| **Session** | `session.diff` | Session diff computed |
+| **Session** | `session.error` | Session error occurred |
+| **Session** | `session.idle` | Agent finished responding |
+| **Session** | `session.status` | Session status changed |
+| **Session** | `session.updated` | Session metadata changed |
+| **Todo** | `todo.updated` | Todo item changed |
+| **Shell** | `shell.env` | Shell environment requested |
+| **Tool** | `tool.execute.after` | Tool execution completed |
+| **Tool** | `tool.execute.before` | Tool about to execute |
+| **TUI** | `tui.prompt.append` | Text appended to prompt |
+| **TUI** | `tui.command.execute` | Command executed in TUI |
+| **TUI** | `tui.toast.show` | Toast notification shown |
+
+**Confidence:** HIGH — official docs, verified against source
+
+### Event Payload Access Pattern
+
+```typescript
+event: async ({ event }) => {
+  // event.type is a string discriminator
+  // event.properties contains typed payload (varies by event type)
+  if (event.type === "session.idle") {
+    // Properties include session info
+  }
+  if (event.type === "message.updated") {
+    const message = (event as any).properties?.message
+    // message.role, message.content, etc.
+  }
+  if (event.type === "file.edited") {
+    // Properties include file path info
   }
 }
 ```
 
-**Per-agent override** in agent markdown frontmatter:
-```yaml
+**Note:** Event `properties` typing comes from `@opencode-ai/sdk` `Event` type. The exact shape varies per event type. Community plugins frequently use `(event as any).properties` for access, suggesting the discriminated union may not be fully narrowed in the current SDK types.
+
+**Confidence:** MEDIUM — event type list from docs, but payload shapes inferred from community patterns and SDK types
+
 ---
-permission:
-  skill:
-    "documents-*": "allow"
----
+
+## 4. Custom Tool Registration
+
+### tool.ts — Complete Source
+
+```typescript
+// Source: packages/plugin/src/tool.ts (38 lines)
+import { z } from "zod"
+
+export type ToolContext = {
+  sessionID: string
+  messageID: string
+  agent: string
+  /** Current project directory for this session. */
+  directory: string
+  /** Project worktree root for this session. */
+  worktree: string
+  abort: AbortSignal
+  metadata(input: { title?: string; metadata?: { [key: string]: any } }): void
+  ask(input: AskInput): Promise<void>
+}
+
+type AskInput = {
+  permission: string
+  patterns: string[]
+  always: string[]
+  metadata: { [key: string]: any }
+}
+
+export function tool<Args extends z.ZodRawShape>(input: {
+  description: string
+  args: Args
+  execute(args: z.infer<z.ZodObject<Args>>, context: ToolContext): Promise<string>
+}) {
+  return input
+}
+
+tool.schema = z
+
+export type ToolDefinition = ReturnType<typeof tool>
 ```
 
-**Disabling skills entirely** for an agent:
-```yaml
----
-tools:
-  skill: false
----
+**Confidence:** HIGH — verbatim from source
+
+### Key Details
+
+1. **`tool.schema` IS Zod** — literally `tool.schema = z`. This means `tool.schema.string()` = `z.string()`, `tool.schema.number()` = `z.number()`, etc. Full Zod API available.
+
+2. **Zod is bundled with the plugin package** — it's a dependency of `@opencode-ai/plugin`. You do NOT need to install Zod separately. Import via `tool.schema` or directly from `zod` if you want.
+
+3. **`execute` must return `Promise<string>`** — the tool output to the LLM is always a string.
+
+4. **`ToolContext` provides:**
+   - `sessionID`, `messageID`, `agent` — identity
+   - `directory`, `worktree` — file paths
+   - `abort: AbortSignal` — for cancellation
+   - `metadata()` — set title/metadata displayed in UI
+   - `ask()` — request permission from user
+
+5. **Tool name collision**: Plugin tools with the same name as built-in tools take precedence (official docs confirm this).
+
+### Usage Pattern
+
+```typescript
+import { type Plugin, tool } from "@opencode-ai/plugin"
+
+export const MyPlugin: Plugin = async (ctx) => {
+  return {
+    tool: {
+      "gsd-status": tool({
+        description: "Get current bGSD project status",
+        args: {
+          format: tool.schema.enum(["brief", "full"]).optional(),
+        },
+        async execute(args, context) {
+          // context.directory, context.sessionID available
+          // Must return a string
+          return JSON.stringify({ phase: "01", status: "in_progress" })
+        },
+      }),
+    },
+  }
+}
 ```
 
-## OpenCode Extensibility Architecture (Three Systems)
+---
 
-### 1. Rules (AGENTS.md / instructions)
-- **What:** Static instructions injected into ALL agent conversations at startup
-- **When loaded:** Always, immediately, into system prompt
-- **bGSD equivalent:** `AGENTS.md` in project root, `references/*.md` loaded by agents
-- **Cost:** Full token cost always paid upfront
-- **Config:** `instructions` array in opencode.json supports globs and URLs
+## 5. SDK Client API (client.*)
 
-### 2. Skills (SKILL.md)
-- **What:** Modular instruction packages loaded on-demand by agents
-- **When loaded:** Only when agent explicitly calls `skill()` tool
-- **bGSD equivalent:** `references/*.md` (partial), shared agent patterns (duplicated)
-- **Cost:** Only metadata (name+description) paid upfront; full content only when needed
-- **Config:** Permission-based access control per agent
+The `client` property on `PluginInput` is `ReturnType<typeof createOpencodeClient>` from `@opencode-ai/sdk`.
 
-### 3. Commands (commands/*.md)
-- **What:** User-invokable prompts with argument substitution
-- **When loaded:** On user `/command` invocation
-- **bGSD equivalent:** `commands/bgsd-*.md` (exact match — bGSD already uses this)
-- **Config:** Can specify agent, model, subtask mode
+### TUI Methods (Most Relevant for v9.0)
 
-### Key Insight for bGSD Migration
+| Method | Signature | Returns | Purpose |
+|--------|-----------|---------|---------|
+| `client.tui.showToast()` | `{ body: { message: string; variant: "success" \| "error" \| "info" \| "warning" } }` | `boolean` | Toast notification |
+| `client.tui.appendPrompt()` | `{ body: { text: string } }` | `boolean` | Inject text into prompt |
+| `client.tui.submitPrompt()` | `{}` | `boolean` | Submit current prompt |
+| `client.tui.clearPrompt()` | `{}` | `boolean` | Clear prompt text |
+| `client.tui.executeCommand()` | `{ body: { command: string } }` | `boolean` | Execute a command |
+| `client.tui.openHelp()` | `{}` | `boolean` | Open help dialog |
+| `client.tui.openSessions()` | `{}` | `boolean` | Open session picker |
+| `client.tui.openModels()` | `{}` | `boolean` | Open model selector |
+| `client.tui.openThemes()` | `{}` | `boolean` | Open theme selector |
 
-bGSD currently duplicates shared patterns across agent definitions:
-- `<project_context>` block (skill/AGENTS.md discovery) — duplicated in 9 agents
-- `PATH SETUP` block — duplicated in 10 agents
-- References like RACI.md, verification-patterns.md — loaded by multiple agents
+### Session Methods (For Event-Driven Actions)
 
-Skills can consolidate these into lazy-loaded packages:
-- `gsd-project-context` skill — shared project discovery logic
-- `gsd-raci` skill — RACI matrix and handoff contracts
-- `gsd-verification` skill — verification patterns
-- `gsd-tdd` skill — TDD execution patterns
+| Method | Key Params | Returns |
+|--------|-----------|---------|
+| `client.session.prompt()` | `{ path: { id }, body: { parts: Part[], noReply?: boolean } }` | AssistantMessage or UserMessage |
+| `client.session.create()` | `{ body: { title } }` | Session |
+| `client.session.list()` | — | Session[] |
+| `client.session.get()` | `{ path: { id } }` | Session |
+| `client.session.abort()` | `{ path: { id } }` | boolean |
+| `client.session.messages()` | `{ path: { id } }` | `{ info: Message, parts: Part[] }[]` |
+| `client.session.command()` | `{ path: { id }, body: { command } }` | AssistantMessage |
 
-## Recommended Stack Changes for v8.3
+**Key pattern for plugins injecting context without triggering AI response:**
+```typescript
+await client.session.prompt({
+  path: { id: sessionId },
+  body: {
+    noReply: true,  // Context injection, no AI response
+    parts: [{ type: "text", text: "Context here" }],
+  },
+})
+```
 
-### No New Runtime Dependencies
+### App Methods
 
-| Category | Decision | Rationale |
-|----------|----------|-----------|
-| Skills format | SKILL.md (markdown + YAML frontmatter) | Native OpenCode format, no parsing library needed |
-| Skills validation | None at build time | OpenCode validates at startup; bGSD deploy.sh can add basic checks |
-| Frontmatter parsing | Not needed in gsd-tools.cjs | Skills are consumed by OpenCode, not by gsd-tools |
-| Directory structure | `skills/<name>/SKILL.md` | Standard OpenCode convention |
+| Method | Signature | Returns |
+|--------|-----------|---------|
+| `client.app.log()` | `{ body: { service, level, message, extra? } }` | boolean |
+| `client.app.agents()` | — | Agent[] |
 
-### Deploy Infrastructure Changes
+**Logging levels:** `debug`, `info`, `warn`, `error`
 
-| Change | What | Why |
-|--------|------|-----|
-| deploy.sh update | Copy `skills/` to `~/.config/opencode/skills/` | Deploy skills alongside agents and commands |
-| manifest.json update | Include `skills/*/SKILL.md` and supporting files | Track deployed skills for cleanup |
-| build.cjs | No changes needed | Skills are not compiled/bundled |
+### File/Find Methods
 
-### Skills to Create (Migration Candidates)
+| Method | Purpose |
+|--------|---------|
+| `client.find.text()` | Search file contents |
+| `client.find.files()` | Find files by name |
+| `client.find.symbols()` | Workspace symbol search |
+| `client.file.read()` | Read file content |
+| `client.file.status()` | Git file status |
 
-| Skill Name | Source Content | Current Location | Estimated Tokens Saved |
-|------------|---------------|------------------|----------------------|
-| `gsd-project-context` | `<project_context>` block | Duplicated in 9 agent .md files | ~200 tokens × 9 = 1800 |
-| `gsd-raci` | RACI matrix reference | `references/RACI.md` (291 lines) | Loaded only when needed |
-| `gsd-verification` | Verification patterns | `references/verification-patterns.md` | Loaded only when needed |
-| `gsd-tdd` | TDD execution patterns | `references/tdd.md` | Loaded only when needed |
-| `gsd-git-integration` | Git conventions | `references/git-integration.md` | Loaded only when needed |
-| `gsd-ui-brand` | Formatting/branding | `references/ui-brand.md` | Loaded only when needed |
-| `gsd-model-profiles` | Model selection guide | `references/model-profiles.md` + `model-profile-resolution.md` | Loaded only when needed |
-| `gsd-checkpoints` | Checkpoint/trajectory | `references/checkpoints.md` | Loaded only when needed |
-| `gsd-continuation` | Continuation format | `references/continuation-format.md` | Loaded only when needed |
-| `gsd-questioning` | Questioning patterns | `references/questioning.md` | Loaded only when needed |
+**Confidence:** HIGH — official SDK docs page (opencode.ai/docs/sdk), cross-verified with source types
 
-### What Cannot Be Skills
+---
 
-| Content | Reason |
-|---------|--------|
-| Agent system prompts | These ARE the agent definition — they must be in agent .md files |
-| Workflow orchestration | Workflows invoke agents, not the other way around |
-| CLI tool (gsd-tools.cjs) | Binary, not an instruction package |
-| Commands (commands/*.md) | Already using OpenCode's native command system |
-| PATH SETUP block | Must be in agent definition (needed before any tool calls) |
+## 6. ESM vs CJS Considerations
 
-## Integration Points with Existing bGSD Architecture
+### Critical: plugin.js Is ESM, gsd-tools.cjs Is CJS
 
-### Agent Manifest System
-bGSD agents declare what they need in their frontmatter. Skills complement this:
-- **Agent frontmatter** → tool access, model, token budgets
-- **Skill loading** → domain knowledge, reference documentation, patterns
+| File | Format | Loaded By | Runtime |
+|------|--------|-----------|---------|
+| `plugin.js` | **ESM** (uses `import`/`export`) | **Bun** (OpenCode runtime) | Bun |
+| `bin/gsd-tools.cjs` | **CJS** (esbuild output) | **Node.js** (via `execFileSync`) | Node.js |
 
-### Deploy Pipeline
-Current: `deploy.sh` copies agents/, commands/, bin/, references/, workflows/
-New: Also copies `skills/*/` to `~/.config/opencode/skills/`
+**Current plugin.js** already uses ESM syntax (`import { readFileSync }`, `export const BgsdPlugin`). This works because Bun natively handles ESM.
 
-### Agent Definition Changes
-Each agent currently has a `<project_context>` block instructing it to check `.agents/skills/`. This can be:
-1. **Kept as-is** for project-level skills (user's project context)
-2. **Supplemented** with bGSD-level skills for shared reference docs
+### Import Considerations
 
-The bGSD skills would live at the global level (`~/.config/opencode/skills/`) and provide GSD-specific knowledge. Project skills stay project-local.
+1. **`@opencode-ai/plugin` types**: Import as `import type { Plugin } from "@opencode-ai/plugin"`. Type-only imports are erased at runtime — zero cost.
 
-### Token Budget Impact
-- **Current:** References loaded eagerly by agents that declare them (~60-80K token budgets)
-- **With skills:** Only skill names/descriptions in system prompt (~50 tokens per skill × 10 skills = 500 tokens)
-- **Savings:** References load only when needed, not upfront. Estimated 20-40% reduction in baseline agent context for agents that load multiple references.
+2. **`tool` function**: Import as value: `import { tool } from "@opencode-ai/plugin"`. This requires the package to be available at runtime. Since OpenCode installs plugin dependencies via `bun install`, this is handled automatically.
 
-## Constraints and Limitations
+3. **`gsd-tools.cjs` from plugin.js**: Cannot `import` a CJS file easily in ESM. The current pattern uses `execFileSync('node', ['bin/gsd-tools.cjs', ...])` which is correct and should continue.
 
-### 1. No Conditional Skill Discovery
-Skills are discovered at startup and cached. You cannot dynamically register or unregister skills mid-session. Restart required after adding/modifying skills.
+4. **No esbuild bundling needed for plugin.js**: The plugin file is loaded directly by Bun. It should NOT be bundled into gsd-tools.cjs. Keep plugin.js as a standalone ESM file.
 
-### 2. Agent Must Decide to Load
-Skills are **passive** — the agent must recognize it needs a skill and call `skill()`. If the description is vague, agents may not load it when they should. Good descriptions are critical.
+### Package Configuration Required
 
-### 3. No Skill Composition
-Skills cannot import or reference other skills. Each skill is standalone. If a skill needs content from another, it must duplicate or reference the file path.
+For local plugin dependencies, add to `.opencode/package.json` or the config directory:
 
-### 4. Name Uniqueness Across All Paths
-Skill names must be unique across ALL discovery paths. A project-local `gsd-raci` would conflict with a global `gsd-raci`. Use a consistent prefix convention (e.g., `gsd-*` for bGSD skills).
+```json
+{
+  "dependencies": {
+    "@opencode-ai/plugin": "latest"
+  }
+}
+```
 
-### 5. Description Length Matters
-The description is what agents see to decide whether to load a skill. Too short = missed loads. Too long = wasted tokens in every agent's system prompt. Target 50-150 characters.
+OpenCode runs `bun install` at startup to install these. **However**, for type-only imports, no package installation is needed at runtime — Bun just skips them.
 
-### 6. File-Based Only
-Skills cannot contain executable logic that OpenCode runs. They're instruction documents. Scripts in `scripts/` are referenced by the skill content but executed by the agent via bash tool, not by the skill system itself.
+### Known Issue: ESM Extension Resolution (#8006)
 
-### 7. No Version Pinning
-Skills don't have built-in versioning. The `metadata.version` field is informational only — OpenCode doesn't enforce compatibility.
+GitHub issue #8006 reported that `@opencode-ai/plugin` published `dist/index.js` with `export * from "./tool"` (missing `.js` extension), breaking ESM resolution. This affects npm consumers but NOT local plugins (Bun resolves extensionless imports). For our use case (local plugin loaded by Bun), this is a non-issue.
 
-### 8. Claude Code Compatibility
-OpenCode reads `.claude/skills/` as a fallback path. If bGSD ever needs cross-editor compatibility, skills placed in `.agents/skills/` would be recognized by OpenCode (via the agent-compatible path).
+**Confidence:** HIGH — verified from official docs, source package.json, and current plugin.js
 
-## Alternatives Considered
+---
 
-| Approach | Recommended | Alternative | Why Not |
-|----------|-------------|-------------|---------|
-| Shared agent content | OpenCode skills | Inline in each agent .md | Duplication, token waste, maintenance burden |
-| Reference loading | Skills with `references/` subdirs | Current manual `Read` tool calls | Skills provide base directory context, cleaner UX |
-| Project context | Keep `<project_context>` in agents | Move to skill | Project context detection must happen at agent startup, not on-demand |
-| Deploy mechanism | Extend deploy.sh | Separate skills installer | Keep single deploy pipeline |
-| Skill placement | Global `~/.config/opencode/skills/` | Project-local `.opencode/skills/` | bGSD is a global plugin, not project-specific |
+## 7. Experimental Hooks — Stability Contract
+
+### Identified Experimental Hooks
+
+| Hook | Status | Purpose |
+|------|--------|---------|
+| `experimental.chat.messages.transform` | Experimental | Modify message history before LLM call |
+| `experimental.chat.system.transform` | Experimental | Inject into system prompt |
+| `experimental.session.compacting` | Experimental | Customize compaction behavior |
+| `experimental.text.complete` | Experimental | Modify text completion output |
+
+### Stability Assessment
+
+**No formal stability contract exists.** Analysis:
+
+1. **Naming convention**: The `experimental.` prefix is the only indicator. No versioning scheme (e.g., Stability 0/1/2) is documented.
+
+2. **Breakage risk**: Community plugins (opencode-rules, oh-my-opencode) widely use `experimental.chat.system.transform` and `experimental.session.compacting`. This creates implicit stability — breaking these would break hundreds of plugins.
+
+3. **Current usage in bGSD**: `plugin.js` already uses `experimental.session.compacting` (shipped since v1.0). This confirms it's functional and stable-in-practice.
+
+4. **`experimental.chat.system.transform` is critical for v9.0**: This is the primary hook for always-on context injection. It's widely used in the ecosystem.
+
+5. **Source code shows no deprecation markers**: No `@deprecated` annotations, no alternative hooks offered.
+
+### Recommendation
+
+**Use experimental hooks confidently** for v9.0. Rationale:
+- They've been stable through 1000+ plugin package versions
+- Breaking them would affect 2.4M weekly downloads worth of ecosystem
+- The `experimental.chat.system.transform` hook is the ONLY way to inject system prompt context — there's no non-experimental alternative
+- Add defensive guards (null checks, try/catch) as the current plugin.js already does
+
+**Confidence:** MEDIUM — no formal contract, but strong ecosystem evidence of stability
+
+---
+
+## 8. `stop` Hook — NOT in Official Types
+
+The `stop` hook appears in community guides (johnlindquist's gist) but is **NOT present in the official `Hooks` interface** in `packages/plugin/src/index.ts`.
+
+```typescript
+// NOT in the official type:
+stop: async (input) => { ... }
+```
+
+**Assessment:** This was likely a community convention or an earlier API that was removed. Do NOT rely on it for v9.0. Use `event` hook with `session.idle` instead for detecting when the agent stops.
+
+**Confidence:** HIGH — verified by source code analysis; the `Hooks` interface is complete at 234 lines and does not include `stop`
+
+---
+
+## 9. Integration Strategy with Existing Architecture
+
+### What Changes for plugin.js
+
+| Current (v8.3) | New (v9.0) | Rationale |
+|----------------|------------|-----------|
+| 3 hooks | 8-10 hooks | Full embedded experience |
+| No type imports | `import type { Plugin } from "@opencode-ai/plugin"` | Type safety (erased at runtime) |
+| No `tool` import | `import { tool } from "@opencode-ai/plugin"` | Custom LLM-callable tools |
+| No SDK client usage | `client.tui.showToast()`, `client.session.prompt()` | Toast notifications, context injection |
+| `console.log` for logging | `client.app.log()` for structured logging | Proper log levels, plugin identity |
+| `readFileSync` direct | Same + `execFileSync` for gsd-tools | CLI provides structured JSON |
+
+### What Does NOT Change
+
+| Aspect | Status | Why |
+|--------|--------|-----|
+| `bin/gsd-tools.cjs` | Unchanged | Still CJS, still the main CLI engine |
+| esbuild pipeline | Unchanged | plugin.js is not bundled |
+| `src/` modules | Unchanged | Plugin calls CLI via subprocess |
+| `deploy.sh` | Minor update | Copy plugin.js to config directory |
+| Node.js requirement | Unchanged | gsd-tools.cjs still needs Node.js >=22.5 |
+
+### Plugin-to-CLI Communication Pattern
+
+```
+plugin.js (ESM, Bun)
+  -> execFileSync('node', ['bin/gsd-tools.cjs', 'command', '--json'])
+  -> parse JSON output
+  -> use in hook logic
+```
+
+This is the **correct** pattern. Do not try to `import` gsd-tools modules directly into plugin.js — they're CJS and designed for Node.js, not Bun.
+
+### New Dependencies for plugin.js
+
+| Dependency | How Provided | Need to Install? |
+|------------|-------------|-----------------|
+| `@opencode-ai/plugin` | Type imports only in JS version | No (types erased) |
+| `zod` | Via `tool.schema` (bundled in `@opencode-ai/plugin`) | No |
+| `@opencode-ai/sdk` types | Transitive via plugin package | No |
+
+**For TypeScript type-checking only** (if plugin.js becomes plugin.ts):
+```json
+// .opencode/package.json or config directory
+{
+  "dependencies": {
+    "@opencode-ai/plugin": "latest"
+  }
+}
+```
+
+---
+
+## 10. Hooks Mapping to v9.0 Features
+
+| v9.0 Feature | Primary Hook(s) | SDK Client Methods |
+|--------------|-----------------|-------------------|
+| Always-on context injection | `experimental.chat.system.transform` | — |
+| Custom LLM-callable tools | `tool` (on Hooks return) | — |
+| Event-driven state sync | `event` (session.idle, file.edited) | `client.session.prompt()` |
+| Smart command enrichment | `command.execute.before` | — |
+| Advisory guardrails | `tool.execute.before`, `tool.execute.after` | `client.tui.showToast()` |
+| Toast notifications | `event` (various) | `client.tui.showToast()` |
+| Enhanced compaction | `experimental.session.compacting` | — |
+| System prompt transform | `experimental.chat.system.transform` | — |
+| Tool definition modification | `tool.definition` | — |
+
+---
+
+## 11. What NOT to Use
+
+| API/Pattern | Why Avoid |
+|-------------|-----------|
+| `stop` hook | Not in official types; community-only pattern |
+| `client.auth.set()` | Not relevant to bGSD; auth is user's concern |
+| `chat.params` | Modifying LLM parameters is outside bGSD scope |
+| `chat.headers` | Custom headers not needed |
+| `auth` hook | Authentication provider not applicable |
+| Direct `require()` in plugin.js | Bun runs ESM; use `import` |
+| Bundling plugin.js with esbuild | Plugin loaded directly by Bun; no bundling needed |
+| `(event as any).session_id` | Prefer `event.properties` typed access where possible |
+| Global mutable state without session keys | Use `Map<sessionID, state>` pattern for session isolation |
+
+---
+
+## 12. Version Pinning Recommendation
+
+```json
+{
+  "@opencode-ai/plugin": "^1.2.0"
+}
+```
+
+**Rationale:** The package is at v1.2.22 with 4,404 versions published. The high churn suggests frequent releases tracking OpenCode core. Pin to `^1.2.0` minor range to get bug fixes but avoid potential breaking changes in a hypothetical 2.0.
+
+For type-only imports in plain JS, version doesn't matter at runtime. Only relevant if doing TypeScript type-checking.
+
+---
 
 ## Sources
 
-- OpenCode Official Skills Docs — https://opencode.ai/docs/skills (last updated Mar 7, 2026) — **HIGH confidence**
-- OpenCode Agents Docs — https://opencode.ai/docs/agents — **HIGH confidence**
-- OpenCode Tools Docs — https://opencode.ai/docs/tools — **HIGH confidence**
-- OpenCode Rules Docs — https://opencode.ai/docs/rules — **HIGH confidence**
-- OpenCode Commands Docs — https://opencode.ai/docs/commands — **HIGH confidence**
-- OpenCode Custom Tools Docs — https://opencode.ai/docs/custom-tools — **HIGH confidence**
-- Context7 /anomalyco/opencode (939 snippets, High reputation) — **HIGH confidence**
-- Context7 /malhashemi/opencode-skills (77 snippets, High reputation) — **HIGH confidence**
-- malhashemi/opencode-skills GitHub README (archived, graduated to native) — **MEDIUM confidence** (historical, but skill format unchanged)
-- Live system inspection of `~/.config/oc/` directory structure — **HIGH confidence**
-- bGSD agent .md files (gsd-executor.md, gsd-planner.md, gsd-github-ci.md) — **HIGH confidence** (primary source)
-- bGSD deploy.sh and plugin.js — **HIGH confidence** (primary source)
+| Source | URL | Trust | Date |
+|--------|-----|-------|------|
+| Plugin source (index.ts) | https://github.com/anomalyco/opencode/blob/dev/packages/plugin/src/index.ts | PRIMARY | 2026-03-08 |
+| Tool source (tool.ts) | https://github.com/anomalyco/opencode/blob/dev/packages/plugin/src/tool.ts | PRIMARY | 2026-03-08 |
+| Plugin package.json | https://github.com/anomalyco/opencode/blob/dev/packages/plugin/package.json | PRIMARY | 2026-03-08 |
+| Official docs — Plugins | https://opencode.ai/docs/plugins/ | HIGH | 2026-03-07 |
+| Official docs — SDK | https://opencode.ai/docs/sdk/ | HIGH | 2026-03-07 |
+| npm registry | https://www.npmjs.com/package/@opencode-ai/plugin | HIGH | 2026-03-08 |
+| Community guide (johnlindquist) | https://gist.github.com/johnlindquist/0adf1032b4e84942f3e1050aba3c5e4a | MEDIUM | 2026-01-11 |
+| ESM issue #8006 | https://github.com/anomalyco/opencode/issues/8006 | MEDIUM | 2026-01-12 |
+| Context7 plugin docs | /websites/opencode_ai_plugins | HIGH | 2026-03-08 |
 
 ---
-*Last updated: 2026-03-08*
+
+## Confidence Summary
+
+| Area | Confidence | Basis |
+|------|-----------|-------|
+| Hook interface & types | HIGH | Direct source code extraction |
+| Event type list | HIGH | Official docs (Mar 7, 2026) |
+| Event payload shapes | MEDIUM | SDK types + community patterns |
+| Tool registration pattern | HIGH | Source + official docs + examples |
+| `tool.schema = z` (Zod) | HIGH | Direct source code |
+| SDK client methods | HIGH | Official SDK docs page |
+| `client.tui.showToast()` signature | HIGH | Official SDK docs |
+| ESM/CJS compatibility | HIGH | Current plugin.js + official docs |
+| Experimental hook stability | MEDIUM | Ecosystem evidence, no formal contract |
+| `stop` hook (ABSENT) | HIGH | Source code confirms non-existence |
+| Plugin-to-CLI integration | HIGH | Current working pattern in plugin.js |
