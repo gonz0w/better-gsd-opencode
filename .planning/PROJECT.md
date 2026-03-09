@@ -14,13 +14,18 @@ Manage and deliver high-quality software with high-quality documentation, while 
 
 ## Next Milestone Goals
 
-- Define the post-v9.0 milestone scope with updated requirements and success criteria
-- Prioritize plugin enhancements (permission auto-approve, background delegation, multi-session coordination, tool analytics)
-- Establish validation strategy and phase sequencing for the next delivery cycle
+- Benchmark this plugin against modern OpenCode plugins to identify high-impact latency bottlenecks
+- Improve end-to-end responsiveness for the most-used commands and workflows with measurable before/after metrics
+- Adopt dependencies or newer technical approaches where they provide clear, validated performance gains
 
-## Current Milestone: Between milestones
+## Current Milestone: v9.1 Performance Acceleration & Plugin Benchmarking
 
-v9.0 is complete and archived. Run `/bgsd-new-milestone` to start questioning, research, requirements, and roadmap definition for the next cycle.
+**Goal:** Make the plugin materially faster by combining deep performance analysis with targeted modernization, informed by competitive benchmarking.
+
+**Target features:**
+- Performance benchmark harness comparing bGSD workflows against modern plugin patterns
+- Profiling and latency attribution across CLI, plugin hooks, parsing, cache, and I/O paths
+- Targeted performance architecture updates (including selective dependency adoption) with regression safeguards
 
 <details>
 <summary>Previous: v9.0 Embedded Plugin Experience (shipped 2026-03-09)</summary>
@@ -206,4 +211,4 @@ Known tech debt: Bundle at ~1163KB (over 1050KB budget). `node:sqlite` is Stabil
 | Namespace routing (colon syntax) | Semantic grouping for 100+ CLI commands | Good — discoverable, backward-compatible |
 
 ---
-*Last updated: 2026-03-09 after v9.0 milestone completion*
+*Last updated: 2026-03-09 after v9.1 milestone start*
