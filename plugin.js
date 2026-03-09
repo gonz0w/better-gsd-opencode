@@ -1,6 +1,6 @@
 // src/plugin/index.js
-import { readFileSync as readFileSync5 } from "fs";
-import { join as join7 } from "path";
+import { readFileSync as readFileSync7 } from "fs";
+import { join as join9 } from "path";
 import { homedir as homedir2 } from "os";
 
 // src/plugin/safe-hook.js
@@ -625,17 +625,150 @@ function invalidateConfig(cwd) {
   }
 }
 
+// src/plugin/parsers/project.js
+import { readFileSync as readFileSync5 } from "fs";
+import { join as join7 } from "path";
+var _cache4 = /* @__PURE__ */ new Map();
+function parseProject(cwd) {
+  const resolvedCwd = cwd || process.cwd();
+  if (_cache4.has(resolvedCwd)) {
+    return _cache4.get(resolvedCwd);
+  }
+  const projectPath = join7(resolvedCwd, ".planning", "PROJECT.md");
+  let raw;
+  try {
+    raw = readFileSync5(projectPath, "utf-8");
+  } catch {
+    return null;
+  }
+  if (!raw || raw.trim().length === 0) {
+    return null;
+  }
+  const coreValueMatch = raw.match(/##\s*Core\s+Value\s*\n+([^\n]+)/i) || raw.match(/\*\*Core\s+[Vv]alue:?\*\*:?\s*([^\n]+)/i);
+  const coreValue = coreValueMatch ? coreValueMatch[1].trim() : null;
+  const techStackMatch = raw.match(/Tech\s+stack:\s*([^\n]+)/i) || raw.match(/\*\*Tech:?\*\*:?\s*([^\n]+)/i);
+  const techStack = techStackMatch ? techStackMatch[1].trim() : null;
+  const milestoneMatch = raw.match(/##\s*Current\s+Milestone:\s*([^\n]+)/i);
+  const currentMilestone = milestoneMatch ? milestoneMatch[1].trim() : null;
+  const result = Object.freeze({
+    raw,
+    coreValue,
+    techStack,
+    currentMilestone
+  });
+  _cache4.set(resolvedCwd, result);
+  return result;
+}
+function invalidateProject(cwd) {
+  if (cwd) {
+    _cache4.delete(cwd);
+  } else {
+    _cache4.clear();
+  }
+}
+
+// src/plugin/parsers/intent.js
+import { readFileSync as readFileSync6 } from "fs";
+import { join as join8 } from "path";
+var _cache5 = /* @__PURE__ */ new Map();
+function parseIntent(cwd) {
+  const resolvedCwd = cwd || process.cwd();
+  if (_cache5.has(resolvedCwd)) {
+    return _cache5.get(resolvedCwd);
+  }
+  const intentPath = join8(resolvedCwd, ".planning", "INTENT.md");
+  let raw;
+  try {
+    raw = readFileSync6(intentPath, "utf-8");
+  } catch {
+    return null;
+  }
+  if (!raw || raw.trim().length === 0) {
+    return null;
+  }
+  const objectiveMatch = raw.match(/<objective>([\s\S]*?)<\/objective>/);
+  const objective = objectiveMatch ? objectiveMatch[1].trim() : null;
+  const outcomesMatch = raw.match(/<outcomes>([\s\S]*?)<\/outcomes>/);
+  const outcomes = [];
+  if (outcomesMatch) {
+    const outcomesContent = outcomesMatch[1];
+    const entryPattern = /-\s*(DO-\d+)\s*(?:\[P\d+\])?\s*:\s*([^\n]+)/g;
+    let match;
+    while ((match = entryPattern.exec(outcomesContent)) !== null) {
+      outcomes.push(Object.freeze({
+        id: match[1],
+        text: match[2].trim()
+      }));
+    }
+  }
+  const result = Object.freeze({
+    raw,
+    objective,
+    outcomes: Object.freeze(outcomes)
+  });
+  _cache5.set(resolvedCwd, result);
+  return result;
+}
+function invalidateIntent(cwd) {
+  if (cwd) {
+    _cache5.delete(cwd);
+  } else {
+    _cache5.clear();
+  }
+}
+
 // src/plugin/parsers/index.js
 function invalidateAll(cwd) {
   invalidateState(cwd);
   invalidateRoadmap(cwd);
   invalidatePlans(cwd);
   invalidateConfig(cwd);
+  invalidateProject(cwd);
+  invalidateIntent(cwd);
+}
+
+// src/plugin/project-state.js
+function getProjectState(cwd) {
+  const resolvedCwd = cwd || process.cwd();
+  const state = parseState(resolvedCwd);
+  if (!state) {
+    return null;
+  }
+  const roadmap = parseRoadmap(resolvedCwd);
+  const config = parseConfig(resolvedCwd);
+  const project = parseProject(resolvedCwd);
+  const intent = parseIntent(resolvedCwd);
+  let phaseNum = null;
+  if (state.phase) {
+    const phaseMatch = state.phase.match(/^(\d+)/);
+    if (phaseMatch) {
+      phaseNum = parseInt(phaseMatch[1], 10);
+    }
+  }
+  let currentPhase = null;
+  if (phaseNum && roadmap) {
+    currentPhase = roadmap.getPhase(phaseNum);
+  }
+  const currentMilestone = roadmap ? roadmap.currentMilestone : null;
+  let plans = Object.freeze([]);
+  if (phaseNum) {
+    plans = parsePlans(phaseNum, resolvedCwd);
+  }
+  return Object.freeze({
+    state,
+    roadmap,
+    config,
+    project,
+    intent,
+    plans,
+    currentPhase,
+    currentMilestone
+  });
 }
 
 // src/plugin/index.js
 var BgsdPlugin = async ({ directory }) => {
-  const bgsdHome = join7(homedir2(), ".config", "opencode", "bgsd-oc");
+  const bgsdHome = join9(homedir2(), ".config", "opencode", "bgsd-oc");
   const registry = createToolRegistry(safeHook);
   const sessionCreated = safeHook("session.created", async (input, output) => {
     console.log("[bGSD] Planning plugin available. Use /bgsd-help to get started.");
@@ -646,8 +779,8 @@ var BgsdPlugin = async ({ directory }) => {
   });
   const compacting = safeHook("compacting", async (input, output) => {
     const projectDir = directory || input?.cwd;
-    const statePath = join7(projectDir, ".planning", "STATE.md");
-    const stateContent = readFileSync5(statePath, "utf-8");
+    const statePath = join9(projectDir, ".planning", "STATE.md");
+    const stateContent = readFileSync7(statePath, "utf-8");
     if (output && output.context) {
       output.context.push(
         `## bGSD Project State (preserved across compaction)
@@ -665,14 +798,19 @@ ${stateContent}`
 export {
   BgsdPlugin,
   createToolRegistry,
+  getProjectState,
   invalidateAll,
   invalidateConfig,
+  invalidateIntent,
   invalidatePlans,
+  invalidateProject,
   invalidateRoadmap,
   invalidateState,
   parseConfig,
+  parseIntent,
   parsePlan,
   parsePlans,
+  parseProject,
   parseRoadmap,
   parseState,
   safeHook

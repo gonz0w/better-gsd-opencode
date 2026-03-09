@@ -7,11 +7,15 @@ export { parseState, invalidateState } from './state.js';
 export { parseRoadmap, invalidateRoadmap } from './roadmap.js';
 export { parsePlan, parsePlans, invalidatePlans } from './plan.js';
 export { parseConfig, invalidateConfig } from './config.js';
+export { parseProject, invalidateProject } from './project.js';
+export { parseIntent, invalidateIntent } from './intent.js';
 
 import { invalidateState } from './state.js';
 import { invalidateRoadmap } from './roadmap.js';
 import { invalidatePlans } from './plan.js';
 import { invalidateConfig } from './config.js';
+import { invalidateProject } from './project.js';
+import { invalidateIntent } from './intent.js';
 
 /**
  * Invalidate all parser caches for a given CWD (or all if no CWD).
@@ -24,4 +28,6 @@ export function invalidateAll(cwd) {
   invalidateRoadmap(cwd);
   invalidatePlans(cwd);
   invalidateConfig(cwd);
+  invalidateProject(cwd);
+  invalidateIntent(cwd);
 }

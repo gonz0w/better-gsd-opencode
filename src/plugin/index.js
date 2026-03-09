@@ -9,7 +9,10 @@ export { parseState, invalidateState } from './parsers/state.js';
 export { parseRoadmap, invalidateRoadmap } from './parsers/roadmap.js';
 export { parsePlan, parsePlans, invalidatePlans } from './parsers/plan.js';
 export { parseConfig, invalidateConfig } from './parsers/config.js';
+export { parseProject, invalidateProject } from './parsers/project.js';
+export { parseIntent, invalidateIntent } from './parsers/intent.js';
 export { invalidateAll } from './parsers/index.js';
+export { getProjectState } from './project-state.js';
 export { createToolRegistry } from './tool-registry.js';
 export { safeHook } from './safe-hook.js';
 
