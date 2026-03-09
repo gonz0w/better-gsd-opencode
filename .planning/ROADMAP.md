@@ -228,7 +228,7 @@ Full details: `.planning/milestones/v8.3-ROADMAP.md`
   4. `grep -r 'gsd-tools\|get-shit-done\|GSD_HOME\|GSD_DEBUG\|GSD_PROFILE\|gsd-executor\|gsd-planner\|gsd-verifier' src/ commands/ workflows/ templates/ agents/ skills/` returns zero matches (excluding milestone archives and MILESTONES.md history)
   5. All 766+ tests pass with the new naming
 **Plans:**
-  2/4 plans executed
+  3/4 plans executed
   - Plan 01 (Wave 1): Source code env vars, config paths, usage strings, build pipeline [RBND-01, RBND-02, RBND-03, RBND-04, RBND-05]
   - Plan 02 (Wave 2): Agent file renames, install.js migration, deploy.sh [RBND-06, RBND-07]
   - Plan 03 (Wave 3): Workflows, commands, templates, skills, AGENTS.md [RBND-08]
