@@ -179,7 +179,7 @@ Continue research for Phase {phase_number}: {phase_name}
 
 ```
 Task(
-  prompt="First, read __OPENCODE_CONFIG__/agents/bbgsd-phase-researcher.md for your role and instructions.\n\n" + continuation_prompt,
+  prompt="First, read __OPENCODE_CONFIG__/agents/bgsd-phase-researcher.md for your role and instructions.\n\n" + continuation_prompt,
   subagent_type="general",
   model="{researcher_model}",
   description="Continue research Phase {phase}"

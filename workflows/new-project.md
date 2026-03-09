@@ -147,28 +147,28 @@ Ask: "Research domain ecosystem?" → Yes/No.
 **If yes:** Create `.planning/research/`, spawn 4 parallel researchers:
 
 ```
-Task(prompt="Read __OPENCODE_CONFIG__/agents/bbgsd-project-researcher.md for instructions.
+Task(prompt="Read __OPENCODE_CONFIG__/agents/bgsd-project-researcher.md for instructions.
 Research: Stack dimension for [domain]. [greenfield|subsequent] context.
 Question: What's the standard 2025 stack for [domain]?
 Read: {project_path}
 Write to: .planning/research/STACK.md (use template research-project/STACK.md)
 ", subagent_type="general", model="{researcher_model}", description="Stack research")
 
-Task(prompt="Read __OPENCODE_CONFIG__/agents/bbgsd-project-researcher.md for instructions.
+Task(prompt="Read __OPENCODE_CONFIG__/agents/bgsd-project-researcher.md for instructions.
 Research: Features dimension for [domain]. [greenfield|subsequent] context.
 Question: What features do [domain] products have? Table stakes vs differentiating?
 Read: {project_path}
 Write to: .planning/research/FEATURES.md (use template research-project/FEATURES.md)
 ", subagent_type="general", model="{researcher_model}", description="Features research")
 
-Task(prompt="Read __OPENCODE_CONFIG__/agents/bbgsd-project-researcher.md for instructions.
+Task(prompt="Read __OPENCODE_CONFIG__/agents/bgsd-project-researcher.md for instructions.
 Research: Architecture dimension for [domain]. [greenfield|subsequent] context.
 Question: How are [domain] systems typically structured?
 Read: {project_path}
 Write to: .planning/research/ARCHITECTURE.md (use template research-project/ARCHITECTURE.md)
 ", subagent_type="general", model="{researcher_model}", description="Architecture research")
 
-Task(prompt="Read __OPENCODE_CONFIG__/agents/bbgsd-project-researcher.md for instructions.
+Task(prompt="Read __OPENCODE_CONFIG__/agents/bgsd-project-researcher.md for instructions.
 Research: Pitfalls dimension for [domain]. [greenfield|subsequent] context.
 Question: What do [domain] projects commonly get wrong?
 Read: {project_path}

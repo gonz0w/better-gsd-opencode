@@ -53,7 +53,7 @@ PHASE_REQ_IDS=$(echo "$PHASE_DESC" | grep -i "Requirements:" | head -1 | sed 's/
 
 ```
 Task(
-  prompt="Read __OPENCODE_CONFIG__/agents/bbgsd-phase-researcher.md for instructions.
+  prompt="Read __OPENCODE_CONFIG__/agents/bgsd-phase-researcher.md for instructions.
 Research Phase {phase_number}: {phase_name}.
 Question: What do I need to know to PLAN this phase well?
 Read: {context_path}, {requirements_path}, {state_path}
@@ -97,7 +97,7 @@ Display assertion count and coverage. If none found: note "No assertions for {re
 
 ```
 Task(
-  prompt="Read __OPENCODE_CONFIG__/agents/bbgsd-planner.md for instructions.
+  prompt="Read __OPENCODE_CONFIG__/agents/bgsd-planner.md for instructions.
 
 Phase: {phase_number}, Mode: {standard|gap_closure}
 Read: {state_path}, {roadmap_path}, {requirements_path}, {context_path}, {research_path}, .planning/INTENT.md (if exists)
@@ -132,7 +132,7 @@ PASSED → step 14. ISSUES → revision loop (max 3):
 
 ```
 Task(
-  prompt="Read __OPENCODE_CONFIG__/agents/bbgsd-planner.md for instructions.
+  prompt="Read __OPENCODE_CONFIG__/agents/bgsd-planner.md for instructions.
 Revision mode. Read: {phase_dir}/*-PLAN.md
 Checker issues: {structured_issues}. Make targeted updates, return what changed.",
   subagent_type="general", model="{planner_model}", description="Revise Phase {phase} plans"

@@ -142,7 +142,7 @@ Task(
 
 ```
 Task(
-  prompt="First, read __OPENCODE_CONFIG__/agents/bbgsd-planner.md for your role.\n\n
+  prompt="First, read __OPENCODE_CONFIG__/agents/bgsd-planner.md for your role.\n\n
 <revision_context>
 **Mode:** quick-full (revision)
 <files_to_read>

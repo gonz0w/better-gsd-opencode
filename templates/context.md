@@ -8,7 +8,7 @@ Template for `.planning/phases/XX-name/{phase_num}-CONTEXT.md` - captures implem
 
 **Downstream consumers:**
 - `bgsd-phase-researcher` — Reads decisions to focus research (e.g., "card layout" → research card component patterns)
-- `bbgsd-planner` — Reads decisions to create specific tasks (e.g., "infinite scroll" → task includes virtualization)
+- `bgsd-planner` — Reads decisions to create specific tasks (e.g., "infinite scroll" → task includes virtualization)
 
 ---
 
@@ -278,6 +278,6 @@ The output should answer: "What does the researcher need to investigate? What ch
 **After creation:**
 - File lives in phase directory: `.planning/phases/XX-name/{phase_num}-CONTEXT.md`
 - `bgsd-phase-researcher` uses decisions to focus investigation
-- `bbgsd-planner` uses decisions + research to create executable tasks
+- `bgsd-planner` uses decisions + research to create executable tasks
 - Downstream agents should NOT need to ask the user again about captured decisions
 </guidelines>

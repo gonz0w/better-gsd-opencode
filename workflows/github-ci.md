@@ -44,7 +44,7 @@ If not authenticated, error with instructions:
 ```
 ERROR: GitHub CLI not authenticated.
 Run: gh auth login
-Then retry: /bbgsd-github-ci
+Then retry: /bgsd-github-ci
 ```
 
 ```bash
@@ -184,7 +184,7 @@ Display checkpoint details and present options to user.
 
 Options:
 1. Dismiss remaining alerts as acceptable risk
-2. Apply manual fixes and re-run: /bbgsd-github-ci --branch ${BRANCH_NAME}
+2. Apply manual fixes and re-run: /bgsd-github-ci --branch ${BRANCH_NAME}
 3. Close PR without merging
 ```
 
@@ -192,7 +192,7 @@ Options:
 
 **Step 6: Record state (direct invocation only)**
 
-If this workflow was invoked directly via `/bbgsd-github-ci` (not spawned by execute-phase):
+If this workflow was invoked directly via `/bgsd-github-ci` (not spawned by execute-phase):
 
 Record CI decisions and session from agent's return:
 ```bash

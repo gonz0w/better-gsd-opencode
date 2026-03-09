@@ -108,7 +108,7 @@ PASSED → present_ready. ISSUES → revision_loop.
 Max 3 iterations:
 ```
 Task(
-  prompt="Read __OPENCODE_CONFIG__/agents/bbgsd-planner.md for instructions.
+  prompt="Read __OPENCODE_CONFIG__/agents/bgsd-planner.md for instructions.
 Revision mode. Read: {phase_dir}/*-PLAN.md. Checker issues: {issues}.
 Make targeted updates, return what changed.",
   subagent_type="general", model="{planner_model}", description="Revise gap plans"

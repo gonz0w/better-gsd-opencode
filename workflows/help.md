@@ -75,11 +75,11 @@ Usage: `/bgsd-quick` or `/bgsd-quick --ci` (with CI quality gate)
 
 ### GitHub CI Quality Gate
 
-**`/bbgsd-github-ci`**
+**`/bgsd-github-ci`**
 Push branch, create PR, monitor code scanning checks (CodeQL), fix true positives, dismiss false positives, and auto-merge when clean.
 
 Autonomous fix-push-recheck loop (max 3 iterations). Also available as a post-execution step via `--ci` flag on `/bgsd-execute-phase` or `/bgsd-quick`, or by setting `workflow.ci_gate: true` in config.
-Usage: `/bbgsd-github-ci` or `/bbgsd-github-ci --branch my-branch --no-merge`
+Usage: `/bgsd-github-ci` or `/bgsd-github-ci --branch my-branch --no-merge`
 
 ### Roadmap Management
 
