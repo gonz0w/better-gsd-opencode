@@ -29,7 +29,36 @@ const CONFIG_DEFAULTS = Object.freeze({
   plan_checker: true,
   verifier: true,
   staleness_threshold: 2,
+  // Phase 75: Event-driven state sync settings
+  idle_validation: Object.freeze({
+    enabled: true,
+    cooldown_seconds: 5,
+    staleness_threshold_hours: 2,
+  }),
+  notifications: Object.freeze({
+    enabled: true,
+    os_notifications: true,
+    dnd_mode: false,
+    rate_limit_per_minute: 5,
+    sound: false,
+  }),
+  stuck_detection: Object.freeze({
+    error_threshold: 3,
+    spinning_threshold: 5,
+  }),
+  file_watcher: Object.freeze({
+    debounce_ms: 200,
+    max_watched_paths: 500,
+  }),
 });
+
+/**
+ * Keys whose defaults are nested objects — require shallow merge
+ * so user can override individual sub-keys while preserving other defaults.
+ */
+const NESTED_OBJECT_KEYS = new Set([
+  'idle_validation', 'notifications', 'stuck_detection', 'file_watcher',
+]);
 
 /**
  * Parse config.json from the given working directory (or CWD).
@@ -60,7 +89,7 @@ export function parseConfig(cwd) {
     return defaults;
   }
 
-  // Build config with defaults — support nested workflow section
+  // Build config with defaults — support nested workflow section and nested object merging
   const result = {};
   for (const [key, defaultValue] of Object.entries(CONFIG_DEFAULTS)) {
     if (parsed[key] !== undefined) {
@@ -70,6 +99,13 @@ export function parseConfig(cwd) {
           result[key] = parsed[key];
         } else if (typeof parsed[key] === 'object' && parsed[key] !== null && 'enabled' in parsed[key]) {
           result[key] = parsed[key].enabled;
+        } else {
+          result[key] = defaultValue;
+        }
+      } else if (NESTED_OBJECT_KEYS.has(key)) {
+        // Shallow merge: user overrides + defaults for unset sub-keys
+        if (typeof parsed[key] === 'object' && parsed[key] !== null) {
+          result[key] = Object.freeze({ ...defaultValue, ...parsed[key] });
         } else {
           result[key] = defaultValue;
         }
