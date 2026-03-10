@@ -35130,6 +35130,23 @@ var require_install_guidance = __commonJS({
           win32: "winget install GitHub.cli"
         },
         alternatives: "GitHub web interface"
+      },
+      bun: {
+        name: "bun",
+        aliases: [],
+        description: "Fast JavaScript runtime",
+        website: "https://bun.sh",
+        install: {
+          darwin: "curl -fsSL https://bun.sh/install | bash",
+          linux: "curl -fsSL https://bun.sh/install | bash",
+          win32: 'powershell -c "irm bun.sh/install.ps1|iex"'
+        },
+        alternatives: "Node.js (built-in)",
+        additionalInstall: {
+          darwin: "brew install oven-sh/bun/bun",
+          linux: "npm install -g bun",
+          win32: "scoop install bun"
+        }
       }
     };
     function getPlatform() {
@@ -35251,6 +35268,253 @@ var require_tools = __commonJS({
   }
 });
 
+// src/lib/cli-tools/bun-runtime.js
+var require_bun_runtime = __commonJS({
+  "src/lib/cli-tools/bun-runtime.js"(exports2, module2) {
+    var { execFileSync } = require("child_process");
+    var sessionCache = /* @__PURE__ */ new Map();
+    function detectBun() {
+      const cacheKey = "bun";
+      if (sessionCache.has(cacheKey)) {
+        return sessionCache.get(cacheKey);
+      }
+      let result = {
+        available: false,
+        name: "bun"
+      };
+      try {
+        const version = execFileSync("bun", ["--version"], {
+          encoding: "utf8",
+          stdio: ["pipe", "pipe", "pipe"],
+          timeout: 3e3
+        }).trim();
+        if (version) {
+          result.available = true;
+          result.version = version;
+          try {
+            const path = execFileSync("which", ["bun"], {
+              encoding: "utf8",
+              stdio: ["pipe", "pipe", "pipe"]
+            }).trim();
+            result.path = path;
+          } catch {
+          }
+          sessionCache.set(cacheKey, result);
+          return result;
+        }
+      } catch {
+      }
+      try {
+        const path = execFileSync("which", ["bun"], {
+          encoding: "utf8",
+          stdio: ["pipe", "pipe", "pipe"]
+        }).trim();
+        if (path) {
+          result.available = true;
+          result.path = path;
+        }
+      } catch {
+      }
+      sessionCache.set(cacheKey, result);
+      return result;
+    }
+    function isRunningUnderBun() {
+      if (process.versions && process.versions.bun) {
+        return { isBun: true, version: process.versions.bun };
+      }
+      try {
+        if (typeof Bun !== "undefined") {
+          return { isBun: true, version: Bun.version };
+        }
+      } catch {
+      }
+      try {
+        if (globalThis && "Bun" in globalThis) {
+          return { isBun: true, version: globalThis.Bun?.version };
+        }
+      } catch {
+      }
+      return { isBun: false };
+    }
+    function benchmarkStartup(scriptPath, runs = 10) {
+      const results = {
+        node: [],
+        bun: []
+      };
+      for (let i = 0; i < runs; i++) {
+        const start = Date.now();
+        try {
+          execFileSync("node", [scriptPath], {
+            stdio: "pipe",
+            timeout: 5e3
+          });
+          results.node.push(Date.now() - start);
+        } catch {
+        }
+      }
+      const bunStatus = detectBun();
+      if (bunStatus.available) {
+        for (let i = 0; i < runs; i++) {
+          const start = Date.now();
+          try {
+            execFileSync("bun", [scriptPath], {
+              stdio: "pipe",
+              timeout: 5e3
+            });
+            results.bun.push(Date.now() - start);
+          } catch {
+          }
+        }
+      }
+      const avgNode = results.node.length > 0 ? results.node.reduce((a, b) => a + b, 0) / results.node.length : 0;
+      const avgBun = results.bun.length > 0 ? results.bun.reduce((a, b) => a + b, 0) / results.bun.length : 0;
+      const speedup = avgBun > 0 ? avgNode / avgBun : 0;
+      return {
+        node: parseFloat(avgNode.toFixed(2)),
+        bun: parseFloat(avgBun.toFixed(2)),
+        speedup: parseFloat(speedup.toFixed(2)),
+        nodeRuns: results.node.length,
+        bunRuns: results.bun.length
+      };
+    }
+    function clearCache() {
+      sessionCache.clear();
+    }
+    function getCachedResult() {
+      return sessionCache.get("bun") || null;
+    }
+    module2.exports = {
+      detectBun,
+      isRunningUnderBun,
+      benchmarkStartup,
+      clearCache,
+      getCachedResult
+    };
+  }
+});
+
+// src/commands/runtime.js
+var require_runtime = __commonJS({
+  "src/commands/runtime.js"(exports2, module2) {
+    "use strict";
+    var path = require("path");
+    var fs = require("fs");
+    var { detectBun, isRunningUnderBun, benchmarkStartup } = require_bun_runtime();
+    var { getInstallGuidance } = require_install_guidance();
+    var { output: output2 } = require_output();
+    function cmdRuntimeStatus(cwd, raw) {
+      const bunStatus = detectBun();
+      const runningUnder = isRunningUnderBun();
+      const lines = [];
+      lines.push("=== Bun Runtime Status ===");
+      lines.push("");
+      if (bunStatus.available) {
+        lines.push("Status: Available \u2713");
+        lines.push(`Version: ${bunStatus.version || "unknown"}`);
+        lines.push(`Path: ${bunStatus.path || "unknown"}`);
+        lines.push("Bun is ready to use");
+      } else {
+        lines.push("Status: Not available \u2717");
+        lines.push("");
+        const guidance = getInstallGuidance("bun");
+        if (guidance) {
+          lines.push("Install Instructions:");
+          lines.push(`  ${guidance.installCommand}`);
+          lines.push("");
+          lines.push(`Alternatives: ${guidance.alternatives}`);
+        }
+      }
+      if (runningUnder.isBun) {
+        lines.push("");
+        lines.push(`Currently running under Bun v${runningUnder.version}`);
+      }
+      const result = {
+        available: bunStatus.available,
+        version: bunStatus.version || null,
+        path: bunStatus.path || null,
+        runningUnderBun: runningUnder.isBun,
+        runningVersion: runningUnder.version || null,
+        installCommand: bunStatus.available ? null : getInstallGuidance("bun")?.installCommand
+      };
+      if (raw) {
+        output2(result, raw);
+      } else {
+        console.log(lines.join("\n"));
+      }
+    }
+    function cmdRuntimeBenchmark(cwd, raw, args = {}) {
+      const runs = args.runs || 10;
+      const testScript = `
+const fs = require('fs');
+const path = require('path');
+const { execSync } = require('child_process');
+// Simple workload - read a few files
+const dirs = ['src/lib', 'src/commands', 'bin'];
+let count = 0;
+for (const dir of dirs) {
+  try {
+    const files = fs.readdirSync(dir);
+    for (const f of files) {
+      if (f.endsWith('.js')) count++;
+    }
+  } catch {}
+}
+console.log('Processed', count, 'files');
+`;
+      const scriptPath = path.join(cwd, ".bgsd-benchmark-temp.js");
+      fs.writeFileSync(scriptPath, testScript);
+      const lines = [];
+      lines.push("=== Runtime Benchmark ===");
+      lines.push("");
+      lines.push(`Running ${runs} iterations...`);
+      lines.push("");
+      const bunStatus = detectBun();
+      if (!bunStatus.available) {
+        lines.push("Bun is not available. Install Bun to run benchmark.");
+        lines.push("");
+        const guidance = getInstallGuidance("bun");
+        if (guidance) {
+          lines.push(`Install: ${guidance.installCommand}`);
+        }
+      } else {
+        const results = benchmarkStartup(scriptPath, runs);
+        lines.push(`Node.js: ${results.node}ms (${results.nodeRuns} successful runs)`);
+        lines.push(`Bun: ${results.bun}ms (${results.bunRuns} successful runs)`);
+        lines.push("");
+        if (results.node > 0 && results.bun > 0) {
+          if (results.speedup >= 1) {
+            lines.push(`Bun is ${results.speedup}x faster than Node.js`);
+          } else {
+            lines.push(`Node.js is ${(1 / results.speedup).toFixed(2)}x faster than Bun`);
+          }
+        } else if (results.node > 0 && results.bun === 0) {
+          lines.push("Bun runs failed - cannot compare");
+        }
+      }
+      try {
+        fs.unlinkSync(scriptPath);
+      } catch {
+      }
+      const result = {
+        runs,
+        bunAvailable: bunStatus.available,
+        node: bunStatus.available ? benchmarkStartup(scriptPath, runs).node : null,
+        bun: bunStatus.available ? benchmarkStartup(scriptPath, runs).bun : null,
+        speedup: bunStatus.available ? benchmarkStartup(scriptPath, runs).speedup : null
+      };
+      if (raw) {
+        output2(result, raw);
+      } else {
+        console.log(lines.join("\n"));
+      }
+    }
+    module2.exports = {
+      cmdRuntimeStatus,
+      cmdRuntimeBenchmark
+    };
+  }
+});
+
 // src/router.js
 var require_router = __commonJS({
   "src/router.js"(exports2, module2) {
@@ -35322,6 +35586,9 @@ var require_router = __commonJS({
     }
     function lazyTools() {
       return _modules.tools || (_modules.tools = require_tools());
+    }
+    function lazyRuntime() {
+      return _modules.runtime || (_modules.runtime = require_runtime());
     }
     async function main2() {
       const args = process.argv.slice(2);
@@ -36142,8 +36409,17 @@ Examples:
               }
             } else if (subcommand === "tools") {
               lazyTools().cmdToolsStatus(cwd, raw);
+            } else if (subcommand === "runtime") {
+              const runtimeSub = restArgs[0];
+              if (runtimeSub === "benchmark") {
+                const runsIdx = restArgs.indexOf("--runs");
+                const runs = runsIdx !== -1 ? parseInt(restArgs[runsIdx + 1], 10) : 10;
+                lazyRuntime().cmdRuntimeBenchmark(cwd, raw, { runs });
+              } else {
+                lazyRuntime().cmdRuntimeStatus(cwd, raw);
+              }
             } else {
-              error(`Unknown util subcommand: ${subcommand}. Available: config-get, config-set, env, current-timestamp, list-todos, todo, memory, mcp, classify, frontmatter, progress, websearch, history-digest, trace-requirement, codebase, cache, agent, resolve-model, template, generate-slug, verify-path-exists, config-ensure-section, config-migrate, scaffold, phase-plan-index, state-snapshot, summary-extract, quick-summary, extract-sections, git, profiler, tools`);
+              error(`Unknown util subcommand: ${subcommand}. Available: config-get, config-set, env, current-timestamp, list-todos, todo, memory, mcp, classify, frontmatter, progress, websearch, history-digest, trace-requirement, codebase, cache, agent, resolve-model, template, generate-slug, verify-path-exists, config-ensure-section, config-migrate, scaffold, phase-plan-index, state-snapshot, summary-extract, quick-summary, extract-sections, git, profiler, tools, runtime`);
             }
             break;
           }
@@ -36190,6 +36466,17 @@ Examples:
           // Unknown namespace
           default:
             error(`Unknown namespace: ${namespace}. Available namespaces: init, plan, execute, verify, util, research, cache`);
+        }
+        return;
+      }
+      if (command === "runtime") {
+        const runtimeSub = remainingArgs[0];
+        if (runtimeSub === "benchmark") {
+          const runsIdx = remainingArgs.indexOf("--runs");
+          const runs = runsIdx !== -1 ? parseInt(remainingArgs[runsIdx + 1], 10) : 10;
+          lazyRuntime().cmdRuntimeBenchmark(cwd, raw, { runs });
+        } else {
+          lazyRuntime().cmdRuntimeStatus(cwd, raw);
         }
         return;
       }
