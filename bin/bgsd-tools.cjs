@@ -441,16 +441,15 @@ Subcommands:
   phase-completeness <phase>   Check all plans have summaries
   references <file>            Check @-refs and paths resolve
   commits <h1> [h2] ...       Batch verify commit hashes
-  artifacts <plan-file>         Check must_haves.artifacts
+  artifacts <plan-file>        Check must_haves.artifacts
   key-links <plan-file>        Check must_haves.key_links
   analyze-plan <plan-file>     Analyze plan complexity
   deliverables [--plan file]   Run tests + verify deliverables
   requirements                 Check REQUIREMENTS.md coverage
   regression [--before f] [--after f]  Detect regressions
   plan-wave <phase-dir>        Check file conflicts
-  plan-deps <phase-dir>       Check dependency cycles
-  quality [--plan f] [--phase N]  Composite quality score
-  agents [--check-overlap]     Verify agent manifests and check overlap`,
+  plan-deps <phase-dir>        Check dependency cycles
+  quality [--plan f] [--phase N]  Composite quality score`,
       "verify:assertions": `Usage: bgsd-tools verify:assertions <subcommand> [options]
 
 Manage structured acceptance criteria.
@@ -478,6 +477,16 @@ Subcommands:
       "verify:token-budget": `Usage: bgsd-tools verify:token-budget
 
 Show token counts for workflow files vs budgets.`,
+      "verify:orphans": `Usage: bgsd-tools verify:orphans
+
+Run reachability audit to find orphaned exports, files, workflows, templates, and config entries.
+
+Checks:
+  - Orphaned exports (functions/classes not imported by any file)
+  - Orphaned files (source files not imported by any other file)
+  - Orphaned workflows (workflows not referenced by commands/agents)
+  - Orphaned templates (templates not referenced by workflows/commands)
+  - Orphaned configs (skills referenced by agents that don't exist)`,
       // util namespace
       "util:config-get": `Usage: bgsd-tools util:config-get <key.path>
 
@@ -7184,70 +7193,6 @@ var require_verify = __commonJS({
       }
       output2(result, raw, passed ? "passed" : errs.length > 0 ? "failed" : "warnings");
     }
-    function cmdVerifyAgents(cwd, options, raw) {
-      const os = require("os");
-      const checkOverlap = options && options.checkOverlap;
-      const agentDir = path.join(process.env.HOME || os.homedir(), ".config", "opencode", "agents");
-      if (!fs.existsSync(agentDir)) {
-        output2({ error: "Agent directory not found", path: agentDir }, raw);
-        return;
-      }
-      const agentFiles = fs.readdirSync(agentDir).filter(f => f.endsWith(".md") && f.startsWith("bgsd-"));
-      const agents = [];
-      for (const file of agentFiles) {
-        const filePath = path.join(agentDir, file);
-        const content = safeReadFile(filePath);
-        if (!content) continue;
-        const fm = extractFrontmatter(content);
-        const name = file.replace(".md", "");
-        const description = fm.description || "No description";
-        let tools = [];
-        if (fm.tools && typeof fm.tools === "object") {
-          tools = Object.keys(fm.tools).filter(k => fm.tools[k] === true || fm.tools[k] === "true");
-        }
-        const capabilities = [];
-        if (/<skills>/.test(content)) {
-          const skillMatch = content.match(/<skills>([\s\S]*?)<\/skills>/);
-          if (skillMatch) {
-            const skillBlock = skillMatch[1];
-            const lines = skillBlock.trim().split("\n");
-            let foundHeader = false;
-            for (const line of lines) {
-              if (line.includes("|---")) {
-                foundHeader = true;
-                continue;
-              }
-              if (!foundHeader) continue;
-              const match = line.match(/^\|\s*(\S+)\s*\|/);
-              if (match && match[1] && match[1] !== "Skill") {
-                capabilities.push(match[1]);
-              }
-            }
-          }
-        }
-        agents.push({ name, description, tools, capabilities, file });
-      }
-      const overlaps = [];
-      for (let i = 0; i < agents.length; i++) {
-        for (let j = i + 1; j < agents.length; j++) {
-          const a1 = agents[i];
-          const a2 = agents[j];
-          const commonTools = a1.tools.filter(t => a2.tools.includes(t));
-          const commonCaps = a1.capabilities.filter(c => a2.capabilities.includes(c));
-          if (commonTools.length > 0 || commonCaps.length > 0) {
-            overlaps.push({ agent1: a1.name, agent2: a2.name, common_tools: commonTools, common_capabilities: commonCaps });
-          }
-        }
-      }
-      const result = {
-        agent_count: agents.length,
-        agents: agents.map(a => ({ name: a.name, description: a.description, tool_count: a.tools.length, capability_count: a.capabilities.length })),
-        overlap_checked: checkOverlap,
-        overlaps_found: overlaps.length,
-        overlaps: checkOverlap ? overlaps : []
-      };
-      output2(result, raw, overlaps.length === 0 ? "passed" : "warnings");
-    }
     module2.exports = {
       cmdVerifyPlanStructure,
       cmdVerifyPhaseCompleteness,
@@ -7265,7 +7210,6 @@ var require_verify = __commonJS({
       cmdVerifyPlanWave,
       cmdVerifyPlanDeps,
       cmdVerifyQuality,
-      cmdVerifyAgents,
       parseAssertionsMd,
       cmdAssertionsList,
       cmdAssertionsValidate
@@ -16007,7 +15951,7 @@ var require_codebase_intel = __commonJS({
         lang.extensions = [...lang.extensions].sort();
       }
       const durationMs = Date.now() - startMs;
-      return {
+      const baseIntel = {
         version: 1,
         generated_at: (/* @__PURE__ */ new Date()).toISOString(),
         git_commit_hash: gitInfo.commit_hash,
@@ -16021,6 +15965,11 @@ var require_codebase_intel = __commonJS({
           total_lines: totalLines,
           languages_detected: Object.keys(languages).length
         }
+      };
+      const agentContexts = generateAgentContexts(cwd, baseIntel);
+      return {
+        ...baseIntel,
+        agent_contexts: agentContexts
       };
     }
     function readIntel(cwd) {
@@ -16064,6 +16013,182 @@ var require_codebase_intel = __commonJS({
       }
       return { age_ms: ageMs, commits_behind: commitsBehind };
     }
+    var AGENT_MANIFESTS = {
+      "bgsd-executor": {
+        fields: [
+          "phase_dir",
+          "phase_number",
+          "phase_name",
+          "plans",
+          "incomplete_plans",
+          "plan_count",
+          "incomplete_count",
+          "branch_name",
+          "commit_docs",
+          "verifier_enabled",
+          "task_routing",
+          "env_summary"
+        ],
+        optional: ["codebase_conventions", "codebase_dependencies"]
+      },
+      "bgsd-verifier": {
+        fields: [
+          "phase_dir",
+          "phase_number",
+          "phase_name",
+          "plans",
+          "summaries",
+          "verifier_enabled"
+        ],
+        optional: ["codebase_stats"]
+      },
+      "bgsd-planner": {
+        fields: [
+          "phase_dir",
+          "phase_number",
+          "phase_name",
+          "plan_count",
+          "research_enabled",
+          "plan_checker_enabled",
+          "intent_summary"
+        ],
+        optional: [
+          "codebase_stats",
+          "codebase_conventions",
+          "codebase_dependencies",
+          "codebase_freshness",
+          "env_summary"
+        ]
+      },
+      "bgsd-phase-researcher": {
+        fields: ["phase_dir", "phase_number", "phase_name", "intent_summary"],
+        optional: ["codebase_stats", "env_summary"]
+      },
+      "bgsd-plan-checker": {
+        fields: ["phase_dir", "phase_number", "phase_name", "plans", "plan_count"],
+        optional: ["codebase_stats", "codebase_dependencies"]
+      },
+      "bgsd-reviewer": {
+        fields: ["phase_dir", "phase_number", "phase_name", "codebase_conventions", "codebase_dependencies"],
+        optional: ["codebase_stats"]
+      }
+    };
+    function generateAgentContexts(cwd, intel) {
+      const contexts = {};
+      const generatedAt = (/* @__PURE__ */ new Date()).toISOString();
+      let phaseInfo = { phase: null, current_plan: null, status: null };
+      try {
+        const statePath = path.join(cwd, ".planning", "STATE.md");
+        if (fs.existsSync(statePath)) {
+          const stateContent = fs.readFileSync(statePath, "utf-8");
+          const phaseMatch = stateContent.match(/\*\*Phase:\*\*\s*(\d+)/m);
+          const planMatch = stateContent.match(/\*\*Current Plan:\*\*\s*(.+)/m);
+          const statusMatch = stateContent.match(/\*\*Status:\*\*\s*(.+)/m);
+          if (phaseMatch) phaseInfo.phase = phaseMatch[1];
+          if (planMatch) phaseInfo.current_plan = planMatch[1].trim();
+          if (statusMatch) phaseInfo.status = statusMatch[1].trim();
+        }
+      } catch {
+      }
+      let roadmapInfo = { plans: [], summaries: [] };
+      try {
+        const roadmapPath = path.join(cwd, ".planning", "ROADMAP.md");
+        if (fs.existsSync(roadmapPath)) {
+          const roadmapContent = fs.readFileSync(roadmapPath, "utf-8");
+          const phaseMatch = roadmapContent.match(/## Phase \d+.*?\n([\s\S]*?)(?=## Phase|$)/);
+          if (phaseMatch) {
+            const planMatches = phaseMatch[1].match(/Plan \d+/g) || [];
+            roadmapInfo.plans = planMatches.map((p) => p.toLowerCase().replace(/ /g, "-"));
+          }
+        }
+      } catch {
+      }
+      let configInfo = { commit_docs: true, verifier: false, research: false, plan_checker: false };
+      try {
+        const configPath = path.join(cwd, ".planning", "config.json");
+        if (fs.existsSync(configPath)) {
+          const config = JSON.parse(fs.readFileSync(configPath, "utf-8"));
+          configInfo = {
+            commit_docs: config.commit_docs !== false,
+            verifier: config.verifier === true,
+            research: config.research === true,
+            plan_checker: config.plan_checker === true
+          };
+        }
+      } catch {
+      }
+      const baseContext = {
+        phase_dir: phaseInfo.phase ? `phases/${phaseInfo.phase}-quality-and-context` : null,
+        phase_number: phaseInfo.phase,
+        phase_name: "Quality and Context",
+        plans: roadmapInfo.plans,
+        summaries: roadmapInfo.summaries,
+        incomplete_plans: [],
+        plan_count: roadmapInfo.plans.length,
+        incomplete_count: 0,
+        branch_name: null,
+        commit_docs: configInfo.commit_docs,
+        verifier_enabled: configInfo.verifier,
+        task_routing: null,
+        env_summary: null,
+        codebase_stats: intel?.stats ? {
+          total_files: intel.stats.total_files,
+          total_lines: intel.stats.total_lines,
+          git_commit: intel.git_commit_hash,
+          generated_at: intel.generated_at
+        } : null,
+        codebase_conventions: intel?.conventions || null,
+        codebase_dependencies: intel?.dependencies ? {
+          total_modules: intel.dependencies.stats?.total_files_parsed || 0,
+          total_edges: intel.dependencies.stats?.total_edges || 0
+        } : null,
+        codebase_freshness: null,
+        research_enabled: configInfo.research,
+        plan_checker_enabled: configInfo.plan_checker,
+        intent_summary: null
+      };
+      for (const [agentType, manifest] of Object.entries(AGENT_MANIFESTS)) {
+        const allowed = /* @__PURE__ */ new Set([...manifest.fields, ...manifest.optional || []]);
+        const scoped = { _agent: agentType, generated_at: generatedAt };
+        for (const key of allowed) {
+          if (key in baseContext && baseContext[key] !== void 0 && baseContext[key] !== null) {
+            scoped[key] = baseContext[key];
+          }
+        }
+        const originalKeys = Object.keys(baseContext).length;
+        const scopedKeys = Object.keys(scoped).length - 1;
+        scoped._savings = {
+          original_keys: originalKeys,
+          scoped_keys: scopedKeys,
+          reduction_pct: originalKeys > 0 ? Math.round((1 - scopedKeys / originalKeys) * 100) : 0
+        };
+        contexts[agentType] = scoped;
+      }
+      return contexts;
+    }
+    function isIntelStale(cwd) {
+      const intel = readIntel(cwd);
+      if (!intel) return true;
+      if (!intel.agent_contexts) return true;
+      if (intel.git_commit_hash) {
+        const gitInfo = getGitInfo(cwd);
+        if (gitInfo.commit_hash && gitInfo.commit_hash !== intel.git_commit_hash) {
+          return true;
+        }
+      }
+      return false;
+    }
+    function readIntelWithCache(cwd, autoRegenerate = false) {
+      const intel = readIntel(cwd);
+      if (!intel) return null;
+      if (isIntelStale(cwd)) {
+        if (autoRegenerate) {
+          return null;
+        }
+        return { ...intel, _stale: true };
+      }
+      return intel;
+    }
     module2.exports = {
       LANGUAGE_MAP,
       SKIP_DIRS,
@@ -16075,7 +16200,10 @@ var require_codebase_intel = __commonJS({
       getStalenessAge,
       performAnalysis,
       readIntel,
-      writeIntel
+      writeIntel,
+      generateAgentContexts,
+      isIntelStale,
+      readIntelWithCache
     };
   }
 });
@@ -16527,983 +16655,6 @@ var require_conventions = __commonJS({
       extractConventions,
       generateRules
     };
-  }
-});
-
-// src/lib/deps.js
-var require_deps = __commonJS({
-  "src/lib/deps.js"(exports2, module2) {
-    "use strict";
-    var fs = require("fs");
-    var path = require("path");
-    var { debugLog } = require_output();
-    var { readIntel } = require_codebase_intel();
-    function parseJavaScript(content) {
-      const imports = [];
-      let stripped = content.replace(/\/\*[\s\S]*?\*\//g, "");
-      stripped = stripped.replace(/\/\/[^\n]*/g, "");
-      const requireRe = /\brequire\s*\(\s*['"]([^'"]+)['"]\s*\)/g;
-      let m;
-      while ((m = requireRe.exec(stripped)) !== null) {
-        imports.push(m[1]);
-      }
-      const importFromRe = /\b(?:import|export)\s+[\s\S]*?\s+from\s+['"]([^'"]+)['"]/g;
-      while ((m = importFromRe.exec(stripped)) !== null) {
-        imports.push(m[1]);
-      }
-      const sideEffectRe = /\bimport\s+['"]([^'"]+)['"]/g;
-      while ((m = sideEffectRe.exec(stripped)) !== null) {
-        imports.push(m[1]);
-      }
-      const dynamicRe = /\bimport\s*\(\s*['"]([^'"]+)['"]\s*\)/g;
-      while ((m = dynamicRe.exec(stripped)) !== null) {
-        imports.push(m[1]);
-      }
-      return [...new Set(imports)];
-    }
-    function parsePython(content) {
-      const imports = [];
-      const stripped = content.replace(/#[^\n]*/g, "");
-      const fromImportRe = /^\s*from\s+(\.{0,3}[\w.]*)\s+import\b/gm;
-      let m;
-      while ((m = fromImportRe.exec(stripped)) !== null) {
-        imports.push(m[1]);
-      }
-      const importRe = /^\s*import\s+([\w.]+(?:\s*,\s*[\w.]+)*)/gm;
-      while ((m = importRe.exec(stripped)) !== null) {
-        const modules = m[1].split(",").map((s) => s.trim().split(/\s+as\s+/)[0].trim());
-        for (const mod of modules) {
-          if (mod) imports.push(mod);
-        }
-      }
-      return [...new Set(imports)];
-    }
-    function parseGo(content) {
-      const imports = [];
-      let stripped = content.replace(/\/\*[\s\S]*?\*\//g, "");
-      stripped = stripped.replace(/\/\/[^\n]*/g, "");
-      const singleRe = /\bimport\s+"([^"]+)"/g;
-      let m;
-      while ((m = singleRe.exec(stripped)) !== null) {
-        imports.push(m[1]);
-      }
-      const groupRe = /\bimport\s*\(([\s\S]*?)\)/g;
-      while ((m = groupRe.exec(stripped)) !== null) {
-        const block = m[1];
-        const pathRe = /"([^"]+)"/g;
-        let pm;
-        while ((pm = pathRe.exec(block)) !== null) {
-          imports.push(pm[1]);
-        }
-      }
-      return [...new Set(imports)];
-    }
-    function parseElixir(content) {
-      const imports = [];
-      const stripped = content.replace(/#[^\n]*/g, "");
-      const simpleRe = /^\s*(?:alias|import|use|require)\s+([A-Z][\w.]*)/gm;
-      let m;
-      while ((m = simpleRe.exec(stripped)) !== null) {
-        imports.push(m[1]);
-      }
-      const multiRe = /^\s*alias\s+([A-Z][\w.]*)\.\{([^}]+)\}/gm;
-      while ((m = multiRe.exec(stripped)) !== null) {
-        const base = m[1];
-        const parts = m[2].split(",").map((s) => s.trim());
-        for (const part of parts) {
-          if (part) imports.push(`${base}.${part}`);
-        }
-      }
-      return [...new Set(imports)];
-    }
-    function parseRust(content) {
-      const imports = [];
-      let stripped = content.replace(/\/\*[\s\S]*?\*\//g, "");
-      stripped = stripped.replace(/\/\/[^\n]*/g, "");
-      const useRe = /\buse\s+([\w:]+(?:::[\w:{}*,\s]+)?)/g;
-      let m;
-      while ((m = useRe.exec(stripped)) !== null) {
-        const fullPath = m[1].split("{")[0].replace(/::$/, "");
-        imports.push(fullPath);
-      }
-      const modRe = /\bmod\s+(\w+)\s*;/g;
-      while ((m = modRe.exec(stripped)) !== null) {
-        imports.push(m[1]);
-      }
-      const externRe = /\bextern\s+crate\s+(\w+)/g;
-      while ((m = externRe.exec(stripped)) !== null) {
-        imports.push(m[1]);
-      }
-      return [...new Set(imports)];
-    }
-    var IMPORT_PARSERS = {
-      javascript: parseJavaScript,
-      typescript: parseJavaScript,
-      // Same syntax
-      python: parsePython,
-      go: parseGo,
-      elixir: parseElixir,
-      rust: parseRust
-    };
-    function buildFileSet(intel) {
-      return new Set(Object.keys(intel.files || {}));
-    }
-    function resolveJsImport(specifier, fromFile, fileSet) {
-      if (!specifier.startsWith(".")) return null;
-      const dir = path.dirname(fromFile);
-      const base = path.join(dir, specifier);
-      const normalized = base.split(path.sep).join("/");
-      const candidates = [
-        normalized,
-        normalized + ".js",
-        normalized + ".ts",
-        normalized + ".tsx",
-        normalized + ".jsx",
-        normalized + ".cjs",
-        normalized + ".mjs",
-        normalized + "/index.js",
-        normalized + "/index.ts",
-        normalized + "/index.tsx"
-      ];
-      for (const candidate of candidates) {
-        if (fileSet.has(candidate)) return candidate;
-      }
-      return null;
-    }
-    function resolvePythonImport(specifier, fromFile, fileSet) {
-      let modulePath;
-      if (specifier.startsWith(".")) {
-        const dir = path.dirname(fromFile);
-        const dots = specifier.match(/^(\.+)/)[1];
-        const levels = dots.length - 1;
-        let baseDir = dir;
-        for (let i = 0; i < levels; i++) {
-          baseDir = path.dirname(baseDir);
-        }
-        const rest = specifier.slice(dots.length).replace(/\./g, "/");
-        modulePath = rest ? path.join(baseDir, rest) : baseDir;
-      } else {
-        modulePath = specifier.replace(/\./g, "/");
-      }
-      const normalized = modulePath.split(path.sep).join("/");
-      const candidates = [
-        normalized + ".py",
-        normalized + "/__init__.py",
-        normalized + ".pyi"
-      ];
-      for (const candidate of candidates) {
-        if (fileSet.has(candidate)) return candidate;
-      }
-      return null;
-    }
-    function resolveElixirImport(specifier, fromFile, fileSet, intel) {
-      const parts = specifier.split(".");
-      const pathParts = parts.map(
-        (p) => p.replace(
-          /([A-Z])/g,
-          (match, letter, offset) => (offset > 0 ? "_" : "") + letter.toLowerCase()
-        )
-      );
-      const fullPath = pathParts.join("/");
-      const withoutApp = pathParts.slice(1).join("/");
-      const candidates = [];
-      for (const base of [fullPath, withoutApp]) {
-        if (!base) continue;
-        candidates.push(`lib/${base}.ex`);
-        candidates.push(`${base}.ex`);
-        candidates.push(`lib/${base}/index.ex`);
-      }
-      for (const candidate of candidates) {
-        if (fileSet.has(candidate)) return candidate;
-      }
-      return null;
-    }
-    function resolveGoImport(specifier, fromFile, fileSet) {
-      const pkgName = specifier.split("/").pop();
-      if (!pkgName) return null;
-      for (const file of fileSet) {
-        if (file.endsWith(".go")) {
-          const dir = path.dirname(file);
-          const dirName = path.basename(dir);
-          if (dirName === pkgName) return file;
-        }
-      }
-      return null;
-    }
-    function resolveRustImport(specifier, fromFile, fileSet) {
-      let modulePath;
-      if (specifier.startsWith("crate")) {
-        const rest = specifier.replace(/^crate::?/, "").replace(/::/g, "/");
-        modulePath = "src/" + rest;
-      } else if (specifier.startsWith("super")) {
-        const dir = path.dirname(fromFile);
-        const supers = specifier.match(/^(super::)*/)[0];
-        const levels = (supers.match(/super/g) || []).length;
-        let baseDir = dir;
-        for (let i = 0; i < levels; i++) {
-          baseDir = path.dirname(baseDir);
-        }
-        const rest = specifier.replace(/^(super::)+/, "").replace(/::/g, "/");
-        modulePath = rest ? path.join(baseDir, rest) : baseDir;
-      } else {
-        return null;
-      }
-      const normalized = modulePath.split(path.sep).join("/");
-      const candidates = [
-        normalized + ".rs",
-        normalized + "/mod.rs"
-      ];
-      for (const candidate of candidates) {
-        if (fileSet.has(candidate)) return candidate;
-      }
-      return null;
-    }
-    function parseImports(filePath, content, language, fileSet, intel) {
-      const parser = IMPORT_PARSERS[language];
-      if (!parser) return [];
-      const rawImports = parser(content);
-      return rawImports.map((raw) => {
-        let resolved = null;
-        switch (language) {
-          case "javascript":
-          case "typescript":
-            resolved = resolveJsImport(raw, filePath, fileSet);
-            break;
-          case "python":
-            resolved = resolvePythonImport(raw, filePath, fileSet);
-            break;
-          case "go":
-            resolved = resolveGoImport(raw, filePath, fileSet);
-            break;
-          case "elixir":
-            resolved = resolveElixirImport(raw, filePath, fileSet, intel);
-            break;
-          case "rust":
-            resolved = resolveRustImport(raw, filePath, fileSet);
-            break;
-        }
-        return { raw, resolved };
-      });
-    }
-    function buildDependencyGraph(intel) {
-      const forward = {};
-      const reverse = {};
-      const languagesParsed = /* @__PURE__ */ new Set();
-      let totalEdges = 0;
-      let totalFilesParsed = 0;
-      let parseErrors = 0;
-      const fileSet = buildFileSet(intel);
-      const files = intel.files || {};
-      for (const [filePath, fileInfo] of Object.entries(files)) {
-        const language = fileInfo.language;
-        if (!language || !IMPORT_PARSERS[language]) continue;
-        totalFilesParsed++;
-        languagesParsed.add(language);
-        let content;
-        try {
-          const absPath = path.resolve(filePath);
-          content = fs.readFileSync(absPath, "utf8");
-        } catch (e) {
-          debugLog("deps.buildGraph", `read error: ${filePath}: ${e.message}`);
-          parseErrors++;
-          continue;
-        }
-        try {
-          const imports = parseImports(filePath, content, language, fileSet, intel);
-          const resolvedTargets = [];
-          for (const imp of imports) {
-            if (imp.resolved) {
-              resolvedTargets.push(imp.resolved);
-              if (!reverse[imp.resolved]) {
-                reverse[imp.resolved] = [];
-              }
-              if (!reverse[imp.resolved].includes(filePath)) {
-                reverse[imp.resolved].push(filePath);
-              }
-              totalEdges++;
-            }
-          }
-          if (resolvedTargets.length > 0) {
-            forward[filePath] = [...new Set(resolvedTargets)];
-          }
-        } catch (e) {
-          debugLog("deps.buildGraph", `parse error: ${filePath}: ${e.message}`);
-          parseErrors++;
-        }
-      }
-      return {
-        forward,
-        reverse,
-        stats: {
-          total_files_parsed: totalFilesParsed,
-          total_edges: totalEdges,
-          languages_parsed: [...languagesParsed].sort(),
-          parse_errors: parseErrors
-        },
-        built_at: (/* @__PURE__ */ new Date()).toISOString()
-      };
-    }
-    function findCycles(graph) {
-      const forward = graph.forward || {};
-      let index = 0;
-      const stack = [];
-      const onStack = /* @__PURE__ */ new Set();
-      const indices = {};
-      const lowlinks = {};
-      const sccs = [];
-      function strongConnect(v) {
-        indices[v] = index;
-        lowlinks[v] = index;
-        index++;
-        stack.push(v);
-        onStack.add(v);
-        const neighbors = forward[v] || [];
-        for (const w of neighbors) {
-          if (indices[w] === void 0) {
-            strongConnect(w);
-            lowlinks[v] = Math.min(lowlinks[v], lowlinks[w]);
-          } else if (onStack.has(w)) {
-            lowlinks[v] = Math.min(lowlinks[v], indices[w]);
-          }
-        }
-        if (lowlinks[v] === indices[v]) {
-          const scc = [];
-          let w;
-          do {
-            w = stack.pop();
-            onStack.delete(w);
-            scc.push(w);
-          } while (w !== v);
-          if (scc.length >= 2) {
-            sccs.push(scc);
-          }
-        }
-      }
-      const allNodes = new Set(Object.keys(forward));
-      for (const targets of Object.values(forward)) {
-        for (const t of targets) allNodes.add(t);
-      }
-      for (const node of allNodes) {
-        if (indices[node] === void 0) {
-          strongConnect(node);
-        }
-      }
-      sccs.sort((a, b) => b.length - a.length);
-      const filesInCycles = /* @__PURE__ */ new Set();
-      for (const scc of sccs) {
-        for (const f of scc) filesInCycles.add(f);
-      }
-      return {
-        cycles: sccs,
-        cycle_count: sccs.length,
-        files_in_cycles: filesInCycles.size
-      };
-    }
-    function getTransitiveDependents(graph, filePath, maxDepth = 10) {
-      const reverse = graph.reverse || {};
-      const visited = /* @__PURE__ */ new Set();
-      const directDependents = [];
-      const transitiveDependents = [];
-      let maxDepthReached = 0;
-      const queue = [[filePath, 0]];
-      visited.add(filePath);
-      while (queue.length > 0) {
-        const [current, depth] = queue.shift();
-        if (depth > maxDepth) continue;
-        const dependents = reverse[current] || [];
-        for (const dep of dependents) {
-          if (visited.has(dep)) continue;
-          visited.add(dep);
-          const depDepth = depth + 1;
-          if (depDepth > maxDepthReached) maxDepthReached = depDepth;
-          if (depDepth === 1) {
-            directDependents.push(dep);
-          } else {
-            transitiveDependents.push({ file: dep, depth: depDepth });
-          }
-          if (depDepth < maxDepth) {
-            queue.push([dep, depDepth]);
-          }
-        }
-      }
-      transitiveDependents.sort((a, b) => a.depth - b.depth);
-      return {
-        file: filePath,
-        direct_dependents: directDependents,
-        transitive_dependents: transitiveDependents,
-        fan_in: directDependents.length + transitiveDependents.length,
-        max_depth_reached: maxDepthReached
-      };
-    }
-    module2.exports = {
-      buildDependencyGraph,
-      findCycles,
-      getTransitiveDependents,
-      // Expose individual parsers for testing
-      parseJavaScript,
-      parsePython,
-      parseGo,
-      parseElixir,
-      parseRust
-    };
-  }
-});
-
-// src/lib/lifecycle.js
-var require_lifecycle = __commonJS({
-  "src/lib/lifecycle.js"(exports2, module2) {
-    "use strict";
-    var path = require("path");
-    var { debugLog } = require_output();
-    var { findCycles } = require_deps();
-    var MIGRATION_DIR_RE = /(?:^|\/)(migrations|db\/migrate|priv\/[^/]*\/migrations)\//;
-    var MAX_MIGRATION_NODES = 20;
-    function classifyMigrationPrefix(basename) {
-      if (/^\d{14}[_-]/.test(basename)) return 95;
-      if (/^\d{8}[_-]/.test(basename)) return 85;
-      if (/^\d{1,4}[_-]/.test(basename)) return 90;
-      return 70;
-    }
-    var LIFECYCLE_DETECTORS = [
-      // ─── Generic Migration Detector ──────────────────────────────────────────
-      {
-        name: "generic-migrations",
-        /**
-         * Detect if this codebase has migration directories.
-         */
-        detect(intel) {
-          var filePaths = Object.keys(intel.files || {});
-          return filePaths.some(function(f) {
-            return MIGRATION_DIR_RE.test(f);
-          });
-        },
-        /**
-         * Extract lifecycle nodes from migration directories.
-         * Builds sequential chains: each migration depends on the previous one.
-         */
-        extractLifecycle(intel, cwd) {
-          var filePaths = Object.keys(intel.files || {});
-          var migrationDirs = /* @__PURE__ */ new Set();
-          for (var i = 0; i < filePaths.length; i++) {
-            var f = filePaths[i];
-            if (MIGRATION_DIR_RE.test(f)) {
-              var dir = f.replace(/\/[^/]+$/, "");
-              migrationDirs.add(dir);
-            }
-          }
-          var nodes = [];
-          migrationDirs.forEach(function(dir2) {
-            var dirFiles = filePaths.filter(function(fp) {
-              if (!fp.startsWith(dir2 + "/")) return false;
-              var rest = fp.slice(dir2.length + 1);
-              return !rest.includes("/");
-            }).sort();
-            var capped = false;
-            var cappedCount = 0;
-            if (dirFiles.length > MAX_MIGRATION_NODES) {
-              cappedCount = dirFiles.length - MAX_MIGRATION_NODES;
-              dirFiles = dirFiles.slice(dirFiles.length - MAX_MIGRATION_NODES);
-              capped = true;
-            }
-            var prevId = null;
-            for (var j = 0; j < dirFiles.length; j++) {
-              var file = dirFiles[j];
-              var basename = path.basename(file);
-              var nameNoExt = basename.replace(/\.[^.]+$/, "");
-              var confidence = classifyMigrationPrefix(basename);
-              var id = "migration:" + nameNoExt;
-              var node = {
-                id,
-                file_or_step: file,
-                type: "migration",
-                must_run_before: [],
-                must_run_after: prevId ? [prevId] : [],
-                framework: "generic",
-                confidence
-              };
-              if (prevId) {
-                var prevNode = nodes.find(function(n) {
-                  return n.id === prevId;
-                });
-                if (prevNode) prevNode.must_run_before.push(id);
-              }
-              nodes.push(node);
-              prevId = id;
-            }
-            if (capped && nodes.length > 0) {
-              var firstKeptId = nodes[nodes.length - dirFiles.length].id;
-              var summaryNode = {
-                id: "migration:earlier-" + cappedCount,
-                file_or_step: "... and " + cappedCount + " earlier migrations",
-                type: "migration",
-                must_run_before: [firstKeptId],
-                must_run_after: [],
-                framework: "generic",
-                confidence: 0
-              };
-              nodes.unshift(summaryNode);
-            }
-          });
-          return nodes;
-        }
-      },
-      // ─── Elixir/Phoenix Detector ─────────────────────────────────────────────
-      {
-        name: "elixir-phoenix",
-        /**
-         * Detect if this codebase uses Elixir/Phoenix.
-         * Gates on framework detection from Phase 24 conventions.
-         */
-        detect(intel) {
-          if (!intel.conventions || !intel.conventions.frameworks) return false;
-          return intel.conventions.frameworks.some(function(f) {
-            return f.framework === "elixir-phoenix";
-          });
-        },
-        /**
-         * Extract Elixir/Phoenix lifecycle nodes.
-         * Detects: config ordering, application boot, seed→migration dependency, router compilation.
-         */
-        extractLifecycle(intel, cwd) {
-          var filePaths = Object.keys(intel.files || {});
-          var nodes = [];
-          var configExs = filePaths.find(function(f) {
-            return f === "config/config.exs";
-          });
-          var runtimeExs = filePaths.find(function(f) {
-            return f === "config/runtime.exs";
-          });
-          if (configExs) {
-            nodes.push({
-              id: "config:compile-time",
-              file_or_step: configExs,
-              type: "config",
-              must_run_before: [],
-              must_run_after: [],
-              framework: "elixir-phoenix",
-              confidence: 95
-            });
-          }
-          if (runtimeExs) {
-            nodes.push({
-              id: "config:runtime",
-              file_or_step: runtimeExs,
-              type: "config",
-              must_run_before: [],
-              must_run_after: configExs ? ["config:compile-time"] : [],
-              framework: "elixir-phoenix",
-              confidence: 90
-            });
-          }
-          var appFile = filePaths.find(function(f) {
-            return /lib\/[^/]+\/application\.ex$/.test(f);
-          });
-          if (appFile) {
-            var bootAfter = [];
-            if (configExs) bootAfter.push("config:compile-time");
-            if (runtimeExs) bootAfter.push("config:runtime");
-            nodes.push({
-              id: "boot:application",
-              file_or_step: appFile,
-              type: "boot",
-              must_run_before: [],
-              must_run_after: bootAfter,
-              framework: "elixir-phoenix",
-              confidence: 95
-            });
-            if (configExs) {
-              var configNode = nodes.find(function(n) {
-                return n.id === "config:compile-time";
-              });
-              if (configNode) configNode.must_run_before.push("boot:application");
-            }
-            if (runtimeExs) {
-              var runtimeNode = nodes.find(function(n) {
-                return n.id === "config:runtime";
-              });
-              if (runtimeNode) runtimeNode.must_run_before.push("boot:application");
-            }
-          }
-          var seedFile = filePaths.find(function(f) {
-            return /seeds\.exs$/.test(f);
-          });
-          var migrationFiles = filePaths.filter(function(f) {
-            return /priv\/[^/]*\/migrations\//.test(f);
-          });
-          if (seedFile && migrationFiles.length > 0) {
-            var sortedMigrations = migrationFiles.slice().sort();
-            var lastMigrationBasename = path.basename(sortedMigrations[sortedMigrations.length - 1]);
-            var lastMigrationId = "migration:" + lastMigrationBasename.replace(/\.[^.]+$/, "");
-            nodes.push({
-              id: "seed:seeds",
-              file_or_step: seedFile,
-              type: "seed",
-              must_run_before: [],
-              must_run_after: [lastMigrationId],
-              framework: "elixir-phoenix",
-              confidence: 90
-            });
-          }
-          var routerFile = filePaths.find(function(f) {
-            return /router\.ex$/.test(f);
-          });
-          if (routerFile && appFile) {
-            nodes.push({
-              id: "compilation:router",
-              file_or_step: routerFile,
-              type: "compilation",
-              must_run_before: [],
-              must_run_after: ["boot:application"],
-              framework: "elixir-phoenix",
-              confidence: 85
-            });
-            var bootNode = nodes.find(function(n) {
-              return n.id === "boot:application";
-            });
-            if (bootNode) bootNode.must_run_before.push("compilation:router");
-          }
-          return nodes;
-        }
-      }
-    ];
-    function mergeNodes(nodes) {
-      var byFile = {};
-      for (var i = 0; i < nodes.length; i++) {
-        var node = nodes[i];
-        var key = node.file_or_step;
-        if (!byFile[key]) {
-          byFile[key] = node;
-        } else {
-          if (node.confidence > byFile[key].confidence) {
-            var old = byFile[key];
-            for (var j = 0; j < old.must_run_before.length; j++) {
-              if (node.must_run_before.indexOf(old.must_run_before[j]) === -1) {
-                node.must_run_before.push(old.must_run_before[j]);
-              }
-            }
-            for (var k = 0; k < old.must_run_after.length; k++) {
-              if (node.must_run_after.indexOf(old.must_run_after[k]) === -1) {
-                node.must_run_after.push(old.must_run_after[k]);
-              }
-            }
-            byFile[key] = node;
-          } else {
-            var existing = byFile[key];
-            for (var j2 = 0; j2 < node.must_run_before.length; j2++) {
-              if (existing.must_run_before.indexOf(node.must_run_before[j2]) === -1) {
-                existing.must_run_before.push(node.must_run_before[j2]);
-              }
-            }
-            for (var k2 = 0; k2 < node.must_run_after.length; k2++) {
-              if (existing.must_run_after.indexOf(node.must_run_after[k2]) === -1) {
-                existing.must_run_after.push(node.must_run_after[k2]);
-              }
-            }
-          }
-        }
-      }
-      return Object.values(byFile);
-    }
-    function enforceSymmetry(nodes) {
-      var nodeMap = {};
-      for (var i = 0; i < nodes.length; i++) {
-        nodeMap[nodes[i].id] = nodes[i];
-      }
-      for (var j = 0; j < nodes.length; j++) {
-        var node = nodes[j];
-        for (var k = 0; k < node.must_run_after.length; k++) {
-          var beforeId = node.must_run_after[k];
-          var beforeNode = nodeMap[beforeId];
-          if (beforeNode && beforeNode.must_run_before.indexOf(node.id) === -1) {
-            beforeNode.must_run_before.push(node.id);
-          }
-        }
-        for (var m = 0; m < node.must_run_before.length; m++) {
-          var afterId = node.must_run_before[m];
-          var afterNode = nodeMap[afterId];
-          if (afterNode && afterNode.must_run_after.indexOf(node.id) === -1) {
-            afterNode.must_run_after.push(node.id);
-          }
-        }
-      }
-    }
-    function buildChains(nodes) {
-      if (nodes.length === 0) return [];
-      var nodeMap = {};
-      for (var i = 0; i < nodes.length; i++) {
-        nodeMap[nodes[i].id] = nodes[i];
-      }
-      var adjacency = {};
-      var inDegree = {};
-      for (var j = 0; j < nodes.length; j++) {
-        var node = nodes[j];
-        if (!adjacency[node.id]) adjacency[node.id] = [];
-        if (inDegree[node.id] === void 0) inDegree[node.id] = 0;
-        for (var k = 0; k < node.must_run_before.length; k++) {
-          var target = node.must_run_before[k];
-          adjacency[node.id].push(target);
-          if (inDegree[target] === void 0) inDegree[target] = 0;
-          inDegree[target]++;
-          if (!adjacency[target]) adjacency[target] = [];
-        }
-      }
-      var visited = /* @__PURE__ */ new Set();
-      var components = [];
-      function bfsComponent(start) {
-        var comp2 = /* @__PURE__ */ new Set();
-        var q = [start];
-        comp2.add(start);
-        while (q.length > 0) {
-          var cur = q.shift();
-          var fwd = adjacency[cur] || [];
-          for (var fi = 0; fi < fwd.length; fi++) {
-            if (!comp2.has(fwd[fi])) {
-              comp2.add(fwd[fi]);
-              q.push(fwd[fi]);
-            }
-          }
-          var curNode = nodeMap[cur];
-          if (curNode) {
-            for (var ri = 0; ri < curNode.must_run_after.length; ri++) {
-              var prev = curNode.must_run_after[ri];
-              if (!comp2.has(prev)) {
-                comp2.add(prev);
-                q.push(prev);
-              }
-            }
-          }
-        }
-        return comp2;
-      }
-      for (var ci = 0; ci < nodes.length; ci++) {
-        if (!visited.has(nodes[ci].id)) {
-          var comp = bfsComponent(nodes[ci].id);
-          comp.forEach(function(id) {
-            visited.add(id);
-          });
-          components.push(comp);
-        }
-      }
-      var chains = [];
-      for (var si = 0; si < components.length; si++) {
-        var compSet = components[si];
-        var localInDegree = {};
-        compSet.forEach(function(id) {
-          localInDegree[id] = 0;
-        });
-        compSet.forEach(function(id) {
-          var edges2 = adjacency[id] || [];
-          for (var ei = 0; ei < edges2.length; ei++) {
-            if (compSet.has(edges2[ei])) {
-              localInDegree[edges2[ei]]++;
-            }
-          }
-        });
-        var queue = [];
-        compSet.forEach(function(id) {
-          if (localInDegree[id] === 0) queue.push(id);
-        });
-        var sorted = [];
-        while (queue.length > 0) {
-          var current = queue.shift();
-          sorted.push(current);
-          var edges = adjacency[current] || [];
-          for (var ei2 = 0; ei2 < edges.length; ei2++) {
-            if (compSet.has(edges[ei2])) {
-              localInDegree[edges[ei2]]--;
-              if (localInDegree[edges[ei2]] === 0) {
-                queue.push(edges[ei2]);
-              }
-            }
-          }
-        }
-        if (sorted.length > 1) {
-          chains.push(sorted);
-        }
-      }
-      return chains;
-    }
-    function buildLifecycleGraph(intel, cwd) {
-      var allNodes = [];
-      var detectorsUsed = [];
-      for (var i = 0; i < LIFECYCLE_DETECTORS.length; i++) {
-        var detector = LIFECYCLE_DETECTORS[i];
-        try {
-          if (detector.detect(intel)) {
-            debugLog("lifecycle", "detector activated: " + detector.name);
-            var extracted = detector.extractLifecycle(intel, cwd);
-            allNodes = allNodes.concat(extracted);
-            detectorsUsed.push(detector.name);
-          }
-        } catch (e) {
-          debugLog("lifecycle", "detector error: " + detector.name + ": " + e.message);
-        }
-      }
-      var nodes = mergeNodes(allNodes);
-      enforceSymmetry(nodes);
-      var edgeCount = 0;
-      for (var j = 0; j < nodes.length; j++) {
-        edgeCount += nodes[j].must_run_before.length;
-      }
-      var forward = {};
-      for (var k = 0; k < nodes.length; k++) {
-        forward[nodes[k].id] = nodes[k].must_run_before.slice();
-      }
-      var cycleData = findCycles({ forward });
-      var chains = buildChains(nodes);
-      return {
-        nodes,
-        edges: edgeCount,
-        chains,
-        cycles: cycleData.cycles || [],
-        detectors_used: detectorsUsed,
-        stats: {
-          node_count: nodes.length,
-          edge_count: edgeCount,
-          chain_count: chains.length,
-          cycle_count: cycleData.cycle_count || 0
-        },
-        built_at: (/* @__PURE__ */ new Date()).toISOString()
-      };
-    }
-    module2.exports = {
-      LIFECYCLE_DETECTORS,
-      buildLifecycleGraph
-    };
-  }
-});
-
-// node_modules/tokenx/dist/index.mjs
-var dist_exports = {};
-__export(dist_exports, {
-  approximateTokenSize: () => approximateTokenSize,
-  estimateTokenCount: () => estimateTokenCount,
-  isWithinTokenLimit: () => isWithinTokenLimit,
-  sliceByTokens: () => sliceByTokens,
-  splitByTokens: () => splitByTokens
-});
-function isWithinTokenLimit(text, tokenLimit, options) {
-  return estimateTokenCount(text, options) <= tokenLimit;
-}
-function estimateTokenCount(text, options = {}) {
-  if (!text) return 0;
-  const { defaultCharsPerToken = DEFAULT_CHARS_PER_TOKEN, languageConfigs = DEFAULT_LANGUAGE_CONFIGS } = options;
-  const segments = text.split(TOKEN_SPLIT_PATTERN).filter(Boolean);
-  let tokenCount = 0;
-  for (const segment of segments) tokenCount += estimateSegmentTokens(segment, languageConfigs, defaultCharsPerToken);
-  return tokenCount;
-}
-function sliceByTokens(text, start = 0, end, options = {}) {
-  if (!text) return "";
-  const { defaultCharsPerToken = DEFAULT_CHARS_PER_TOKEN, languageConfigs = DEFAULT_LANGUAGE_CONFIGS } = options;
-  let totalTokens = 0;
-  if (start < 0 || end !== void 0 && end < 0) totalTokens = estimateTokenCount(text, options);
-  const normalizedStart = start < 0 ? Math.max(0, totalTokens + start) : Math.max(0, start);
-  const normalizedEnd = end === void 0 ? Infinity : end < 0 ? Math.max(0, totalTokens + end) : end;
-  if (normalizedStart >= normalizedEnd) return "";
-  const segments = text.split(TOKEN_SPLIT_PATTERN).filter(Boolean);
-  const parts = [];
-  let currentTokenPos = 0;
-  for (const segment of segments) {
-    if (currentTokenPos >= normalizedEnd) break;
-    const tokenCount = estimateSegmentTokens(segment, languageConfigs, defaultCharsPerToken);
-    const extracted = extractSegmentPart(segment, currentTokenPos, tokenCount, normalizedStart, normalizedEnd);
-    if (extracted) parts.push(extracted);
-    currentTokenPos += tokenCount;
-  }
-  return parts.join("");
-}
-function splitByTokens(text, tokensPerChunk, options = {}) {
-  if (!text || tokensPerChunk <= 0) return [];
-  const { defaultCharsPerToken = DEFAULT_CHARS_PER_TOKEN, languageConfigs = DEFAULT_LANGUAGE_CONFIGS, overlap = 0 } = options;
-  const segments = text.split(TOKEN_SPLIT_PATTERN).filter(Boolean);
-  const chunks = [];
-  let currentChunk = [];
-  let currentTokenCount = 0;
-  for (const segment of segments) {
-    const tokenCount = estimateSegmentTokens(segment, languageConfigs, defaultCharsPerToken);
-    currentChunk.push(segment);
-    currentTokenCount += tokenCount;
-    if (currentTokenCount >= tokensPerChunk) {
-      chunks.push(currentChunk.join(""));
-      if (overlap > 0) {
-        const overlapSegments = [];
-        let overlapTokenCount = 0;
-        for (let i = currentChunk.length - 1; i >= 0 && overlapTokenCount < overlap; i--) {
-          const segmentValue = currentChunk[i];
-          const tokCount = estimateSegmentTokens(segmentValue, languageConfigs, defaultCharsPerToken);
-          overlapSegments.unshift(segmentValue);
-          overlapTokenCount += tokCount;
-        }
-        currentChunk = overlapSegments;
-        currentTokenCount = overlapTokenCount;
-      } else {
-        currentChunk = [];
-        currentTokenCount = 0;
-      }
-    }
-  }
-  if (currentChunk.length > 0) chunks.push(currentChunk.join(""));
-  return chunks;
-}
-function estimateSegmentTokens(segment, languageConfigs, defaultCharsPerToken) {
-  if (PATTERNS.whitespace.test(segment)) return 0;
-  if (PATTERNS.cjk.test(segment)) return getCharacterCount(segment);
-  if (PATTERNS.numeric.test(segment)) return 1;
-  if (segment.length <= SHORT_TOKEN_THRESHOLD) return 1;
-  if (PATTERNS.punctuation.test(segment)) return segment.length > 1 ? Math.ceil(segment.length / 2) : 1;
-  if (PATTERNS.alphanumeric.test(segment)) {
-    const charsPerToken$1 = getLanguageSpecificCharsPerToken(segment, languageConfigs) ?? defaultCharsPerToken;
-    return Math.ceil(segment.length / charsPerToken$1);
-  }
-  const charsPerToken = getLanguageSpecificCharsPerToken(segment, languageConfigs) ?? defaultCharsPerToken;
-  return Math.ceil(segment.length / charsPerToken);
-}
-function getLanguageSpecificCharsPerToken(segment, languageConfigs) {
-  for (const config of languageConfigs) if (config.pattern.test(segment)) return config.averageCharsPerToken;
-}
-function getCharacterCount(text) {
-  return Array.from(text).length;
-}
-function extractSegmentPart(segment, segmentTokenStart, segmentTokenCount, targetStart, targetEnd) {
-  if (segmentTokenCount === 0) return segmentTokenStart >= targetStart && segmentTokenStart < targetEnd ? segment : "";
-  const segmentTokenEnd = segmentTokenStart + segmentTokenCount;
-  if (segmentTokenStart >= targetEnd || segmentTokenEnd <= targetStart) return "";
-  const overlapStart = Math.max(0, targetStart - segmentTokenStart);
-  const overlapEnd = Math.min(segmentTokenCount, targetEnd - segmentTokenStart);
-  if (overlapStart === 0 && overlapEnd === segmentTokenCount) return segment;
-  const charStart = Math.floor(overlapStart / segmentTokenCount * segment.length);
-  const charEnd = Math.ceil(overlapEnd / segmentTokenCount * segment.length);
-  return segment.slice(charStart, charEnd);
-}
-var PATTERNS, TOKEN_SPLIT_PATTERN, DEFAULT_CHARS_PER_TOKEN, SHORT_TOKEN_THRESHOLD, DEFAULT_LANGUAGE_CONFIGS, approximateTokenSize;
-var init_dist = __esm({
-  "node_modules/tokenx/dist/index.mjs"() {
-    PATTERNS = {
-      whitespace: /^\s+$/,
-      cjk: /[\u4E00-\u9FFF\u3400-\u4DBF\u3000-\u303F\uFF00-\uFFEF\u30A0-\u30FF\u2E80-\u2EFF\u31C0-\u31EF\u3200-\u32FF\u3300-\u33FF\uAC00-\uD7AF\u1100-\u11FF\u3130-\u318F\uA960-\uA97F\uD7B0-\uD7FF]/,
-      numeric: /^\d+(?:[.,]\d+)*$/,
-      punctuation: /[.,!?;(){}[\]<>:/\\|@#$%^&*+=`~_-]/,
-      alphanumeric: /^[a-zA-Z0-9\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u00FF]+$/
-    };
-    TOKEN_SPLIT_PATTERN = /* @__PURE__ */ new RegExp(`(\\s+|${PATTERNS.punctuation.source}+)`);
-    DEFAULT_CHARS_PER_TOKEN = 6;
-    SHORT_TOKEN_THRESHOLD = 3;
-    DEFAULT_LANGUAGE_CONFIGS = [
-      {
-        pattern: /[äöüßẞ]/i,
-        averageCharsPerToken: 3
-      },
-      {
-        pattern: /[éèêëàâîïôûùüÿçœæáíóúñ]/i,
-        averageCharsPerToken: 3
-      },
-      {
-        pattern: /[ąćęłńóśźżěščřžýůúďťň]/i,
-        averageCharsPerToken: 3.5
-      }
-    ];
-    approximateTokenSize = estimateTokenCount;
   }
 });
 
@@ -24030,6 +23181,1232 @@ var require_ast = __commonJS({
   }
 });
 
+// src/lib/deps.js
+var require_deps = __commonJS({
+  "src/lib/deps.js"(exports2, module2) {
+    "use strict";
+    var fs = require("fs");
+    var path = require("path");
+    var { debugLog } = require_output();
+    var { readIntel } = require_codebase_intel();
+    function parseJavaScript(content) {
+      const imports = [];
+      let stripped = content.replace(/\/\*[\s\S]*?\*\//g, "");
+      stripped = stripped.replace(/\/\/[^\n]*/g, "");
+      const requireRe = /\brequire\s*\(\s*['"]([^'"]+)['"]\s*\)/g;
+      let m;
+      while ((m = requireRe.exec(stripped)) !== null) {
+        imports.push(m[1]);
+      }
+      const importFromRe = /\b(?:import|export)\s+[\s\S]*?\s+from\s+['"]([^'"]+)['"]/g;
+      while ((m = importFromRe.exec(stripped)) !== null) {
+        imports.push(m[1]);
+      }
+      const sideEffectRe = /\bimport\s+['"]([^'"]+)['"]/g;
+      while ((m = sideEffectRe.exec(stripped)) !== null) {
+        imports.push(m[1]);
+      }
+      const dynamicRe = /\bimport\s*\(\s*['"]([^'"]+)['"]\s*\)/g;
+      while ((m = dynamicRe.exec(stripped)) !== null) {
+        imports.push(m[1]);
+      }
+      return [...new Set(imports)];
+    }
+    function parsePython(content) {
+      const imports = [];
+      const stripped = content.replace(/#[^\n]*/g, "");
+      const fromImportRe = /^\s*from\s+(\.{0,3}[\w.]*)\s+import\b/gm;
+      let m;
+      while ((m = fromImportRe.exec(stripped)) !== null) {
+        imports.push(m[1]);
+      }
+      const importRe = /^\s*import\s+([\w.]+(?:\s*,\s*[\w.]+)*)/gm;
+      while ((m = importRe.exec(stripped)) !== null) {
+        const modules = m[1].split(",").map((s) => s.trim().split(/\s+as\s+/)[0].trim());
+        for (const mod of modules) {
+          if (mod) imports.push(mod);
+        }
+      }
+      return [...new Set(imports)];
+    }
+    function parseGo(content) {
+      const imports = [];
+      let stripped = content.replace(/\/\*[\s\S]*?\*\//g, "");
+      stripped = stripped.replace(/\/\/[^\n]*/g, "");
+      const singleRe = /\bimport\s+"([^"]+)"/g;
+      let m;
+      while ((m = singleRe.exec(stripped)) !== null) {
+        imports.push(m[1]);
+      }
+      const groupRe = /\bimport\s*\(([\s\S]*?)\)/g;
+      while ((m = groupRe.exec(stripped)) !== null) {
+        const block = m[1];
+        const pathRe = /"([^"]+)"/g;
+        let pm;
+        while ((pm = pathRe.exec(block)) !== null) {
+          imports.push(pm[1]);
+        }
+      }
+      return [...new Set(imports)];
+    }
+    function parseElixir(content) {
+      const imports = [];
+      const stripped = content.replace(/#[^\n]*/g, "");
+      const simpleRe = /^\s*(?:alias|import|use|require)\s+([A-Z][\w.]*)/gm;
+      let m;
+      while ((m = simpleRe.exec(stripped)) !== null) {
+        imports.push(m[1]);
+      }
+      const multiRe = /^\s*alias\s+([A-Z][\w.]*)\.\{([^}]+)\}/gm;
+      while ((m = multiRe.exec(stripped)) !== null) {
+        const base = m[1];
+        const parts = m[2].split(",").map((s) => s.trim());
+        for (const part of parts) {
+          if (part) imports.push(`${base}.${part}`);
+        }
+      }
+      return [...new Set(imports)];
+    }
+    function parseRust(content) {
+      const imports = [];
+      let stripped = content.replace(/\/\*[\s\S]*?\*\//g, "");
+      stripped = stripped.replace(/\/\/[^\n]*/g, "");
+      const useRe = /\buse\s+([\w:]+(?:::[\w:{}*,\s]+)?)/g;
+      let m;
+      while ((m = useRe.exec(stripped)) !== null) {
+        const fullPath = m[1].split("{")[0].replace(/::$/, "");
+        imports.push(fullPath);
+      }
+      const modRe = /\bmod\s+(\w+)\s*;/g;
+      while ((m = modRe.exec(stripped)) !== null) {
+        imports.push(m[1]);
+      }
+      const externRe = /\bextern\s+crate\s+(\w+)/g;
+      while ((m = externRe.exec(stripped)) !== null) {
+        imports.push(m[1]);
+      }
+      return [...new Set(imports)];
+    }
+    var IMPORT_PARSERS = {
+      javascript: parseJavaScript,
+      typescript: parseJavaScript,
+      // Same syntax
+      python: parsePython,
+      go: parseGo,
+      elixir: parseElixir,
+      rust: parseRust
+    };
+    function buildFileSet(intel) {
+      return new Set(Object.keys(intel.files || {}));
+    }
+    function resolveJsImport(specifier, fromFile, fileSet) {
+      if (!specifier.startsWith(".")) return null;
+      const dir = path.dirname(fromFile);
+      const base = path.join(dir, specifier);
+      const normalized = base.split(path.sep).join("/");
+      const candidates = [
+        normalized,
+        normalized + ".js",
+        normalized + ".ts",
+        normalized + ".tsx",
+        normalized + ".jsx",
+        normalized + ".cjs",
+        normalized + ".mjs",
+        normalized + "/index.js",
+        normalized + "/index.ts",
+        normalized + "/index.tsx"
+      ];
+      for (const candidate of candidates) {
+        if (fileSet.has(candidate)) return candidate;
+      }
+      return null;
+    }
+    function resolvePythonImport(specifier, fromFile, fileSet) {
+      let modulePath;
+      if (specifier.startsWith(".")) {
+        const dir = path.dirname(fromFile);
+        const dots = specifier.match(/^(\.+)/)[1];
+        const levels = dots.length - 1;
+        let baseDir = dir;
+        for (let i = 0; i < levels; i++) {
+          baseDir = path.dirname(baseDir);
+        }
+        const rest = specifier.slice(dots.length).replace(/\./g, "/");
+        modulePath = rest ? path.join(baseDir, rest) : baseDir;
+      } else {
+        modulePath = specifier.replace(/\./g, "/");
+      }
+      const normalized = modulePath.split(path.sep).join("/");
+      const candidates = [
+        normalized + ".py",
+        normalized + "/__init__.py",
+        normalized + ".pyi"
+      ];
+      for (const candidate of candidates) {
+        if (fileSet.has(candidate)) return candidate;
+      }
+      return null;
+    }
+    function resolveElixirImport(specifier, fromFile, fileSet, intel) {
+      const parts = specifier.split(".");
+      const pathParts = parts.map(
+        (p) => p.replace(
+          /([A-Z])/g,
+          (match, letter, offset) => (offset > 0 ? "_" : "") + letter.toLowerCase()
+        )
+      );
+      const fullPath = pathParts.join("/");
+      const withoutApp = pathParts.slice(1).join("/");
+      const candidates = [];
+      for (const base of [fullPath, withoutApp]) {
+        if (!base) continue;
+        candidates.push(`lib/${base}.ex`);
+        candidates.push(`${base}.ex`);
+        candidates.push(`lib/${base}/index.ex`);
+      }
+      for (const candidate of candidates) {
+        if (fileSet.has(candidate)) return candidate;
+      }
+      return null;
+    }
+    function resolveGoImport(specifier, fromFile, fileSet) {
+      const pkgName = specifier.split("/").pop();
+      if (!pkgName) return null;
+      for (const file of fileSet) {
+        if (file.endsWith(".go")) {
+          const dir = path.dirname(file);
+          const dirName = path.basename(dir);
+          if (dirName === pkgName) return file;
+        }
+      }
+      return null;
+    }
+    function resolveRustImport(specifier, fromFile, fileSet) {
+      let modulePath;
+      if (specifier.startsWith("crate")) {
+        const rest = specifier.replace(/^crate::?/, "").replace(/::/g, "/");
+        modulePath = "src/" + rest;
+      } else if (specifier.startsWith("super")) {
+        const dir = path.dirname(fromFile);
+        const supers = specifier.match(/^(super::)*/)[0];
+        const levels = (supers.match(/super/g) || []).length;
+        let baseDir = dir;
+        for (let i = 0; i < levels; i++) {
+          baseDir = path.dirname(baseDir);
+        }
+        const rest = specifier.replace(/^(super::)+/, "").replace(/::/g, "/");
+        modulePath = rest ? path.join(baseDir, rest) : baseDir;
+      } else {
+        return null;
+      }
+      const normalized = modulePath.split(path.sep).join("/");
+      const candidates = [
+        normalized + ".rs",
+        normalized + "/mod.rs"
+      ];
+      for (const candidate of candidates) {
+        if (fileSet.has(candidate)) return candidate;
+      }
+      return null;
+    }
+    function parseImports(filePath, content, language, fileSet, intel) {
+      const parser = IMPORT_PARSERS[language];
+      if (!parser) return [];
+      const rawImports = parser(content);
+      return rawImports.map((raw) => {
+        let resolved = null;
+        switch (language) {
+          case "javascript":
+          case "typescript":
+            resolved = resolveJsImport(raw, filePath, fileSet);
+            break;
+          case "python":
+            resolved = resolvePythonImport(raw, filePath, fileSet);
+            break;
+          case "go":
+            resolved = resolveGoImport(raw, filePath, fileSet);
+            break;
+          case "elixir":
+            resolved = resolveElixirImport(raw, filePath, fileSet, intel);
+            break;
+          case "rust":
+            resolved = resolveRustImport(raw, filePath, fileSet);
+            break;
+        }
+        return { raw, resolved };
+      });
+    }
+    function buildDependencyGraph(intel) {
+      const forward = {};
+      const reverse = {};
+      const languagesParsed = /* @__PURE__ */ new Set();
+      let totalEdges = 0;
+      let totalFilesParsed = 0;
+      let parseErrors = 0;
+      const fileSet = buildFileSet(intel);
+      const files = intel.files || {};
+      for (const [filePath, fileInfo] of Object.entries(files)) {
+        const language = fileInfo.language;
+        if (!language || !IMPORT_PARSERS[language]) continue;
+        totalFilesParsed++;
+        languagesParsed.add(language);
+        let content;
+        try {
+          const absPath = path.resolve(filePath);
+          content = fs.readFileSync(absPath, "utf8");
+        } catch (e) {
+          debugLog("deps.buildGraph", `read error: ${filePath}: ${e.message}`);
+          parseErrors++;
+          continue;
+        }
+        try {
+          const imports = parseImports(filePath, content, language, fileSet, intel);
+          const resolvedTargets = [];
+          for (const imp of imports) {
+            if (imp.resolved) {
+              resolvedTargets.push(imp.resolved);
+              if (!reverse[imp.resolved]) {
+                reverse[imp.resolved] = [];
+              }
+              if (!reverse[imp.resolved].includes(filePath)) {
+                reverse[imp.resolved].push(filePath);
+              }
+              totalEdges++;
+            }
+          }
+          if (resolvedTargets.length > 0) {
+            forward[filePath] = [...new Set(resolvedTargets)];
+          }
+        } catch (e) {
+          debugLog("deps.buildGraph", `parse error: ${filePath}: ${e.message}`);
+          parseErrors++;
+        }
+      }
+      return {
+        forward,
+        reverse,
+        stats: {
+          total_files_parsed: totalFilesParsed,
+          total_edges: totalEdges,
+          languages_parsed: [...languagesParsed].sort(),
+          parse_errors: parseErrors
+        },
+        built_at: (/* @__PURE__ */ new Date()).toISOString()
+      };
+    }
+    function findCycles(graph) {
+      const forward = graph.forward || {};
+      let index = 0;
+      const stack = [];
+      const onStack = /* @__PURE__ */ new Set();
+      const indices = {};
+      const lowlinks = {};
+      const sccs = [];
+      function strongConnect(v) {
+        indices[v] = index;
+        lowlinks[v] = index;
+        index++;
+        stack.push(v);
+        onStack.add(v);
+        const neighbors = forward[v] || [];
+        for (const w of neighbors) {
+          if (indices[w] === void 0) {
+            strongConnect(w);
+            lowlinks[v] = Math.min(lowlinks[v], lowlinks[w]);
+          } else if (onStack.has(w)) {
+            lowlinks[v] = Math.min(lowlinks[v], indices[w]);
+          }
+        }
+        if (lowlinks[v] === indices[v]) {
+          const scc = [];
+          let w;
+          do {
+            w = stack.pop();
+            onStack.delete(w);
+            scc.push(w);
+          } while (w !== v);
+          if (scc.length >= 2) {
+            sccs.push(scc);
+          }
+        }
+      }
+      const allNodes = new Set(Object.keys(forward));
+      for (const targets of Object.values(forward)) {
+        for (const t of targets) allNodes.add(t);
+      }
+      for (const node of allNodes) {
+        if (indices[node] === void 0) {
+          strongConnect(node);
+        }
+      }
+      sccs.sort((a, b) => b.length - a.length);
+      const filesInCycles = /* @__PURE__ */ new Set();
+      for (const scc of sccs) {
+        for (const f of scc) filesInCycles.add(f);
+      }
+      return {
+        cycles: sccs,
+        cycle_count: sccs.length,
+        files_in_cycles: filesInCycles.size
+      };
+    }
+    function getTransitiveDependents(graph, filePath, maxDepth = 10) {
+      const reverse = graph.reverse || {};
+      const visited = /* @__PURE__ */ new Set();
+      const directDependents = [];
+      const transitiveDependents = [];
+      let maxDepthReached = 0;
+      const queue = [[filePath, 0]];
+      visited.add(filePath);
+      while (queue.length > 0) {
+        const [current, depth] = queue.shift();
+        if (depth > maxDepth) continue;
+        const dependents = reverse[current] || [];
+        for (const dep of dependents) {
+          if (visited.has(dep)) continue;
+          visited.add(dep);
+          const depDepth = depth + 1;
+          if (depDepth > maxDepthReached) maxDepthReached = depDepth;
+          if (depDepth === 1) {
+            directDependents.push(dep);
+          } else {
+            transitiveDependents.push({ file: dep, depth: depDepth });
+          }
+          if (depDepth < maxDepth) {
+            queue.push([dep, depDepth]);
+          }
+        }
+      }
+      transitiveDependents.sort((a, b) => a.depth - b.depth);
+      return {
+        file: filePath,
+        direct_dependents: directDependents,
+        transitive_dependents: transitiveDependents,
+        fan_in: directDependents.length + transitiveDependents.length,
+        max_depth_reached: maxDepthReached
+      };
+    }
+    function findOrphanedExports(intel, graph, options = {}) {
+      const knownRuntime = options.knownRuntime || [];
+      const orphans = [];
+      const files = intel.files || {};
+      const { extractExports } = require_ast();
+      for (const [filePath, fileInfo] of Object.entries(files)) {
+        const language = fileInfo.language;
+        if (language !== "javascript" && language !== "typescript") continue;
+        const absPath = path.resolve(filePath);
+        let exports3;
+        try {
+          exports3 = extractExports(absPath);
+        } catch (e) {
+          debugLog("deps.findOrphanedExports", `extract error: ${filePath}: ${e.message}`);
+          continue;
+        }
+        const allExports = [
+          ...exports3.named || [],
+          ...exports3.cjsExports || []
+        ];
+        if (exports3.default) {
+          allExports.push(exports3.default);
+        }
+        for (const exportName of allExports) {
+          if (knownRuntime.includes(exportName)) continue;
+          const importers = graph.reverse[filePath] || [];
+          if (importers.length === 0) {
+            orphans.push({
+              file: filePath,
+              export_name: exportName,
+              reason: "not imported by any file"
+            });
+          }
+        }
+      }
+      return orphans;
+    }
+    function findOrphanedFiles(intel, graph, options = {}) {
+      const defaultEntryPatterns = [
+        /^bin\//,
+        // bin/ entry points
+        /^index\./,
+        // index files (often entry points)
+        /^commands\//,
+        // Command files are often entry points
+        /\/commands\//
+        // Commands directory
+      ];
+      const entryPatterns = options.entryPatterns || defaultEntryPatterns;
+      const orphans = [];
+      const fileSet = buildFileSet(intel);
+      const reverse = graph.reverse || {};
+      for (const filePath of fileSet) {
+        const isEntryPoint = entryPatterns.some((pattern) => pattern.test(filePath));
+        if (isEntryPoint) continue;
+        const importers = reverse[filePath] || [];
+        if (importers.length === 0) {
+          orphans.push({
+            file: filePath,
+            reason: "not imported by any file"
+          });
+        }
+      }
+      return orphans;
+    }
+    function findOrphanedWorkflows(intel, options = {}) {
+      const workflowsDir = options.workflowsDir || "workflows";
+      const orphans = [];
+      const cwd = process.cwd();
+      const workflowsPath = path.join(cwd, workflowsDir);
+      let workflowFiles = [];
+      try {
+        if (fs.existsSync(workflowsPath)) {
+          workflowFiles = fs.readdirSync(workflowsPath).filter((f) => f.endsWith(".md")).map((f) => path.join(workflowsDir, f));
+        }
+      } catch (e) {
+        debugLog("deps.findOrphanedWorkflows", `read error: ${e.message}`);
+        return orphans;
+      }
+      const referencedPaths = /* @__PURE__ */ new Set();
+      const commandsPath = path.join(cwd, "commands");
+      if (fs.existsSync(commandsPath)) {
+        try {
+          const commandFiles = fs.readdirSync(commandsPath).filter((f) => f.endsWith(".md"));
+          for (const cmdFile of commandFiles) {
+            const content = fs.readFileSync(path.join(commandsPath, cmdFile), "utf8");
+            const pathMatches = content.match(/@[\w\/-]+\.\w+/g) || [];
+            for (const ref of pathMatches) {
+              referencedPaths.add(ref.substring(1));
+            }
+          }
+        } catch (e) {
+          debugLog("deps.findOrphanedWorkflows", `commands read error: ${e.message}`);
+        }
+      }
+      const agentsPath = path.join(cwd, "agents");
+      if (fs.existsSync(agentsPath)) {
+        try {
+          const agentFiles = fs.readdirSync(agentsPath).filter((f) => f.endsWith(".md"));
+          for (const agentFile of agentFiles) {
+            const content = fs.readFileSync(path.join(agentsPath, agentFile), "utf8");
+            const pathMatches = content.match(/@[\w\/-]+\.\w+/g) || [];
+            for (const ref of pathMatches) {
+              referencedPaths.add(ref.substring(1));
+            }
+          }
+        } catch (e) {
+          debugLog("deps.findOrphanedWorkflows", `agents read error: ${e.message}`);
+        }
+      }
+      for (const workflow of workflowFiles) {
+        if (!referencedPaths.has(workflow)) {
+          orphans.push({
+            file: workflow,
+            reason: "not referenced by any command or agent"
+          });
+        }
+      }
+      return orphans;
+    }
+    function findOrphanedTemplates(intel, options = {}) {
+      const templatesDir = options.templatesDir || "templates";
+      const orphans = [];
+      const cwd = process.cwd();
+      const templatesPath = path.join(cwd, templatesDir);
+      let templateFiles = [];
+      try {
+        if (fs.existsSync(templatesPath)) {
+          templateFiles = fs.readdirSync(templatesPath).filter((f) => f.endsWith(".md")).map((f) => path.join(templatesDir, f));
+        }
+      } catch (e) {
+        debugLog("deps.findOrphanedTemplates", `read error: ${e.message}`);
+        return orphans;
+      }
+      const referencedPaths = /* @__PURE__ */ new Set();
+      const workflowsPath = path.join(cwd, "workflows");
+      if (fs.existsSync(workflowsPath)) {
+        try {
+          const workflowFiles = fs.readdirSync(workflowsPath).filter((f) => f.endsWith(".md"));
+          for (const wfFile of workflowFiles) {
+            const content = fs.readFileSync(path.join(workflowsPath, wfFile), "utf8");
+            const pathMatches = content.match(/@[\w\/-]+\.\w+/g) || [];
+            for (const ref of pathMatches) {
+              referencedPaths.add(ref.substring(1));
+            }
+          }
+        } catch (e) {
+          debugLog("deps.findOrphanedTemplates", `workflows read error: ${e.message}`);
+        }
+      }
+      const commandsPath = path.join(cwd, "commands");
+      if (fs.existsSync(commandsPath)) {
+        try {
+          const commandFiles = fs.readdirSync(commandsPath).filter((f) => f.endsWith(".md"));
+          for (const cmdFile of commandFiles) {
+            const content = fs.readFileSync(path.join(commandsPath, cmdFile), "utf8");
+            const pathMatches = content.match(/@[\w\/-]+\.\w+/g) || [];
+            for (const ref of pathMatches) {
+              referencedPaths.add(ref.substring(1));
+            }
+          }
+        } catch (e) {
+          debugLog("deps.findOrphanedTemplates", `commands read error: ${e.message}`);
+        }
+      }
+      for (const template of templateFiles) {
+        if (!referencedPaths.has(template)) {
+          orphans.push({
+            file: template,
+            reason: "not referenced by any workflow or command"
+          });
+        }
+      }
+      return orphans;
+    }
+    function findOrphanedConfigs(intel, options = {}) {
+      const configPath = options.configPath || ".planning/config.json";
+      const orphans = [];
+      const cwd = process.cwd();
+      const fullConfigPath = path.join(cwd, configPath);
+      if (!fs.existsSync(fullConfigPath)) {
+        return orphans;
+      }
+      let config;
+      try {
+        const configContent = fs.readFileSync(fullConfigPath, "utf8");
+        config = JSON.parse(configContent);
+      } catch (e) {
+        debugLog("deps.findOrphanedConfigs", `config read error: ${e.message}`);
+        return orphans;
+      }
+      const codeReferences = /* @__PURE__ */ new Set();
+      const files = intel.files || {};
+      for (const [filePath] of Object.entries(files)) {
+        const absPath = path.resolve(filePath);
+        try {
+          const content = fs.readFileSync(absPath, "utf8");
+          const configRefMatches = content.match(/config\.\w+/g) || [];
+          for (const ref of configRefMatches) {
+            codeReferences.add(ref);
+          }
+        } catch (e) {
+        }
+      }
+      const configKeys = ["mode", "depth", "parallelization", "commit_docs", "model_profile", "workflow"];
+      for (const key of configKeys) {
+        if (config[key] !== void 0 && !codeReferences.has(`config.${key}`)) {
+        }
+      }
+      const skillsPath = path.join(cwd, "skills");
+      const agentsPath = path.join(cwd, "agents");
+      if (fs.existsSync(agentsPath)) {
+        try {
+          const agentFiles = fs.readdirSync(agentsPath).filter((f) => f.endsWith(".md"));
+          const availableSkills = /* @__PURE__ */ new Set();
+          if (fs.existsSync(skillsPath)) {
+            const skillFiles = fs.readdirSync(skillsPath).filter((f) => f === "SKILL.md");
+            const skillDirs = fs.readdirSync(skillsPath).filter(
+              (f) => fs.statSync(path.join(skillsPath, f)).isDirectory()
+            );
+            for (const dir of skillDirs) {
+              availableSkills.add(dir);
+            }
+          }
+          for (const agentFile of agentFiles) {
+            const content = fs.readFileSync(path.join(agentsPath, agentFile), "utf8");
+            const skillMatches = content.match(/(?:skill|skills):\s*\w+/g) || [];
+            for (const match of skillMatches) {
+              const skillName = match.split(":")[1]?.trim();
+              if (skillName && !availableSkills.has(skillName)) {
+                orphans.push({
+                  type: "skill",
+                  file: `agents/${agentFile}`,
+                  reason: `references non-existent skill: ${skillName}`
+                });
+              }
+            }
+          }
+        } catch (e) {
+          debugLog("deps.findOrphanedConfigs", `agents check error: ${e.message}`);
+        }
+      }
+      return orphans;
+    }
+    module2.exports = {
+      buildDependencyGraph,
+      findCycles,
+      getTransitiveDependents,
+      findOrphanedExports,
+      findOrphanedFiles,
+      findOrphanedWorkflows,
+      findOrphanedTemplates,
+      findOrphanedConfigs,
+      // Expose individual parsers for testing
+      parseJavaScript,
+      parsePython,
+      parseGo,
+      parseElixir,
+      parseRust
+    };
+  }
+});
+
+// src/lib/lifecycle.js
+var require_lifecycle = __commonJS({
+  "src/lib/lifecycle.js"(exports2, module2) {
+    "use strict";
+    var path = require("path");
+    var { debugLog } = require_output();
+    var { findCycles } = require_deps();
+    var MIGRATION_DIR_RE = /(?:^|\/)(migrations|db\/migrate|priv\/[^/]*\/migrations)\//;
+    var MAX_MIGRATION_NODES = 20;
+    function classifyMigrationPrefix(basename) {
+      if (/^\d{14}[_-]/.test(basename)) return 95;
+      if (/^\d{8}[_-]/.test(basename)) return 85;
+      if (/^\d{1,4}[_-]/.test(basename)) return 90;
+      return 70;
+    }
+    var LIFECYCLE_DETECTORS = [
+      // ─── Generic Migration Detector ──────────────────────────────────────────
+      {
+        name: "generic-migrations",
+        /**
+         * Detect if this codebase has migration directories.
+         */
+        detect(intel) {
+          var filePaths = Object.keys(intel.files || {});
+          return filePaths.some(function(f) {
+            return MIGRATION_DIR_RE.test(f);
+          });
+        },
+        /**
+         * Extract lifecycle nodes from migration directories.
+         * Builds sequential chains: each migration depends on the previous one.
+         */
+        extractLifecycle(intel, cwd) {
+          var filePaths = Object.keys(intel.files || {});
+          var migrationDirs = /* @__PURE__ */ new Set();
+          for (var i = 0; i < filePaths.length; i++) {
+            var f = filePaths[i];
+            if (MIGRATION_DIR_RE.test(f)) {
+              var dir = f.replace(/\/[^/]+$/, "");
+              migrationDirs.add(dir);
+            }
+          }
+          var nodes = [];
+          migrationDirs.forEach(function(dir2) {
+            var dirFiles = filePaths.filter(function(fp) {
+              if (!fp.startsWith(dir2 + "/")) return false;
+              var rest = fp.slice(dir2.length + 1);
+              return !rest.includes("/");
+            }).sort();
+            var capped = false;
+            var cappedCount = 0;
+            if (dirFiles.length > MAX_MIGRATION_NODES) {
+              cappedCount = dirFiles.length - MAX_MIGRATION_NODES;
+              dirFiles = dirFiles.slice(dirFiles.length - MAX_MIGRATION_NODES);
+              capped = true;
+            }
+            var prevId = null;
+            for (var j = 0; j < dirFiles.length; j++) {
+              var file = dirFiles[j];
+              var basename = path.basename(file);
+              var nameNoExt = basename.replace(/\.[^.]+$/, "");
+              var confidence = classifyMigrationPrefix(basename);
+              var id = "migration:" + nameNoExt;
+              var node = {
+                id,
+                file_or_step: file,
+                type: "migration",
+                must_run_before: [],
+                must_run_after: prevId ? [prevId] : [],
+                framework: "generic",
+                confidence
+              };
+              if (prevId) {
+                var prevNode = nodes.find(function(n) {
+                  return n.id === prevId;
+                });
+                if (prevNode) prevNode.must_run_before.push(id);
+              }
+              nodes.push(node);
+              prevId = id;
+            }
+            if (capped && nodes.length > 0) {
+              var firstKeptId = nodes[nodes.length - dirFiles.length].id;
+              var summaryNode = {
+                id: "migration:earlier-" + cappedCount,
+                file_or_step: "... and " + cappedCount + " earlier migrations",
+                type: "migration",
+                must_run_before: [firstKeptId],
+                must_run_after: [],
+                framework: "generic",
+                confidence: 0
+              };
+              nodes.unshift(summaryNode);
+            }
+          });
+          return nodes;
+        }
+      },
+      // ─── Elixir/Phoenix Detector ─────────────────────────────────────────────
+      {
+        name: "elixir-phoenix",
+        /**
+         * Detect if this codebase uses Elixir/Phoenix.
+         * Gates on framework detection from Phase 24 conventions.
+         */
+        detect(intel) {
+          if (!intel.conventions || !intel.conventions.frameworks) return false;
+          return intel.conventions.frameworks.some(function(f) {
+            return f.framework === "elixir-phoenix";
+          });
+        },
+        /**
+         * Extract Elixir/Phoenix lifecycle nodes.
+         * Detects: config ordering, application boot, seed→migration dependency, router compilation.
+         */
+        extractLifecycle(intel, cwd) {
+          var filePaths = Object.keys(intel.files || {});
+          var nodes = [];
+          var configExs = filePaths.find(function(f) {
+            return f === "config/config.exs";
+          });
+          var runtimeExs = filePaths.find(function(f) {
+            return f === "config/runtime.exs";
+          });
+          if (configExs) {
+            nodes.push({
+              id: "config:compile-time",
+              file_or_step: configExs,
+              type: "config",
+              must_run_before: [],
+              must_run_after: [],
+              framework: "elixir-phoenix",
+              confidence: 95
+            });
+          }
+          if (runtimeExs) {
+            nodes.push({
+              id: "config:runtime",
+              file_or_step: runtimeExs,
+              type: "config",
+              must_run_before: [],
+              must_run_after: configExs ? ["config:compile-time"] : [],
+              framework: "elixir-phoenix",
+              confidence: 90
+            });
+          }
+          var appFile = filePaths.find(function(f) {
+            return /lib\/[^/]+\/application\.ex$/.test(f);
+          });
+          if (appFile) {
+            var bootAfter = [];
+            if (configExs) bootAfter.push("config:compile-time");
+            if (runtimeExs) bootAfter.push("config:runtime");
+            nodes.push({
+              id: "boot:application",
+              file_or_step: appFile,
+              type: "boot",
+              must_run_before: [],
+              must_run_after: bootAfter,
+              framework: "elixir-phoenix",
+              confidence: 95
+            });
+            if (configExs) {
+              var configNode = nodes.find(function(n) {
+                return n.id === "config:compile-time";
+              });
+              if (configNode) configNode.must_run_before.push("boot:application");
+            }
+            if (runtimeExs) {
+              var runtimeNode = nodes.find(function(n) {
+                return n.id === "config:runtime";
+              });
+              if (runtimeNode) runtimeNode.must_run_before.push("boot:application");
+            }
+          }
+          var seedFile = filePaths.find(function(f) {
+            return /seeds\.exs$/.test(f);
+          });
+          var migrationFiles = filePaths.filter(function(f) {
+            return /priv\/[^/]*\/migrations\//.test(f);
+          });
+          if (seedFile && migrationFiles.length > 0) {
+            var sortedMigrations = migrationFiles.slice().sort();
+            var lastMigrationBasename = path.basename(sortedMigrations[sortedMigrations.length - 1]);
+            var lastMigrationId = "migration:" + lastMigrationBasename.replace(/\.[^.]+$/, "");
+            nodes.push({
+              id: "seed:seeds",
+              file_or_step: seedFile,
+              type: "seed",
+              must_run_before: [],
+              must_run_after: [lastMigrationId],
+              framework: "elixir-phoenix",
+              confidence: 90
+            });
+          }
+          var routerFile = filePaths.find(function(f) {
+            return /router\.ex$/.test(f);
+          });
+          if (routerFile && appFile) {
+            nodes.push({
+              id: "compilation:router",
+              file_or_step: routerFile,
+              type: "compilation",
+              must_run_before: [],
+              must_run_after: ["boot:application"],
+              framework: "elixir-phoenix",
+              confidence: 85
+            });
+            var bootNode = nodes.find(function(n) {
+              return n.id === "boot:application";
+            });
+            if (bootNode) bootNode.must_run_before.push("compilation:router");
+          }
+          return nodes;
+        }
+      }
+    ];
+    function mergeNodes(nodes) {
+      var byFile = {};
+      for (var i = 0; i < nodes.length; i++) {
+        var node = nodes[i];
+        var key = node.file_or_step;
+        if (!byFile[key]) {
+          byFile[key] = node;
+        } else {
+          if (node.confidence > byFile[key].confidence) {
+            var old = byFile[key];
+            for (var j = 0; j < old.must_run_before.length; j++) {
+              if (node.must_run_before.indexOf(old.must_run_before[j]) === -1) {
+                node.must_run_before.push(old.must_run_before[j]);
+              }
+            }
+            for (var k = 0; k < old.must_run_after.length; k++) {
+              if (node.must_run_after.indexOf(old.must_run_after[k]) === -1) {
+                node.must_run_after.push(old.must_run_after[k]);
+              }
+            }
+            byFile[key] = node;
+          } else {
+            var existing = byFile[key];
+            for (var j2 = 0; j2 < node.must_run_before.length; j2++) {
+              if (existing.must_run_before.indexOf(node.must_run_before[j2]) === -1) {
+                existing.must_run_before.push(node.must_run_before[j2]);
+              }
+            }
+            for (var k2 = 0; k2 < node.must_run_after.length; k2++) {
+              if (existing.must_run_after.indexOf(node.must_run_after[k2]) === -1) {
+                existing.must_run_after.push(node.must_run_after[k2]);
+              }
+            }
+          }
+        }
+      }
+      return Object.values(byFile);
+    }
+    function enforceSymmetry(nodes) {
+      var nodeMap = {};
+      for (var i = 0; i < nodes.length; i++) {
+        nodeMap[nodes[i].id] = nodes[i];
+      }
+      for (var j = 0; j < nodes.length; j++) {
+        var node = nodes[j];
+        for (var k = 0; k < node.must_run_after.length; k++) {
+          var beforeId = node.must_run_after[k];
+          var beforeNode = nodeMap[beforeId];
+          if (beforeNode && beforeNode.must_run_before.indexOf(node.id) === -1) {
+            beforeNode.must_run_before.push(node.id);
+          }
+        }
+        for (var m = 0; m < node.must_run_before.length; m++) {
+          var afterId = node.must_run_before[m];
+          var afterNode = nodeMap[afterId];
+          if (afterNode && afterNode.must_run_after.indexOf(node.id) === -1) {
+            afterNode.must_run_after.push(node.id);
+          }
+        }
+      }
+    }
+    function buildChains(nodes) {
+      if (nodes.length === 0) return [];
+      var nodeMap = {};
+      for (var i = 0; i < nodes.length; i++) {
+        nodeMap[nodes[i].id] = nodes[i];
+      }
+      var adjacency = {};
+      var inDegree = {};
+      for (var j = 0; j < nodes.length; j++) {
+        var node = nodes[j];
+        if (!adjacency[node.id]) adjacency[node.id] = [];
+        if (inDegree[node.id] === void 0) inDegree[node.id] = 0;
+        for (var k = 0; k < node.must_run_before.length; k++) {
+          var target = node.must_run_before[k];
+          adjacency[node.id].push(target);
+          if (inDegree[target] === void 0) inDegree[target] = 0;
+          inDegree[target]++;
+          if (!adjacency[target]) adjacency[target] = [];
+        }
+      }
+      var visited = /* @__PURE__ */ new Set();
+      var components = [];
+      function bfsComponent(start) {
+        var comp2 = /* @__PURE__ */ new Set();
+        var q = [start];
+        comp2.add(start);
+        while (q.length > 0) {
+          var cur = q.shift();
+          var fwd = adjacency[cur] || [];
+          for (var fi = 0; fi < fwd.length; fi++) {
+            if (!comp2.has(fwd[fi])) {
+              comp2.add(fwd[fi]);
+              q.push(fwd[fi]);
+            }
+          }
+          var curNode = nodeMap[cur];
+          if (curNode) {
+            for (var ri = 0; ri < curNode.must_run_after.length; ri++) {
+              var prev = curNode.must_run_after[ri];
+              if (!comp2.has(prev)) {
+                comp2.add(prev);
+                q.push(prev);
+              }
+            }
+          }
+        }
+        return comp2;
+      }
+      for (var ci = 0; ci < nodes.length; ci++) {
+        if (!visited.has(nodes[ci].id)) {
+          var comp = bfsComponent(nodes[ci].id);
+          comp.forEach(function(id) {
+            visited.add(id);
+          });
+          components.push(comp);
+        }
+      }
+      var chains = [];
+      for (var si = 0; si < components.length; si++) {
+        var compSet = components[si];
+        var localInDegree = {};
+        compSet.forEach(function(id) {
+          localInDegree[id] = 0;
+        });
+        compSet.forEach(function(id) {
+          var edges2 = adjacency[id] || [];
+          for (var ei = 0; ei < edges2.length; ei++) {
+            if (compSet.has(edges2[ei])) {
+              localInDegree[edges2[ei]]++;
+            }
+          }
+        });
+        var queue = [];
+        compSet.forEach(function(id) {
+          if (localInDegree[id] === 0) queue.push(id);
+        });
+        var sorted = [];
+        while (queue.length > 0) {
+          var current = queue.shift();
+          sorted.push(current);
+          var edges = adjacency[current] || [];
+          for (var ei2 = 0; ei2 < edges.length; ei2++) {
+            if (compSet.has(edges[ei2])) {
+              localInDegree[edges[ei2]]--;
+              if (localInDegree[edges[ei2]] === 0) {
+                queue.push(edges[ei2]);
+              }
+            }
+          }
+        }
+        if (sorted.length > 1) {
+          chains.push(sorted);
+        }
+      }
+      return chains;
+    }
+    function buildLifecycleGraph(intel, cwd) {
+      var allNodes = [];
+      var detectorsUsed = [];
+      for (var i = 0; i < LIFECYCLE_DETECTORS.length; i++) {
+        var detector = LIFECYCLE_DETECTORS[i];
+        try {
+          if (detector.detect(intel)) {
+            debugLog("lifecycle", "detector activated: " + detector.name);
+            var extracted = detector.extractLifecycle(intel, cwd);
+            allNodes = allNodes.concat(extracted);
+            detectorsUsed.push(detector.name);
+          }
+        } catch (e) {
+          debugLog("lifecycle", "detector error: " + detector.name + ": " + e.message);
+        }
+      }
+      var nodes = mergeNodes(allNodes);
+      enforceSymmetry(nodes);
+      var edgeCount = 0;
+      for (var j = 0; j < nodes.length; j++) {
+        edgeCount += nodes[j].must_run_before.length;
+      }
+      var forward = {};
+      for (var k = 0; k < nodes.length; k++) {
+        forward[nodes[k].id] = nodes[k].must_run_before.slice();
+      }
+      var cycleData = findCycles({ forward });
+      var chains = buildChains(nodes);
+      return {
+        nodes,
+        edges: edgeCount,
+        chains,
+        cycles: cycleData.cycles || [],
+        detectors_used: detectorsUsed,
+        stats: {
+          node_count: nodes.length,
+          edge_count: edgeCount,
+          chain_count: chains.length,
+          cycle_count: cycleData.cycle_count || 0
+        },
+        built_at: (/* @__PURE__ */ new Date()).toISOString()
+      };
+    }
+    module2.exports = {
+      LIFECYCLE_DETECTORS,
+      buildLifecycleGraph
+    };
+  }
+});
+
+// node_modules/tokenx/dist/index.mjs
+var dist_exports = {};
+__export(dist_exports, {
+  approximateTokenSize: () => approximateTokenSize,
+  estimateTokenCount: () => estimateTokenCount,
+  isWithinTokenLimit: () => isWithinTokenLimit,
+  sliceByTokens: () => sliceByTokens,
+  splitByTokens: () => splitByTokens
+});
+function isWithinTokenLimit(text, tokenLimit, options) {
+  return estimateTokenCount(text, options) <= tokenLimit;
+}
+function estimateTokenCount(text, options = {}) {
+  if (!text) return 0;
+  const { defaultCharsPerToken = DEFAULT_CHARS_PER_TOKEN, languageConfigs = DEFAULT_LANGUAGE_CONFIGS } = options;
+  const segments = text.split(TOKEN_SPLIT_PATTERN).filter(Boolean);
+  let tokenCount = 0;
+  for (const segment of segments) tokenCount += estimateSegmentTokens(segment, languageConfigs, defaultCharsPerToken);
+  return tokenCount;
+}
+function sliceByTokens(text, start = 0, end, options = {}) {
+  if (!text) return "";
+  const { defaultCharsPerToken = DEFAULT_CHARS_PER_TOKEN, languageConfigs = DEFAULT_LANGUAGE_CONFIGS } = options;
+  let totalTokens = 0;
+  if (start < 0 || end !== void 0 && end < 0) totalTokens = estimateTokenCount(text, options);
+  const normalizedStart = start < 0 ? Math.max(0, totalTokens + start) : Math.max(0, start);
+  const normalizedEnd = end === void 0 ? Infinity : end < 0 ? Math.max(0, totalTokens + end) : end;
+  if (normalizedStart >= normalizedEnd) return "";
+  const segments = text.split(TOKEN_SPLIT_PATTERN).filter(Boolean);
+  const parts = [];
+  let currentTokenPos = 0;
+  for (const segment of segments) {
+    if (currentTokenPos >= normalizedEnd) break;
+    const tokenCount = estimateSegmentTokens(segment, languageConfigs, defaultCharsPerToken);
+    const extracted = extractSegmentPart(segment, currentTokenPos, tokenCount, normalizedStart, normalizedEnd);
+    if (extracted) parts.push(extracted);
+    currentTokenPos += tokenCount;
+  }
+  return parts.join("");
+}
+function splitByTokens(text, tokensPerChunk, options = {}) {
+  if (!text || tokensPerChunk <= 0) return [];
+  const { defaultCharsPerToken = DEFAULT_CHARS_PER_TOKEN, languageConfigs = DEFAULT_LANGUAGE_CONFIGS, overlap = 0 } = options;
+  const segments = text.split(TOKEN_SPLIT_PATTERN).filter(Boolean);
+  const chunks = [];
+  let currentChunk = [];
+  let currentTokenCount = 0;
+  for (const segment of segments) {
+    const tokenCount = estimateSegmentTokens(segment, languageConfigs, defaultCharsPerToken);
+    currentChunk.push(segment);
+    currentTokenCount += tokenCount;
+    if (currentTokenCount >= tokensPerChunk) {
+      chunks.push(currentChunk.join(""));
+      if (overlap > 0) {
+        const overlapSegments = [];
+        let overlapTokenCount = 0;
+        for (let i = currentChunk.length - 1; i >= 0 && overlapTokenCount < overlap; i--) {
+          const segmentValue = currentChunk[i];
+          const tokCount = estimateSegmentTokens(segmentValue, languageConfigs, defaultCharsPerToken);
+          overlapSegments.unshift(segmentValue);
+          overlapTokenCount += tokCount;
+        }
+        currentChunk = overlapSegments;
+        currentTokenCount = overlapTokenCount;
+      } else {
+        currentChunk = [];
+        currentTokenCount = 0;
+      }
+    }
+  }
+  if (currentChunk.length > 0) chunks.push(currentChunk.join(""));
+  return chunks;
+}
+function estimateSegmentTokens(segment, languageConfigs, defaultCharsPerToken) {
+  if (PATTERNS.whitespace.test(segment)) return 0;
+  if (PATTERNS.cjk.test(segment)) return getCharacterCount(segment);
+  if (PATTERNS.numeric.test(segment)) return 1;
+  if (segment.length <= SHORT_TOKEN_THRESHOLD) return 1;
+  if (PATTERNS.punctuation.test(segment)) return segment.length > 1 ? Math.ceil(segment.length / 2) : 1;
+  if (PATTERNS.alphanumeric.test(segment)) {
+    const charsPerToken$1 = getLanguageSpecificCharsPerToken(segment, languageConfigs) ?? defaultCharsPerToken;
+    return Math.ceil(segment.length / charsPerToken$1);
+  }
+  const charsPerToken = getLanguageSpecificCharsPerToken(segment, languageConfigs) ?? defaultCharsPerToken;
+  return Math.ceil(segment.length / charsPerToken);
+}
+function getLanguageSpecificCharsPerToken(segment, languageConfigs) {
+  for (const config of languageConfigs) if (config.pattern.test(segment)) return config.averageCharsPerToken;
+}
+function getCharacterCount(text) {
+  return Array.from(text).length;
+}
+function extractSegmentPart(segment, segmentTokenStart, segmentTokenCount, targetStart, targetEnd) {
+  if (segmentTokenCount === 0) return segmentTokenStart >= targetStart && segmentTokenStart < targetEnd ? segment : "";
+  const segmentTokenEnd = segmentTokenStart + segmentTokenCount;
+  if (segmentTokenStart >= targetEnd || segmentTokenEnd <= targetStart) return "";
+  const overlapStart = Math.max(0, targetStart - segmentTokenStart);
+  const overlapEnd = Math.min(segmentTokenCount, targetEnd - segmentTokenStart);
+  if (overlapStart === 0 && overlapEnd === segmentTokenCount) return segment;
+  const charStart = Math.floor(overlapStart / segmentTokenCount * segment.length);
+  const charEnd = Math.ceil(overlapEnd / segmentTokenCount * segment.length);
+  return segment.slice(charStart, charEnd);
+}
+var PATTERNS, TOKEN_SPLIT_PATTERN, DEFAULT_CHARS_PER_TOKEN, SHORT_TOKEN_THRESHOLD, DEFAULT_LANGUAGE_CONFIGS, approximateTokenSize;
+var init_dist = __esm({
+  "node_modules/tokenx/dist/index.mjs"() {
+    PATTERNS = {
+      whitespace: /^\s+$/,
+      cjk: /[\u4E00-\u9FFF\u3400-\u4DBF\u3000-\u303F\uFF00-\uFFEF\u30A0-\u30FF\u2E80-\u2EFF\u31C0-\u31EF\u3200-\u32FF\u3300-\u33FF\uAC00-\uD7AF\u1100-\u11FF\u3130-\u318F\uA960-\uA97F\uD7B0-\uD7FF]/,
+      numeric: /^\d+(?:[.,]\d+)*$/,
+      punctuation: /[.,!?;(){}[\]<>:/\\|@#$%^&*+=`~_-]/,
+      alphanumeric: /^[a-zA-Z0-9\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u00FF]+$/
+    };
+    TOKEN_SPLIT_PATTERN = /* @__PURE__ */ new RegExp(`(\\s+|${PATTERNS.punctuation.source}+)`);
+    DEFAULT_CHARS_PER_TOKEN = 6;
+    SHORT_TOKEN_THRESHOLD = 3;
+    DEFAULT_LANGUAGE_CONFIGS = [
+      {
+        pattern: /[äöüßẞ]/i,
+        averageCharsPerToken: 3
+      },
+      {
+        pattern: /[éèêëàâîïôûùüÿçœæáíóúñ]/i,
+        averageCharsPerToken: 3
+      },
+      {
+        pattern: /[ąćęłńóśźżěščřžýůúďťň]/i,
+        averageCharsPerToken: 3.5
+      }
+    ];
+    approximateTokenSize = estimateTokenCount;
+  }
+});
+
 // src/lib/context.js
 var require_context = __commonJS({
   "src/lib/context.js"(exports2, module2) {
@@ -24367,6 +24744,18 @@ var require_context = __commonJS({
         }
       };
     }
+    function getCachedAgentContext(cwd, agentType) {
+      const { readIntelWithCache } = require_codebase_intel();
+      const intel = readIntelWithCache(cwd, false);
+      if (intel && intel.agent_contexts && intel.agent_contexts[agentType]) {
+        const cached = intel.agent_contexts[agentType];
+        if (intel._stale) {
+          return { ...cached, _stale: true };
+        }
+        return cached;
+      }
+      return null;
+    }
     module2.exports = {
       estimateTokens,
       estimateJsonTokens,
@@ -24375,7 +24764,8 @@ var require_context = __commonJS({
       scopeContextForAgent,
       compactPlanState,
       compactDepGraph,
-      buildTaskContext
+      buildTaskContext,
+      getCachedAgentContext
     };
   }
 });
@@ -31849,7 +32239,7 @@ var require_features = __commonJS({
     var { execGit } = require_git();
     var { estimateTokens, estimateJsonTokens, checkBudget } = require_context();
     var { readIntel } = require_codebase_intel();
-    var { getTransitiveDependents } = require_deps();
+    var { getTransitiveDependents, findOrphanedExports, findOrphanedFiles, findOrphanedWorkflows, findOrphanedTemplates, findOrphanedConfigs, buildDependencyGraph } = require_deps();
     var { banner, sectionHeader, formatTable, summaryLine, actionHint, color, SYMBOLS, progressBar, colorByPercent } = require_format();
     function cmdSessionDiff(cwd, raw) {
       let since = null;
@@ -33462,6 +33852,33 @@ Improved: ${improved} | Unchanged: ${unchanged} | Worsened: ${worsened}
         test_count: testCount
       }, raw);
     }
+    function cmdAuditOrphans(cwd, raw) {
+      const intel = readIntel(cwd);
+      if (!intel) {
+        error('Codebase intel not found. Run "bgsd-tools util:codebase analyze" first.');
+      }
+      const graph = buildDependencyGraph(intel);
+      const orphanedExports = findOrphanedExports(intel, graph);
+      const orphanedFiles = findOrphanedFiles(intel, graph);
+      const orphanedWorkflows = findOrphanedWorkflows(intel);
+      const orphanedTemplates = findOrphanedTemplates(intel);
+      const orphanedConfigs = findOrphanedConfigs(intel);
+      output2({
+        orphaned_exports: orphanedExports,
+        orphaned_files: orphanedFiles,
+        orphaned_workflows: orphanedWorkflows,
+        orphaned_templates: orphanedTemplates,
+        orphaned_configs: orphanedConfigs,
+        summary: {
+          total_orphans: orphanedExports.length + orphanedFiles.length + orphanedWorkflows.length + orphanedTemplates.length + orphanedConfigs.length,
+          exports_count: orphanedExports.length,
+          files_count: orphanedFiles.length,
+          workflows_count: orphanedWorkflows.length,
+          templates_count: orphanedTemplates.length,
+          configs_count: orphanedConfigs.length
+        }
+      }, raw);
+    }
     function cmdSessionSummary(cwd, raw) {
       const pd = path.join(cwd, ".planning");
       const sc = safeReadFile(path.join(pd, "STATE.md"));
@@ -33557,6 +33974,7 @@ Improved: ${improved} | Unchanged: ${unchanged} | Worsened: ${worsened}
       cmdExtractSections,
       cmdTokenBudget,
       cmdTestCoverage,
+      cmdAuditOrphans,
       cmdSessionSummary
     };
   }
@@ -36080,13 +36498,8 @@ Available: execute-phase, plan-phase, new-project, new-milestone, quick, resume,
                   plan: planIdx !== -1 ? restArgs[planIdx + 1] : null,
                   phase: phaseIdx !== -1 ? restArgs[phaseIdx + 1] : null
                 }, raw);
-              } else if (verifySub === "agents") {
-                const overlapIdx = restArgs.indexOf("--check-overlap");
-                lazyVerify().cmdVerifyAgents(cwd, {
-                  checkOverlap: overlapIdx !== -1
-                }, raw);
               } else {
-                error("Unknown verify subcommand. Available: plan-structure, phase-completeness, references, commits, artifacts, key-links, analyze-plan, deliverables, requirements, regression, plan-wave, plan-deps, quality, agents");
+                error("Unknown verify subcommand. Available: plan-structure, phase-completeness, references, commits, artifacts, key-links, analyze-plan, deliverables, requirements, regression, plan-wave, plan-deps, quality");
               }
             } else if (subcommand === "assertions") {
               const assertSub = restArgs[0];
@@ -36142,8 +36555,10 @@ Available: execute-phase, plan-phase, new-project, new-milestone, quick, resume,
               lazyFeatures().cmdValidateConfig(cwd, raw);
             } else if (subcommand === "test-coverage") {
               lazyFeatures().cmdTestCoverage(cwd, raw);
+            } else if (subcommand === "orphans") {
+              lazyFeatures().cmdAuditOrphans(cwd, raw);
             } else {
-              error(`Unknown verify subcommand: ${subcommand}. Available: state, verify, assertions, search-decisions, search-lessons, review, context-budget, token-budget, summary, validate, validate-dependencies, validate-config, test-coverage`);
+              error(`Unknown verify subcommand: ${subcommand}. Available: state, verify, assertions, search-decisions, search-lessons, review, context-budget, token-budget, summary, validate, validate-dependencies, validate-config, test-coverage, orphans`);
             }
             break;
           }
