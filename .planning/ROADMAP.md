@@ -14,7 +14,7 @@ This milestone expands CLI tool integrations for faster operations and explores 
 
 - [x] **Phase 82: Tool Detection Infrastructure** - CLI tool availability detection, caching, install guidance, graceful fallback (completed 2026-03-10)
 - [x] **Phase 83: Search & Discovery** - ripgrep, fd, jq integrations with JSON output (completed 2026-03-10)
-- [ ] **Phase 84: Extended Tools** - yq, bat, gh CLI integrations
+- [x] **Phase 84: Extended Tools** - yq, bat, gh CLI integrations (completed 2026-03-10)
 - [ ] **Phase 85: Runtime Exploration** - Bun runtime detection, compatibility docs, benchmarking
 
 ---
@@ -68,7 +68,7 @@ This milestone expands CLI tool integrations for faster operations and explores 
   2. User can view file contents with syntax highlighting via bat
   3. User can perform GitHub operations (list PRs, view issues) via gh CLI with proper auth handling
 
-**Plans:** 1/1 (84-01)
+**Plans:** 1/1 plans complete
 
 ---
 
@@ -95,7 +95,7 @@ This milestone expands CLI tool integrations for faster operations and explores 
 |-------|----------------|--------|-----------|
 | 82. Tool Detection Infrastructure | 1/1 | Complete    | 2026-03-10 |
 | 83. Search & Discovery | 1/1 | Complete    | 2026-03-10 |
-| 84. Extended Tools | 1/1 | Ready to execute | - |
+| 84. Extended Tools | 1/1 | Complete   | 2026-03-10 |
 | 85. Runtime Exploration | 0/1 | Not started | - |
 
 ---
