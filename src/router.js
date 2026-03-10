@@ -972,6 +972,10 @@ Examples:
             lazyRuntime().cmdRuntimeStatus(cwd, raw);
           }
         } else if (subcommand === 'measure') {
+          // Check build-time feature flag
+          if (global.BGSD_INCLUDE_BENCHMARKS === false) {
+            error('Benchmarks are disabled in this build. Set INCLUDE_BENCHMARKS=true to enable.');
+          }
           const binPathIdx = restArgs.indexOf('--bin');
           // --verbose is a global flag - check global._gsdCompactMode
           const isVerbose = global._gsdCompactMode === false;
@@ -1048,6 +1052,10 @@ Examples:
   }
 
   if (command === 'measure') {
+    // Check build-time feature flag
+    if (global.BGSD_INCLUDE_BENCHMARKS === false) {
+      error('Benchmarks are disabled in this build. Set INCLUDE_BENCHMARKS=true to enable.');
+    }
     const binPathIdx = remainingArgs.indexOf('--bin');
     // --verbose is a global flag - check global._gsdCompactMode
     const isVerbose = global._gsdCompactMode === false;
