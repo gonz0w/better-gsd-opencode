@@ -49,10 +49,10 @@
 | AGNT-01 - Agent zero overlap | Phase 86 | Complete |
 | AGNT-02 - Agent boundaries validated | Phase 86 | Complete |
 | AGNT-03 - Handoff contracts | Phase 86 | Complete |
-| CMND-01 - Subcommand groups | Phase 87 | Pending |
-| CMND-02 - Stale commands removed | Phase 87 | Pending |
-| CMND-03 - Overlapping consolidated | Phase 87 | Pending |
-| CMND-04 - Internal not exposed | Phase 87 | Pending |
+| CMND-01 - Subcommand groups | Phase 87 | Complete |
+| CMND-02 - Stale commands removed | Phase 87 | Complete |
+| CMND-03 - Overlapping consolidated | Phase 87 | Complete |
+| CMND-04 - Internal not exposed | Phase 87 | Complete |
 | CTXT-01 - Deterministic context | Phase 88 | Pending |
 | CTXT-02 - Zero orphaned code | Phase 88 | Pending |
 | CTXT-03 - Dead code audit | Phase 88 | Pending |
