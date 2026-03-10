@@ -200,7 +200,13 @@ function cmdConfigSet(cwd, keyPath, value, raw) {
     }
     current = current[key];
   }
-  current[keys[keys.length - 1]] = parsedValue;
+  // Prevent prototype pollution
+  const lastKey = keys[keys.length - 1];
+  if (lastKey === '__proto__' || lastKey === 'constructor' || lastKey === 'prototype') {
+    error('Cannot set prototype properties');
+  }
+  
+  current[lastKey] = parsedValue;
 
   // Write back
   try {

@@ -30307,7 +30307,11 @@ var require_misc = __commonJS({
         }
         current = current[key];
       }
-      current[keys[keys.length - 1]] = parsedValue;
+      const lastKey = keys[keys.length - 1];
+      if (lastKey === "__proto__" || lastKey === "constructor" || lastKey === "prototype") {
+        error("Cannot set prototype properties");
+      }
+      current[lastKey] = parsedValue;
       try {
         fs.writeFileSync(configPath, JSON.stringify(config, null, 2), "utf-8");
         const result = { updated: true, key: keyPath, value: parsedValue };
