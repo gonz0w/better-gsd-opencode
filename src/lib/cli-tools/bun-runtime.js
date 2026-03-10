@@ -1,19 +1,113 @@
 /**
  * Bun Runtime Detection Module
  * 
- * Detects Bun runtime availability with session caching.
+ * Detects Bun runtime availability with config persistence.
  * Uses execFileSync with array args to prevent shell injection.
  */
 
+const fs = require('fs');
+const path = require('path');
 const { execFileSync } = require('child_process');
 
 // Session cache for Bun detection (Map, cleared on process exit - no TTL)
 const sessionCache = new Map();
 
 /**
+ * Get config file path - looks for .planning/config.json in cwd or parent dirs
+ */
+function getConfigPath() {
+  let cwd = process.cwd();
+  // Walk up to find .planning directory
+  while (cwd !== path.parse(cwd).root) {
+    const configPath = path.join(cwd, '.planning', 'config.json');
+    if (fs.existsSync(configPath)) {
+      return configPath;
+    }
+    cwd = path.dirname(cwd);
+  }
+  return null;
+}
+
+/**
+ * Read config from .planning/config.json
+ * @returns {object} Config object or empty object
+ */
+function readConfig() {
+  const configPath = getConfigPath();
+  if (!configPath) {
+    return {};
+  }
+  try {
+    return JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+  } catch {
+    return {};
+  }
+}
+
+/**
+ * Write config to .planning/config.json
+ * @param {object} config - Config object to write
+ */
+function writeConfig(config) {
+  const configPath = getConfigPath();
+  if (!configPath) {
+    return false;
+  }
+  try {
+    fs.writeFileSync(configPath, JSON.stringify(config, null, 2), 'utf-8');
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Get config value by key path (e.g., 'runtime' or 'bun.detected')
+ * @param {string} keyPath - Dot-notation key path
+ * @returns {any} Config value or undefined
+ */
+function configGet(keyPath) {
+  const config = readConfig();
+  const keys = keyPath.split('.');
+  let current = config;
+  for (const key of keys) {
+    if (current === undefined || current === null || typeof current !== 'object') {
+      return undefined;
+    }
+    current = current[key];
+  }
+  return current;
+}
+
+/**
+ * Set config value by key path (e.g., 'runtime' or 'bun.detected')
+ * @param {string} keyPath - Dot-notation key path
+ * @param {any} value - Value to set
+ * @returns {boolean} Success
+ */
+function configSet(keyPath, value) {
+  const configPath = getConfigPath();
+  if (!configPath) {
+    return false;
+  }
+  const config = readConfig();
+  const keys = keyPath.split('.');
+  let current = config;
+  for (let i = 0; i < keys.length - 1; i++) {
+    const key = keys[i];
+    if (current[key] === undefined || typeof current[key] !== 'object') {
+      current[key] = {};
+    }
+    current = current[key];
+  }
+  current[keys[keys.length - 1]] = value;
+  return writeConfig(config);
+}
+
+/**
  * Detect if Bun runtime is available on the system
  * Detection order: bun --version first (3s timeout), fallback to which bun
- * @returns {object} - { available: boolean, name: string, version?: string, path?: string }
+ * @returns {object} - { available: boolean, name: string, version?: string, path?: string, fromConfig?: boolean }
  */
 function detectBun() {
   const cacheKey = 'bun';
@@ -21,6 +115,34 @@ function detectBun() {
   // Check session cache first
   if (sessionCache.has(cacheKey)) {
     return sessionCache.get(cacheKey);
+  }
+  
+  // Check config for forced runtime preference
+  const runtimePref = configGet('runtime');
+  
+  // If runtime is forced to 'node', skip detection
+  if (runtimePref === 'node') {
+    const result = {
+      available: false,
+      name: 'bun',
+      fromConfig: true
+    };
+    sessionCache.set(cacheKey, result);
+    return result;
+  }
+  
+  // If runtime is forced to 'bun', assume available (skip detection for speed)
+  if (runtimePref === 'bun') {
+    // Try to get cached version if available
+    const cachedVersion = configGet('bun.detected');
+    const result = {
+      available: true,
+      name: 'bun',
+      version: cachedVersion || 'unknown',
+      fromConfig: true
+    };
+    sessionCache.set(cacheKey, result);
+    return result;
   }
   
   let result = {
@@ -49,6 +171,11 @@ function detectBun() {
         result.path = path;
       } catch {
         // PATH lookup failed, but we have version
+      }
+      
+      // Cache detection result in config for faster subsequent runs
+      if (version && version !== 'unknown') {
+        configSet('bun.detected', version);
       }
       
       sessionCache.set(cacheKey, result);
@@ -187,10 +314,21 @@ function getCachedResult() {
   return sessionCache.get('bun') || null;
 }
 
+/**
+ * Get cached Bun version from config (persisted across sessions)
+ * @returns {string|null} - Cached version or null
+ */
+function getCachedBunVersion() {
+  return configGet('bun.detected') || null;
+}
+
 module.exports = {
   detectBun,
   isRunningUnderBun,
   benchmarkStartup,
   clearCache,
-  getCachedResult
+  getCachedResult,
+  getCachedBunVersion,
+  configGet,
+  configSet
 };
