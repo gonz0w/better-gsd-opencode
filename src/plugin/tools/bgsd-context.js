@@ -1,5 +1,9 @@
-import { z } from 'zod';
 import { getProjectState } from '../project-state.js';
+import { createObjectSchema, validateArgs } from '../validation/adapter.js';
+
+const CONTEXT_ARGS_SCHEMA = createObjectSchema({
+  task: { type: 'coerceNumber', optional: true },
+});
 
 /**
  * bgsd_context — Task-scoped context reader.
@@ -17,11 +21,23 @@ export const bgsd_context = {
     'for a different task in the current plan.',
 
   args: {
-    task: z.coerce.number().optional().describe('Task number within current plan. Defaults to current task.'),
+    task: {
+      type: 'number',
+      optional: true,
+      description: 'Task number within current plan. Defaults to current task.',
+    },
   },
 
   async execute(args, context) {
     try {
+      const parsedArgs = validateArgs('bgsd_context', CONTEXT_ARGS_SCHEMA, args);
+      if (!parsedArgs.ok) {
+        return JSON.stringify({
+          error: parsedArgs.error.code,
+          message: parsedArgs.error.message,
+        });
+      }
+
       const projectDir = context.directory || process.cwd();
       const projectState = getProjectState(projectDir);
 
@@ -59,13 +75,14 @@ export const bgsd_context = {
         : null;
 
       // Determine task index (1-indexed input, 0-indexed array)
-      const taskIndex = args.task ? args.task - 1 : 0;
+      const taskNumber = parsedArgs.data.task;
+      const taskIndex = taskNumber ? taskNumber - 1 : 0;
       const totalTasks = currentPlan.tasks.length;
 
       if (taskIndex < 0 || taskIndex >= totalTasks) {
         return JSON.stringify({
           error: 'validation_error',
-          message: `Task ${args.task} not found. Current plan has ${totalTasks} task${totalTasks !== 1 ? 's' : ''}.`,
+          message: `Task ${taskNumber} not found. Current plan has ${totalTasks} task${totalTasks !== 1 ? 's' : ''}.`,
         });
       }
 

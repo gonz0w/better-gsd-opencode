@@ -1,9 +1,9 @@
-import { z } from 'zod';
 import { getProjectState } from '../project-state.js';
 import { readFileSync, writeFileSync, mkdirSync, rmdirSync, existsSync, statSync } from 'fs';
 import { join } from 'path';
 import { invalidateState } from '../parsers/state.js';
 import { invalidatePlans } from '../parsers/plan.js';
+import { createObjectSchema, validateArgs } from '../validation/adapter.js';
 
 /**
  * bgsd_progress — State mutation tool.
@@ -17,6 +17,14 @@ import { invalidatePlans } from '../parsers/plan.js';
  */
 
 const LOCK_STALE_MS = 10000; // 10 seconds
+const PROGRESS_ARGS_SCHEMA = createObjectSchema({
+  action: {
+    type: 'enum',
+    values: ['complete-task', 'uncomplete-task', 'add-blocker', 'remove-blocker', 'record-decision', 'advance'],
+    optional: false,
+  },
+  value: { type: 'string', optional: true },
+});
 
 export const bgsd_progress = {
   description:
@@ -32,8 +40,16 @@ export const bgsd_progress = {
     'Returns updated state snapshot after the change.',
 
   args: {
-    action: z.enum(['complete-task', 'uncomplete-task', 'add-blocker', 'remove-blocker', 'record-decision', 'advance']).describe('The progress action to perform'),
-    value: z.string().optional().describe('Value for the action: blocker text for add-blocker, blocker index (1-based) for remove-blocker, decision text for record-decision. Not needed for complete-task, uncomplete-task, advance.'),
+    action: {
+      type: 'enum',
+      values: ['complete-task', 'uncomplete-task', 'add-blocker', 'remove-blocker', 'record-decision', 'advance'],
+      description: 'The progress action to perform',
+    },
+    value: {
+      type: 'string',
+      optional: true,
+      description: 'Value for the action: blocker text for add-blocker, blocker index (1-based) for remove-blocker, decision text for record-decision. Not needed for complete-task, uncomplete-task, advance.',
+    },
   },
 
   async execute(args, context) {
@@ -41,6 +57,15 @@ export const bgsd_progress = {
     const lockDir = join(projectDir, '.planning', '.lock');
 
     try {
+      const parsedArgs = validateArgs('bgsd_progress', PROGRESS_ARGS_SCHEMA, args);
+      if (!parsedArgs.ok) {
+        return JSON.stringify({
+          error: parsedArgs.error.code,
+          message: parsedArgs.error.message,
+        });
+      }
+      const validatedArgs = parsedArgs.data;
+
       // Check project exists
       const projectState = getProjectState(projectDir);
       if (!projectState) {
@@ -51,13 +76,13 @@ export const bgsd_progress = {
       }
 
       // Validate action-specific requirements
-      if ((args.action === 'add-blocker' || args.action === 'record-decision') && !args.value) {
+      if ((validatedArgs.action === 'add-blocker' || validatedArgs.action === 'record-decision') && !validatedArgs.value) {
         return JSON.stringify({
           error: 'validation_error',
-          message: `Action '${args.action}' requires a 'value' parameter.`,
+          message: `Action '${validatedArgs.action}' requires a 'value' parameter.`,
         });
       }
-      if (args.action === 'remove-blocker' && !args.value) {
+      if (validatedArgs.action === 'remove-blocker' && !validatedArgs.value) {
         return JSON.stringify({
           error: 'validation_error',
           message: "Action 'remove-blocker' requires a 'value' parameter (blocker index, 1-based).",
@@ -102,7 +127,7 @@ export const bgsd_progress = {
         const { state } = projectState;
         let actionResult = null;
 
-        switch (args.action) {
+        switch (validatedArgs.action) {
           case 'complete-task': {
             // Increment progress percentage
             const currentProgress = state.progress !== null ? state.progress : 0;
@@ -125,13 +150,13 @@ export const bgsd_progress = {
           }
 
           case 'add-blocker': {
-            content = addBlocker(content, args.value);
-            actionResult = `Blocker added: ${args.value}`;
+            content = addBlocker(content, validatedArgs.value);
+            actionResult = `Blocker added: ${validatedArgs.value}`;
             break;
           }
 
           case 'remove-blocker': {
-            const idx = parseInt(args.value, 10);
+            const idx = parseInt(validatedArgs.value, 10);
             if (isNaN(idx) || idx < 1) {
               return JSON.stringify({
                 error: 'validation_error',
@@ -151,8 +176,8 @@ export const bgsd_progress = {
           }
 
           case 'record-decision': {
-            content = recordDecision(content, args.value, state.phase);
-            actionResult = `Decision recorded: ${args.value}`;
+            content = recordDecision(content, validatedArgs.value, state.phase);
+            actionResult = `Decision recorded: ${validatedArgs.value}`;
             break;
           }
 
@@ -180,7 +205,7 @@ export const bgsd_progress = {
 
         return JSON.stringify({
           success: true,
-          action: args.action,
+          action: validatedArgs.action,
           result: actionResult,
           state: {
             phase: fresh ? fresh.phase : null,

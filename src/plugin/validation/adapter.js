@@ -92,6 +92,41 @@ function emitDebugMarker(toolName, engine) {
   process.stderr.write(`[bGSD:validation-engine] ${toolName}:${engine}\n`);
 }
 
+function runValidation(engine, schemaSpec, source) {
+  if (engine === 'valibot') {
+    return v.safeParse(buildValibotSchema(schemaSpec), source);
+  }
+
+  return buildZodSchema(schemaSpec).safeParse(source);
+}
+
+function normalizeDebugResult(result, engine) {
+  if (result.success) {
+    const payload = engine === 'valibot' ? result.output : result.data;
+    return { success: true, data: payload };
+  }
+
+  return {
+    success: false,
+    message: firstErrorMessage({ ...result, engine }),
+  };
+}
+
+function emitShadowCompareDiagnostics(toolName, schemaSpec, source, primaryEngine, primaryResult) {
+  if (process.env.GSD_DEBUG !== '1') {
+    return;
+  }
+
+  const shadowEngine = primaryEngine === 'valibot' ? 'zod' : 'valibot';
+  const shadowResult = runValidation(shadowEngine, schemaSpec, source);
+
+  const primaryNormalized = normalizeDebugResult(primaryResult, primaryEngine);
+  const shadowNormalized = normalizeDebugResult(shadowResult, shadowEngine);
+  const parity = JSON.stringify(primaryNormalized) === JSON.stringify(shadowNormalized) ? 'match' : 'mismatch';
+
+  process.stderr.write(`[bGSD:validation-shadow] ${toolName}:${primaryEngine}->${shadowEngine}:${parity}\n`);
+}
+
 export function createObjectSchema(shape) {
   return { type: 'object', shape };
 }
@@ -102,9 +137,8 @@ export function validateArgs(toolName, schemaSpec, input) {
   const engine = flags.engine;
   emitDebugMarker(toolName, engine);
 
-  const result = engine === 'valibot'
-    ? v.safeParse(buildValibotSchema(schemaSpec), source)
-    : buildZodSchema(schemaSpec).safeParse(source);
+  const result = runValidation(engine, schemaSpec, source);
+  emitShadowCompareDiagnostics(toolName, schemaSpec, source, engine, result);
 
   if (engine === 'valibot') {
     if (result.success) {

@@ -1,5 +1,7 @@
-import { z } from 'zod';
 import { getProjectState } from '../project-state.js';
+import { createObjectSchema, validateArgs } from '../validation/adapter.js';
+
+const STATUS_ARGS_SCHEMA = createObjectSchema({});
 
 /**
  * bgsd_status — Execution state reader.
@@ -19,6 +21,14 @@ export const bgsd_status = {
 
   async execute(args, context) {
     try {
+      const parsedArgs = validateArgs('bgsd_status', STATUS_ARGS_SCHEMA, args);
+      if (!parsedArgs.ok) {
+        return JSON.stringify({
+          error: parsedArgs.error.code,
+          message: parsedArgs.error.message,
+        });
+      }
+
       const projectDir = context.directory || process.cwd();
       const projectState = getProjectState(projectDir);
 
