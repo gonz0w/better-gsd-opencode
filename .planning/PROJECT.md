@@ -2,7 +2,7 @@
 
 ## What This Is
 
-A single-file Node.js CLI built from 34 organized `src/` modules via esbuild, producing `bin/bgsd-tools.cjs`. It provides structured data operations for AI-driven project planning workflows running in the host editor. Fifteen versions shipped: v1.0 (test suite, module split, observability), v1.1 (context reduction — 46.7% CLI, 54.6% workflow, 67% reference compression), v2.0 (state validation, cross-session memory, quality scoring), v3.0 (intent engineering — INTENT.md, drift validation, workflow injection), v4.0 (environment awareness, MCP profiling, worktree parallelism), v5.0 (codebase intelligence — convention extraction, dependency graphs, lifecycle awareness), v6.0 (UX overhaul — shared formatting engine, TTY-aware smart output, branded CLI), v7.0 (agent orchestration — AST intelligence, task routing, context efficiency, TDD execution, review gates), v7.1 (trajectory engineering — checkpoint, pivot, compare, choose, decision journal, dead-end detection), v8.0 (performance & agent architecture — SQLite caching, agent consolidation 11→9, namespace routing, profiler instrumentation, token budgets, RACI matrix), v8.1 (RAG-powered research — YouTube integration, NotebookLM synthesis, multi-source orchestration, 4-tier degradation, session persistence), v8.2 (cleanup & validation — dead code removal, namespace-only routing, 24-40% init speedup, RACI handoff contracts), v8.3 (agent quality & skills — OpenCode skills architecture with 27 skills and 52.4% agent line reduction, agent consistency audit, GitHub CI agent overhaul, 766 tests fully green), and v9.0 (embedded plugin experience — always-on context injection, native LLM tools, event-driven sync, advisory guardrails).
+A single-file Node.js CLI built from 34 organized `src/` modules via esbuild, producing `bin/bgsd-tools.cjs`. It provides structured data operations for AI-driven project planning workflows running in the host editor. Sixteen versions shipped: v1.0 (test suite, module split, observability), v1.1 (context reduction — 46.7% CLI, 54.6% workflow, 67% reference compression), v2.0 (state validation, cross-session memory, quality scoring), v3.0 (intent engineering — INTENT.md, drift validation, workflow injection), v4.0 (environment awareness, MCP profiling, worktree parallelism), v5.0 (codebase intelligence — convention extraction, dependency graphs, lifecycle awareness), v6.0 (UX overhaul — shared formatting engine, TTY-aware smart output, branded CLI), v7.0 (agent orchestration — AST intelligence, task routing, context efficiency, TDD execution, review gates), v7.1 (trajectory engineering — checkpoint, pivot, compare, choose, decision journal, dead-end detection), v8.0 (performance & agent architecture — SQLite caching, agent consolidation 11→9, namespace routing, profiler instrumentation, token budgets, RACI matrix), v8.1 (RAG-powered research — YouTube integration, NotebookLM synthesis, multi-source orchestration, 4-tier degradation, session persistence), v8.2 (cleanup & validation — dead code removal, namespace-only routing, 24-40% init speedup, RACI handoff contracts), v8.3 (agent quality & skills — OpenCode skills architecture with 27 skills and 52.4% agent line reduction, agent consistency audit, GitHub CI agent overhaul, 766 tests fully green), v9.0 (embedded plugin experience — always-on context injection, native LLM tools, event-driven sync, advisory guardrails), and v9.1 (performance acceleration — valibot validation, fast-glob discovery, compile-cache, SQLite statement caching, safe adoption controls).
 
 ## Core Value
 
@@ -10,22 +10,34 @@ Manage and deliver high-quality software with high-quality documentation, while 
 
 ## Current State
 
-**Last shipped:** v9.0 Embedded Plugin Experience (2026-03-09)
+**Last shipped:** v9.1 Performance Acceleration & Plugin Benchmarking (2026-03-10)
 
 ## Next Milestone Goals
 
-- Benchmark this plugin against modern OpenCode plugins to identify high-impact latency bottlenecks
-- Improve end-to-end responsiveness for the most-used commands and workflows with measurable before/after metrics
-- Adopt dependencies or newer technical approaches where they provide clear, validated performance gains
+- Expand CLI tool integrations (ripgrep, fd, fzf, bat, gh, lazygit, jq) for faster operations
+- Explore Bun runtime for 3-5x faster CLI startup and reduced memory
+- Build competitive plugin benchmark adapter for cross-plugin comparison
+- Investigate alternative libraries (valibot alternatives, caching patterns, observability)
 
-## Current Milestone: v9.1 Performance Acceleration & Plugin Benchmarking
+## Current Milestone: v9.2 CLI Tool Integrations & Runtime Modernization
 
-**Goal:** Make the plugin materially faster by combining deep performance analysis with targeted modernization, informed by competitive benchmarking.
+**Goal:** Expand CLI tool integrations for faster operations and explore Bun runtime for significant startup improvements.
 
 **Target features:**
-- Performance benchmark harness comparing bGSD workflows against modern plugin patterns
-- Profiling and latency attribution across CLI, plugin hooks, parsing, cache, and I/O paths
-- Targeted performance architecture updates (including selective dependency adoption) with regression safeguards
+- CLI tool integrations: ripgrep, fd, fzf, bat, gh, lazygit, jq, yq
+- Bun runtime exploration for 3-5x faster startup
+- Plugin benchmark adapter for cross-plugin comparison
+
+<details>
+<summary>Previous: v9.1 Performance Acceleration (shipped 2026-03-10)</summary>
+
+- Validation engine modernization — valibot with zod fallback, 34.48% improvement
+- File discovery optimization — fast-glob, in-process ignore, no subprocess overhead
+- Compile-cache acceleration — warm starts 76-102ms faster on Node 22+
+- SQLite statement caching — p50 latency reduced ~43%, p99 reduced ~22%
+- Safe adoption controls — unified optimization flags, parity-check utility, backward compatibility
+
+</details>
 
 <details>
 <summary>Previous: v9.0 Embedded Plugin Experience (shipped 2026-03-09)</summary>

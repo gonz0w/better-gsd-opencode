@@ -1,146 +1,73 @@
-# Requirements: bGSD Plugin v9.1
+# Requirements: bGSD Plugin v9.2
 
-**Defined:** 2026-03-09
+**Defined:** 2026-03-10
 **Core Value:** Manage and deliver high-quality software with high-quality documentation, while continuously reducing token usage and improving performance
 
-## v9.1 Requirements
+## v9.2 Requirements
 
-Requirements for v9.1 Performance Acceleration & Plugin Benchmarking milestone (dependency-driven scope). Each maps to roadmap phases.
+> Draft requirements — to be refined through research and planning
 
-### Validation Engine Modernization
-
-- [x] **VALD-01**: User can run plugin tools with lower schema-validation overhead by replacing Zod hot-path usage with a lighter validator engine.
-- [x] **VALD-02**: User receives identical tool behavior and output contracts after validator migration.
-- [x] **VALD-03**: Maintainer can enable fallback to legacy validation path if compatibility issues appear.
-
-### File Discovery and Ignore Optimization
-
-- [x] **SCAN-01**: User can run file-heavy commands faster via optimized traversal (`fast-glob`) in discovery hotspots.
-- [x] **SCAN-02**: User can avoid repeated ignore subprocess overhead by using in-process ignore matching (`ignore`).
-- [x] **SCAN-03**: Maintainer can preserve exact file-selection parity with legacy scan behavior.
-
-### Startup and Cache Runtime Gains
-
-- [x] **RUNT-01**: User can get faster repeated CLI invocation startup through compile-cache enablement (guarded by config/env).
-- [ ] **RUNT-02**: User can get reduced cache-layer tail latency through SQLite statement caching.
-- [x] **RUNT-03**: User can keep current behavior on unsupported runtimes via automatic fallback paths.
-
-### Safe Dependency Adoption and Rollback
-
-- [ ] **SAFE-01**: Maintainer can toggle each dependency-backed optimization independently using explicit config/env flags.
-- [ ] **SAFE-02**: User can rely on backward compatibility for existing `.planning/` artifacts after dependency migrations.
-- [ ] **SAFE-03**: Maintainer can validate each dependency adoption with parity checks and no functional regressions in core flows.
-
-## Future Requirements
-
-### Performance and Telemetry Enhancements
-
-- **PERF-01**: Competitive plugin benchmark adapter for cross-plugin comparison
-- **PERF-02**: Expanded telemetry/APM export path for performance observability
-
-### Runtime Modernization (v9.2 Backlog)
-
-- **RUNT-04**: User can run CLI with Bun runtime for faster startup (~3-5x) and reduced memory usage
-- **RUNT-05**: User can use Bun as build tool for faster bundling compared to esbuild
-- **RUNT-06**: User can use pnpm for faster package installation and reduced disk usage
-
-### CLI Tool Integration (v9.2 Backlog)
+### CLI Tool Integrations
 
 #### Search and Grep Tools
-- **CLI-01**: Plugin can use ripgrep (rg) for 5-10x faster content searching with PCRE2 support
-- **CLI-02**: Plugin can use ugrep for fastest grep alternative with pattern flexibility
-- **CLI-03**: Plugin can auto-detect available grep tool and fall back to Node equivalents
+
+- [ ] **CLI-01**: Plugin can use ripgrep (rg) for 5-10x faster content searching with PCRE2 support
+- [ ] **CLI-02**: Plugin can use ugrep for fastest grep alternative with pattern flexibility
+- [ ] **CLI-03**: Plugin can auto-detect available grep tool and fall back to Node equivalents
 
 #### File Discovery Tools
-- **CLI-04**: Plugin can use fd for faster file traversal with simpler syntax than find
-- **CLI-05**: Plugin can use fd's ignore integration for consistent .gitignore handling
+
+- [ ] **CLI-04**: Plugin can use fd for faster file traversal with simpler syntax than find
+- [ ] **CLI-05**: Plugin can use fd's ignore integration for consistent .gitignore handling
 
 #### Fuzzy Finding Tools
-- **CLI-06**: Plugin can integrate with fzf for interactive file/command selection
-- **CLI-07**: Plugin can use fzf-preview for enhanced interactive workflows
+
+- [ ] **CLI-06**: Plugin can integrate with fzf for interactive file/command selection
+- [ ] **CLI-07**: Plugin can use fzf-preview for enhanced interactive workflows
 
 #### Utility Tools
-- **CLI-08**: Plugin can use bat for syntax-highlighted file output
-- **CLI-09**: Plugin can detect CLI tool availability and provide setup hints
-- **CLI-10**: Plugin can gracefully degrade when CLI tools are unavailable
+
+- [ ] **CLI-08**: Plugin can use bat for syntax-highlighted file output
+- [ ] **CLI-09**: Plugin can detect CLI tool availability and provide setup hints
+- [ ] **CLI-10**: Plugin can gracefully degrade when CLI tools are unavailable
 
 #### Git TUI Tools
-- **CLI-11**: Plugin can integrate with lazygit for terminal git workflow
-- **CLI-12**: Plugin can use gh CLI for GitHub operations (PRs, issues, releases)
-- **CLI-13**: Plugin can use gitui for faster terminal git operations
+
+- [ ] **CLI-11**: Plugin can integrate with lazygit for terminal git workflow
+- [ ] **CLI-12**: Plugin can use gh CLI for GitHub operations (PRs, issues, releases)
+- [ ] **CLI-13**: Plugin can use gitui for faster terminal git operations
 
 #### Data Processing Tools
-- **CLI-14**: Plugin can use jq for JSON processing and filtering
-- **CLI-15**: Plugin can use yq for YAML processing
-- **CLI-16**: Plugin can use xq for XML processing
 
-#### HTTP/Network Tools
-- **CLI-17**: Plugin can use httpie/curlie for human-friendly HTTP requests
-- **CLI-18**: Plugin can use xh for fast Rust-based HTTP client
+- [ ] **CLI-14**: Plugin can use jq for JSON processing and filtering
+- [ ] **CLI-15**: Plugin can use yq for YAML processing
 
-#### Diff and Merge Tools
-- **CLI-19**: Plugin can use diff-so-fancy for prettier git diffs
-- **CLI-20**: Plugin can use icdiff for side-by-side diffs in CI/automation
+### Runtime Modernization
 
-#### Text Transformation Tools
-- **CLI-21**: Plugin can use sd for intuitive sed replacement
-- **CLI-22**: Plugin can use toree for advanced find-and-replace
+- [ ] **RUNT-04**: User can run CLI with Bun runtime for faster startup (~3-5x) and reduced memory usage
+- [ ] **RUNT-05**: User can use Bun as build tool for faster bundling compared to esbuild
+- [ ] **RUNT-06**: User can use pnpm for faster package installation and reduced disk usage
 
-#### System Monitoring Tools
-- **CLI-23**: Plugin can use btop/htop for system resource monitoring
-- **CLI-24**: Plugin can use lsof for port and file descriptor analysis
+### Benchmarking
 
-#### Documentation Tools
-- **CLI-25**: Plugin can use tldr for simplified man pages
-- **CLI-26**: Plugin can use cheat for community-driven command examples
-
-#### Process Management Tools
-- **CLI-27**: Plugin can use procs for modern process viewer
-- **CLI-28**: Plugin can use fdclone for find improvements
-
-### Library and Ecosystem Exploration (v9.2 Backlog)
-
-- **LIB-01**: Researcher explores alternative libraries and non-code enhancements to elevate plugin to world-class status. Areas to investigate:
-  - **Validation**: runtypes, arktype, msgpack/protobuf for serialization
-  - **Markdown/Docs**: unified/remark, marked, shiki for AST processing
-  - **Git**: isomorphic-git (pure JS git), simple-git CLI wrapper
-  - **Caching**: keyv, stale-while-revalidate patterns
-  - **Observability**: opentelemetry, pino for JSON logging
-  - **AI/Semantic**: @xenova/transformers, vectra for local embeddings
-  - **Config**: cosmiconfig for flexible loading
-  - **IPC**: chokidar for file watching, electron-store for persistence
-  - **Non-library**: Plugin marketplace, benchmark suite, security audit, performance regression CI, contribution guidelines, health telemetry
+- [ ] **PERF-01**: Competitive plugin benchmark adapter for cross-plugin comparison
+- [ ] **PERF-02**: Expanded telemetry/APM export path for performance observability
 
 ## Out of Scope
 
 | Feature | Reason |
 |---------|--------|
-| Broad async rewrite of all CLI/plugin internals | High churn and risk for v9.1; dependency-first wins are prioritized |
-| Dependency additions without hotspot evidence | Avoids bundle bloat and unnecessary complexity |
-| Large benchmark framework expansion in v9.1 | User requested direct runtime wins over benchmark-heavy scope |
+| Full runtime rewrite | High risk; incremental adoption preferred |
+| New dependency without hotspot evidence | Avoids bundle bloat |
 
 ## Traceability
 
-| Requirement | Phase | Status | Test Command |
-|-------------|-------|--------|--------------|
-| VALD-01 | Phase 77 | Complete | npm test |
-| VALD-02 | Phase 77 | Complete | npm test |
-| VALD-03 | Phase 77 | Complete | npm test |
-| SCAN-01 | Phase 78 | Complete | npm test |
-| SCAN-02 | Phase 78 | Complete | npm test |
-| SCAN-03 | Phase 78 | Complete | npm test |
-| RUNT-01 | Phase 79 | Complete | bin/bgsd wrapper with Node version guard |
-| RUNT-02 | Phase 80 | Pending | npm test |
-| RUNT-03 | Phase 79 | Complete | bin/bgsd wrapper fallback logic |
-| SAFE-01 | Phase 81 | Pending | npm test |
-| SAFE-02 | Phase 81 | Pending | npm test |
-| SAFE-03 | Phase 81 | Pending | npm test |
-
-**Coverage:**
-- v9.1 requirements: 12 total
-- Mapped to phases: 12
-- Unmapped: 0
+| Requirement | Phase | Status |
+|-------------|-------|--------|
+| CLI-01 - CLI-15 | TBD | Pending |
+| RUNT-04 - RUNT-06 | TBD | Pending |
+| PERF-01 - PERF-02 | TBD | Pending |
 
 ---
-*Requirements defined: 2026-03-09*
-*Last updated: 2026-03-10 after phase 79 verification*
+*Requirements defined: 2026-03-10*
+*Last updated: 2026-03-10*

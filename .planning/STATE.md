@@ -9,12 +9,12 @@ See: `.planning/PROJECT.md` (updated 2026-03-09)
 
 ## Current Position
 
-**Phase:** 81 of 81 (Safe Adoption Controls and Regression Parity)
-**Current Plan:** Not started
-**Status:** Milestone complete
+**Phase:** Milestone complete
+**Current Plan:** N/A
+**Status:** v9.1 shipped
 **Last Activity:** 2026-03-10
 
-**Progress:** [██████████] 100%
+**Progress:** Milestone complete — see `.planning/milestones/v9.1-ROADMAP.md`
 
 ## Performance Metrics
 
