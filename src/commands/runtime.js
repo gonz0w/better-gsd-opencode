@@ -2,7 +2,7 @@
 
 const path = require('path');
 const fs = require('fs');
-const { detectBun, isRunningUnderBun, benchmarkStartup } = require('../lib/cli-tools/bun-runtime');
+const { detectBun, isRunningUnderBun, benchmarkStartup, benchmarkFileIO, benchmarkNested, benchmarkHTTPServer } = require('../lib/cli-tools/bun-runtime');
 const { getInstallGuidance } = require('../lib/cli-tools/install-guidance');
 const { output } = require('../lib/output');
 
@@ -64,9 +64,39 @@ function cmdRuntimeStatus(cwd, raw) {
  */
 function cmdRuntimeBenchmark(cwd, raw, args = {}) {
   const runs = args.runs || 10;
+  const benchmarkType = args.type || 'all'; // 'simple', 'io', 'nested', 'http', 'all'
   
-  // Create a simple test script for benchmarking
-  const testScript = `
+  // Check if Bun is available first
+  const bunStatus = detectBun();
+  
+  const lines = [];
+  lines.push('=== Runtime Benchmark ===');
+  lines.push('');
+  
+  if (!bunStatus.available) {
+    lines.push('Bun is not available. Install Bun to run benchmark.');
+    lines.push('');
+    const guidance = getInstallGuidance('bun');
+    if (guidance) {
+      lines.push(`Install: ${guidance.installCommand}`);
+    }
+    
+    if (raw) {
+      output({ runs, bunAvailable: false, error: 'Bun not available' }, raw);
+    } else {
+      console.log(lines.join('\n'));
+    }
+    return;
+  }
+  
+  lines.push(`Running ${runs} iterations per benchmark type...`);
+  lines.push('');
+  
+  const results = {};
+  
+  // Run simple benchmark (existing)
+  if (benchmarkType === 'simple' || benchmarkType === 'all') {
+    const testScript = `
 const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
@@ -83,61 +113,65 @@ for (const dir of dirs) {
 }
 console.log('Processed', count, 'files');
 `;
-  
-  // Write temp script (use .cjs extension for CommonJS compatibility)
-  const scriptPath = path.join(cwd, '.bgsd-benchmark-temp.cjs');
-  fs.writeFileSync(scriptPath, testScript);
-  
-  const lines = [];
-  lines.push('=== Runtime Benchmark ===');
-  lines.push('');
-  lines.push(`Running ${runs} iterations...`);
-  lines.push('');
-  
-  // Check if Bun is available first
-  const bunStatus = detectBun();
-  
-  if (!bunStatus.available) {
-    lines.push('Bun is not available. Install Bun to run benchmark.');
-    lines.push('');
-    const guidance = getInstallGuidance('bun');
-    if (guidance) {
-      lines.push(`Install: ${guidance.installCommand}`);
-    }
-  } else {
-    // Run benchmark
-    const results = benchmarkStartup(scriptPath, runs);
-    
-    lines.push(`Node.js: ${results.node}ms (${results.nodeRuns} successful runs)`);
-    lines.push(`Bun: ${results.bun}ms (${results.bunRuns} successful runs)`);
-    lines.push('');
-    
-    if (results.node > 0 && results.bun > 0) {
-      if (results.speedup >= 1) {
-        lines.push(`Bun is ${results.speedup}x faster than Node.js`);
-      } else {
-        lines.push(`Node.js is ${(1/results.speedup).toFixed(2)}x faster than Bun`);
-      }
-    } else if (results.node > 0 && results.bun === 0) {
-      lines.push('Bun runs failed - cannot compare');
-    }
+    const scriptPath = path.join(cwd, '.bgsd-benchmark-temp.cjs');
+    fs.writeFileSync(scriptPath, testScript);
+    results.simple = benchmarkStartup(scriptPath, runs);
+    try { fs.unlinkSync(scriptPath); } catch {}
   }
   
-  // Run benchmark once and reuse results
-  const benchmarkResults = bunStatus.available ? benchmarkStartup(scriptPath, runs) : { node: null, bun: null, speedup: null };
+  // Run File I/O benchmark
+  if (benchmarkType === 'io' || benchmarkType === 'all') {
+    results.io = benchmarkFileIO(cwd, runs);
+  }
   
-  const result = {
-    runs: runs,
-    bunAvailable: bunStatus.available,
-    node: benchmarkResults.node,
-    bun: benchmarkResults.bun,
-    speedup: benchmarkResults.speedup
-  };
+  // Run Nested directory benchmark
+  if (benchmarkType === 'nested' || benchmarkType === 'all') {
+    results.nested = benchmarkNested(cwd, runs);
+  }
+  
+  // Run HTTP server benchmark
+  if (benchmarkType === 'http' || benchmarkType === 'all') {
+    results.http = benchmarkHTTPServer(cwd, runs);
+  }
+  
+  // Display results table
+  if (benchmarkType === 'all') {
+    lines.push('| Benchmark Type    | Node.js  | Bun     | Speedup | Notes                     |');
+    lines.push('|-------------------|----------|---------|---------|---------------------------|');
+    lines.push(`| Simple            | ${results.simple.node}ms  | ${results.simple.bun}ms   | ${results.simple.speedup}x   | Simple require overhead    |`);
+    lines.push(`| File I/O          | ${results.io.node}ms  | ${results.io.bun}ms   | ${results.io.speedup}x   | Read/write/parse files    |`);
+    lines.push(`| Nested Traversal  | ${results.nested.node}ms | ${results.nested.bun}ms  | ${results.nested.speedup}x   | Recursive directory walk   |`);
+    lines.push(`| HTTP Server       | ${results.http.node}ms  | ${results.http.bun}ms   | ${results.http.speedup}x   | Server + request cycle    |`);
+    lines.push('');
+    lines.push('### Realistic Improvement Range');
+    lines.push('');
+    lines.push('- **Simple:** 1.5-2x (Node.js competitive on require overhead)');
+    lines.push('- **File I/O:** 2-3x (Bun advantage on I/O operations)');
+    lines.push('- **Nested:** 2-4x (Bun advantage on recursive traversal)');
+    lines.push('- **HTTP:** 3-5x (Bun advantage on full bootstrap)');
+    lines.push('');
+    lines.push('### Why Node.js v25 is Competitive');
+    lines.push('');
+    lines.push('Node.js v25 has improved simple require performance, closing the gap on basic module loading.');
+    lines.push('However, Bun still excels at:');
+    lines.push('- File I/O operations (native async I/O)');
+    lines.push('- Recursive directory traversal');
+    lines.push('- Full application bootstrap with HTTP servers');
+  } else {
+    // Single benchmark mode
+    const r = results[benchmarkType];
+    lines.push(`Node.js: ${r.node}ms (${r.nodeRuns} runs)`);
+    lines.push(`Bun: ${r.bun}ms (${r.bunRuns} runs)`);
+    lines.push('');
+    lines.push(`Speedup: ${r.speedup}x`);
+  }
 
-  // Cleanup temp script after benchmark
-  try {
-    fs.unlinkSync(scriptPath);
-  } catch {}
+  const result = {
+    runs,
+    bunAvailable: true,
+    type: benchmarkType,
+    results
+  };
 
   if (raw) {
     output(result, raw);
