@@ -6,7 +6,7 @@ This milestone delivers dependency-driven performance acceleration for the plugi
 
 ## Milestones
 
-- 🚧 **v9.1 Performance Acceleration & Plugin Benchmarking** - Phases 77-81 (in progress)
+- ✅ **v9.1 Performance Acceleration & Plugin Benchmarking** - Phases 77-81 (completed)
 - ✅ Previous milestones shipped - see `.planning/MILESTONES.md`
 
 ## Phases
@@ -15,7 +15,7 @@ This milestone delivers dependency-driven performance acceleration for the plugi
 - [x] **Phase 78: File Discovery and Ignore Optimization** - Speed high-fanout scans and remove ignore subprocess overhead with parity guarantees. (completed 2026-03-10)
 - [x] **Phase 79: Startup Compile-Cache Acceleration** - Improve repeated CLI startup through guarded compile-cache enablement and fallback behavior. (completed 2026-03-10)
 - [x] **Phase 80: SQLite Statement Cache Acceleration** - Reduce cache-layer tail latency through statement reuse with runtime-safe fallback. (completed 2026-03-10)
-- [ ] **Phase 81: Safe Adoption Controls and Regression Parity** - Provide independent optimization toggles and enforce backward-compatible core flows.
+- [x] **Phase 81: Safe Adoption Controls and Regression Parity** - Provide independent optimization toggles and enforce backward-compatible core flows. (completed 2026-03-09)
 
 ## Phase Details
 
@@ -66,7 +66,7 @@ This milestone delivers dependency-driven performance acceleration for the plugi
   1. Maintainer can toggle each dependency-backed optimization independently using explicit flags.
   2. User can continue using existing `.planning/` artifacts with no compatibility break after migrations.
   3. Maintainer can run parity checks and validate no functional regressions in core flows.
-**Plans**: TBD
+**Plans**: 2/2 plans complete
 
 ## Progress
 
@@ -76,4 +76,4 @@ This milestone delivers dependency-driven performance acceleration for the plugi
 | 78. File Discovery and Ignore Optimization | 3/3 | Complete    | 2026-03-10 |
 | 79. Startup Compile-Cache Acceleration | 3/3 | Complete    | 2026-03-10 |
 | 80. SQLite Statement Cache Acceleration | 1/1 | Complete    | 2026-03-10 |
-| 81. Safe Adoption Controls and Regression Parity | 0/TBD | Not started | - |
+| 81. Safe Adoption Controls and Regression Parity | 2/2 | Complete    | 2026-03-09 |

@@ -10,9 +10,9 @@ See: `.planning/PROJECT.md` (updated 2026-03-09)
 ## Current Position
 
 **Phase:** 81 of 81 (Safe Adoption Controls and Regression Parity)
-**Current Plan:** 01 complete
+**Current Plan:** 02 complete
 **Status:** Plan complete
-**Last Activity:** 2026-03-10
+**Last Activity:** 2026-03-09
 
 **Progress:** [██████████] 100%
 
@@ -38,6 +38,7 @@ See: `.planning/PROJECT.md` (updated 2026-03-09)
 | Phase 79-startup-compile-cache-acceleration P02 | 10 min | 3 tasks | 3 files |
 | Phase 80-sqlite-statement-cache-acceleration P01 | 8 min | 3 tasks | 1 file |
 | Phase 81-safe-adoption-controls-and-regression-parity P01 | 7 min | 3 tasks | 4 files |
+| Phase 81 P02 | 8 min | 3 tasks | 1 file |
 
 ## Accumulated Context
 
@@ -66,6 +67,7 @@ See: `.planning/PROJECT.md` (updated 2026-03-09)
 - [Phase 80-sqlite-statement-cache-acceleration]: BGSD_SQLITE_STATEMENT_CACHE env var controls feature (default: enabled on Node 22.5+)
 - [Phase 81-safe-adoption-controls-and-regression-parity]: Added optimization flags section to CONFIG_SCHEMA with env var override support
 - [Phase 81-safe-adoption-controls-and-regression-parity]: Created util:settings command to display all config including optimization flags
+- [Phase 81-02]: Parser backward compatibility verified — parsers gracefully handle missing fields, extra unknown fields, and return null for non-existent files
 
 ### Pending Todos
 
@@ -78,6 +80,6 @@ None yet.
 
 ## Session Continuity
 
-**Last session:** 2026-03-10T04:26:15Z
-**Stopped at:** Completed 81-01-PLAN.md — Phase 81 Plan 01 complete
+**Last session:** 2026-03-09T21:38:00Z
+**Stopped at:** Completed 81-02-PLAN.md — Phase 81 Plan 02 complete
 **Next step:** Phase 81 complete - milestone v9.1 ready for completion
