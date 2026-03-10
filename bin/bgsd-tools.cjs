@@ -15269,6 +15269,24 @@ var require_discovery = __commonJS({
     function getActiveMode() {
       return DEFAULT_MODE;
     }
+    function diagnoseParity(cwd) {
+      const legacyDirs = legacyGetSourceDirs(cwd).sort();
+      const optimizedDirs = optimizedGetSourceDirs(cwd).sort();
+      const dirsMatch = stableStringify(legacyDirs) === stableStringify(optimizedDirs);
+      const dirs = dirsMatch ? legacyDirs : [.../* @__PURE__ */ new Set([...legacyDirs, ...optimizedDirs])].sort();
+      const skipDirs = SKIP_DIRS;
+      const legacyFiles = legacyWalkSourceFiles(cwd, dirs, skipDirs).sort();
+      const optimizedFiles = optimizedWalkSourceFiles(cwd, dirs, skipDirs).sort();
+      const filesMatch = stableStringify(legacyFiles) === stableStringify(optimizedFiles);
+      const legacySet = new Set(legacyFiles);
+      const optimizedSet = new Set(optimizedFiles);
+      const onlyLegacy = legacyFiles.filter((f) => !optimizedSet.has(f));
+      const onlyOptimized = optimizedFiles.filter((f) => !legacySet.has(f));
+      return {
+        sourceDirs: { match: dirsMatch, legacy: legacyDirs, optimized: optimizedDirs },
+        walkFiles: { match: filesMatch, legacy: legacyFiles, optimized: optimizedFiles, onlyLegacy, onlyOptimized }
+      };
+    }
     module2.exports = {
       LANGUAGE_MAP,
       SKIP_DIRS,
@@ -15279,7 +15297,8 @@ var require_discovery = __commonJS({
       legacyWalkSourceFiles,
       optimizedGetSourceDirs,
       optimizedWalkSourceFiles,
-      getActiveMode
+      getActiveMode,
+      diagnoseParity
     };
   }
 });

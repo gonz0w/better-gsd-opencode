@@ -404,6 +404,46 @@ function getActiveMode() {
   return DEFAULT_MODE;
 }
 
+/**
+ * Parity diagnostic: run both discovery paths and return a structured comparison.
+ * Designed for mismatch triage — maintainers can call this to identify exactly
+ * which files or directories differ between legacy and optimized behavior.
+ *
+ * Usage:
+ *   BGSD_DISCOVERY_SHADOW=1 — enables shadow compare on every call (via env)
+ *   discovery.diagnoseParity(cwd) — explicit one-shot comparison for triage
+ *
+ * Fallback controls:
+ *   BGSD_DISCOVERY_MODE=legacy — forces legacy subprocess path globally
+ *   options.mode = 'legacy' — forces legacy per-call in adapter API
+ *   options.shadowCompare = true — runs both paths and logs mismatches
+ *
+ * @param {string} cwd - Project root to diagnose
+ * @returns {{ sourceDirs: { match: boolean, legacy: string[], optimized: string[] }, walkFiles: { match: boolean, legacy: string[], optimized: string[], onlyLegacy: string[], onlyOptimized: string[] }}}
+ */
+function diagnoseParity(cwd) {
+  const legacyDirs = legacyGetSourceDirs(cwd).sort();
+  const optimizedDirs = optimizedGetSourceDirs(cwd).sort();
+  const dirsMatch = stableStringify(legacyDirs) === stableStringify(optimizedDirs);
+
+  const dirs = dirsMatch ? legacyDirs : [...new Set([...legacyDirs, ...optimizedDirs])].sort();
+  const skipDirs = SKIP_DIRS;
+
+  const legacyFiles = legacyWalkSourceFiles(cwd, dirs, skipDirs).sort();
+  const optimizedFiles = optimizedWalkSourceFiles(cwd, dirs, skipDirs).sort();
+  const filesMatch = stableStringify(legacyFiles) === stableStringify(optimizedFiles);
+
+  const legacySet = new Set(legacyFiles);
+  const optimizedSet = new Set(optimizedFiles);
+  const onlyLegacy = legacyFiles.filter(f => !optimizedSet.has(f));
+  const onlyOptimized = optimizedFiles.filter(f => !legacySet.has(f));
+
+  return {
+    sourceDirs: { match: dirsMatch, legacy: legacyDirs, optimized: optimizedDirs },
+    walkFiles: { match: filesMatch, legacy: legacyFiles, optimized: optimizedFiles, onlyLegacy, onlyOptimized },
+  };
+}
+
 module.exports = {
   LANGUAGE_MAP,
   SKIP_DIRS,
@@ -415,4 +455,5 @@ module.exports = {
   optimizedGetSourceDirs,
   optimizedWalkSourceFiles,
   getActiveMode,
+  diagnoseParity,
 };

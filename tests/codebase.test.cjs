@@ -2328,5 +2328,48 @@ describe('discovery parity: legacy vs optimized (Phase 78 Plan 03)', () => {
     });
     assertSourceDirsParity(tmpDir);
   });
+
+  // ─── diagnoseParity: structured mismatch diagnostic ─────────────────────
+  test('diagnoseParity returns structured comparison with match flags', () => {
+    tmpDir = createParityProject({
+      files: {
+        'src/index.js': 'module.exports = {};\n',
+        'package.json': '{"name":"test"}\n',
+      },
+    });
+    const result = discovery.diagnoseParity(tmpDir);
+
+    // Source dirs should match for a simple project
+    assert.strictEqual(result.sourceDirs.match, true, 'Source dirs should match');
+    assert.ok(Array.isArray(result.sourceDirs.legacy), 'legacy dirs should be array');
+    assert.ok(Array.isArray(result.sourceDirs.optimized), 'optimized dirs should be array');
+
+    // Walk files should match (no gitignore differences)
+    assert.strictEqual(result.walkFiles.match, true, 'Walk files should match with no gitignore rules');
+    assert.deepStrictEqual(result.walkFiles.onlyLegacy, [], 'No legacy-only files');
+    assert.deepStrictEqual(result.walkFiles.onlyOptimized, [], 'No optimized-only files');
+  });
+
+  test('diagnoseParity reports onlyLegacy for gitignore-filtered files', () => {
+    tmpDir = createParityProject({
+      files: {
+        'src/index.js': 'module.exports = {};\n',
+        'src/debug.log': 'debug output\n',
+        'package.json': '{"name":"test"}\n',
+      },
+      gitignoreRules: ['*.log'],
+    });
+    const result = discovery.diagnoseParity(tmpDir);
+
+    // Source dirs match (gitignore doesn't affect dir detection)
+    assert.strictEqual(result.sourceDirs.match, true, 'Source dirs should match');
+
+    // Walk files differ: legacy includes .log, optimized filters it
+    assert.strictEqual(result.walkFiles.match, false, 'Walk files should differ');
+    assert.ok(result.walkFiles.onlyLegacy.some(f => f.endsWith('.log')),
+      'onlyLegacy should contain the .log file');
+    assert.deepStrictEqual(result.walkFiles.onlyOptimized, [],
+      'onlyOptimized should be empty (optimized is a subset of legacy here)');
+  });
 });
 
