@@ -2,6 +2,14 @@
 
 const { COMMAND_HELP } = require('./lib/constants');
 const { error } = require('./lib/output');
+const { diagnoseCompileCache } = require('./lib/runtime-capabilities');
+
+// ─── Compile-cache guard (Phase 79: startup compile-cache acceleration) ────────
+// This runs at CLI startup to check if compile-cache should be enabled.
+// Uses BGSD_COMPILE_CACHE env var (1=enable, 0=disable, default=disabled).
+// Falls back gracefully on unsupported runtimes (RUNT-03 requirement).
+// Only shows diagnostic info in verbose mode (BGSD_DEBUG=1).
+const _compileCacheDiag = diagnoseCompileCache({ verbose: false });
 
 // ─── Lazy-loaded command modules ─────────────────────────────────────────────
 // Each module is loaded on first use, not at startup. This avoids parsing and
@@ -101,8 +109,11 @@ async function main() {
   // ─── Namespace Parsing: support namespace:command syntax ─────────────────────
   // Split on first colon only: "plan:intent" → namespace="plan", cmd="intent"
   // "plan:intent show" → namespace="plan", subcmd="intent show"
+  // Also support space-separated: "init execute-phase 79" → namespace="init", subcmd="execute-phase"
   let namespace = null;
   let remainingArgs = args.slice(1);
+  
+  const KNOWN_NAMESPACES = ['init', 'plan', 'execute', 'verify', 'util', 'research', 'cache'];
   
   if (command && command.includes(':')) {
     const colonIdx = command.indexOf(':');
@@ -112,6 +123,9 @@ async function main() {
     if (cmdPart) {
       remainingArgs = [cmdPart, ...remainingArgs];
     }
+  } else if (command && KNOWN_NAMESPACES.includes(command)) {
+    // Space-separated: "init execute-phase 79" → treat first arg as namespace
+    namespace = command;
   }
 
   // ─── Profiler: opt-in performance timing via BGSD_PROFILE=1 ────────────

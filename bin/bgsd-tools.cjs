@@ -1015,6 +1015,119 @@ var require_output = __commonJS({
   }
 });
 
+// src/lib/runtime-capabilities.js
+var require_runtime_capabilities = __commonJS({
+  "src/lib/runtime-capabilities.js"(exports2, module2) {
+    var os = require("os");
+    function parseNodeVersion(version) {
+      const match = version.replace(/^v/, "").match(/^(\d+)\.(\d+)\.(\d+)/);
+      if (!match) {
+        return { major: 0, minor: 0, patch: 0 };
+      }
+      return {
+        major: parseInt(match[1], 10),
+        minor: parseInt(match[2], 10),
+        patch: parseInt(match[3], 10)
+      };
+    }
+    function detectCompileCacheSupport() {
+      const version = parseNodeVersion(process.version);
+      if (version.major < 10) {
+        return {
+          supported: false,
+          reason: `Node.js ${process.version} is too old. Compile-cache requires Node 10.4.0+.`
+        };
+      }
+      if (version.major === 10 && version.minor < 4) {
+        return {
+          supported: false,
+          reason: `Node.js ${process.version} predates compile-cache flag. Requires Node 10.4.0+.`
+        };
+      }
+      if (version.major >= 22) {
+        return {
+          supported: true,
+          reason: `Node.js ${process.version} supports compile-cache (enabled by default in 22+).`
+        };
+      }
+      return {
+        supported: true,
+        reason: `Node.js ${process.version} supports --experimental-code-cache flag.`
+      };
+    }
+    function isCompileCacheEnabled() {
+      const envValue = process.env.BGSD_COMPILE_CACHE;
+      if (envValue !== void 0) {
+        if (envValue === "1" || envValue === "true") {
+          return { enabled: true, source: "env" };
+        }
+        if (envValue === "0" || envValue === "false") {
+          return { enabled: false, source: "env" };
+        }
+        console.warn(`[runtime-capabilities] Invalid BGSD_COMPILE_CACHE value: ${envValue}. Expected 0, 1, true, or false.`);
+        return { enabled: false, source: "env-invalid" };
+      }
+      return { enabled: false, source: "default" };
+    }
+    function getCompileCacheArgs() {
+      const { supported, reason: supportReason } = detectCompileCacheSupport();
+      const { enabled, source } = isCompileCacheEnabled();
+      if (source === "env" && !enabled) {
+        return {
+          useCache: false,
+          args: [],
+          reason: "BGSD_COMPILE_CACHE=0 - explicitly disabled by user"
+        };
+      }
+      if (enabled && !supported) {
+        return {
+          useCache: false,
+          args: [],
+          reason: `BGSD_COMPILE_CACHE=1 but unsupported: ${supportReason}`
+        };
+      }
+      if (enabled && supported) {
+        return {
+          useCache: true,
+          args: ["--experimental-code-cache"],
+          reason: `BGSD_COMPILE_CACHE=1 enabled, runtime supports: ${supportReason}`
+        };
+      }
+      return {
+        useCache: false,
+        args: [],
+        reason: "Default: compile-cache disabled for safety (RUNT-03 fallback)"
+      };
+    }
+    function diagnoseCompileCache(options = {}) {
+      const verbose = options.verbose || process.env.BGSD_DEBUG === "1";
+      const { supported, reason: supportReason } = detectCompileCacheSupport();
+      const { enabled, source } = isCompileCacheEnabled();
+      const { useCache, args, reason } = getCompileCacheArgs();
+      if (verbose) {
+        console.error(`[runtime-capabilities] Compile-cache diagnostics:`);
+        console.error(`  Runtime support: ${supported ? "YES" : "NO"} - ${supportReason}`);
+        console.error(`  User setting: ${source} - ${enabled ? "enabled" : "disabled"}`);
+        console.error(`  Active: ${useCache ? "YES" : "NO"} - ${reason}`);
+      }
+      return {
+        runtimeSupported: supported,
+        userEnabled: enabled,
+        settingSource: source,
+        useCache,
+        args,
+        reason
+      };
+    }
+    module2.exports = {
+      detectCompileCacheSupport,
+      isCompileCacheEnabled,
+      getCompileCacheArgs,
+      diagnoseCompileCache
+    };
+  }
+});
+
 // src/lib/config.js
 var require_config = __commonJS({
   "src/lib/config.js"(exports2, module2) {
@@ -34171,6 +34284,8 @@ var require_router = __commonJS({
     "use strict";
     var { COMMAND_HELP } = require_constants();
     var { error } = require_output();
+    var { diagnoseCompileCache } = require_runtime_capabilities();
+    var _compileCacheDiag = diagnoseCompileCache({ verbose: false });
     var _modules = {};
     function lazyState() {
       return _modules.state || (_modules.state = require_state());
@@ -34280,6 +34395,7 @@ var require_router = __commonJS({
       const cwd = process.cwd();
       let namespace = null;
       let remainingArgs = args.slice(1);
+      const KNOWN_NAMESPACES = ["init", "plan", "execute", "verify", "util", "research", "cache"];
       if (command && command.includes(":")) {
         const colonIdx = command.indexOf(":");
         namespace = command.substring(0, colonIdx);
@@ -34287,6 +34403,8 @@ var require_router = __commonJS({
         if (cmdPart) {
           remainingArgs = [cmdPart, ...remainingArgs];
         }
+      } else if (command && KNOWN_NAMESPACES.includes(command)) {
+        namespace = command;
       }
       const { startTimer: profStart, endTimer: profEnd, writeBaseline, isProfilingEnabled } = require_profiler();
       const cmdTimer = profStart("command:" + (command || "unknown"));
