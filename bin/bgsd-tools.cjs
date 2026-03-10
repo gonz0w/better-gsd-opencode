@@ -441,15 +441,16 @@ Subcommands:
   phase-completeness <phase>   Check all plans have summaries
   references <file>            Check @-refs and paths resolve
   commits <h1> [h2] ...       Batch verify commit hashes
-  artifacts <plan-file>        Check must_haves.artifacts
+  artifacts <plan-file>         Check must_haves.artifacts
   key-links <plan-file>        Check must_haves.key_links
   analyze-plan <plan-file>     Analyze plan complexity
   deliverables [--plan file]   Run tests + verify deliverables
   requirements                 Check REQUIREMENTS.md coverage
   regression [--before f] [--after f]  Detect regressions
   plan-wave <phase-dir>        Check file conflicts
-  plan-deps <phase-dir>        Check dependency cycles
-  quality [--plan f] [--phase N]  Composite quality score`,
+  plan-deps <phase-dir>       Check dependency cycles
+  quality [--plan f] [--phase N]  Composite quality score
+  agents [--check-overlap]     Verify agent manifests and check overlap`,
       "verify:assertions": `Usage: bgsd-tools verify:assertions <subcommand> [options]
 
 Manage structured acceptance criteria.
@@ -7183,6 +7184,70 @@ var require_verify = __commonJS({
       }
       output2(result, raw, passed ? "passed" : errs.length > 0 ? "failed" : "warnings");
     }
+    function cmdVerifyAgents(cwd, options, raw) {
+      const os = require("os");
+      const checkOverlap = options && options.checkOverlap;
+      const agentDir = path.join(process.env.HOME || os.homedir(), ".config", "opencode", "agents");
+      if (!fs.existsSync(agentDir)) {
+        output2({ error: "Agent directory not found", path: agentDir }, raw);
+        return;
+      }
+      const agentFiles = fs.readdirSync(agentDir).filter(f => f.endsWith(".md") && f.startsWith("bgsd-"));
+      const agents = [];
+      for (const file of agentFiles) {
+        const filePath = path.join(agentDir, file);
+        const content = safeReadFile(filePath);
+        if (!content) continue;
+        const fm = extractFrontmatter(content);
+        const name = file.replace(".md", "");
+        const description = fm.description || "No description";
+        let tools = [];
+        if (fm.tools && typeof fm.tools === "object") {
+          tools = Object.keys(fm.tools).filter(k => fm.tools[k] === true || fm.tools[k] === "true");
+        }
+        const capabilities = [];
+        if (/<skills>/.test(content)) {
+          const skillMatch = content.match(/<skills>([\s\S]*?)<\/skills>/);
+          if (skillMatch) {
+            const skillBlock = skillMatch[1];
+            const lines = skillBlock.trim().split("\n");
+            let foundHeader = false;
+            for (const line of lines) {
+              if (line.includes("|---")) {
+                foundHeader = true;
+                continue;
+              }
+              if (!foundHeader) continue;
+              const match = line.match(/^\|\s*(\S+)\s*\|/);
+              if (match && match[1] && match[1] !== "Skill") {
+                capabilities.push(match[1]);
+              }
+            }
+          }
+        }
+        agents.push({ name, description, tools, capabilities, file });
+      }
+      const overlaps = [];
+      for (let i = 0; i < agents.length; i++) {
+        for (let j = i + 1; j < agents.length; j++) {
+          const a1 = agents[i];
+          const a2 = agents[j];
+          const commonTools = a1.tools.filter(t => a2.tools.includes(t));
+          const commonCaps = a1.capabilities.filter(c => a2.capabilities.includes(c));
+          if (commonTools.length > 0 || commonCaps.length > 0) {
+            overlaps.push({ agent1: a1.name, agent2: a2.name, common_tools: commonTools, common_capabilities: commonCaps });
+          }
+        }
+      }
+      const result = {
+        agent_count: agents.length,
+        agents: agents.map(a => ({ name: a.name, description: a.description, tool_count: a.tools.length, capability_count: a.capabilities.length })),
+        overlap_checked: checkOverlap,
+        overlaps_found: overlaps.length,
+        overlaps: checkOverlap ? overlaps : []
+      };
+      output2(result, raw, overlaps.length === 0 ? "passed" : "warnings");
+    }
     module2.exports = {
       cmdVerifyPlanStructure,
       cmdVerifyPhaseCompleteness,
@@ -7200,6 +7265,7 @@ var require_verify = __commonJS({
       cmdVerifyPlanWave,
       cmdVerifyPlanDeps,
       cmdVerifyQuality,
+      cmdVerifyAgents,
       parseAssertionsMd,
       cmdAssertionsList,
       cmdAssertionsValidate
@@ -36014,8 +36080,13 @@ Available: execute-phase, plan-phase, new-project, new-milestone, quick, resume,
                   plan: planIdx !== -1 ? restArgs[planIdx + 1] : null,
                   phase: phaseIdx !== -1 ? restArgs[phaseIdx + 1] : null
                 }, raw);
+              } else if (verifySub === "agents") {
+                const overlapIdx = restArgs.indexOf("--check-overlap");
+                lazyVerify().cmdVerifyAgents(cwd, {
+                  checkOverlap: overlapIdx !== -1
+                }, raw);
               } else {
-                error("Unknown verify subcommand. Available: plan-structure, phase-completeness, references, commits, artifacts, key-links, analyze-plan, deliverables, requirements, regression, plan-wave, plan-deps, quality");
+                error("Unknown verify subcommand. Available: plan-structure, phase-completeness, references, commits, artifacts, key-links, analyze-plan, deliverables, requirements, regression, plan-wave, plan-deps, quality, agents");
               }
             } else if (subcommand === "assertions") {
               const assertSub = restArgs[0];
