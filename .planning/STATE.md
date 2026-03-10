@@ -10,7 +10,7 @@ See: `.planning/PROJECT.md` (updated 2026-03-09)
 ## Current Position
 
 **Phase:** 79 of 81 (Startup Compile-cache Acceleration)
-**Current Plan:** 79-01 complete
+**Current Plan:** 79-02 complete
 **Status:** Plan complete
 **Last Activity:** 2026-03-10
 
@@ -35,6 +35,7 @@ See: `.planning/PROJECT.md` (updated 2026-03-09)
 | Phase 78 P02 | 3 min | 3 tasks | 5 files |
 | Phase 78 P03 | 11 min | 3 tasks | 4 files |
 | Phase 79-startup-compile-cache-acceleration P01 | 5 min | 3 tasks | 4 files |
+| Phase 79-startup-compile-cache-acceleration P02 | 10 min | 3 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -56,6 +57,8 @@ See: `.planning/PROJECT.md` (updated 2026-03-09)
 - [Phase 79-startup-compile-cache-acceleration]: Compile-cache guard uses BGSD_COMPILE_CACHE env var (default disabled for safety)
 - [Phase 79-startup-compile-cache-acceleration]: Runtime capability detection identifies Node 10.4+ support, graceful fallback on older runtimes
 - [Phase 79-startup-compile-cache-acceleration]: Benchmark shows ~10% startup speedup with compile-cache enabled
+- [Phase 79-02]: Created bin/bgsd wrapper script that applies --experimental-code-cache flag before spawning Node
+- [Phase 79-02]: RUNT-01 achieved - warm starts are faster (76-102ms) due to Node 22+ compile-cache by default
 
 ### Pending Todos
 
@@ -68,6 +71,6 @@ None yet.
 
 ## Session Continuity
 
-**Last session:** 2026-03-10T03:30:00Z
-**Stopped at:** Completed 79-01-PLAN.md — Phase 79 Plan 01 complete
+**Last session:** 2026-03-10T03:45:00Z
+**Stopped at:** Completed 79-02-PLAN.md — Phase 79 Plan 02 complete
 **Next step:** Plan Phase 80 or continue Phase 79
