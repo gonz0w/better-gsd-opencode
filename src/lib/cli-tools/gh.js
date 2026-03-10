@@ -213,8 +213,9 @@ function checkAuth(options = {}) {
         windowsHide: true
       });
       
-      // Parse auth status - if no error, user is logged in
-      const isLoggedIn = output.includes('Logged in to') || output.includes('github.com');
+      // Parse auth status - check for logged in indicator
+      // gh auth status returns "Logged in to github.com as user..." on success
+      const isLoggedIn = output.includes('Logged in to') && output.includes('.github.com');
       return { authenticated: isLoggedIn, status: output.trim() };
     },
     () => {
