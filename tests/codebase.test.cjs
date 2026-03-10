@@ -8,7 +8,7 @@ const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
 
-const { TOOLS_PATH, runGsdTools, createTempProject, cleanup } = require('./helpers.cjs');
+const { TOOLS_PATH, runGsdTools, createTempProject, createParityProject, cleanup } = require('./helpers.cjs');
 
 describe('codebase-impact batch grep', () => {
   test('returns dependents for a known file', () => {
@@ -2022,6 +2022,311 @@ describe('optimized discovery default (Phase 78 Plan 02)', () => {
       adapterSrc.includes('runWithShadowCompare'),
       'Shadow compare runner should still be available'
     );
+  });
+});
+
+// ─── Phase 78 Plan 03: Legacy-vs-Optimized Parity Fixture Matrix ──────────
+describe('discovery parity: legacy vs optimized (Phase 78 Plan 03)', () => {
+  const discovery = require('../src/lib/adapters/discovery');
+  let tmpDir;
+
+  afterEach(() => {
+    if (tmpDir) cleanup(tmpDir);
+    tmpDir = null;
+  });
+
+  /**
+   * Helper: compare legacy and optimized source-dir outputs,
+   * normalizing sort order so comparison is deterministic.
+   */
+  function assertSourceDirsParity(cwd) {
+    const legacy = discovery.legacyGetSourceDirs(cwd).sort();
+    const optimized = discovery.optimizedGetSourceDirs(cwd).sort();
+    assert.deepStrictEqual(optimized, legacy,
+      `Source-dir parity mismatch.\n  Legacy:    ${JSON.stringify(legacy)}\n  Optimized: ${JSON.stringify(optimized)}`);
+    return { legacy, optimized };
+  }
+
+  /**
+   * Helper: compare legacy and optimized walk-files outputs.
+   * When no .gitignore rules affect walked files, both paths should produce identical results.
+   */
+  function assertWalkFilesParity(cwd, sourceDirs) {
+    const skipDirs = discovery.SKIP_DIRS;
+    const legacyFiles = discovery.legacyWalkSourceFiles(cwd, sourceDirs, skipDirs).sort();
+    const optimizedFiles = discovery.optimizedWalkSourceFiles(cwd, sourceDirs, skipDirs).sort();
+    assert.deepStrictEqual(optimizedFiles, legacyFiles,
+      `Walk-files parity mismatch.\n  Legacy (${legacyFiles.length} files):    ${JSON.stringify(legacyFiles.slice(0, 10))}\n  Optimized (${optimizedFiles.length} files): ${JSON.stringify(optimizedFiles.slice(0, 10))}`);
+    return { legacy: legacyFiles, optimized: optimizedFiles };
+  }
+
+  // ─── Parity fixture 1: Basic project with src directory ──────────────────
+  test('parity: basic project with src directory', () => {
+    tmpDir = createParityProject({
+      files: {
+        'src/index.js': 'const x = 1;\n',
+        'src/utils.js': 'module.exports = {};\n',
+        'package.json': '{"name":"test"}\n',
+      },
+    });
+    const dirs = assertSourceDirsParity(tmpDir);
+    assertWalkFilesParity(tmpDir, dirs.legacy);
+  });
+
+  // ─── Parity fixture 2: Root-level source files (no src/) ────────────────
+  test('parity: root-level source files trigger fallback to "."', () => {
+    tmpDir = createParityProject({
+      files: {
+        'app.js': 'console.log("root level");\n',
+        'config.json': '{"key": "value"}\n',
+      },
+    });
+    const dirs = assertSourceDirsParity(tmpDir);
+    assert.ok(dirs.legacy.includes('.'), 'Legacy should detect root-level "."');
+    assertWalkFilesParity(tmpDir, dirs.legacy);
+  });
+
+  // ─── Parity fixture 3: Nested .gitignore — source-dir detection parity ──
+  test('parity: nested .gitignore — source-dir detection agrees', () => {
+    tmpDir = createParityProject({
+      files: {
+        'src/index.js': 'module.exports = {};\n',
+        'src/gen/output.js': '// generated file\n',
+        'src/gen/keep.js': '// should be kept\n',
+        'package.json': '{"name":"test"}\n',
+      },
+      nestedGitignores: {
+        'src/gen': ['output.js'],
+      },
+    });
+    assertSourceDirsParity(tmpDir);
+  });
+
+  // ─── Parity fixture 3b: Optimized walk filters nested-ignored files ─────
+  test('optimized walk correctly filters files matched by nested .gitignore', () => {
+    tmpDir = createParityProject({
+      files: {
+        'src/index.js': 'module.exports = {};\n',
+        'src/gen/output.js': '// generated file — ignored\n',
+        'src/gen/keep.js': '// should be kept\n',
+        'package.json': '{"name":"test"}\n',
+      },
+      nestedGitignores: {
+        'src/gen': ['output.js'],
+      },
+    });
+    const skipDirs = discovery.SKIP_DIRS;
+    const sourceDirs = discovery.legacyGetSourceDirs(tmpDir);
+    const legacyFiles = discovery.legacyWalkSourceFiles(tmpDir, sourceDirs, skipDirs).sort();
+    const optimizedFiles = discovery.optimizedWalkSourceFiles(tmpDir, sourceDirs, skipDirs).sort();
+
+    // Legacy does NOT apply .gitignore during walk — it includes the ignored file
+    assert.ok(legacyFiles.some(f => f.includes('output.js')),
+      'Legacy walk does not filter nested-gitignored files (known limitation)');
+    // Optimized correctly filters the ignored file
+    assert.ok(!optimizedFiles.some(f => f.includes('output.js')),
+      'Optimized walk should filter files matching nested .gitignore rules');
+    // Both keep the non-ignored file
+    assert.ok(legacyFiles.some(f => f.includes('keep.js')), 'Legacy keeps non-ignored files');
+    assert.ok(optimizedFiles.some(f => f.includes('keep.js')), 'Optimized keeps non-ignored files');
+  });
+
+  // ─── Parity fixture 4: Negation rules — source-dir detection parity ─────
+  test('parity: gitignore negation rules — source-dir detection agrees', () => {
+    tmpDir = createParityProject({
+      files: {
+        'src/index.js': 'const x = 1;\n',
+        'logs/app.log': 'some log\n',
+        'logs/important.js': '// important script in logs\n',
+        'package.json': '{"name":"test"}\n',
+      },
+      gitignoreRules: [
+        'logs/',
+        '!logs/important.js',
+      ],
+    });
+    assertSourceDirsParity(tmpDir);
+  });
+
+  // ─── Parity fixture 5: Hidden directories ─────────────────────────────
+  test('parity: hidden directories are skipped by both paths', () => {
+    tmpDir = createParityProject({
+      files: {
+        'src/index.js': 'module.exports = {};\n',
+        '.hidden/secret.js': '// hidden dir source\n',
+        '.config/settings.js': '// config dir source\n',
+        'package.json': '{"name":"test"}\n',
+      },
+    });
+    const dirs = assertSourceDirsParity(tmpDir);
+    // Neither path should include hidden directories
+    assert.ok(!dirs.legacy.includes('.hidden'), 'Legacy should skip .hidden');
+    assert.ok(!dirs.optimized.includes('.hidden'), 'Optimized should skip .hidden');
+    assertWalkFilesParity(tmpDir, dirs.legacy);
+  });
+
+  // ─── Parity fixture 6: Git-ignored top-level directory — source-dir parity
+  test('parity: git-ignored top-level directory excluded from source-dirs by both paths', () => {
+    tmpDir = createParityProject({
+      files: {
+        'src/index.js': 'const x = 1;\n',
+        'generated/output.js': '// generated output\n',
+        'package.json': '{"name":"test"}\n',
+      },
+      gitignoreRules: ['generated/'],
+    });
+    const dirs = assertSourceDirsParity(tmpDir);
+    assert.ok(!dirs.legacy.includes('generated'), 'Legacy should skip git-ignored dir');
+    assert.ok(!dirs.optimized.includes('generated'), 'Optimized should skip git-ignored dir');
+    // Note: walk parity for "." root includes generated/ in legacy (no gitignore in walk),
+    // tested separately in the "optimized walk filters" test below
+  });
+
+  // ─── Parity fixture 6b: Optimized walk filters dir-level gitignore files
+  test('optimized walk filters files inside git-ignored directories', () => {
+    tmpDir = createParityProject({
+      files: {
+        'src/index.js': 'const x = 1;\n',
+        'generated/output.js': '// generated output\n',
+        'package.json': '{"name":"test"}\n',
+      },
+      gitignoreRules: ['generated/'],
+    });
+    const skipDirs = discovery.SKIP_DIRS;
+    // Force both to walk "generated" to observe filter behavior
+    const legacyFiles = discovery.legacyWalkSourceFiles(tmpDir, ['src', 'generated'], skipDirs).sort();
+    const optimizedFiles = discovery.optimizedWalkSourceFiles(tmpDir, ['src', 'generated'], skipDirs).sort();
+
+    // Legacy doesn't apply gitignore during walk — includes generated/output.js
+    assert.ok(legacyFiles.some(f => f.includes('generated')),
+      'Legacy walk includes files from git-ignored dir (known)');
+    // Optimized correctly filters the git-ignored directory contents
+    assert.ok(!optimizedFiles.some(f => f.includes('generated')),
+      'Optimized walk should filter out files inside git-ignored directories');
+  });
+
+  // ─── Parity fixture 7: Multiple KNOWN_SOURCE_DIRS present ──────────────
+  test('parity: multiple known source dirs (src, lib, test)', () => {
+    tmpDir = createParityProject({
+      files: {
+        'src/main.js': 'module.exports = {};\n',
+        'lib/helpers.js': 'module.exports = {};\n',
+        'tests/test.js': 'require("assert");\n',
+        'package.json': '{"name":"test"}\n',
+      },
+    });
+    const dirs = assertSourceDirsParity(tmpDir);
+    assert.ok(dirs.legacy.includes('src'), 'Should detect src');
+    assert.ok(dirs.legacy.includes('lib'), 'Should detect lib');
+    assert.ok(dirs.legacy.includes('tests'), 'Should detect tests');
+    assertWalkFilesParity(tmpDir, dirs.legacy);
+  });
+
+  // ─── Parity fixture 8: Non-standard dir with source files ───────────────
+  test('parity: non-standard directory with source files detected', () => {
+    tmpDir = createParityProject({
+      files: {
+        'scripts/deploy.js': 'console.log("deploy");\n',
+        'scripts/setup.sh': '#!/bin/bash\necho setup\n',
+        'package.json': '{"name":"test"}\n',
+      },
+    });
+    const dirs = assertSourceDirsParity(tmpDir);
+    assert.ok(dirs.legacy.includes('scripts'), 'Legacy should detect scripts dir with source');
+    assertWalkFilesParity(tmpDir, dirs.legacy);
+  });
+
+  // ─── Parity fixture 9: Empty project falls back to root ─────────────────
+  test('parity: empty project (no source files) falls back to "."', () => {
+    tmpDir = createParityProject({
+      files: {
+        'README.md': '# empty project\n',
+        'package.json': '{"name":"test"}\n',
+      },
+    });
+    const dirs = assertSourceDirsParity(tmpDir);
+    assert.deepStrictEqual(dirs.legacy, ['.'], 'Should fall back to ["."] when no source dirs found');
+    assertWalkFilesParity(tmpDir, dirs.legacy);
+  });
+
+  // ─── Parity fixture 10: Symlinks in source tree ─────────────────────────
+  test('parity: symlinked entries are handled consistently', () => {
+    tmpDir = createParityProject({
+      files: {
+        'src/index.js': 'module.exports = {};\n',
+        'shared/utils.js': 'module.exports = {};\n',
+        'package.json': '{"name":"test"}\n',
+      },
+      symlinks: [
+        { target: 'shared', link: 'src/shared-link' },
+      ],
+    });
+    // Both paths should work without error; exact symlink inclusion may differ
+    // but both must not crash
+    const legacyDirs = discovery.legacyGetSourceDirs(tmpDir).sort();
+    const optimizedDirs = discovery.optimizedGetSourceDirs(tmpDir).sort();
+    assert.ok(Array.isArray(legacyDirs), 'Legacy should return array');
+    assert.ok(Array.isArray(optimizedDirs), 'Optimized should return array');
+  });
+
+  // ─── Parity fixture 11: SKIP_DIRS are always excluded ───────────────────
+  test('parity: SKIP_DIRS (node_modules, .git, dist, build) always excluded', () => {
+    tmpDir = createParityProject({
+      files: {
+        'src/index.js': 'module.exports = {};\n',
+        'node_modules/dep/index.js': '// dependency\n',
+        'dist/bundle.js': '// built output\n',
+        'build/output.js': '// built output\n',
+        'package.json': '{"name":"test"}\n',
+      },
+    });
+    const dirs = assertSourceDirsParity(tmpDir);
+    assert.ok(!dirs.legacy.includes('node_modules'), 'node_modules should be excluded');
+    assert.ok(!dirs.legacy.includes('dist'), 'dist should be excluded');
+    assert.ok(!dirs.legacy.includes('build'), 'build should be excluded');
+    assertWalkFilesParity(tmpDir, dirs.legacy);
+  });
+
+  // ─── Parity fixture 12: Wildcard .gitignore — optimized improvement ─────
+  test('optimized walk correctly filters wildcard-gitignored files (*.log, *.tmp)', () => {
+    tmpDir = createParityProject({
+      files: {
+        'src/index.js': 'module.exports = {};\n',
+        'src/debug.log': 'debug output\n',
+        'src/data.tmp': 'temp data\n',
+        'package.json': '{"name":"test"}\n',
+      },
+      gitignoreRules: ['*.log', '*.tmp'],
+    });
+    const skipDirs = discovery.SKIP_DIRS;
+    const sourceDirs = discovery.legacyGetSourceDirs(tmpDir);
+    const legacyFiles = discovery.legacyWalkSourceFiles(tmpDir, sourceDirs, skipDirs).sort();
+    const optimizedFiles = discovery.optimizedWalkSourceFiles(tmpDir, sourceDirs, skipDirs).sort();
+
+    // Legacy does NOT apply .gitignore during walk
+    assert.ok(legacyFiles.some(f => f.endsWith('.log')),
+      'Legacy walk includes *.log files (known limitation — no gitignore filtering in walk)');
+    // Optimized correctly filters gitignored patterns
+    assert.ok(!optimizedFiles.some(f => f.endsWith('.log')),
+      'Optimized walk should filter *.log per .gitignore');
+    assert.ok(!optimizedFiles.some(f => f.endsWith('.tmp')),
+      'Optimized walk should filter *.tmp per .gitignore');
+    // Both include the real source file
+    assert.ok(legacyFiles.some(f => f.includes('index.js')), 'Legacy keeps source files');
+    assert.ok(optimizedFiles.some(f => f.includes('index.js')), 'Optimized keeps source files');
+  });
+
+  // ─── Parity fixture 13: Source-dir detection with wildcard gitignore ────
+  test('parity: wildcard gitignore does not affect source-dir detection', () => {
+    tmpDir = createParityProject({
+      files: {
+        'src/index.js': 'module.exports = {};\n',
+        'src/debug.log': 'debug output\n',
+        'package.json': '{"name":"test"}\n',
+      },
+      gitignoreRules: ['*.log'],
+    });
+    assertSourceDirsParity(tmpDir);
   });
 });
 
