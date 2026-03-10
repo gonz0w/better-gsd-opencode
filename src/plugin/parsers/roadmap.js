@@ -70,8 +70,8 @@ function parsePhases(content) {
     const plansMatch = section.match(/\*\*Plans:?\*\*:?\s*(?:(\d+)\/)?(\d+)\s*plan/i);
     const planCount = plansMatch ? parseInt(plansMatch[2], 10) : 0;
 
-    // Check completion status via checkbox
-    const escaped = number.replace(/\./g, '\\.');
+    // Check completion status via checkbox - escape all regex special chars
+    const escaped = number.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const checkboxPattern = new RegExp(`-\\s*\\[x\\]\\s*.*Phase\\s+${escaped}`, 'i');
     const status = checkboxPattern.test(content) ? 'complete' : 'incomplete';
 

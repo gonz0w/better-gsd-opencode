@@ -61,7 +61,8 @@ export function createNotifier($, directory) {
   async function sendOsNotification(message) {
     if (!$) return;
     try {
-      const safeMsg = String(message).replace(/"/g, '\\"').replace(/'/g, "'");
+      // Properly escape for shell - escape all shell metacharacters
+      const safeMsg = String(message).replace(/["`$\\]/g, '\\$&');
       if (process.platform === 'darwin') {
         await $`osascript -e ${"display notification \"" + safeMsg + "\" with title \"bGSD\""}`.quiet();
       } else {

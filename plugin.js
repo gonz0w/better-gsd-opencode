@@ -108,7 +108,7 @@ function parsePhases(content) {
     const goal = goalMatch ? goalMatch[1].trim() : null;
     const plansMatch = section.match(/\*\*Plans:?\*\*:?\s*(?:(\d+)\/)?(\d+)\s*plan/i);
     const planCount = plansMatch ? parseInt(plansMatch[2], 10) : 0;
-    const escaped = number5.replace(/\./g, "\\.");
+    const escaped = number5.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     const checkboxPattern = new RegExp(`-\\s*\\[x\\]\\s*.*Phase\\s+${escaped}`, "i");
     const status = checkboxPattern.test(content) ? "complete" : "incomplete";
     phases.push(Object.freeze({
@@ -16203,7 +16203,7 @@ function createNotifier($, directory) {
   async function sendOsNotification(message) {
     if (!$) return;
     try {
-      const safeMsg = String(message).replace(/"/g, '\\"').replace(/'/g, "'");
+      const safeMsg = String(message).replace(/["`$\\]/g, "\\$&");
       if (process.platform === "darwin") {
         await $`osascript -e ${'display notification "' + safeMsg + '" with title "bGSD"'}`.quiet();
       } else {
