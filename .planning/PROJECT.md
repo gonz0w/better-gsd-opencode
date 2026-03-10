@@ -223,4 +223,4 @@ Known tech debt: Bundle at ~1163KB (over 1050KB budget). `node:sqlite` is Stabil
 | Namespace routing (colon syntax) | Semantic grouping for 100+ CLI commands | Good — discoverable, backward-compatible |
 
 ---
-*Last updated: 2026-03-09 after v9.1 milestone start*
+*Last updated: 2026-03-10 after v9.2 milestone start*

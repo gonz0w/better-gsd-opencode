@@ -9,12 +9,12 @@ See: `.planning/PROJECT.md` (updated 2026-03-09)
 
 ## Current Position
 
-**Phase:** Milestone complete
-**Current Plan:** N/A
-**Status:** v9.1 shipped
-**Last Activity:** 2026-03-10
+**Phase:** Not started (defining requirements)
+**Current Plan:** —
+**Status:** Defining requirements
+**Last Activity:** 2026-03-10 — Milestone v9.2 started
 
-**Progress:** Milestone complete — see `.planning/milestones/v9.1-ROADMAP.md`
+**Progress:** Starting v9.2 — CLI Tool Integrations & Runtime Modernization
 
 ## Performance Metrics
 
