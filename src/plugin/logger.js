@@ -38,11 +38,15 @@ export function createLogger(logDir) {
       if (stat.size >= MAX_LOG_SIZE) {
         try {
           copyFileSync(logPath, rotatedPath);
+        } catch {
+          // Concurrent copy - ignore
+        }
+        try {
           const fd = openSync(logPath, 'r+');
           ftruncateSync(fd, 0);
           closeSync(fd);
         } catch {
-          // Concurrent rotation - ignore
+          // File might not exist or be locked - ignore
         }
       }
     } catch {
