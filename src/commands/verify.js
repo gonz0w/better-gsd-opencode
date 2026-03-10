@@ -625,18 +625,6 @@ function cmdValidateHealth(cwd, options, raw) {
             break;
           }
           case 'regenerateState': {
-            // Create backup if exists
-            let backupPath;
-            if (fs.existsSync(statePath)) {
-              const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-              backupPath = `${statePath}.bak-${timestamp}`;
-              try {
-                fs.copyFileSync(statePath, backupPath);
-                repairActions.push({ action: 'backupState', success: true, path: backupPath });
-              } catch {
-                // Backup failed - continue anyway
-              }
-            }
             const milestone = getMilestoneInfo(cwd);
             let stateContent = `# Session State\n\n`;
             stateContent += `## Project Reference\n\n`;
