@@ -20,7 +20,7 @@
 
 ### Quality & Context
 
-- [ ] **CTXT-01**: Context loading is deterministic — agents receive pre-computed context, not search-and-discover
+- [x] **CTXT-01**: Context loading is deterministic — agents receive pre-computed context, not search-and-discover
 - [ ] **CTXT-02**: Zero orphaned code — every function, export, workflow, template, and config entry is reachable
 - [ ] **CTXT-03**: Dead code audit produces zero orphaned items
 

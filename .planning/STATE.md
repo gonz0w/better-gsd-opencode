@@ -36,6 +36,10 @@ See: `.planning/PROJECT.md` (updated 2026-03-10)
 
 ### Decisions
 
+- [88-01]: Pre-computed agent contexts stored in codebase-intel.json under agent_contexts key for 6 agent types.
+- [88-01]: Git commit hash used for cache invalidation - compares HEAD with stored hash.
+- [88-01]: 50% token reduction achieved for executor agent context via scoping.
+
 - [86-02]: Handoff contracts documented in RACI skill with inputs, outputs, preconditions for all 10 agent pairs.
 - [86-01]: Agent manifest audit found zero capability conflicts - all agents share foundational tools (read, write, bash, grep, glob) and skills (project-context, structured-returns), but each has distinct primary responsibility.
 - [86-01]: Created verify:agents command for automated boundary validation.
@@ -75,7 +79,7 @@ None yet.
 
 ## Session Continuity
 
-**Last session:** 2026-03-10T17:19:04.100Z
-**Stopped at:** Completed 87-03 gap closure plan
-**Next step:** Move to phase 88 (Quality & Context)
+**Last session:** 2026-03-10T18:14:30.000Z
+**Stopped at:** Completed 88-01-PLAN.md
+**Next step:** Continue with remaining phase 88 plans or move to phase 89
 
