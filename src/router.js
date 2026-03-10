@@ -2,6 +2,14 @@
 
 const { COMMAND_HELP } = require('./lib/constants');
 const { error } = require('./lib/output');
+const { diagnoseCompileCache } = require('./lib/runtime-capabilities');
+
+// ─── Compile-cache guard (Phase 79: startup compile-cache acceleration) ────────
+// This runs at CLI startup to check if compile-cache should be enabled.
+// Uses BGSD_COMPILE_CACHE env var (1=enable, 0=disable, default=disabled).
+// Falls back gracefully on unsupported runtimes (RUNT-03 requirement).
+// Only shows diagnostic info in verbose mode (BGSD_DEBUG=1).
+const _compileCacheDiag = diagnoseCompileCache({ verbose: false });
 
 // ─── Lazy-loaded command modules ─────────────────────────────────────────────
 // Each module is loaded on first use, not at startup. This avoids parsing and
@@ -91,7 +99,7 @@ async function main() {
   // Parse --no-cache flag: force Map fallback for test parity verification
   const noCacheIdx = args.indexOf('--no-cache');
   if (noCacheIdx !== -1) {
-    process.env.GSD_CACHE_FORCE_MAP = '1';
+    process.env.BGSD_CACHE_FORCE_MAP = '1';
     args.splice(noCacheIdx, 1);
   }
 
@@ -101,8 +109,11 @@ async function main() {
   // ─── Namespace Parsing: support namespace:command syntax ─────────────────────
   // Split on first colon only: "plan:intent" → namespace="plan", cmd="intent"
   // "plan:intent show" → namespace="plan", subcmd="intent show"
+  // Also support space-separated: "init execute-phase 79" → namespace="init", subcmd="execute-phase"
   let namespace = null;
   let remainingArgs = args.slice(1);
+  
+  const KNOWN_NAMESPACES = ['init', 'plan', 'execute', 'verify', 'util', 'research', 'cache'];
   
   if (command && command.includes(':')) {
     const colonIdx = command.indexOf(':');
@@ -112,9 +123,12 @@ async function main() {
     if (cmdPart) {
       remainingArgs = [cmdPart, ...remainingArgs];
     }
+  } else if (command && KNOWN_NAMESPACES.includes(command)) {
+    // Space-separated: "init execute-phase 79" → treat first arg as namespace
+    namespace = command;
   }
 
-  // ─── Profiler: opt-in performance timing via GSD_PROFILE=1 ────────────
+  // ─── Profiler: opt-in performance timing via BGSD_PROFILE=1 ────────────
   const { startTimer: profStart, endTimer: profEnd, writeBaseline, isProfilingEnabled } = require('./lib/profiler');
   const cmdTimer = profStart('command:' + (command || 'unknown'));
 
@@ -127,7 +141,7 @@ async function main() {
   }
 
   if (!command) {
-    error('Usage: gsd-tools <namespace:command> [args] [--pretty] [--verbose]\nCommands: init:<workflow>, plan:<intent|requirements|roadmap|phases|find-phase|milestone|phase>, execute:<commit|rollback-info|session-diff|session-summary|velocity|worktree|tdd|test-run>, verify:<state|verify|assertions|search-decisions|search-lessons|review|context-budget|token-budget>, util:<config-get|config-set|env|current-timestamp|list-todos|todo|memory|mcp|classify|frontmatter|progress|websearch|history-digest|trace-requirement|codebase|cache|agent>, research:<capabilities|yt-search|yt-transcript|collect|nlm-create|nlm-add-source|nlm-ask|nlm-report>');
+    error('Usage: bgsd-tools <namespace:command> [args] [--pretty] [--verbose]\nCommands: init:<workflow>, plan:<intent|requirements|roadmap|phases|find-phase|milestone|phase>, execute:<commit|rollback-info|session-diff|session-summary|velocity|worktree|tdd|test-run>, verify:<state|verify|assertions|search-decisions|search-lessons|review|context-budget|token-budget>, util:<config-get|config-set|env|current-timestamp|list-todos|todo|memory|mcp|classify|frontmatter|progress|websearch|history-digest|trace-requirement|codebase|cache|agent>, research:<capabilities|yt-search|yt-transcript|collect|nlm-create|nlm-add-source|nlm-ask|nlm-report>');
   }
 
   // --help / -h: print command help to stderr (never contaminates JSON stdout)
@@ -366,7 +380,7 @@ async function main() {
           }
         } else if (subcommand === 'profile') {
           // Handle profile via environment variable, not a command
-          error('Set GSD_PROFILE=1 to enable performance profiling');
+          error('Set BGSD_PROFILE=1 to enable performance profiling');
         } else {
           error(`Unknown execute subcommand: ${subcommand}. Available: commit, rollback-info, session-diff, session-summary, velocity, worktree, tdd, test-run, trajectory`);
         }
@@ -548,6 +562,8 @@ async function main() {
           lazyMisc().cmdConfigGet(cwd, restArgs[0], raw);
         } else if (subcommand === 'config-set') {
           lazyMisc().cmdConfigSet(cwd, restArgs[0], restArgs[1], raw);
+        } else if (subcommand === 'settings') {
+          lazyMisc().cmdSettingsList(cwd, raw);
         } else if (subcommand === 'env') {
           const envSub = restArgs[0];
           if (envSub === 'scan') {
@@ -691,11 +707,11 @@ async function main() {
           } else if (cbSub === 'lifecycle') {
             lazyCodebase().cmdCodebaseLifecycle(cwd, restArgs.slice(1), raw);
           } else if (cbSub === 'ast') {
-            lazyCodebase().cmdCodebaseAst(cwd, restArgs[1], raw);
+            lazyCodebase().cmdCodebaseAst(cwd, restArgs.slice(1), raw);
           } else if (cbSub === 'exports') {
-            lazyCodebase().cmdCodebaseExports(cwd, restArgs[1], raw);
+            lazyCodebase().cmdCodebaseExports(cwd, restArgs.slice(1), raw);
           } else if (cbSub === 'complexity') {
-            lazyCodebase().cmdCodebaseComplexity(cwd, restArgs[1], raw);
+            lazyCodebase().cmdCodebaseComplexity(cwd, restArgs.slice(1), raw);
           } else if (cbSub === 'repo-map') {
             lazyCodebase().cmdCodebaseRepoMap(cwd, restArgs.slice(1), raw);
           } else {
@@ -712,7 +728,7 @@ async function main() {
           } else {
             output({
               commands: ['status', 'clear', 'warm'],
-              help: 'gsd-tools cache <status|clear|warm> [files...]'
+              help: 'bgsd-tools cache <status|clear|warm> [files...]'
             }, raw, 'cache');
           }
         } else if (subcommand === 'agent') {
@@ -728,6 +744,8 @@ async function main() {
           }
         } else if (subcommand === 'resolve-model') {
           lazyMisc().cmdResolveModel(cwd, restArgs[0], raw);
+        } else if (subcommand === 'parity-check') {
+          await lazyMisc().cmdParityCheck(cwd, restArgs, raw);
         } else if (subcommand === 'template') {
           const tmplSub = restArgs[0];
           if (tmplSub === 'select') {
@@ -853,7 +871,7 @@ async function main() {
           } else if (profSub === 'cache-speedup') {
             await lazyProfiler().cmdProfilerCacheSpeedup(restArgs.slice(1));
           } else if (!profSub || profSub === '--help' || profSub === '-h') {
-            process.stderr.write(`Usage: gsd-tools util:profiler <subcommand> [options]
+            process.stderr.write(`Usage: bgsd-tools util:profiler <subcommand> [options]
 
 Performance profiler commands.
 
@@ -862,8 +880,8 @@ Subcommands:
   cache-speedup      Measure cache speedup by running commands with/without cache
 
 Examples:
-  gsd-tools util:profiler compare --before baseline.json --after current.json
-  gsd-tools util:profiler cache-speedup --runs 3 --command "state validate"
+  bgsd-tools util:profiler compare --before baseline.json --after current.json
+  bgsd-tools util:profiler cache-speedup --runs 3 --command "state validate"
 `);
           } else {
             error(`Unknown profiler subcommand: ${profSub}. Available: compare, cache-speedup`);

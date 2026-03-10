@@ -200,7 +200,13 @@ function cmdConfigSet(cwd, keyPath, value, raw) {
     }
     current = current[key];
   }
-  current[keys[keys.length - 1]] = parsedValue;
+  // Prevent prototype pollution
+  const lastKey = keys[keys.length - 1];
+  if (lastKey === '__proto__' || lastKey === 'constructor' || lastKey === 'prototype') {
+    error('Cannot set prototype properties');
+  }
+  
+  current[lastKey] = parsedValue;
 
   // Write back
   try {
@@ -1197,10 +1203,20 @@ function cmdSummaryExtract(cwd, summaryPath, fields, raw) {
     });
   };
 
+  // Extract one-liner: prefer frontmatter, fall back to first bold line in body
+  let oneLiner = fm['one-liner'] || null;
+  if (!oneLiner) {
+    // Look for **bold text** as the first non-heading, non-empty line after frontmatter
+    const bodyMatch = content.match(/^---[\s\S]*?---\s*\n(?:#[^\n]*\n\s*)*\*\*([^*]+)\*\*/m);
+    if (bodyMatch) {
+      oneLiner = bodyMatch[1].trim();
+    }
+  }
+
   // Build full result
   const fullResult = {
     path: summaryPath,
-    one_liner: fm['one-liner'] || null,
+    one_liner: oneLiner,
     key_files: fm['key-files'] || [],
     tech_added: (fm['tech-stack'] && fm['tech-stack'].added) || [],
     patterns: fm['patterns-established'] || [],
@@ -1584,6 +1600,167 @@ function cmdReview(cwd, args, raw) {
   }, raw);
 }
 
+async function cmdParityCheck(cwd, args, raw) {
+  const { checkParity, checkAllParity } = require('../lib/utils/parity-check');
+  
+  // Parse args
+  const optIdx = args.indexOf('--optimization');
+  const helpIdx = args.indexOf('--help');
+  const jsonIdx = args.indexOf('--json');
+  
+  const showHelp = helpIdx !== -1;
+  const outputJson = jsonIdx !== -1;
+  
+  // Check for help
+  if (showHelp) {
+    output({
+      commands: ['parity-check'],
+      help: `Usage: bgsd-tools util:parity-check [--optimization <name>] [--json]
+
+Check parity for dependency-backed optimizations.
+
+Options:
+  --optimization <name>  Check specific optimization: valibot, discovery, compile_cache, sqlite_cache
+  --json                 Output in JSON format
+  --help                 Show this help
+
+Without --optimization, checks all optimizations.
+
+Exit codes:
+  0 - All optimizations in parity
+  1 - One or more optimizations not in parity
+
+Examples:
+  bgsd-tools util:parity-check
+  bgsd-tools util:parity-check --optimization valibot
+  bgsd-tools util:parity-check --json`,
+    }, raw, 'parity-check');
+    return;
+  }
+  
+  let results;
+  
+  if (optIdx !== -1 && args[optIdx + 1]) {
+    const optName = args[optIdx + 1];
+    const result = await checkParity(optName, { cwd });
+    results = [result];
+  } else {
+    results = await checkAllParity({ cwd });
+  }
+  
+  // Determine overall match status
+  const allMatch = results.every(r => r.match === true);
+  const exitCode = allMatch ? 0 : 1;
+  
+  if (outputJson) {
+    output({
+      optimizations: results.map(r => ({
+        name: r.optimization,
+        match: r.match,
+        details: r.details,
+      })),
+      allMatch,
+      exitCode,
+    }, raw);
+  } else {
+    // Human-readable output
+    const lines = [];
+    lines.push('=== Parity Check Results ===');
+    lines.push('');
+    
+    for (const result of results) {
+      const status = result.match === true ? '✓ PARITY' : (result.match === false ? '✗ MISMATCH' : '? UNKNOWN');
+      lines.push(`${result.optimization}: ${status}`);
+      
+      if (result.details) {
+        if (result.details.error) {
+          lines.push(`  Error: ${result.details.error}`);
+        } else if (result.details.summary) {
+          lines.push(`  ${result.details.summary}`);
+        } else if (result.details.sourceDirs) {
+          lines.push(`  Source dirs: ${result.details.sourceDirs.match ? 'MATCH' : 'DIFFER'}`);
+          lines.push(`  Walk files: ${result.details.walkFiles.match ? 'MATCH' : 'DIFFER'}`);
+        } else {
+          // Show key details
+          for (const [key, value] of Object.entries(result.details)) {
+            lines.push(`  ${key}: ${value}`);
+          }
+        }
+      }
+      lines.push('');
+    }
+    
+    lines.push(`Overall: ${allMatch ? 'ALL IN PARITY' : 'SOME MISMATCHES'}`);
+    lines.push(`Exit code: ${exitCode}`);
+    
+    output(lines.join('\n'), raw);
+  }
+  
+  // Exit with appropriate code
+  if (!raw && exitCode !== 0) {
+    process.exit(exitCode);
+  }
+}
+
+function cmdSettingsList(cwd, raw) {
+  const { loadConfig } = require('../lib/config');
+  const { CONFIG_SCHEMA } = require('../lib/constants');
+  
+  const config = loadConfig(cwd);
+  
+  // Build output with all config keys including optimization flags
+  const outputLines = [];
+  outputLines.push('=== bGSD Settings ===');
+  outputLines.push('');
+  
+  // Group keys by category
+  const categories = {
+    'General': ['model_profile', 'mode', 'depth', 'commit_docs', 'test_gate', 'context_window', 'context_target_percent'],
+    'Workflow': ['research', 'plan_checker', 'verifier', 'parallelization', 'brave_search'],
+    'Git': ['branching_strategy', 'phase_branch_template', 'milestone_branch_template'],
+    'Research': ['rag_enabled', 'rag_timeout', 'ytdlp_path', 'nlm_path', 'mcp_config_path'],
+    'Optimization': ['optimization_valibot', 'optimization_valibot_fallback', 'optimization_discovery', 'optimization_compile_cache', 'optimization_sqlite_cache'],
+  };
+  
+  for (const [category, keys] of Object.entries(categories)) {
+    outputLines.push(`--- ${category} ---`);
+    for (const key of keys) {
+      const def = CONFIG_SCHEMA[key];
+      if (!def) continue;
+      
+      const value = config[key];
+      const desc = def.description || '';
+      const env = def.env ? ` (env: ${def.env})` : '';
+      
+      outputLines.push(`${key}: ${value}${env} - ${desc}`);
+    }
+    outputLines.push('');
+  }
+  
+  const outputText = outputLines.join('\n');
+  
+  // Output as both structured data and text
+  const structured = {
+    categories: {},
+  };
+  
+  for (const [category, keys] of Object.entries(categories)) {
+    structured.categories[category] = {};
+    for (const key of keys) {
+      if (config[key] !== undefined) {
+        const def = CONFIG_SCHEMA[key];
+        structured.categories[category][key] = {
+          value: config[key],
+          description: def?.description || '',
+          env_var: def?.env || null,
+        };
+      }
+    }
+  }
+  
+  output(structured, raw, outputText);
+}
+
 module.exports = {
   cmdGenerateSlug,
   cmdCurrentTimestamp,
@@ -1613,4 +1790,6 @@ module.exports = {
   cmdScaffold,
   cmdTdd,
   cmdReview,
+  cmdSettingsList,
+  cmdParityCheck,
 };

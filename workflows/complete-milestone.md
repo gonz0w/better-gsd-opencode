@@ -10,7 +10,7 @@ templates/milestone.md, templates/milestone-archive.md, .planning/ROADMAP.md, .p
 
 <step name="verify_readiness">
 ```bash
-ROADMAP=$(node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs plan:roadmap analyze)
+ROADMAP=$(node __OPENCODE_CONFIG__/bgsd-oc/bin/bgsd-tools.cjs plan:roadmap analyze)
 ```
 
 Verify: all milestone phases complete (`disk_status === 'complete'`), `progress_percent` 100%.
@@ -35,7 +35,7 @@ Present: phases, plans, tasks, files, LOC, timeline, git range.
 <step name="extract_accomplishments">
 ```bash
 for summary in .planning/phases/*-*/*-SUMMARY.md; do
-  node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs util:summary-extract "$summary" --fields one_liner | jq -r '.one_liner'
+  node __OPENCODE_CONFIG__/bgsd-oc/bin/bgsd-tools.cjs util:summary-extract "$summary" --fields one_liner | jq -r '.one_liner'
 done
 ```
 Extract 4-6 key accomplishments.
@@ -153,7 +153,7 @@ This automation ensures every milestone has complete documentation with:
 
 <step name="archive_milestone">
 ```bash
-ARCHIVE=$(node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs plan:milestone complete "v[X.Y]" --name "[Name]")
+ARCHIVE=$(node __OPENCODE_CONFIG__/bgsd-oc/bin/bgsd-tools.cjs plan:milestone complete "v[X.Y]" --name "[Name]")
 ```
 
 CLI handles: milestones dir, ROADMAP archive, REQUIREMENTS archive, MILESTONES.md entry, STATE.md update.
@@ -190,7 +190,7 @@ Ask: push to remote?
 
 <step name="git_commit_milestone">
 ```bash
-node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs execute:commit "chore: complete v[X.Y] milestone" --files .planning/milestones/v[X.Y]-ROADMAP.md .planning/milestones/v[X.Y]-REQUIREMENTS.md .planning/milestones/v[X.Y]-DOCS.md .planning/MILESTONES.md .planning/PROJECT.md .planning/STATE.md
+node __OPENCODE_CONFIG__/bgsd-oc/bin/bgsd-tools.cjs execute:commit "chore: complete v[X.Y] milestone" --files .planning/milestones/v[X.Y]-ROADMAP.md .planning/milestones/v[X.Y]-REQUIREMENTS.md .planning/milestones/v[X.Y]-DOCS.md .planning/MILESTONES.md .planning/PROJECT.md .planning/STATE.md
 ```
 </step>
 

@@ -65,7 +65,7 @@ Follow the same questionnaire as new-project Step 4.5 — ask Q1-Q4 (Objective, 
 Display current intent summary (compact):
 
 ```bash
-node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs plan:intent show
+node __OPENCODE_CONFIG__/bgsd-oc/bin/bgsd-tools.cjs plan:intent show
 ```
 
 Then ask guided questions about intent evolution:
@@ -88,7 +88,7 @@ Then ask guided questions about intent evolution:
 All updates use the `--reason` flag to capture why the change was made, automatically logging to the `<history>` section.
 
 ```bash
-node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs execute:commit "docs: evolve intent for milestone v[X.Y]" --files .planning/INTENT.md
+node __OPENCODE_CONFIG__/bgsd-oc/bin/bgsd-tools.cjs execute:commit "docs: evolve intent for milestone v[X.Y]" --files .planning/INTENT.md
 ```
 
 Present evolution summary:
@@ -119,16 +119,16 @@ Keep Accumulated Context section from previous milestone.
 Delete MILESTONE-CONTEXT.md if exists (consumed).
 
 ```bash
-node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs execute:commit "docs: start milestone v[X.Y] [Name]" --files .planning/PROJECT.md .planning/STATE.md
+node __OPENCODE_CONFIG__/bgsd-oc/bin/bgsd-tools.cjs execute:commit "docs: start milestone v[X.Y] [Name]" --files .planning/PROJECT.md .planning/STATE.md
 ```
 
 ## 7. Load Context and Resolve Models
 
-```bash
-INIT=$(node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs init:new-milestone)
-```
+**Context:** This workflow receives project context via `<bgsd-context>` auto-injected by the bGSD plugin's `command.execute.before` hook. If no `<bgsd-context>` block is present, the plugin is not loaded.
 
-Extract from init JSON: `researcher_model`, `synthesizer_model`, `roadmapper_model`, `commit_docs`, `research_enabled`, `current_milestone`, `project_exists`, `roadmap_exists`.
+**If no `<bgsd-context>` found:** Stop and tell the user: "bGSD plugin required for v9.0. Install with: npx bgsd-oc"
+
+Extract from `<bgsd-context>` JSON: `researcher_model`, `synthesizer_model`, `roadmapper_model`, `commit_docs`, `research_enabled`, `current_milestone`, `project_exists`, `roadmap_exists`.
 
 ## 8. Research Decision
 
@@ -140,10 +140,10 @@ question: "Research the domain ecosystem for new features before defining requir
 
 ```bash
 # If "Research first": persist true
-node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs util:config-set workflow.research true
+node __OPENCODE_CONFIG__/bgsd-oc/bin/bgsd-tools.cjs util:config-set workflow.research true
 
 # If "Skip research": persist false
-node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs util:config-set workflow.research false
+node __OPENCODE_CONFIG__/bgsd-oc/bin/bgsd-tools.cjs util:config-set workflow.research false
 ```
 
 **If "Research first":**
@@ -161,7 +161,7 @@ node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs util:config-set workflo
 mkdir -p .planning/research
 ```
 
-Spawn 4 parallel gsd-project-researcher agents. Each uses this template with dimension-specific fields:
+Spawn 4 parallel bgsd-project-researcher agents. Each uses this template with dimension-specific fields:
 
 **Common structure for all 4 researchers:**
 ```
@@ -186,9 +186,9 @@ Focus ONLY on what's needed for the NEW features.
 
 <output>
 Write to: .planning/research/{FILE}
-Use template: __OPENCODE_CONFIG__/get-shit-done/templates/research-project/{FILE}
+Use template: __OPENCODE_CONFIG__/bgsd-oc/templates/research-project/{FILE}
 </output>
-", subagent_type="gsd-project-researcher", model="{researcher_model}", description="{DIMENSION} research")
+", subagent_type="bgsd-project-researcher", model="{researcher_model}", description="{DIMENSION} research")
 ```
 
 **Dimension-specific fields:**
@@ -215,9 +215,9 @@ Synthesize research outputs into SUMMARY.md.
 </files_to_read>
 
 Write to: .planning/research/SUMMARY.md
-Use template: __OPENCODE_CONFIG__/get-shit-done/templates/research-project/SUMMARY.md
+Use template: __OPENCODE_CONFIG__/bgsd-oc/templates/research-project/SUMMARY.md
 Commit after writing.
-", subagent_type="gsd-roadmapper", model="{roadmapper_model}", description="Synthesize research")
+", subagent_type="bgsd-roadmapper", model="{roadmapper_model}", description="Synthesize research")
 ```
 
 Display key findings from SUMMARY.md:
@@ -303,7 +303,7 @@ If "adjust": Return to scoping.
 
 **Commit requirements:**
 ```bash
-node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs execute:commit "docs: define milestone v[X.Y] requirements" --files .planning/REQUIREMENTS.md
+node __OPENCODE_CONFIG__/bgsd-oc/bin/bgsd-tools.cjs execute:commit "docs: define milestone v[X.Y] requirements" --files .planning/REQUIREMENTS.md
 ```
 
 ## 10. Create Roadmap
@@ -343,7 +343,7 @@ Create roadmap for milestone v[X.Y]:
 
 Write files first, then return.
 </instructions>
-", subagent_type="gsd-roadmapper", model="{roadmapper_model}", description="Create roadmap")
+", subagent_type="bgsd-roadmapper", model="{roadmapper_model}", description="Create roadmap")
 ```
 
 **Handle return:**
@@ -381,13 +381,13 @@ Success criteria:
 
 **Validate roadmap parity** (before commit):
 ```bash
-ROADMAP_CHECK=$(node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs verify:validate roadmap --repair 2>/dev/null)
+ROADMAP_CHECK=$(node __OPENCODE_CONFIG__/bgsd-oc/bin/bgsd-tools.cjs verify:validate roadmap --repair 2>/dev/null)
 ```
 If errors found: auto-repair adds missing checklist entries. If repair fails: warn user.
 
 **Commit roadmap** (after approval):
 ```bash
-node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs execute:commit "docs: create milestone v[X.Y] roadmap ([N] phases)" --files .planning/ROADMAP.md .planning/STATE.md .planning/REQUIREMENTS.md
+node __OPENCODE_CONFIG__/bgsd-oc/bin/bgsd-tools.cjs execute:commit "docs: create milestone v[X.Y] roadmap ([N] phases)" --files .planning/ROADMAP.md .planning/STATE.md .planning/REQUIREMENTS.md
 ```
 
 ## 11. Done
@@ -430,7 +430,7 @@ Also: `/bgsd-plan-phase [N]` — skip discussion, plan directly
 - [ ] Research completed (if selected) — 4 parallel agents, milestone-aware
 - [ ] Requirements gathered and scoped per category
 - [ ] REQUIREMENTS.md created with REQ-IDs
-- [ ] gsd-roadmapper spawned with phase numbering context
+- [ ] bgsd-roadmapper spawned with phase numbering context
 - [ ] Roadmap files written immediately (not draft)
 - [ ] User feedback incorporated (if any)
 - [ ] ROADMAP.md phases continue from previous milestone

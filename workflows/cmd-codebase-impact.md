@@ -17,7 +17,7 @@ If no files provided:
 ```
 Usage: /bgsd-codebase-impact <files...>
 
-Example: /bgsd-codebase-impact bin/gsd-tools.cjs
+Example: /bgsd-codebase-impact bin/bgsd-tools.cjs
 Example: /bgsd-codebase-impact src/lib/config.js src/lib/frontmatter.js
 ```
 Exit.
@@ -27,7 +27,7 @@ Exit.
 Run the codebase-impact command:
 
 ```bash
-RESULT=$(node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs util:codebase impact $FILES 2>/dev/null)
+RESULT=$(node __OPENCODE_CONFIG__/bgsd-oc/bin/bgsd-tools.cjs util:codebase impact $FILES 2>/dev/null)
 ```
 
 Parse the JSON output which includes:

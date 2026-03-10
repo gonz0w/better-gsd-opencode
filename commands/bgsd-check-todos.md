@@ -14,7 +14,7 @@ Routes to the check-todos workflow which handles:
 </objective>
 
 <execution_context>
-@__OPENCODE_CONFIG__/get-shit-done/workflows/check-todos.md
+@__OPENCODE_CONFIG__/bgsd-oc/workflows/check-todos.md
 </execution_context>
 
 <context>
@@ -24,7 +24,7 @@ Todo state and roadmap correlation are loaded in-workflow using `init todos` and
 </context>
 
 <process>
-**Follow the check-todos workflow** from `@__OPENCODE_CONFIG__/get-shit-done/workflows/check-todos.md`.
+**Follow the check-todos workflow** from `@__OPENCODE_CONFIG__/bgsd-oc/workflows/check-todos.md`.
 
 The workflow handles all logic including:
 1. Todo existence checking

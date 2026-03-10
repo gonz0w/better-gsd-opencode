@@ -16,8 +16,8 @@ function cmdRoadmapGetPhase(cwd, phaseNum, raw) {
       return;
     }
 
-    // Escape special regex chars in phase number, handle decimal
-    const escapedPhase = phaseNum.replace(/\./g, '\\.');
+    // Escape special regex chars in phase number, handle decimal - escape all special chars
+    const escapedPhase = phaseNum.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
     // Match "## Phase X:", "### Phase X:", or "#### Phase X:" with optional name
     const phasePattern = new RegExp(

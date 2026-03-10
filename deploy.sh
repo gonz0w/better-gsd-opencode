@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# Deploy GSD plugin changes to live OpenCode config
+# Deploy bGSD plugin changes to live OpenCode config
 set -euo pipefail
 
-DEST="$HOME/.config/opencode/get-shit-done"
+DEST="$HOME/.config/opencode/bgsd-oc"
 SRC="$(cd "$(dirname "$0")" && pwd)"
 
-echo "Deploying GSD plugin from dev workspace..."
+echo "Deploying bGSD plugin from dev workspace..."
 echo "  Source: $SRC"
 echo "  Dest:   $DEST"
 echo ""
@@ -44,6 +44,7 @@ fi
 
 # Step 3: Manifest-based file sync
 AGENT_DIR="$HOME/.config/opencode/agents"
+SKILL_DIR="$HOME/.config/opencode/skills"
 MANIFEST="$SRC/bin/manifest.json"
 OLD_MANIFEST="$DEST/bin/manifest.json"
 
@@ -57,12 +58,13 @@ dest_for_file() {
 	local file="$1"
 	case "$file" in
 	commands/bgsd-*.md) echo "$CMD_DIR/$(basename "$file")" ;;
-	agents/gsd-*.md) echo "$AGENT_DIR/$(basename "$file")" ;;
+	agents/bgsd-*.md) echo "$AGENT_DIR/$(basename "$file")" ;;
+	skills/*) echo "$SKILL_DIR/${file#skills/}" ;;
 	*) echo "$DEST/$file" ;;
 	esac
 }
 
-mkdir -p "$CMD_DIR" "$AGENT_DIR"
+mkdir -p "$CMD_DIR" "$AGENT_DIR" "$SKILL_DIR"
 
 # Snapshot old manifest BEFORE copying (copy loop overwrites it)
 HAS_OLD_MANIFEST=false
@@ -121,21 +123,41 @@ fi
 
 echo "  Sync: $ADDED added, $UPDATED updated, $REMOVED removed"
 
+# Clean up old gsd-*.md agent files that now have bgsd-*.md replacements
+OLD_AGENTS=0
+for old_agent in "$AGENT_DIR"/gsd-*.md; do
+	[ -f "$old_agent" ] || continue
+	new_name=$(basename "$old_agent" | sed 's/^gsd-/bgsd-/')
+	if [ -f "$AGENT_DIR/$new_name" ]; then
+		rm "$old_agent"
+		OLD_AGENTS=$((OLD_AGENTS + 1))
+	fi
+done
+if [ $OLD_AGENTS -gt 0 ]; then
+	echo "  Cleaned up $OLD_AGENTS old gsd-*.md agent files"
+fi
+
+# Step 3d: Copy plugin.js to OpenCode auto-load directory
+# OpenCode discovers plugins from ~/.config/opencode/plugin/ (singular, NOT plural)
+PLUGIN_DIR="$HOME/.config/opencode/plugin"
+mkdir -p "$PLUGIN_DIR"
+cp "$SRC/plugin.js" "$PLUGIN_DIR/bgsd.js"
+echo "  Installed plugin: plugin/bgsd.js"
+
 # Step 3e: Substitute path placeholders with actual install paths
-# CRITICAL: Use the ~/.config/oc symlink (-> ~/.config/opencode) to avoid
-# the Anthropic auth plugin mangling "opencode" -> "Claude" in system prompts.
-# See lessons.md for the full story on this mangling issue.
-OPENCODE_CFG="$HOME/.config/oc"
+# Resolve command/workflow placeholders to OpenCode config path.
+OPENCODE_CFG="$HOME/.config/opencode"
 echo "Substituting path placeholders..."
 find "$DEST" -name '*.md' -exec sed -i "s|__OPENCODE_CONFIG__|$OPENCODE_CFG|g" {} +
 find "$CMD_DIR" -name 'bgsd-*.md' -exec sed -i "s|__OPENCODE_CONFIG__|$OPENCODE_CFG|g" {} +
-find "$AGENT_DIR" -name 'gsd-*.md' -exec sed -i "s|__OPENCODE_CONFIG__|$OPENCODE_CFG|g" {} +
-echo "  Path placeholders resolved to: $OPENCODE_CFG (symlink to ~/.config/opencode)"
+find "$AGENT_DIR" -name 'bgsd-*.md' -exec sed -i "s|__OPENCODE_CONFIG__|$OPENCODE_CFG|g" {} +
+find "$SKILL_DIR" -name '*.md' -exec sed -i "s|__OPENCODE_CONFIG__|$OPENCODE_CFG|g" {} + 2>/dev/null || true
+echo "  Path placeholders resolved to: $OPENCODE_CFG"
 
 # Step 4: Smoke test deployed artifact
 echo ""
 echo "Running smoke test..."
-SMOKE=$(node "$DEST/bin/gsd-tools.cjs" util:current-timestamp --raw 2>/dev/null) || true
+SMOKE=$(node "$DEST/bin/bgsd-tools.cjs" util:current-timestamp --raw 2>/dev/null) || true
 if [ -z "$SMOKE" ]; then
 	echo "  ❌ Smoke test FAILED — deployed artifact does not execute correctly."
 	echo "  Rolling back to backup..."
@@ -146,10 +168,31 @@ if [ -z "$SMOKE" ]; then
 fi
 echo "  ✅ Smoke test passed: $SMOKE"
 
+# Validate agent skill references
+echo "Validating skill references..."
+SKILL_ERRORS=0
+for agent in "$AGENT_DIR"/bgsd-*.md; do
+	[ -f "$agent" ] || continue
+	REFS=$(grep -oP '<skill:([a-z0-9-]+)' "$agent" 2>/dev/null | sed 's/<skill://' | sort -u || true)
+	for ref in $REFS; do
+		if [ ! -f "$SKILL_DIR/$ref/SKILL.md" ]; then
+			echo "  ⚠ $(basename "$agent"): references missing skill '$ref'"
+			SKILL_ERRORS=$((SKILL_ERRORS + 1))
+		fi
+	done
+done
+if [ $SKILL_ERRORS -gt 0 ]; then
+	echo "  ⚠ $SKILL_ERRORS broken skill references (non-fatal warning)"
+else
+	echo "  ✅ All skill references valid"
+fi
+
 CMD_COUNT=$(find "$CMD_DIR" -maxdepth 1 -name 'bgsd-*.md' 2>/dev/null | wc -l)
-AGENT_COUNT=$(find "$AGENT_DIR" -maxdepth 1 -name 'gsd-*.md' 2>/dev/null | wc -l)
+AGENT_COUNT=$(find "$AGENT_DIR" -maxdepth 1 -name 'bgsd-*.md' 2>/dev/null | wc -l)
+SKILL_COUNT=$(find "$SKILL_DIR" -maxdepth 2 -name 'SKILL.md' 2>/dev/null | wc -l)
 echo "  Commands deployed: $CMD_COUNT"
 echo "  Agents deployed: $AGENT_COUNT"
+echo "  Skills deployed: $SKILL_COUNT"
 
 echo ""
 echo "Deployed successfully."

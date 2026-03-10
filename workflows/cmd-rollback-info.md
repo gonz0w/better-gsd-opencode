@@ -27,7 +27,7 @@ Exit.
 Run the rollback-info command:
 
 ```bash
-RESULT=$(node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs execute:rollback-info "$PLAN_ID" 2>/dev/null)
+RESULT=$(node __OPENCODE_CONFIG__/bgsd-oc/bin/bgsd-tools.cjs execute:rollback-info "$PLAN_ID" 2>/dev/null)
 ```
 
 Parse the JSON output which includes:

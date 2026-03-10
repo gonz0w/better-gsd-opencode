@@ -10,22 +10,22 @@ Read all execution_context files before starting.
 
 ## 0. Initialize Milestone Context
 
-```bash
-INIT=$(node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs init:milestone-op)
-```
+**Context:** This workflow receives project context via `<bgsd-context>` auto-injected by the bGSD plugin's `command.execute.before` hook. If no `<bgsd-context>` block is present, the plugin is not loaded.
 
-Extract from init JSON: `milestone_version`, `milestone_name`, `phase_count`, `completed_phases`, `commit_docs`.
+**If no `<bgsd-context>` found:** Stop and tell the user: "bGSD plugin required for v9.0. Install with: npx bgsd-oc"
+
+Extract from `<bgsd-context>` JSON: `milestone_version`, `milestone_name`, `phase_count`, `completed_phases`, `commit_docs`.
 
 Resolve verifier model:
 ```bash
-CHECKER_MODEL=$(node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs util:resolve-model gsd-verifier)
+CHECKER_MODEL=$(node __OPENCODE_CONFIG__/bgsd-oc/bin/bgsd-tools.cjs util:resolve-model bgsd-verifier)
 ```
 
 ## 1. Determine Milestone Scope
 
 ```bash
 # Get phases in milestone (sorted numerically, handles decimals)
-node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs plan:phases list
+node __OPENCODE_CONFIG__/bgsd-oc/bin/bgsd-tools.cjs plan:phases list
 ```
 
 - Parse version from arguments or detect current from ROADMAP.md
@@ -39,7 +39,7 @@ For each phase directory, read the VERIFICATION.md:
 
 ```bash
 # For each phase, use find-phase to resolve the directory (handles archived phases)
-PHASE_INFO=$(node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs plan:find-phase 01)
+PHASE_INFO=$(node __OPENCODE_CONFIG__/bgsd-oc/bin/bgsd-tools.cjs plan:find-phase 01)
 # Extract directory from JSON, then read VERIFICATION.md from that directory
 # Repeat for each phase number from ROADMAP.md
 ```
@@ -73,7 +73,7 @@ Milestone Requirements:
 MUST map each integration finding to affected requirement IDs where applicable.
 
 Verify cross-phase wiring and E2E user flows.",
-  subagent_type="gsd-verifier",
+  subagent_type="bgsd-verifier",
   model="{verifier_model}"
 )
 ```
@@ -104,7 +104,7 @@ For each phase's VERIFICATION.md, extract the expanded requirements table:
 For each phase's SUMMARY.md, extract `requirements-completed` from YAML frontmatter:
 ```bash
 for summary in .planning/phases/*-*/*-SUMMARY.md; do
-  node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs util:summary-extract "$summary" --fields requirements_completed | jq -r '.requirements_completed'
+  node __OPENCODE_CONFIG__/bgsd-oc/bin/bgsd-tools.cjs util:summary-extract "$summary" --fields requirements_completed | jq -r '.requirements_completed'
 done
 ```
 

@@ -13,13 +13,11 @@ Dedicated mapper agents: fresh context per domain, write directly (no transfer b
 <process>
 
 <step name="init_context" priority="first">
-Load codebase mapping context:
+**Context:** This workflow receives project context via `<bgsd-context>` auto-injected by the bGSD plugin's `command.execute.before` hook. If no `<bgsd-context>` block is present, the plugin is not loaded.
 
-```bash
-INIT=$(node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs init:map-codebase)
-```
+**If no `<bgsd-context>` found:** Stop and tell the user: "bGSD plugin required for v9.0. Install with: npx bgsd-oc"
 
-Extract from init JSON: `mapper_model`, `commit_docs`, `codebase_dir`, `existing_maps`, `has_maps`, `codebase_dir_exists`.
+Extract from `<bgsd-context>` JSON: `mapper_model`, `commit_docs`, `codebase_dir`, `existing_maps`, `has_maps`, `codebase_dir_exists`.
 </step>
 
 <step name="check_existing">
@@ -72,17 +70,17 @@ Continue to spawn_agents.
 </step>
 
 <step name="spawn_agents">
-Spawn 4 parallel gsd-codebase-mapper agents.
+Spawn 4 parallel bgsd-codebase-mapper agents.
 
-Use Task tool with `subagent_type="gsd-codebase-mapper"`, `model="{mapper_model}"`, and `run_in_background=true` for parallel execution.
+Use Task tool with `subagent_type="bgsd-codebase-mapper"`, `model="{mapper_model}"`, and `run_in_background=true` for parallel execution.
 
-**CRITICAL:** Use the dedicated `gsd-codebase-mapper` agent, NOT `Explore`. The mapper agent writes documents directly.
+**CRITICAL:** Use the dedicated `bgsd-codebase-mapper` agent, NOT `Explore`. The mapper agent writes documents directly.
 
 **Agent 1: Tech Focus**
 
 ```
 Task(
-  subagent_type="gsd-codebase-mapper",
+  subagent_type="bgsd-codebase-mapper",
   model="{mapper_model}",
   run_in_background=true,
   description="Map codebase tech stack",
@@ -102,7 +100,7 @@ Explore thoroughly. Write documents directly using templates. Return confirmatio
 
 ```
 Task(
-  subagent_type="gsd-codebase-mapper",
+  subagent_type="bgsd-codebase-mapper",
   model="{mapper_model}",
   run_in_background=true,
   description="Map codebase architecture",
@@ -122,7 +120,7 @@ Explore thoroughly. Write documents directly using templates. Return confirmatio
 
 ```
 Task(
-  subagent_type="gsd-codebase-mapper",
+  subagent_type="bgsd-codebase-mapper",
   model="{mapper_model}",
   run_in_background=true,
   description="Map codebase conventions",
@@ -142,7 +140,7 @@ Explore thoroughly. Write documents directly using templates. Return confirmatio
 
 ```
 Task(
-  subagent_type="gsd-codebase-mapper",
+  subagent_type="bgsd-codebase-mapper",
   model="{mapper_model}",
   run_in_background=true,
   description="Map codebase concerns",
@@ -240,7 +238,7 @@ Continue to commit_codebase_map.
 Commit the codebase map:
 
 ```bash
-node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs execute:commit "docs: map existing codebase" --files .planning/codebase/*.md
+node __OPENCODE_CONFIG__/bgsd-oc/bin/bgsd-tools.cjs execute:commit "docs: map existing codebase" --files .planning/codebase/*.md
 ```
 
 Continue to offer_next.
@@ -296,7 +294,7 @@ End workflow.
 
 <success_criteria>
 - .planning/codebase/ directory created
-- 4 parallel gsd-codebase-mapper agents spawned with run_in_background=true
+- 4 parallel bgsd-codebase-mapper agents spawned with run_in_background=true
 - Agents write documents directly (orchestrator doesn't receive document contents)
 - Read agent output files to collect confirmations
 - All 7 codebase documents exist

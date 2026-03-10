@@ -2,7 +2,7 @@
 
 ## What This Is
 
-A single-file Node.js CLI built from 34 organized `src/` modules via esbuild, producing `bin/gsd-tools.cjs`. It provides structured data operations for AI-driven project planning workflows running in the host editor. Twelve versions shipped: v1.0 (test suite, module split, observability), v1.1 (context reduction — 46.7% CLI, 54.6% workflow, 67% reference compression), v2.0 (state validation, cross-session memory, quality scoring), v3.0 (intent engineering — INTENT.md, drift validation, workflow injection), v4.0 (environment awareness, MCP profiling, worktree parallelism), v5.0 (codebase intelligence — convention extraction, dependency graphs, lifecycle awareness), v6.0 (UX overhaul — shared formatting engine, TTY-aware smart output, branded CLI), v7.0 (agent orchestration — AST intelligence, task routing, context efficiency, TDD execution, review gates), v7.1 (trajectory engineering — checkpoint, pivot, compare, choose, decision journal, dead-end detection), v8.0 (performance & agent architecture — SQLite caching, agent consolidation 11→9, namespace routing, profiler instrumentation, token budgets, RACI matrix), v8.1 (RAG-powered research — YouTube integration, NotebookLM synthesis, multi-source orchestration, 4-tier degradation, session persistence), and v8.2 (cleanup & validation — dead code removal, namespace-only routing, 24-40% init speedup, RACI handoff contracts).
+A single-file Node.js CLI built from 34 organized `src/` modules via esbuild, producing `bin/bgsd-tools.cjs`. It provides structured data operations for AI-driven project planning workflows running in the host editor. Sixteen versions shipped: v1.0 (test suite, module split, observability), v1.1 (context reduction — 46.7% CLI, 54.6% workflow, 67% reference compression), v2.0 (state validation, cross-session memory, quality scoring), v3.0 (intent engineering — INTENT.md, drift validation, workflow injection), v4.0 (environment awareness, MCP profiling, worktree parallelism), v5.0 (codebase intelligence — convention extraction, dependency graphs, lifecycle awareness), v6.0 (UX overhaul — shared formatting engine, TTY-aware smart output, branded CLI), v7.0 (agent orchestration — AST intelligence, task routing, context efficiency, TDD execution, review gates), v7.1 (trajectory engineering — checkpoint, pivot, compare, choose, decision journal, dead-end detection), v8.0 (performance & agent architecture — SQLite caching, agent consolidation 11→9, namespace routing, profiler instrumentation, token budgets, RACI matrix), v8.1 (RAG-powered research — YouTube integration, NotebookLM synthesis, multi-source orchestration, 4-tier degradation, session persistence), v8.2 (cleanup & validation — dead code removal, namespace-only routing, 24-40% init speedup, RACI handoff contracts), v8.3 (agent quality & skills — OpenCode skills architecture with 27 skills and 52.4% agent line reduction, agent consistency audit, GitHub CI agent overhaul, 766 tests fully green), v9.0 (embedded plugin experience — always-on context injection, native LLM tools, event-driven sync, advisory guardrails), and v9.1 (performance acceleration — valibot validation, fast-glob discovery, compile-cache, SQLite statement caching, safe adoption controls).
 
 ## Core Value
 
@@ -10,54 +10,66 @@ Manage and deliver high-quality software with high-quality documentation, while 
 
 ## Current State
 
-**Last shipped:** v8.2 Cleanup, Performance & Validation (2026-03-07)
+**Last shipped:** v9.1 Performance Acceleration & Plugin Benchmarking (2026-03-10)
 
-**What shipped in v8.2:**
-- Dead code audit and removal (~80 exports, 12 files, router.js 1642→928 lines)
-- Namespace-only CLI routing (890-line backward-compat block removed, bundle -53KB)
-- Init command optimization (24-40% faster, 97% I/O reduction, lazy acorn loading)
-- RACI matrix with 23 lifecycle steps, 12 handoff contracts, zero agent overlap
-- All 22 requirements delivered, 0 new test failures
+## Next Milestone Goals
 
-**Next Milestone Goals:** TBD — run `/bgsd-new-milestone` to define
+- Expand CLI tool integrations (ripgrep, fd, fzf, bat, gh, lazygit, jq) for faster operations
+- Explore Bun runtime for 3-5x faster CLI startup and reduced memory
+- Build competitive plugin benchmark adapter for cross-plugin comparison
+- Investigate alternative libraries (valibot alternatives, caching patterns, observability)
+
+## Current Milestone: v9.2 CLI Tool Integrations & Runtime Modernization
+
+**Goal:** Expand CLI tool integrations for faster operations and explore Bun runtime for significant startup improvements.
+
+**Target features:**
+- CLI tool integrations: ripgrep, fd, fzf, bat, gh, lazygit, jq, yq
+- Bun runtime exploration for 3-5x faster startup
+- Plugin benchmark adapter for cross-plugin comparison
 
 <details>
-<summary>Previous: v8.1 RAG-Powered Research Pipeline (shipped 2026-03-03)</summary>
+<summary>Previous: v9.1 Performance Acceleration (shipped 2026-03-10)</summary>
 
-- YouTube integration via yt-dlp with search, transcript extraction, quality scoring
-- NotebookLM RAG synthesis via notebooklm-py with auth health checking
-- Multi-source research pipeline with 4-tier graceful degradation
-- SQLite caching for research results with session persistence and resume
+- Validation engine modernization — valibot with zod fallback, 34.48% improvement
+- File discovery optimization — fast-glob, in-process ignore, no subprocess overhead
+- Compile-cache acceleration — warm starts 76-102ms faster on Node 22+
+- SQLite statement caching — p50 latency reduced ~43%, p99 reduced ~22%
+- Safe adoption controls — unified optimization flags, parity-check utility, backward compatibility
 
 </details>
 
 <details>
-<summary>Previous: v8.0 Performance & Agent Architecture (shipped 2026-03-03)</summary>
+<summary>Previous: v9.0 Embedded Plugin Experience (shipped 2026-03-09)</summary>
 
-- Two-layer SQLite caching (L1 in-memory Map + L2 SQLite via `node:sqlite`) with graceful degradation to Map-only on Node <22.5
-- Agent consolidation (11→9): merged gsd-integration-checker into gsd-verifier, gsd-research-synthesizer into gsd-roadmapper
-- RACI matrix mapping every lifecycle step to exactly one responsible agent, with automated audit command
-- Token budgets (60-80K) declared in all 9 agent manifests, context builder enforces limits
-- Namespace routing for CLI commands (`init:`, `plan:`, `execute:`, `verify:`, `util:` prefixes)
-- Profiler instrumentation on hot paths (`GSD_PROFILE=1`), compare command with regression highlighting
+**Goal:** Transform the bGSD plugin from a minimal 3-hook integration into a deeply embedded OpenCode experience — always-on context injection, custom LLM-callable tools replacing CLI calls, event-driven state sync, smart command enrichment, advisory guardrails, toast notifications, and enhanced compaction.
 
-</details>
-
-<details>
-<summary>Previous: v7.1 Trajectory Engineering (shipped 2026-03-02)</summary>
-
-- Decision journal foundation with trajectories sacred memory store, crypto-generated IDs, cross-session persistence
-- Checkpoint system with named snapshots, auto-collected metrics, branch-based tracking
-- Pivot engine with structured reason capture, auto-checkpoint, selective rewind
-- Multi-attempt comparison with side-by-side metrics matrix
-- Choose & cleanup lifecycle — merge winner via `--no-ff`, archive alternatives as tags
+**Target features:**
+- Always-on context injection (system prompt always knows current phase, plan, blockers)
+- Custom LLM-callable tools registered via plugin `tool` property (replacing hot-path CLI calls over time)
+- Event-driven state sync (auto-update STATE.md on session idle, react to file changes and commits)
+- Smart command enrichment (slash commands auto-inject project context before executing)
+- Tool interception and advisory guardrails (convention enforcement, test-after-edit suggestions)
+- Toast/notification UX (desktop notifications for phase transitions, milestone completion, stuck detection)
+- Enhanced compaction (preserve decisions, blockers, current task context — not just STATE.md)
 
 </details>
 
 <details>
-<summary>Previous: v1.0-v7.0 (shipped 2026-02-22 through 2026-02-27)</summary>
+<summary>Previous: v8.3 Agent Quality & Skills (shipped 2026-03-09)</summary>
 
-See `.planning/MILESTONES.md` for full history of v1.0 through v7.0.
+- OpenCode skills architecture — 27 skills extracted, 52.4% agent line reduction (7,361 to 3,504 lines)
+- Agent consistency across all 10 agents (project_context, PATH SETUP, structured_returns)
+- GitHub CI agent overhaul (deviation_rules, state tracking, structured returns, unified checkpoint format)
+- Test suite fully green — 766 tests, 0 failures (fixed 49 pre-existing failures)
+- Pre-commit test gate in executor workflow
+
+</details>
+
+<details>
+<summary>Previous: v1.0-v8.2 (shipped 2026-02-22 through 2026-03-07)</summary>
+
+See `.planning/MILESTONES.md` for full history of v1.0 through v8.2.
 
 </details>
 
@@ -133,7 +145,9 @@ See `.planning/MILESTONES.md` for full history of v1.0 through v7.0.
 
 ### Active
 
-No active requirements — next milestone not yet defined. Run `/bgsd-new-milestone` to start.
+- [ ] Define and scope next milestone requirements
+- [ ] Create fresh `.planning/REQUIREMENTS.md` for next milestone
+- [ ] Generate roadmap phases for next milestone
 
 ### Out of Scope
 
@@ -151,14 +165,14 @@ No active requirements — next milestone not yet defined. Run `/bgsd-new-milest
 
 ## Context
 
-Shipped v1.0 through v8.2. 762 tests passing, 34 src/ modules, ~1163KB bundle, esbuild bundler.
+Shipped v1.0 through v8.3. 766 tests passing, 34 src/ modules, ~1163KB bundle, esbuild bundler.
 Platform: OC (host editor).
 Tech stack: Node.js >= 22.5 (required for `node:sqlite` caching), node:test, esbuild, tokenx (bundled), acorn (bundled).
 Source: 34 modules — `src/lib/` (18 modules) and `src/commands/` (14 modules) + router + index.
 Deploy pipeline: `npm run build` → esbuild bundle → `deploy.sh` with smoke test and rollback.
-9 specialized AI agents, 41 slash commands, 45 workflows.
+9 specialized AI agents, 41 slash commands, 45 workflows, 27 skills.
 
-Known tech debt: Bundle at ~1163KB (over 1050KB budget). `node:sqlite` is Stability 1.2 (Release Candidate). 31 pre-existing test failures (config-migrate, compact, codebase-impact, codebase ast CLI handler).
+Known tech debt: Bundle at ~1163KB (over 1050KB budget). `node:sqlite` is Stability 1.2 (Release Candidate).
 
 ## Constraints
 
@@ -209,4 +223,4 @@ Known tech debt: Bundle at ~1163KB (over 1050KB budget). `node:sqlite` is Stabil
 | Namespace routing (colon syntax) | Semantic grouping for 100+ CLI commands | Good — discoverable, backward-compatible |
 
 ---
-*Last updated: 2026-03-07 after v8.2 milestone completion*
+*Last updated: 2026-03-09 after v9.1 milestone start*

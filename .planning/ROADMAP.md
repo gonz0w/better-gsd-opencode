@@ -1,197 +1,59 @@
-# Roadmap: GSD Plugin Performance & Quality Improvement
+# Roadmap: bGSD Plugin v9.2 CLI Tool Integrations & Runtime Modernization
+
+## Overview
+
+This milestone expands CLI tool integrations for faster operations and explores Bun runtime for significant startup improvements.
 
 ## Milestones
 
-- ✅ **v1.0 Performance & Quality** — Phases 1-5 (shipped 2026-02-22)
-- ✅ **v1.1 Context Reduction & Tech Debt** — Phases 6-9 (shipped 2026-02-22)
-- ✅ **v2.0 Quality & Intelligence** — Phases 10-13 (shipped 2026-02-24)
-- ✅ **v3.0 Intent Engineering** — Phases 14-17 (shipped 2026-02-25)
-- ✅ **v4.0 Environment & Execution Intelligence** — Phases 18-22 (shipped 2026-02-25)
-- ✅ **v5.0 Codebase Intelligence** — Phases 23-29 (shipped 2026-02-26)
-- ✅ **v6.0 UX & Developer Experience** — Phases 30-36 (shipped 2026-02-27)
-- ✅ **v7.0 Agent Orchestration & Efficiency** — Phases 37-44 (shipped 2026-02-27)
-- ✅ **v7.1 Trajectory Engineering** — Phases 45-50 (shipped 2026-03-02)
-- ✅ **v8.0 Performance & Agent Architecture** — Phases 51-55 (shipped 2026-03-03)
-- ✅ **v8.1 RAG-Powered Research Pipeline** — Phases 56-60 (shipped 2026-03-03)
-- ✅ **v8.2 Cleanup, Performance & Validation** — Phases 61-66 (shipped 2026-03-07)
+- ⏳ **v9.2 CLI Tool Integrations & Runtime Modernization** - Phases 82+ (planned)
+- ✅ **v9.1 Performance Acceleration** - Phases 77-81 (completed 2026-03-10) — see `.planning/milestones/v9.1-ROADMAP.md`
+- ✅ Previous milestones shipped - see `.planning/MILESTONES.md`
 
 ## Phases
 
 <details>
-<summary>✅ v1.0 Performance & Quality (Phases 1-5) — SHIPPED 2026-02-22</summary>
+<summary>✅ Phase 77-81: v9.1 Performance Acceleration (archived)</summary>
 
-- [x] Phase 1: Foundation & Safety Nets (4/4 plans) — completed 2026-02-22
-- [x] Phase 2: Error Handling & Hardening (2/2 plans) — completed 2026-02-22
-- [x] Phase 3: Developer Experience & Discoverability (3/3 plans) — completed 2026-02-22
-- [x] Phase 4: Build System & Module Split (3/3 plans) — completed 2026-02-22
-- [x] Phase 5: Performance & Polish (2/2 plans) — completed 2026-02-22
+- Phase 77: Validation Engine Modernization — valibot with zod fallback, 34.48% improvement
+- Phase 78: File Discovery and Ignore Optimization — fast-glob, no subprocess overhead
+- Phase 79: Startup Compile-Cache Acceleration — warm starts 76-102ms faster
+- Phase 80: SQLite Statement Cache Acceleration — p50 ~43% faster, p99 ~22% faster
+- Phase 81: Safe Adoption Controls — optimization flags, parity-check, backward compatibility
 
-Full details: `.planning/milestones/v1.0-ROADMAP.md`
-
-</details>
-
-<details>
-<summary>✅ v1.1 Context Reduction & Tech Debt (Phases 6-9) — SHIPPED 2026-02-22</summary>
-
-- [x] Phase 6: Token Measurement & Output Infrastructure (3/3 plans) — completed 2026-02-22
-- [x] Phase 7: Init Command Compaction (3/3 plans) — completed 2026-02-22
-- [x] Phase 8: Workflow & Reference Compression (3/3 plans) — completed 2026-02-22
-- [x] Phase 9: Tech Debt Cleanup (1/1 plans) — completed 2026-02-22
-
-Full details: `.planning/milestones/v1.1-ROADMAP.md`
+See `.planning/milestones/v9.1-ROADMAP.md` for full details.
 
 </details>
 
-<details>
-<summary>✅ v2.0 Quality & Intelligence (Phases 10-13) — SHIPPED 2026-02-24</summary>
+## v9.2 Scope (Draft)
 
-- [x] Phase 10: State Intelligence (2/2 plans) — completed 2026-02-22
-- [x] Phase 11: Session Continuity (3/3 plans) — completed 2026-02-24
-- [x] Phase 12: Quality Gates (4/4 plans) — completed 2026-02-24
-- [x] Phase 13: Test Infrastructure & Polish (4/4 plans) — completed 2026-02-24
+### CLI Tool Integrations
 
-Full details: `.planning/milestones/v2.0-ROADMAP.md`
+- **Search/Grep**: ripgrep (rg), ugrep integration
+- **File Discovery**: fd integration
+- **Fuzzy Finding**: fzf integration
+- **Output**: bat for syntax-highlighted output
+- **Git Tools**: gh CLI, lazygit integration
+- **Data Processing**: jq, yq integration
 
-</details>
+### Runtime Modernization
 
-<details>
-<summary>✅ v3.0 Intent Engineering (Phases 14-17) — SHIPPED 2026-02-25</summary>
+- Explore Bun runtime for 3-5x faster startup
+- Evaluate pnpm for faster package installation
 
-- [x] Phase 14: Intent Capture Foundation (3/3 plans) — completed 2026-02-25
-- [x] Phase 15: Intent Tracing & Validation (2/2 plans) — completed 2026-02-25
-- [x] Phase 16: Workflow Integration & Self-Application (3/3 plans) — completed 2026-02-25
-- [x] Phase 17: Intent Enhancement (2/2 plans) — completed 2026-02-25
+### Benchmarking
 
-Full details: `.planning/milestones/v3.0-ROADMAP.md`
+- Competitive plugin benchmark adapter
 
-</details>
-
-<details>
-<summary>✅ v4.0 Environment & Execution Intelligence (Phases 18-22) — SHIPPED 2026-02-25</summary>
-
-- [x] Phase 18: Environment Awareness (3/3 plans) — completed 2026-02-25
-- [x] Phase 19: MCP Server Profiling (3/3 plans) — completed 2026-02-25
-- [x] Phase 20: Structured Requirements (3/3 plans) — completed 2026-02-25
-- [x] Phase 21: Worktree Parallelism (3/3 plans) — completed 2026-02-25
-- [x] Phase 22: Workflow Polish (1/1 plans) — completed 2026-02-25
-
-Full details: `.planning/milestones/v4.0-ROADMAP.md`
-
-</details>
-
-<details>
-<summary>✅ v5.0 Codebase Intelligence (Phases 23-29) — SHIPPED 2026-02-26</summary>
-
-- [x] Phase 23: Infrastructure & Storage (2/2 plans) — completed 2026-02-26
-- [x] Phase 24: Convention Extraction (2/2 plans) — completed 2026-02-26
-- [x] Phase 25: Dependency Graph (2/2 plans) — completed 2026-02-26
-- [x] Phase 26: Init Integration & Context Summary (2/2 plans) — completed 2026-02-26
-- [x] Phase 27: Task-Scoped Context (2/2 plans) — completed 2026-02-26
-- [x] Phase 28: Lifecycle Analysis (2/2 plans) — completed 2026-02-26
-- [x] Phase 29: Workflow Integration (2/2 plans) — completed 2026-02-26
-
-Full details: `.planning/milestones/v5.0-ROADMAP.md`
-
-</details>
-
-<details>
-<summary>✅ v6.0 UX & Developer Experience (Phases 30-36) — SHIPPED 2026-02-27</summary>
-
-- [x] Phase 30: Formatting Foundation & Smart Output (2/2 plans) — completed 2026-02-26
-- [x] Phase 31: Quality Gates & Format Testing (2/2 plans) — completed 2026-02-27
-- [x] Phase 32: Init & State Command Renderers (1/1 plans) — completed 2026-02-27
-- [x] Phase 33: Verify & Codebase Command Renderers (1/1 plans) — completed 2026-02-27
-- [x] Phase 34: Feature & Intent Command Renderers (1/1 plans) — completed 2026-02-27
-- [x] Phase 35: Workflow Output Tightening (2/2 plans) — completed 2026-02-27
-- [x] Phase 36: Integration & Polish (2/2 plans) — completed 2026-02-27
-
-Full details: `.planning/milestones/v6.0-ROADMAP.md`
-
-</details>
-
-<details>
-<summary>✅ v7.0 Agent Orchestration & Efficiency (Phases 37-44) — SHIPPED 2026-02-27</summary>
-
-- [x] Phase 37: Foundation & Safety Net (2/2 plans) — completed 2026-02-27
-- [x] Phase 38: AST Intelligence & Repo Map (2/2 plans) — completed 2026-02-27
-- [x] Phase 39: Orchestration Intelligence (1/1 plans) — completed 2026-02-27
-- [x] Phase 40: Context Efficiency (2/2 plans) — completed 2026-02-27
-- [x] Phase 41: Agent Quality Gates (2/2 plans) — completed 2026-02-27
-- [x] Phase 42: Integration & Validation (3/3 plans) — completed 2026-02-27
-- [x] Phase 43: TDD Execution Engine (2/2 plans) — completed 2026-02-27
-- [x] Phase 44: Review Gate Hardening (1/1 plans) — completed 2026-02-27
-
-Full details: `.planning/milestones/v7.0-ROADMAP.md`
-
-</details>
-
-<details>
-<summary>✅ v7.1 Trajectory Engineering (Phases 45-50) — SHIPPED 2026-03-02</summary>
-
-- [x] Phase 45: Foundation — Decision Journal & State Coherence (2/2 plans) — completed 2026-02-28
-- [x] Phase 46: Checkpoint — Snapshot & Metrics Collection (2/2 plans) — completed 2026-02-28
-- [x] Phase 47: Pivot — Selective Rewind & Attempt Archival (2/2 plans) — completed 2026-03-01
-- [x] Phase 48: Compare — Multi-Attempt Metrics Aggregation (2/2 plans) — completed 2026-03-01
-- [x] Phase 49: Choose — Merge Winner & Cleanup (2/2 plans) — completed 2026-03-01
-- [x] Phase 50: Integration — Agent Context & Dead-End Detection (2/2 plans) — completed 2026-03-02
-
-Full details: `.planning/milestones/v7.1-ROADMAP.md`
-
-</details>
-
-<details>
-<summary>✅ v8.0 Performance & Agent Architecture (Phases 51-55) — SHIPPED 2026-03-03</summary>
-
-- [x] Phase 51: Cache Foundation (3/3 plans) — completed 2026-03-02
-- [x] Phase 52: Cache Integration & Warm-up (2/2 plans) — completed 2026-03-02
-- [x] Phase 53: Agent Consolidation (3/3 plans) — completed 2026-03-02
-- [x] Phase 54: Command Consolidation (4/4 plans) — completed 2026-03-02
-- [x] Phase 55: Profiler & Performance Validation (2/2 plans) — completed 2026-03-02
-
-Full details: `.planning/milestones/v8.0-ROADMAP.md`
-
-</details>
-
-<details>
-<summary>✅ v8.1 RAG-Powered Research Pipeline (Phases 56-60) — SHIPPED 2026-03-03</summary>
-
-- [x] Phase 56: foundation-and-config (2/2 plans) — completed 2026-03-03
-- [x] Phase 57: youtube-integration (2/2 plans) — completed 2026-03-03
-- [x] Phase 58: research-orchestration (2/2 plans) — completed 2026-03-03
-- [x] Phase 59: notebooklm-integration (2/2 plans) — completed 2026-03-03
-- [x] Phase 60: testing-caching-polish (2/2 plans) — completed 2026-03-03
-
-Full details: `.planning/milestones/v8.1-ROADMAP.md`
-
-</details>
-
-<details>
-<summary>✅ v8.2 Cleanup, Performance & Validation (Phases 61-66) — SHIPPED 2026-03-07</summary>
-
-- [x] Phase 61: Tooling & Safety Net (2/2 plans) — completed 2026-03-07
-- [x] Phase 62: Audit & Discovery (2/2 plans) — completed 2026-03-07
-- [x] Phase 63: Dead Code Removal (3/3 plans) — completed 2026-03-07
-- [x] Phase 64: Command & Workflow Cleanup (2/2 plans) — completed 2026-03-07
-- [x] Phase 65: Performance Tuning (2/2 plans) — completed 2026-03-07
-- [x] Phase 66: Agent Architecture Refinement (3/3 plans) — completed 2026-03-07
-
-Full details: `.planning/milestones/v8.2-ROADMAP.md`
-
-</details>
+---
 
 ## Progress
 
-| Phase | Milestone | Plans Complete | Status | Completed |
-|-------|-----------|----------------|--------|-----------|
-| 1-5 | v1.0 | 14/14 | Complete | 2026-02-22 |
-| 6-9 | v1.1 | 10/10 | Complete | 2026-02-22 |
-| 10-13 | v2.0 | 13/13 | Complete | 2026-02-24 |
-| 14-17 | v3.0 | 10/10 | Complete | 2026-02-25 |
-| 18-22 | v4.0 | 13/13 | Complete | 2026-02-25 |
-| 23-29 | v5.0 | 14/14 | Complete | 2026-02-26 |
-| 30-36 | v6.0 | 11/11 | Complete | 2026-02-27 |
-| 37-44 | v7.0 | 15/15 | Complete | 2026-02-27 |
-| 45-50 | v7.1 | 12/12 | Complete | 2026-03-02 |
-| 51-55 | v8.0 | 14/14 | Complete | 2026-03-03 |
-| 56-60 | v8.1 | 10/10 | Complete | 2026-03-03 |
-| 61-66 | v8.2 | 14/14 | Complete | 2026-03-07 |
+| Milestone | Status |
+|-----------|--------|
+| v9.1 Performance Acceleration | ✅ Complete |
+| v9.2 CLI Tool Integrations | ⏳ Planned |
+
+---
+
+*See `.planning/milestones/v9.1-ROADMAP.md` for v9.1 archive.*

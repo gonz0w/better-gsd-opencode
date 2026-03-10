@@ -34,11 +34,11 @@ If `$FULL_MODE`:
 
 **Step 2: Initialize**
 
-```bash
-INIT=$(node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs init:quick "$DESCRIPTION" --compact)
-```
+**Context:** This workflow receives project context via `<bgsd-context>` auto-injected by the bGSD plugin's `command.execute.before` hook. If no `<bgsd-context>` block is present, the plugin is not loaded.
 
-Parse JSON for: `planner_model`, `executor_model`, `checker_model`, `verifier_model`, `commit_docs`, `next_num`, `slug`, `date`, `timestamp`, `quick_dir`, `task_dir`, `roadmap_exists`, `planning_exists`.
+**If no `<bgsd-context>` found:** Stop and tell the user: "bGSD plugin required for v9.0. Install with: npx bgsd-oc"
+
+Parse `<bgsd-context>` JSON for: `planner_model`, `executor_model`, `checker_model`, `verifier_model`, `commit_docs`, `next_num`, `slug`, `date`, `timestamp`, `quick_dir`, `task_dir`, `roadmap_exists`, `planning_exists`.
 
 **If `roadmap_exists` false:** Error — run `/bgsd-new-project` first.
 
@@ -84,7 +84,7 @@ Write plan to: ${QUICK_DIR}/${next_num}-PLAN.md
 Return: ## PLANNING COMPLETE with plan path
 </output>
 ",
-  subagent_type="gsd-planner",
+  subagent_type="bgsd-planner",
   model="{planner_model}",
   description="Quick plan: ${DESCRIPTION}"
 )
@@ -128,7 +128,7 @@ Task(
 ## VERIFICATION PASSED or ## ISSUES FOUND (structured list)
 </expected_output>
 ",
-  subagent_type="gsd-plan-checker",
+  subagent_type="bgsd-plan-checker",
   model="{checker_model}",
   description="Check quick plan: ${DESCRIPTION}"
 )
@@ -181,7 +181,7 @@ Execute quick task ${next_num}.
 - Do NOT update ROADMAP.md
 </constraints>
 ",
-  subagent_type="gsd-executor",
+  subagent_type="bgsd-executor",
   model="{executor_model}",
   description="Execute: ${DESCRIPTION}"
 )
@@ -195,7 +195,7 @@ Verify summary exists. If executor reports "failed" with `classifyHandoffIfNeede
 
 Check if CI gate should run:
 ```bash
-CI_ENABLED=$(node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs util:config-get workflow.ci_gate 2>/dev/null || echo "false")
+CI_ENABLED=$(node __OPENCODE_CONFIG__/bgsd-oc/bin/bgsd-tools.cjs util:config-get workflow.ci_gate 2>/dev/null || echo "false")
 ```
 
 Also run if `--ci` flag was passed in `$ARGUMENTS`. Skip if `--no-ci` flag present.
@@ -226,7 +226,7 @@ SCOPE: quick-${next_num}
 - ./AGENTS.md (if exists)
 </files_to_read>
 ",
-  subagent_type="gsd-github-ci",
+  subagent_type="bgsd-github-ci",
   model="{executor_model}",
   description="GitHub CI: quick-${next_num}"
 )
@@ -262,7 +262,7 @@ Task goal: ${DESCRIPTION}
 </files_to_read>
 
 Check must_haves against codebase. Create VERIFICATION.md at ${QUICK_DIR}/${next_num}-VERIFICATION.md.",
-  subagent_type="gsd-verifier",
+  subagent_type="bgsd-verifier",
   model="{verifier_model}",
   description="Verify: ${DESCRIPTION}"
 )
@@ -303,7 +303,7 @@ If table exists, match its column format. If adding --full to project with exist
 Build file list: `${QUICK_DIR}/${next_num}-PLAN.md`, `${QUICK_DIR}/${next_num}-SUMMARY.md`, `.planning/STATE.md`, (if full mode: `${QUICK_DIR}/${next_num}-VERIFICATION.md`)
 
 ```bash
-node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs execute:commit "docs(quick-${next_num}): ${DESCRIPTION}" --files ${file_list}
+node __OPENCODE_CONFIG__/bgsd-oc/bin/bgsd-tools.cjs execute:commit "docs(quick-${next_num}): ${DESCRIPTION}" --files ${file_list}
 commit_hash=$(git rev-parse --short HEAD)
 ```
 

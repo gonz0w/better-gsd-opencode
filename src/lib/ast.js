@@ -1069,7 +1069,7 @@ function generateRepoMap(cwd, options) {
   const tokenBudget = opts.tokenBudget || 1000;
   const charBudget = tokenBudget * 4; // Rough token-to-char conversion
 
-  const { getSourceDirs, walkSourceFiles, SKIP_DIRS, LANGUAGE_MAP } = require('./codebase-intel');
+  const { getSourceDirs, walkSourceFiles, SKIP_DIRS } = require('./adapters/discovery');
 
   const sourceDirs = getSourceDirs(cwd);
   const allFiles = walkSourceFiles(cwd, sourceDirs, SKIP_DIRS);

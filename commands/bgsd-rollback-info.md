@@ -6,7 +6,7 @@ Show commits and revert command for a specific plan. Useful when a plan's change
 </objective>
 
 <execution_context>
-@__OPENCODE_CONFIG__/get-shit-done/workflows/cmd-rollback-info.md
+@__OPENCODE_CONFIG__/bgsd-oc/workflows/cmd-rollback-info.md
 </execution_context>
 
 <process>

@@ -102,16 +102,18 @@ Report:
 
 **Step 4: Spawn CI agent**
 
-```bash
-INIT=$(node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs init:execute-phase 2>/dev/null || echo '{"executor_model":"default"}')
-```
+**Context:** This workflow receives project context via `<bgsd-context>` auto-injected by the bGSD plugin's `command.execute.before` hook. If no `<bgsd-context>` block is present, the plugin is not loaded.
 
-Parse `executor_model` from init JSON.
+**If no `<bgsd-context>` found:** Stop and tell the user: "bGSD plugin required for v9.0. Install with: npx bgsd-oc"
+
+Parse `executor_model` from `<bgsd-context>` JSON.
 
 ```
 Task(
   prompt="
 Run the GitHub CI quality gate.
+
+<spawned_by>github-ci-workflow</spawned_by>
 
 <ci_parameters>
 BRANCH_NAME: ${BRANCH_NAME}
@@ -125,7 +127,7 @@ SCOPE: ${SCOPE}
 - ./AGENTS.md (if exists)
 </files_to_read>
 ",
-  subagent_type="gsd-github-ci",
+  subagent_type="bgsd-github-ci",
   model="{executor_model}",
   description="GitHub CI: ${SCOPE}"
 )
@@ -133,11 +135,13 @@ SCOPE: ${SCOPE}
 
 ---
 
-**Step 5: Report results**
+**Step 5: Parse and report results**
 
-Parse agent return for CI COMPLETE structure.
+Parse the agent's structured return. Handle each type:
 
-Display summary:
+**If CI COMPLETE:**
+
+Display full summary including timing and decisions:
 ```
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
  bGSD ► CI COMPLETE
@@ -146,11 +150,64 @@ Display summary:
 ◆ Status: ${STATUS}
 ◆ Checks: ${PASSED} passed, ${FIXED} fixed, ${DISMISSED} dismissed
 ◆ Merge: ${MERGE_STATUS}
+◆ Duration: ${TOTAL_TIME} (checks: ${WAIT_TIME}, fixes: ${FIX_TIME})
+◆ Decisions: ${DECISION_COUNT} made
 ```
 
-If agent returned checkpoint (auth gate, merge blocked, fix limit):
-- Display checkpoint details
-- Provide next steps to user
+If fixes were applied or alerts dismissed, display the detail tables from CI COMPLETE.
+
+**If CHECKPOINT REACHED with Type: human-action:**
+
+Display checkpoint details and STOP. User must take action.
+```
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ bGSD ► CI CHECKPOINT
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+◆ Type: human-action
+◆ PR: ${PR_URL}
+◆ Status: ${CHECKPOINT_DETAILS}
+
+Required Action:
+${AWAITING}
+```
+
+**If CHECKPOINT REACHED with Type: human-verify:**
+
+Display checkpoint details and present options to user.
+```
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ bGSD ► CI CHECKPOINT
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+◆ Type: human-verify
+◆ PR: ${PR_URL}
+◆ Status: ${CHECKPOINT_DETAILS}
+
+Options:
+1. Dismiss remaining alerts as acceptable risk
+2. Apply manual fixes and re-run: /bgsd-github-ci --branch ${BRANCH_NAME}
+3. Close PR without merging
+```
+
+---
+
+**Step 6: Record state (direct invocation only)**
+
+If this workflow was invoked directly via `/bgsd-github-ci` (not spawned by execute-phase):
+
+Record CI decisions and session from agent's return:
+```bash
+BGSD_HOME=$(ls -d $HOME/.config/*/bgsd-oc 2>/dev/null | head -1)
+
+# Record key decisions from CI COMPLETE
+node $BGSD_HOME/bin/bgsd-tools.cjs verify:state add-decision \
+  --phase "ci" --summary "CI: ${STATUS} - ${PASSED} passed, ${FIXED} fixed, ${DISMISSED} dismissed"
+
+# Update session
+node $BGSD_HOME/bin/bgsd-tools.cjs verify:state record-session \
+  --stopped-at "CI: ${STATUS} - PR ${PR_URL}"
+```
+
+If agent returned a checkpoint (not CI COMPLETE), skip state recording — the user will take action and re-run.
 
 </process>
 

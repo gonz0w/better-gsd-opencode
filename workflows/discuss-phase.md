@@ -7,11 +7,11 @@ You are a thinking partner, not an interviewer. The user is the visionary — yo
 <downstream_awareness>
 **CONTEXT.md feeds into:**
 
-1. **gsd-phase-researcher** — Reads CONTEXT.md to know WHAT to research
+1. **bgsd-phase-researcher** — Reads CONTEXT.md to know WHAT to research
    - "User wants card-based layout" → researcher investigates card component patterns
    - "Infinite scroll decided" → researcher looks into virtualization libraries
 
-2. **gsd-planner** — Reads CONTEXT.md to know WHAT decisions are locked
+2. **bgsd-planner** — Reads CONTEXT.md to know WHAT decisions are locked
    - "Pull-to-refresh on mobile" → planner includes that in task specs
    - "Agent's Discretion: loading skeleton" → planner can decide approach
 
@@ -82,13 +82,13 @@ Phase: "API documentation"
 <process>
 
 <step name="initialize" priority="first">
+**Context:** This workflow receives project context via `<bgsd-context>` auto-injected by the bGSD plugin's `command.execute.before` hook. If no `<bgsd-context>` block is present, the plugin is not loaded.
+
+**If no `<bgsd-context>` found:** Stop and tell the user: "bGSD plugin required for v9.0. Install with: npx bgsd-oc"
+
 Phase number from argument (required).
 
-```bash
-INIT=$(node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs init:phase-op "${PHASE}")
-```
-
-Parse JSON for: `commit_docs`, `phase_found`, `phase_dir`, `phase_number`, `phase_name`, `phase_slug`, `padded_phase`, `has_research`, `has_context`, `has_plans`, `has_verification`, `plan_count`, `roadmap_exists`, `planning_exists`.
+Parse `<bgsd-context>` JSON for: `commit_docs`, `phase_found`, `phase_dir`, `phase_number`, `phase_name`, `phase_slug`, `padded_phase`, `has_research`, `has_context`, `has_plans`, `has_verification`, `plan_count`, `roadmap_exists`, `planning_exists`.
 
 **If `phase_found` is false:**
 ```
@@ -271,7 +271,7 @@ Create CONTEXT.md capturing decisions made.
 
 **Find or create phase directory:**
 
-Use values from init: `phase_dir`, `phase_slug`, `padded_phase`.
+Use values from `<bgsd-context>`: `phase_dir`, `phase_slug`, `padded_phase`.
 
 If `phase_dir` is null (phase exists in roadmap but no directory):
 ```bash
@@ -379,7 +379,7 @@ Created: .planning/phases/${PADDED_PHASE}-${SLUG}/${PADDED_PHASE}-CONTEXT.md
 Commit phase context (uses `commit_docs` from init internally):
 
 ```bash
-node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs execute:commit "docs(${padded_phase}): capture phase context" --files "${phase_dir}/${padded_phase}-CONTEXT.md"
+node __OPENCODE_CONFIG__/bgsd-oc/bin/bgsd-tools.cjs execute:commit "docs(${padded_phase}): capture phase context" --files "${phase_dir}/${padded_phase}-CONTEXT.md"
 ```
 
 Confirm: "Committed: docs(${padded_phase}): capture phase context"
@@ -389,7 +389,7 @@ Confirm: "Committed: docs(${padded_phase}): capture phase context"
 Update STATE.md with session info:
 
 ```bash
-node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs verify:state record-session \
+node __OPENCODE_CONFIG__/bgsd-oc/bin/bgsd-tools.cjs verify:state record-session \
   --stopped-at "Phase ${PHASE} context gathered" \
   --resume-file "${phase_dir}/${padded_phase}-CONTEXT.md"
 ```
@@ -397,7 +397,7 @@ node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs verify:state record-ses
 Commit STATE.md:
 
 ```bash
-node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs execute:commit "docs(state): record phase ${PHASE} context session" --files .planning/STATE.md
+node __OPENCODE_CONFIG__/bgsd-oc/bin/bgsd-tools.cjs execute:commit "docs(state): record phase ${PHASE} context session" --files .planning/STATE.md
 ```
 </step>
 
@@ -407,12 +407,12 @@ Check for auto-advance trigger:
 1. Parse `--auto` flag from $ARGUMENTS
 2. Read `workflow.auto_advance` from config:
    ```bash
-   AUTO_CFG=$(node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs util:config-get workflow.auto_advance 2>/dev/null || echo "false")
+   AUTO_CFG=$(node __OPENCODE_CONFIG__/bgsd-oc/bin/bgsd-tools.cjs util:config-get workflow.auto_advance 2>/dev/null || echo "false")
    ```
 
 **If `--auto` flag present AND `AUTO_CFG` is not true:** Persist auto-advance to config (handles direct `--auto` usage without new-project):
 ```bash
-node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs util:config-set workflow.auto_advance true
+node __OPENCODE_CONFIG__/bgsd-oc/bin/bgsd-tools.cjs util:config-set workflow.auto_advance true
 ```
 
 **If `--auto` flag present OR `AUTO_CFG` is true:**

@@ -1,5 +1,56 @@
 # Milestones
 
+## ✅ v9.0 Embedded Plugin Experience (Shipped: 2026-03-09)
+
+**Delivered:** Deep plugin integration with always-on context injection, native LLM tools, event-driven state synchronization, and advisory guardrails.
+
+**Phases completed:** 6 phases (71-76), 15 plans, 35 tasks
+**Commits:** 83 | **Files changed:** 217 | **Lines:** +34,616 / -2,113
+**Timeline:** 2 days (2026-03-08 → 2026-03-09)
+
+**Key accomplishments:**
+- Established plugin foundation with ESM build target, safeHook boundaries, in-process parsers, and enforced `bgsd_` tool naming
+- Completed full rebrand to `bgsd-*` names across source, workflows, commands, agents, install/deploy paths, and tests
+- Replaced workflow `init:*` subprocess calls with plugin-injected `<bgsd-context>` across 19 workflows
+- Delivered five native LLM-callable tools (`bgsd_status`, `bgsd_plan`, `bgsd_context`, `bgsd_validate`, `bgsd_progress`) with Zod schemas and build-time validation
+- Added event-driven sync features: idle validation auto-fix, `.planning/` file watcher cache invalidation, and stuck/loop notifications
+- Added advisory guardrails with 27-test coverage and bug fixes for path filtering and guard condition precedence
+
+**What's next:** Ready for next milestone — `/bgsd-new-milestone`
+
+**Archives:**
+- `.planning/milestones/v9.0-ROADMAP.md`
+- `.planning/milestones/v9.0-REQUIREMENTS.md`
+- `.planning/milestones/v9.0-DOCS.md`
+
+---
+
+## ✅ v8.3 Agent Quality & Skills (Shipped: 2026-03-09)
+
+**Delivered:** OpenCode skills architecture (27 skills, 52.4% agent line reduction), agent consistency across all 10 agents, GitHub CI agent overhaul, and fully green test suite (766 tests, 0 failures)
+
+**Phases completed:** 4 phases (67-70), 11 plans
+**Commits:** 92 | **Files changed:** 235 | **Lines:** +21,340 / -11,537
+**Timeline:** 2 days (2026-03-07 → 2026-03-08)
+**Tests:** 766 passing (0 failures)
+
+**Key accomplishments:**
+- Brought GitHub CI agent to quality standard with project_context, deviation_rules, state tracking, structured_returns, and unified checkpoint format matching executor/planner patterns
+- Achieved agent consistency across all 10 agents — all now have project_context discovery, PATH SETUP, and structured_returns blocks
+- Shipped OpenCode skills architecture — 27 skills extracted from inline agent content, reducing agent definitions by 52.4% (7,361 to 3,504 lines) with full build/deploy/install pipeline
+- Fixed 49 pre-existing test failures across config-migrate, compact, codebase-impact, extract-sections, and context-budget — test suite fully green at 766 tests
+- Added pre-commit test gate to executor workflow for zero tolerance on test regressions
+- All 17/17 requirements delivered, 0 new test failures introduced
+
+**What's next:** Ready for next milestone — `/bgsd-new-milestone`
+
+**Archives:**
+- `.planning/milestones/v8.3-ROADMAP.md`
+- `.planning/milestones/v8.3-REQUIREMENTS.md`
+- `.planning/milestones/v8.3-DOCS.md`
+
+---
+
 ## ✅ v8.2 Cleanup, Performance & Validation (Shipped: 2026-03-07)
 
 **Delivered:** Dead code removal, namespace-only routing, init performance optimization, and RACI-validated agent architecture with handoff contracts
@@ -263,4 +314,5 @@
 - `.planning/milestones/v1.0-REQUIREMENTS.md`
 
 ---
+
 

@@ -1312,9 +1312,9 @@ const { extractAtReferences } = require('../lib/helpers');
  * Returns: { timestamp, workflow_count, total_tokens, workflows: [...] }
  */
 function measureAllWorkflows(cwd) {
-  // Detect plugin path: bundled binary at bin/gsd-tools.cjs → ../workflows/
-  // Or use GSD_PLUGIN_DIR env var for testing
-  let pluginDir = process.env.GSD_PLUGIN_DIR;
+  // Detect plugin path: bundled binary at bin/bgsd-tools.cjs → ../workflows/
+  // Or use BGSD_PLUGIN_DIR env var for testing
+  let pluginDir = process.env.BGSD_PLUGIN_DIR;
   if (!pluginDir) {
     // __dirname is the dir of the bundled output (bin/), so go up one level
     pluginDir = path.resolve(__dirname, '..');
@@ -1756,7 +1756,7 @@ const WORKFLOW_BUDGETS = {
 };
 
 function cmdTokenBudget(cwd, raw) {
-  let pluginDir = process.env.GSD_PLUGIN_DIR;
+  let pluginDir = process.env.BGSD_PLUGIN_DIR;
   if (!pluginDir) {
     pluginDir = path.resolve(__dirname, '..');
   }
@@ -1765,7 +1765,7 @@ function cmdTokenBudget(cwd, raw) {
     path.join(pluginDir, 'workflows'),
   ];
   const homeConfig = process.env.HOME
-    ? path.join(process.env.HOME, '.config', 'opencode', 'get-shit-done', 'workflows')
+    ? path.join(process.env.HOME, '.config', 'opencode', 'bgsd-oc', 'workflows')
     : null;
   if (homeConfig) searchDirs.push(homeConfig);
   let workflowsDir = null;
@@ -1802,12 +1802,14 @@ function cmdTokenBudget(cwd, raw) {
 function cmdTestCoverage(cwd, raw) {
   const config = loadConfig(cwd);
 
-  // Determine test file path
-  const testFile = config.test_file || 'bin/gsd-tools.test.cjs';
-  const testPath = path.join(cwd, testFile);
-
-  if (!fs.existsSync(testPath)) {
-    error(`Test file not found: ${testFile}`);
+  // Determine test file(s) — supports split test directory
+  const testDir = path.join(cwd, 'tests');
+  let testFile;
+  if (fs.existsSync(testDir)) {
+    // Read all .test.cjs files from tests/ directory
+    testFile = 'tests/*.test.cjs';
+  } else {
+    testFile = config.test_file || 'bin/bgsd-tools.test.cjs';
   }
 
   // Determine router file path
@@ -1818,22 +1820,51 @@ function cmdTestCoverage(cwd, raw) {
     error(`Router file not found: ${routerFile}`);
   }
 
-  const testContent = fs.readFileSync(testPath, 'utf-8');
+  // Read test content — concatenate all test files if using tests/ directory
+  let testContent;
+  if (fs.existsSync(testDir)) {
+    const testFiles = fs.readdirSync(testDir).filter(f => f.endsWith('.test.cjs'));
+    testContent = testFiles.map(f => fs.readFileSync(path.join(testDir, f), 'utf-8')).join('\n');
+  } else {
+    const testPath = path.join(cwd, testFile);
+    if (!fs.existsSync(testPath)) {
+      error(`Test file not found: ${testFile}`);
+    }
+    testContent = fs.readFileSync(testPath, 'utf-8');
+  }
   const routerContent = fs.readFileSync(routerPath, 'utf-8');
 
-  // Extract all command names from router switch cases
+  // Extract all command names from router namespace routing
   const routerCommands = new Set();
-  const casePattern = /^\s{4}case\s+'([^']+)'/gm;
-  let caseMatch;
-  while ((caseMatch = casePattern.exec(routerContent)) !== null) {
-    routerCommands.add(caseMatch[1]);
+
+  // Extract namespace names from switch cases: case 'init':, case 'plan':, etc.
+  const namespacePattern = /case\s+'(init|plan|execute|verify|util|research|cache)'\s*:/g;
+  const namespaces = new Set();
+  let nsMatch;
+  while ((nsMatch = namespacePattern.exec(routerContent)) !== null) {
+    namespaces.add(nsMatch[1]);
   }
 
-  // Also extract init subcommands as 'init <sub>'
-  const initPattern = /^\s{8}case\s+'([^']+)'/gm;
-  let initMatch;
-  while ((initMatch = initPattern.exec(routerContent)) !== null) {
-    routerCommands.add('init ' + initMatch[1]);
+  // Extract subcommands from if/else if chains: if (subcommand === 'xxx') or } else if (subcommand === 'xxx')
+  const ifSubPattern = /(?:if|else if)\s*\(\s*(?:subcommand|workflow|cbSub|cacheSub|agentSub|envSub|stateSub|verifySub|validateSub|trajSub|tddSub|wtSub|intentCmd|roadCmd|phaseSub|msSub|reqCmd|assertSub)\s*===\s*'([^']+)'/g;
+  let ifMatch;
+  while ((ifMatch = ifSubPattern.exec(routerContent)) !== null) {
+    routerCommands.add(ifMatch[1]);
+  }
+
+  // Extract switch/case subcommands inside namespaces (e.g., case 'execute-phase':)
+  const innerCasePattern = /case\s+'([^']+)'\s*:/g;
+  let innerMatch;
+  while ((innerMatch = innerCasePattern.exec(routerContent)) !== null) {
+    // Skip namespace-level cases already captured
+    if (!namespaces.has(innerMatch[1])) {
+      routerCommands.add(innerMatch[1]);
+    }
+  }
+
+  // Build namespace:subcommand entries for proper matching
+  for (const ns of namespaces) {
+    routerCommands.add(ns);
   }
 
   // Extract tested commands from test file
@@ -1848,7 +1879,16 @@ function cmdTestCoverage(cwd, raw) {
     const cmd = words[0];
     testedCommands.add(cmd);
 
-    if (words.length > 1 && ['init', 'state', 'verify', 'memory', 'roadmap', 'phase', 'phases', 'frontmatter', 'template', 'validate', 'milestone', 'requirements', 'context-budget', 'todo'].includes(cmd)) {
+    // Handle namespace:subcommand syntax (e.g., 'init:progress', 'verify:state')
+    if (cmd.includes(':')) {
+      const [ns, sub] = cmd.split(':');
+      testedCommands.add(ns);
+      testedCommands.add(sub);
+      // Also add further subcommands (e.g., 'verify:state advance-plan' → 'advance-plan')
+      if (words.length > 1) {
+        testedCommands.add(words[1]);
+      }
+    } else if (words.length > 1 && ['init', 'state', 'verify', 'memory', 'roadmap', 'phase', 'phases', 'frontmatter', 'template', 'validate', 'milestone', 'requirements', 'context-budget', 'todo'].includes(cmd)) {
       testedCommands.add(cmd + ' ' + words[1]);
     }
   }
@@ -1862,7 +1902,15 @@ function cmdTestCoverage(cwd, raw) {
     const cmd = words[0];
     testedCommands.add(cmd);
 
-    if (words.length > 1 && ['init', 'state', 'verify', 'memory', 'roadmap', 'phase', 'phases', 'frontmatter', 'template', 'validate', 'milestone', 'requirements', 'context-budget', 'todo'].includes(cmd)) {
+    // Handle namespace:subcommand syntax
+    if (cmd.includes(':')) {
+      const [ns, sub] = cmd.split(':');
+      testedCommands.add(ns);
+      testedCommands.add(sub);
+      if (words.length > 1) {
+        testedCommands.add(words[1]);
+      }
+    } else if (words.length > 1 && ['init', 'state', 'verify', 'memory', 'roadmap', 'phase', 'phases', 'frontmatter', 'template', 'validate', 'milestone', 'requirements', 'context-budget', 'todo'].includes(cmd)) {
       testedCommands.add(cmd + ' ' + words[1]);
     }
   }
@@ -1888,9 +1936,12 @@ function cmdTestCoverage(cwd, raw) {
   const allCommands = [...routerCommands].sort();
   const covered = allCommands.filter(cmd => {
     if (testedCommands.has(cmd)) return true;
-    const base = cmd.split(' ')[0];
-    if (testedCommands.has(base) && cmd.startsWith('init ')) {
-      return testedCommands.has(cmd);
+    // Check if the command is tested via namespace:subcommand syntax
+    for (const tested of testedCommands) {
+      if (tested.includes(':')) {
+        const parts = tested.split(':');
+        if (parts[1] === cmd || parts[1].split(/\s+/)[0] === cmd) return true;
+      }
     }
     return false;
   });

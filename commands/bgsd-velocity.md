@@ -6,7 +6,7 @@ Show execution velocity metrics: plans completed per day, average duration, and 
 </objective>
 
 <execution_context>
-@__OPENCODE_CONFIG__/get-shit-done/workflows/cmd-velocity.md
+@__OPENCODE_CONFIG__/bgsd-oc/workflows/cmd-velocity.md
 </execution_context>
 
 <process>

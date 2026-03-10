@@ -1,85 +1,92 @@
-# Feature Landscape: v8.2 Cleanup, Performance & Validation
+# Feature Landscape: Dependency-Driven Plugin Acceleration (v9.1)
 
-**Domain:** Hardening milestone for a mature Node.js CLI tool (34 src/ modules, ~1216KB bundle)
-**Researched:** 2026-03-06
-**Confidence:** HIGH (tools verified via Context7, npm registry, and direct measurement on this codebase)
+**Domain:** Faster plugin behavior achieved through selective dependency modernization only.
+**Researched:** 2026-03-09
+**Milestone context:** User wants responsiveness wins from module adoption, not a benchmark-heavy milestone.
 
-## Table Stakes
+## Scope Positioning
 
-Features that define what "hardened" means for this milestone. Missing = milestone incomplete.
+This milestone should ship speed gains users can feel by upgrading execution primitives, not by building broad benchmarking infrastructure.
 
-| Feature | Why Expected | Complexity | Notes |
-|---|---|---|---|
-| Dead code audit (unused exports) | 37 source files accumulated over 8 versions — guaranteed dead exports exist | Low | knip finds them automatically; removal is manual review |
-| Dead code audit (unused files) | Workflows, templates, references accumulated — some may be orphaned | Low | knip + manual audit of non-source files |
-| Bundle composition report | Must know WHERE 1216KB comes from before optimizing | Low | esbuild metafile already available — just enable it |
-| Stale command removal | Router has 100+ commands — some likely obsolete (e.g., join-discord) | Low | Manual audit of `src/router.js` against actual usage |
-| Unused dependency detection | npm packages in package.json that nothing imports | Low | knip covers this |
-| Circular dependency check | Architectural health baseline — must confirm zero cycles | Low | madge one-liner |
-| Bundle size regression tracking | Already have budget (1500KB) but no per-build metafile history | Low | Write metafile JSON alongside bundle-size.json |
+- **Primary outcome:** lower perceived latency in common plugin interactions (command start, search, plan parsing, tool responses).
+- **Secondary outcome:** lower CPU churn and memory pressure during command-heavy sessions.
+- **Hard boundary:** dependency adoption must map to clear runtime outcomes; avoid large architecture rewrites.
 
-## Differentiators
+## Dependency-Centric Capability Categories
 
-Features that move beyond "audit" into lasting improvement.
+### 1) User-visible responsiveness improvements
 
-| Feature | Value Proposition | Complexity | Notes |
-|---|---|---|---|
-| Constants.js audit (71.9KB) | Largest pure-source module — likely has unused regex patterns from deprecated features | Med | Requires cross-referencing each constant against usage across 36 other files |
-| Router lazy registration | 100+ routes registered on every CLI invocation even if only 1 is used | Med | Could defer registration to command groups — reduces startup time |
-| Build script metafile integration | Permanent bundle composition tracking in every build | Low | Add to existing `build.js` — 5 lines of code |
-| Agent manifest validation script | Verify 9 agent manifests reference only existing commands/workflows | Med | Custom script using madge JSON output + agent file parsing |
-| Profiler hot path identification | Use `--cpu-prof` to find actual V8 hot spots (not just labeled spans) | Med | One-time analysis to guide optimization; results inform code changes |
-| Command consolidation into subgroups | 41 slash commands into fewer top-level commands with subcommands | Med | Already planned in milestone spec; requires workflow/command file changes |
+| Capability | User-visible effect | Dependency class to adopt | Confidence |
+|------------|---------------------|---------------------------|------------|
+| **Faster command bootstrap path** | Commands begin executing sooner after invocation | startup/lightweight loader helpers, lazy import support modules | HIGH |
+| **Lower-latency file discovery** | Faster command responses when scanning project files | modern glob engine and path matcher | HIGH |
+| **Quicker content search feedback** | Search-backed commands return candidate files sooner | optimized search process wrapper and streaming output parser | HIGH |
+| **Smoother long-running tool calls** | Fewer "frozen" moments while external commands run | async subprocess dependency with timeout/cancel support | HIGH |
+| **Faster state round-trips** | Less delay reading/writing planning docs and cache metadata | optimized serialization/deserialization package | MEDIUM |
 
-## Anti-Features
+### 2) System-level acceleration capabilities
 
-Features to explicitly NOT build. These are over-engineering traps for a hardening milestone.
+| Capability | Internal outcome | Dependency class to adopt | Confidence |
+|------------|------------------|---------------------------|------------|
+| **Parser modernization for markdown/frontmatter hot paths** | Lower parse time and fewer regex backtracking spikes | parser libraries with deterministic tokenization | HIGH |
+| **Glob/search result normalization library** | Reduced custom string churn and path handling bugs | path normalization + matcher ecosystem package | HIGH |
+| **Async process orchestration layer** | Controlled concurrency, cancellation, and safer process lifecycle | subprocess management library | HIGH |
+| **Binary-safe structured serialization** | Smaller payload and faster encode/decode for cached structures | compact serialization format library | MEDIUM |
+| **Stable schema validation at boundaries** | Less defensive re-parsing and cleaner fast-fail behavior | lightweight validation dependency for I/O contracts | MEDIUM |
 
-| Anti-Feature | Why Avoid | What to Do Instead |
-|---|---|---|
-| Automated dead code removal CI gate | Knip output needs human review — auto-fix in CI could delete intentionally-exported APIs | Run `knip` manually or in advisory mode; review before `--fix` |
-| Tree-shaking via ESM migration | CJS→ESM rewrite of 37 files for marginal tree-shaking gains is out of scope; `minify: false` is intentional for debuggability | Focus on removing dead code at source level, not relying on bundler elimination |
-| Code splitting the bundle | Single-file deploy is a core constraint — splitting would break `deploy.sh` | Reduce module sizes through dead code removal instead |
-| Coverage-based dead code detection | c8/nyc test coverage ≠ dead exports. 100% coverage doesn't mean all exports are used by consumers | Use knip for export-level analysis |
-| Dynamic import() for lazy loading | Would break CJS single-file bundle architecture | Keep static requires; reduce what's loaded by removing dead code |
-| Bundle minification | `minify: false` is intentional — bundle must be debuggable in production | Remove dead code at source, not by minifying |
-| Custom dependency graph tool | Madge + existing `src/lib/ast.js` already cover this | Use madge for self-analysis; keep ast.js for target project analysis |
-| Performance monitoring daemon | CLI processes are <5s; APM/monitoring is for servers | Stick with `GSD_PROFILE=1` opt-in spans |
+## Table Stakes (Must Ship)
 
-## Feature Dependencies
+These are the minimum dependency-adoption features needed for this milestone to count as "faster plugin behavior."
 
-```
-Bundle composition report → Constants.js audit (need to know sizes before optimizing)
-Dead code audit (knip) → Stale command removal (knip identifies unused exports in router)
-Circular dependency check → Agent manifest validation (architecture must be clean first)
-Dead code audit → Command consolidation (remove dead commands before reorganizing live ones)
-```
+| Feature | Why it is required | Outcome metric category (not benchmark project) |
+|---------|--------------------|-----------------------------------------------|
+| **Adopt a modern glob/match stack for file discovery paths** | File enumeration is a universal hot path across planning commands | command start-to-first-result latency |
+| **Adopt async subprocess handling for external tool invocations** | Blocking process calls create visible stalls in plugin UX | interaction smoothness and cancellation behavior |
+| **Adopt parser dependency for markdown/frontmatter hot paths** | Regex-only parsing scales poorly on large planning docs | parse latency and error resilience |
+| **Adopt optimized serialization for cache/state payloads** | JSON-heavy payload churn increases CPU and GC overhead | read/write round-trip latency |
+| **Adopt boundary validation dependency for parsed artifacts** | Faster failure on invalid input avoids wasted downstream work | wasted-work reduction and stability |
 
-## MVP Recommendation
+## Differentiators (High-Leverage, Optional)
 
-**Phase 1 — Audit (low risk, high signal):**
-1. Enable esbuild metafile in build.js (5 minutes)
-2. Run `knip` to find all dead code (30 minutes of review)
-3. Run `madge --circular src/` to confirm zero cycles (5 minutes)
-4. Audit router.js for stale commands (30 minutes)
+| Feature | Why it differentiates | Confidence |
+|---------|-----------------------|------------|
+| **Streaming search adapter with incremental results** | Users see early partial output instead of waiting for full completion | HIGH |
+| **Dependency-backed cancellation propagation from plugin to CLI** | Enables responsive stop/retry loops in command-heavy workflows | HIGH |
+| **Adaptive serializer strategy by payload size** | Improves both tiny-command overhead and large-state throughput | MEDIUM |
+| **Parser fallback chain (fast path + compatibility path)** | Keeps backward compatibility while still delivering speed on common cases | HIGH |
 
-**Phase 2 — Remove (medium risk, requires testing):**
-5. Remove dead exports/files identified by knip
-6. Remove stale commands from router
-7. Remove unused constants from constants.js
-8. Run full test suite after each batch of removals
+## Anti-Features (Explicitly Out of Scope)
 
-**Phase 3 — Optimize (targeted, data-driven):**
-9. Profile init command with `--cpu-prof` to find actual hot paths
-10. Optimize identified hot paths (if any exceed threshold)
-11. Consolidate commands into subgroups
+| Anti-Feature | Why excluded from this milestone |
+|--------------|----------------------------------|
+| **Large benchmark harness and competitor shootouts** | User explicitly requested dependency-driven acceleration over benchmark-heavy scope. |
+| **Full async I/O rewrite of the CLI architecture** | Too broad and risky relative to targeted dependency modernization. |
+| **New feature surface unrelated to speed** | Adds maintenance burden without improving responsiveness. |
+| **Replacing stable components without hotspot relevance** | Dependency churn without user-facing gain is not acceptable. |
+| **Massive telemetry expansion projects** | Measurement-heavy work can consume milestone capacity without direct speed wins. |
 
-**Defer:** Router lazy registration — only pursue if profiling shows command registration is a measurable bottleneck (likely <10ms, not worth the complexity).
+## Feature Dependencies and Rollout Order
 
-## Sources
+1. **Process layer first:** adopt subprocess orchestration dependency so command executions can be cancellable and non-blocking where appropriate.
+2. **Discovery/search second:** adopt glob/matcher and search wrappers to reduce visible wait time in everyday flows.
+3. **Parsing third:** adopt parser modules in hot paths while preserving compatibility guarantees.
+4. **Serialization fourth:** optimize state/cache payload handling after parser outputs are stable.
+5. **Validation hardening last:** enforce boundary schemas to lock in performance and correctness gains.
 
-- esbuild metafile API (Context7 `/evanw/esbuild`, official docs)
-- knip configuration guide (Context7 `/webpro-nl/knip`, knip.dev)
-- madge CLI reference (Context7 `/pahen/madge`, GitHub README)
-- Direct bundle analysis: `esbuild.analyzeMetafile()` run on this project
-- PROJECT.md milestone spec for v8.2
+## Recommended MVP Feature Set (Dependency Adoption Only)
+
+Ship these five capabilities for milestone acceptance:
+
+1. Dependency-based glob/search acceleration in core command flows.
+2. Async subprocess dependency with timeout and cancellation support.
+3. Parser dependency adoption for markdown/frontmatter-heavy operations.
+4. Optimized serialization dependency for cache/state transport.
+5. Lightweight schema validation dependency on parse and serialization boundaries.
+
+This MVP is dependency-centric, outcome-oriented, and aligned with "faster behavior" without expanding into broad benchmarking programs.
+
+## Confidence Notes
+
+- **HIGH confidence:** glob/search modernization, subprocess orchestration, and parser-library adoption produce immediate responsiveness improvements when applied to hot paths.
+- **MEDIUM confidence:** serialization format choice and boundary-validation overhead depend on payload shape and migration strategy.
+- **LOW confidence:** none.

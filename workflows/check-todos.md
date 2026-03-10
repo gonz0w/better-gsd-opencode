@@ -9,13 +9,11 @@ Read all files referenced by the invoking prompt's execution_context before star
 <process>
 
 <step name="init_context">
-Load todo context:
+**Context:** This workflow receives project context via `<bgsd-context>` auto-injected by the bGSD plugin's `command.execute.before` hook. If no `<bgsd-context>` block is present, the plugin is not loaded.
 
-```bash
-INIT=$(node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs init:todos)
-```
+**If no `<bgsd-context>` found:** Stop and tell the user: "bGSD plugin required for v9.0. Install with: npx bgsd-oc"
 
-Extract from init JSON: `todo_count`, `todos`, `pending_dir`.
+Extract from `<bgsd-context>` JSON: `todo_count`, `todos`, `pending_dir`.
 
 If `todo_count` is 0:
 ```
@@ -154,7 +152,7 @@ If todo was moved to done/, commit the change:
 
 ```bash
 git rm --cached .planning/todos/pending/[filename] 2>/dev/null || true
-node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs execute:commit "docs: start work on todo - [title]" --files .planning/todos/done/[filename] .planning/STATE.md
+node __OPENCODE_CONFIG__/bgsd-oc/bin/bgsd-tools.cjs execute:commit "docs: start work on todo - [title]" --files .planning/todos/done/[filename] .planning/STATE.md
 ```
 
 Tool respects `commit_docs` config and gitignore automatically.

@@ -4,18 +4,17 @@ Create executable phase prompts (PLAN.md files) for a roadmap phase. Flow: Resea
 
 <required_reading>
 Read all files referenced by execution_context.
-Load ui-brand.md sections as needed via extract-sections.
 </required_reading>
 
 <process>
 
 ## 1. Initialize
 
-```bash
-INIT=$(node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs init:plan-phase "$PHASE" --compact)
-```
+**Context:** This workflow receives project context via `<bgsd-context>` auto-injected by the bGSD plugin's `command.execute.before` hook. If no `<bgsd-context>` block is present, the plugin is not loaded.
 
-Parse: `researcher_model`, `planner_model`, `checker_model`, `research_enabled`, `plan_checker_enabled`, `commit_docs`, `phase_found`, `phase_dir`, `phase_number`, `phase_name`, `phase_slug`, `padded_phase`, `has_research`, `has_context`, `has_plans`, `plan_count`.
+**If no `<bgsd-context>` found:** Stop and tell the user: "bGSD plugin required for v9.0. Install with: npx bgsd-oc"
+
+Parse `<bgsd-context>` JSON for: `researcher_model`, `planner_model`, `checker_model`, `research_enabled`, `plan_checker_enabled`, `commit_docs`, `phase_found`, `phase_dir`, `phase_number`, `phase_name`, `phase_slug`, `padded_phase`, `has_research`, `has_context`, `has_plans`, `plan_count`.
 
 File paths: `state_path`, `roadmap_path`, `requirements_path`, `context_path`, `research_path`, `verification_path`, `uat_path` (null if absent).
 
@@ -31,7 +30,7 @@ No phase number → detect next unplanned. Phase not found → create dir from s
 ## 3. Validate Phase
 
 ```bash
-PHASE_INFO=$(node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs plan:roadmap get-phase "${PHASE}")
+PHASE_INFO=$(node __OPENCODE_CONFIG__/bgsd-oc/bin/bgsd-tools.cjs plan:roadmap get-phase "${PHASE}")
 ```
 Extract `phase_number`, `phase_name`, `goal`.
 
@@ -47,7 +46,7 @@ If RESEARCH.md exists and no `--research`: use existing.
 Otherwise spawn researcher:
 
 ```bash
-PHASE_DESC=$(node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs plan:roadmap get-phase "${PHASE}" | jq -r '.section')
+PHASE_DESC=$(node __OPENCODE_CONFIG__/bgsd-oc/bin/bgsd-tools.cjs plan:roadmap get-phase "${PHASE}" | jq -r '.section')
 PHASE_REQ_IDS=$(echo "$PHASE_DESC" | grep -i "Requirements:" | head -1 | sed 's/.*Requirements:\*\*\s*//' | sed 's/[\[\]]//g')
 ```
 
@@ -81,7 +80,7 @@ Check for `.planning/ASSERTIONS.md` existence. If present, set `assertions_path`
 ## 8. Surface Relevant Lessons
 
 ```bash
-LESSONS=$(node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs verify:search-lessons "${PHASE_NAME}" 2>/dev/null)
+LESSONS=$(node __OPENCODE_CONFIG__/bgsd-oc/bin/bgsd-tools.cjs verify:search-lessons "${PHASE_NAME}" 2>/dev/null)
 ```
 If found: display and include in planner context. If not: skip silently.
 
@@ -89,7 +88,7 @@ If found: display and include in planner context. If not: skip silently.
 
 If `assertions_path` exists:
 ```bash
-ASSERTIONS=$(node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs verify:assertions list --req ${PHASE_REQ_IDS} 2>/dev/null)
+ASSERTIONS=$(node __OPENCODE_CONFIG__/bgsd-oc/bin/bgsd-tools.cjs verify:assertions list --req ${PHASE_REQ_IDS} 2>/dev/null)
 ```
 Display assertion count and coverage. If none found: note "No assertions for {req_ids} — planner will derive must_haves from requirement text."
 
@@ -124,7 +123,7 @@ Task(
   prompt="Verify Phase {phase} plans.
 Read: {phase_dir}/*-PLAN.md, {roadmap_path}, {requirements_path}, {context_path}
 Check: requirement coverage, task structure, dependencies, must_haves.",
-  subagent_type="gsd-plan-checker", model="{checker_model}", description="Verify Phase {phase} plans"
+  subagent_type="bgsd-plan-checker", model="{checker_model}", description="Verify Phase {phase} plans"
 )
 ```
 

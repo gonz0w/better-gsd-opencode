@@ -10,8 +10,7 @@ Context budget: ~15% orchestrator, 100% fresh per subagent.
 </objective>
 
 <execution_context>
-@__OPENCODE_CONFIG__/get-shit-done/workflows/execute-phase.md
-@__OPENCODE_CONFIG__/get-shit-done/references/ui-brand.md
+@__OPENCODE_CONFIG__/bgsd-oc/workflows/execute-phase.md
 </execution_context>
 
 <context>
@@ -22,10 +21,10 @@ Phase: $ARGUMENTS
 
 If $ARGUMENTS does not contain `--gaps-only`, execute ALL incomplete plans normally. Do NOT infer or default to gaps-only mode.
 
-Context files are resolved inside the workflow via `gsd-tools init execute-phase` and per-subagent `<files_to_read>` blocks.
+Context files are resolved inside the workflow via `bgsd-tools init execute-phase` and per-subagent `<files_to_read>` blocks.
 </context>
 
 <process>
-Execute the execute-phase workflow from @__OPENCODE_CONFIG__/get-shit-done/workflows/execute-phase.md end-to-end.
+Execute the execute-phase workflow from @__OPENCODE_CONFIG__/bgsd-oc/workflows/execute-phase.md end-to-end.
 Preserve all workflow gates (wave execution, checkpoint handling, verification, state updates, routing).
 </process>

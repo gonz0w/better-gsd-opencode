@@ -1,9 +1,9 @@
-**Revision:** 9
+**Revision:** 12
 **Created:** 2026-02-25
-**Updated:** 2026-03-06
+**Updated:** 2026-03-09
 
 <objective>
-An intelligent agent orchestration engine for building large-scale software. Provides structured planning, execution, verification, specialized agent coordination, and structured exploration — turning unstructured project ideas into executable plans with traceability from intent through requirements to delivered code. Optimized for minimal context loading, fast execution, and clean agent boundaries — each agent does one thing well with exactly the context it needs.
+An intelligent agent orchestration engine for building large-scale software with a deeply embedded plugin experience. This milestone emphasizes rigorous performance benchmarking against modern OpenCode plugins, targeted latency reduction, and selective adoption of dependencies/new technology where measurable speed gains justify complexity.
 </objective>
 
 <users>
@@ -14,22 +14,23 @@ An intelligent agent orchestration engine for building large-scale software. Pro
 
 <outcomes>
 - DO-20 [P2]: Commands that are slow get profiled and optimized — measurable latency improvement where it matters
-- DO-21 [P1] [achieved v7.1]: Developer can checkpoint code state and decision context at any named point during execution
-- DO-22 [P1] [achieved v7.1]: Developer can pivot to a different approach with recorded reasoning, rewinding to a prior checkpoint
-- DO-23 [P1] [achieved v7.1]: Multiple attempts at the same task/plan/phase can be compared on outcome metrics (tests, complexity, LOC)
-- DO-24 [P1] [achieved v7.1]: Winning approach can be merged back while alternatives are archived as named branches
-- DO-25 [P1] [achieved v7.1]: Decision journal captures all trajectories — what was tried, why it was abandoned, what was chosen — consumable by agents and humans
-- DO-26 [P2] [achieved v7.1]: Trajectory exploration works at task, plan, and phase levels with appropriate granularity at each
 - DO-27 [P1]: Agent roles have zero overlap — each agent has a single, clear responsibility with no duplicated work
 - DO-28 [P1]: Context loading is deterministic — agents receive pre-computed context, not search-and-discover
-- DO-29 [P1] [achieved v8.0]: Read cache (SQLite or similar) eliminates repeated filesystem reads — markdown authoritative, cache serves hot data
 - DO-30 [P1]: Commands consolidated into subcommand groups — fewer top-level commands, same capabilities
-- DO-31 [P2] [achieved v8.0]: Milestone wrapup generates documentation automatically
 - DO-32 [P2]: Memory and disk I/O usage measurably reduced vs v7.1 baselines
 - DO-33 [P1]: Zero orphaned code — every function, export, workflow, template, and config entry is reachable and used
 - DO-34 [P1]: Command surface area reduced — stale commands removed, overlapping commands consolidated, internal-only calls not exposed as slash commands
 - DO-35 [P1]: Agent boundaries validated — each agent has a precise manifest, minimal context load, and structured handoff contracts
 - DO-36 [P2]: Bundle size reduced — dead code removal and dependency pruning measurably shrink the output
+- DO-37 [P1]: Shared agent metadata (references, manifests, common workflows) extracted into reusable OpenCode skills — reducing duplication and context loading across agents
+- DO-38 [P1]: Test suite is fully green — zero pre-existing failures, all 762+ tests pass
+- DO-39 [P1]: The AI always knows current project state (phase, plan, blockers) without agents needing to run init commands — context injected via system prompt hook
+- DO-40 [P1]: Hot-path CLI operations available as native LLM-callable tools — faster, typed, no shell overhead
+- DO-41 [P1]: Project state stays synchronized automatically — STATE.md updates on session idle, file changes trigger validation
+- DO-42 [P2]: Slash commands auto-enrich with project context before executing — reducing manual @-file references
+- DO-43 [P2]: Advisory guardrails catch convention violations and suggest test runs via tool interception — graduating to blocks for critical safety
+- DO-44 [P2]: Phase transitions, milestone completion, and stuck detection trigger visible notifications
+- DO-45 [P1]: Compaction preserves full project context (decisions, blockers, current task, intent) — not just STATE.md
 </outcomes>
 
 <criteria>
@@ -38,20 +39,22 @@ An intelligent agent orchestration engine for building large-scale software. Pro
 - SC-03: `intent drift` produces numeric score; init commands show drift advisory
 - SC-04: All GSD workflows (research, plan, execute, verify) receive intent context automatically
 - SC-05: GSD's own .planning/INTENT.md is maintained alongside its roadmap
-- SC-14 [achieved v7.1]: `trajectory checkpoint` creates named snapshot with code state + decision context
-- SC-15 [achieved v7.1]: `trajectory pivot` records abandonment reason, rewinds code to checkpoint, writes context bridge file
-- SC-16 [achieved v7.1]: `trajectory compare` shows outcome metrics (tests, complexity, LOC) across all attempts
-- SC-17 [achieved v7.1]: `trajectory choose` merges winner and archives alternatives as named git branches
-- SC-18 [achieved v7.1]: Decision journal entries are auto-injected into agent context during execution to prevent dead-end re-exploration
 - SC-19: Agent audit document maps every lifecycle stage to exactly one agent with no overlapping responsibilities
-- SC-20 [achieved v8.0]: SQLite (or similar) cache serves context reads; cache miss falls through to filesystem transparently
 - SC-21: Agent init commands load context from cache in <100ms (vs current filesystem baseline)
 - SC-22: Top-level slash commands reduced by ≥50% via subcommand grouping
-- SC-23 [achieved v8.0]: Milestone wrapup workflow produces documentation artifact automatically
 - SC-24: Dead code audit produces zero orphaned functions, exports, or unreachable modules
 - SC-25: Every workflow, template, and reference file is reachable from at least one command or agent
 - SC-26: Bundle size measurably smaller than v8.1 baseline (~1216KB)
 - SC-27: Agent RACI audit passes with no overlap warnings and clear handoff contracts documented
+- SC-28: Agent metadata shared via OpenCode skills is loadable and reduces per-agent context size
+- SC-29: All 762+ tests pass with zero pre-existing failures (config-migrate, compact, codebase-impact, codebase ast fixed)
+- SC-30: GitHub CI agent uses structured todo tracking and proper workflow gates matching other agents
+- SC-31: System prompt hook injects current phase, plan, and blockers into every LLM interaction without manual init calls
+- SC-32: At least 5 hot-path CLI operations are registered as native LLM-callable tools with typed Zod schemas
+- SC-33: STATE.md auto-updates when session goes idle with no manual intervention
+- SC-34: Compaction preserves PROJECT.md context, INTENT.md summary, decisions, and blockers alongside STATE.md
+- SC-35: Toast notifications fire on phase completion, milestone completion, and stuck detection events
+- SC-36: Tool interception provides advisory warnings when convention-violating file writes are detected
 </criteria>
 
 <constraints>
@@ -76,6 +79,24 @@ Orchestration should feel invisible — the right agent gets the right task with
 </health>
 
 <history>
+### v9.0 — 2026-03-09
+- **Modified** objective: Added deeply embedded editor experience through plugin hooks as a first-class architectural concern.
+  - Reason: Milestone v9.0: Plugin is the primary integration surface for UX
+- **Added** outcomes: DO-39 (always-on context injection), DO-40 (native LLM-callable tools), DO-41 (event-driven state sync), DO-42 (command enrichment), DO-43 (advisory guardrails), DO-44 (notifications), DO-45 (enhanced compaction).
+  - Reason: Milestone v9.0: Embedded Plugin Experience — full hook surface utilization
+- **Added** criteria: SC-31 through SC-36 for plugin integration verification.
+  - Reason: Milestone v9.0: Measurable success criteria for each plugin capability
+- **Modified** objective: An intelligent agent orchestration engine for building large-scale software with a deeply embedded plugin experience. This milestone emphasizes rigorous performance benchmarking against modern OpenCode plugins, targeted latency reduction, and selective adoption of dependencies/new technology where measurable speed gains justify complexity.
+  - Reason: Milestone v9.1: prioritize plugin performance benchmarking and modernization
+
+### v8.3 — 2026-03-08
+- **Modified** objective: Added reusable skills architecture as a first-class architectural concern alongside minimal context loading, fast execution, and clean agent boundaries.
+  - Reason: Milestone v8.3: Skills architecture for shared agent metadata
+- **Added** outcomes: DO-37 (skills-based agent metadata sharing), DO-38 (zero pre-existing test failures).
+  - Reason: Milestone v8.3: Agent quality, skills exploration, and test debt cleanup
+- **Added** criteria: SC-28 (skills reduce context size), SC-29 (all tests green), SC-30 (GitHub CI agent quality).
+  - Reason: Milestone v8.3: Success criteria for agent quality and skills work
+
 ### v8.2 — 2026-03-06
 - **Modified** outcomes: Marked DO-29, DO-31 as achieved v8.0. Added DO-33 (zero orphaned code), DO-34 (command surface reduction), DO-35 (agent boundary validation), DO-36 (bundle size reduction).
   - Reason: Milestone v8.2: Hardening milestone — dead code audit, command cleanup, agent sharpening, performance tuning

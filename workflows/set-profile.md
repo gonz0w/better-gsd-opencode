@@ -23,8 +23,8 @@ if $ARGUMENTS.profile not in ["quality", "balanced", "budget"]:
 Ensure config exists and load current state:
 
 ```bash
-node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs util:config-ensure-section
-INIT=$(node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs verify:state load)
+node __OPENCODE_CONFIG__/bgsd-oc/bin/bgsd-tools.cjs util:config-ensure-section
+INIT=$(node __OPENCODE_CONFIG__/bgsd-oc/bin/bgsd-tools.cjs verify:state load)
 ```
 
 This creates `.planning/config.json` with defaults if missing and loads current config.
@@ -51,14 +51,14 @@ Display confirmation with model table for selected profile:
 
 Agents will now use:
 
-[Show table from MODEL_PROFILES in gsd-tools.cjs for selected profile]
+[Show table from MODEL_PROFILES in bgsd-tools.cjs for selected profile]
 
 Example:
 | Agent | Model |
 |-------|-------|
-| gsd-planner | opus |
-| gsd-executor | sonnet |
-| gsd-verifier | haiku |
+| bgsd-planner | opus |
+| bgsd-executor | sonnet |
+| bgsd-verifier | haiku |
 | ... | ... |
 
 Next spawned agents will use the new profile.

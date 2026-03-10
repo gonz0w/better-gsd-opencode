@@ -3,7 +3,7 @@ description: Research how to implement a phase (standalone - usually use /bgsd-p
 ---
 
 <objective>
-Research how to implement a phase. Spawns gsd-phase-researcher agent with phase context.
+Research how to implement a phase. Spawns bgsd-phase-researcher agent with phase context.
 
 **Note:** This is a standalone research command. For most workflows, use `/bgsd-plan-phase` which integrates research automatically.
 
@@ -18,7 +18,7 @@ Research how to implement a phase. Spawns gsd-phase-researcher agent with phase 
 </objective>
 
 <execution_context>
-@__OPENCODE_CONFIG__/get-shit-done/workflows/research-phase.md
+@__OPENCODE_CONFIG__/bgsd-oc/workflows/research-phase.md
 </execution_context>
 
 <context>

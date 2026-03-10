@@ -31,13 +31,11 @@ Validate first argument is an integer.
 </step>
 
 <step name="init_context">
-Load phase operation context:
+**Context:** This workflow receives project context via `<bgsd-context>` auto-injected by the bGSD plugin's `command.execute.before` hook. If no `<bgsd-context>` block is present, the plugin is not loaded.
 
-```bash
-INIT=$(node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs init:phase-op "${after_phase}")
-```
+**If no `<bgsd-context>` found:** Stop and tell the user: "bGSD plugin required for v9.0. Install with: npx bgsd-oc"
 
-Check `roadmap_exists` from init JSON. If false:
+Check `roadmap_exists` from `<bgsd-context>` JSON. If false:
 ```
 ERROR: No roadmap found (.planning/ROADMAP.md)
 ```
@@ -45,10 +43,10 @@ Exit.
 </step>
 
 <step name="insert_phase">
-**Delegate the phase insertion to gsd-tools:**
+**Delegate the phase insertion to bgsd-tools:**
 
 ```bash
-RESULT=$(node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs plan:phase insert "${after_phase}" "${description}")
+RESULT=$(node __OPENCODE_CONFIG__/bgsd-oc/bin/bgsd-tools.cjs plan:phase insert "${after_phase}" "${description}")
 ```
 
 The CLI handles:
@@ -121,7 +119,7 @@ Project state updated: .planning/STATE.md
 <success_criteria>
 Phase insertion is complete when:
 
-- [ ] `gsd-tools phase insert` executed successfully
+- [ ] `bgsd-tools plan:phase insert` executed successfully
 - [ ] Phase directory created
 - [ ] Roadmap updated with new phase entry (includes "(INSERTED)" marker)
 - [ ] STATE.md updated with roadmap evolution note

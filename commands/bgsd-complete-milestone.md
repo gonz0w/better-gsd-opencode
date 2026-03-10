@@ -12,8 +12,8 @@ Output: Milestone archived (roadmap + requirements), PROJECT.md evolved, git tag
 <execution_context>
 **Load these files NOW (before proceeding):**
 
-- @__OPENCODE_CONFIG__/get-shit-done/workflows/complete-milestone.md (main workflow)
-- @__OPENCODE_CONFIG__/get-shit-done/templates/milestone-archive.md (archive template)
+- @__OPENCODE_CONFIG__/bgsd-oc/workflows/complete-milestone.md (main workflow)
+- @__OPENCODE_CONFIG__/bgsd-oc/templates/milestone-archive.md (archive template)
   </execution_context>
 
 <context>

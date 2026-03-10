@@ -303,12 +303,12 @@ function spawnBackgroundAnalysis(cwd) {
     // Spawn detached analysis
     try {
       const { spawn } = require('child_process');
-      const gsdBin = path.resolve(__dirname, '../../bin/gsd-tools.cjs');
+      const gsdBin = path.resolve(__dirname, '../../bin/bgsd-tools.cjs');
       const child = spawn(process.execPath, [gsdBin, 'codebase', 'analyze', '--raw'], {
         cwd,
         detached: true,
         stdio: 'ignore',
-        env: { ...process.env, GSD_BG_ANALYSIS: '1' },
+        env: { ...process.env, BGSD_BG_ANALYSIS: '1' },
       });
       child.unref();
       debugLog('codebase.bgAnalysis', `spawned background analysis (pid: ${child.pid})`);
@@ -633,13 +633,33 @@ function cmdCodebaseImpact(cwd, args, raw) {
 
   const files = [];
   for (const filePath of filePaths) {
+    const fullPath = path.join(cwd, filePath);
+    if (!fs.existsSync(fullPath)) {
+      files.push({ path: filePath, exists: false, dependent_count: 0, dependents: [], risk: 'low' });
+      continue;
+    }
     const result = getTransitiveDependents(graph, filePath);
-    files.push(result);
+    const allDependents = [
+      ...(result.direct_dependents || []),
+      ...(result.transitive_dependents || []).map(d => d.file),
+    ];
+    const dependents = allDependents.slice(0, 20);
+    files.push({
+      path: filePath,
+      exists: true,
+      dependent_count: result.fan_in || allDependents.length,
+      dependents,
+      risk: allDependents.length > 10 ? 'high' : allDependents.length > 5 ? 'medium' : 'low',
+    });
   }
 
+  const totalDependents = files.reduce((sum, r) => sum + r.dependent_count, 0);
   output({
-    success: true,
+    files_analyzed: files.length,
+    total_dependents: totalDependents,
+    overall_risk: totalDependents > 20 ? 'high' : totalDependents > 10 ? 'medium' : 'low',
     files,
+    source: 'cached_graph',
   }, raw);
 }
 

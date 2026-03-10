@@ -9,13 +9,11 @@ Read all execution_context files before starting.
 <process>
 
 <step name="init_context">
-Load todo context:
+**Context:** This workflow receives project context via `<bgsd-context>` auto-injected by the bGSD plugin's `command.execute.before` hook. If no `<bgsd-context>` block is present, the plugin is not loaded.
 
-```bash
-INIT=$(node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs init:todos)
-```
+**If no `<bgsd-context>` found:** Stop and tell the user: "bGSD plugin required for v9.0. Install with: npx bgsd-oc"
 
-Extract from init JSON: `commit_docs`, `date`, `timestamp`, `todo_count`, `todos`, `pending_dir`, `todos_dir_exists`.
+Extract from `<bgsd-context>` JSON: `commit_docs`, `date`, `timestamp`, `todo_count`, `todos`, `pending_dir`, `todos_dir_exists`.
 
 Ensure directories exist:
 ```bash
@@ -83,7 +81,7 @@ Use values from init context: `timestamp` and `date` are already available.
 
 Generate slug for the title:
 ```bash
-slug=$(node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs util:generate-slug "$title")
+slug=$(node __OPENCODE_CONFIG__/bgsd-oc/bin/bgsd-tools.cjs util:generate-slug "$title")
 ```
 
 Write to `.planning/todos/pending/${date}-${slug}.md`:
@@ -118,7 +116,7 @@ If `.planning/STATE.md` exists:
 Commit the todo and any updated state:
 
 ```bash
-node __OPENCODE_CONFIG__/get-shit-done/bin/gsd-tools.cjs execute:commit "docs: capture todo - [title]" --files .planning/todos/pending/[filename] .planning/STATE.md
+node __OPENCODE_CONFIG__/bgsd-oc/bin/bgsd-tools.cjs execute:commit "docs: capture todo - [title]" --files .planning/todos/pending/[filename] .planning/STATE.md
 ```
 
 Tool respects `commit_docs` config and gitignore automatically.
