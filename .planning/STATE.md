@@ -9,9 +9,9 @@ See: `.planning/PROJECT.md` (updated 2026-03-10)
 
 ## Current Position
 
-**Phase:** 86 (in progress)
-**Current Plan:** Not started
-**Status:** Ready to plan
+**Phase:** 87 (complete)
+**Current Plan:** 02 complete
+**Status:** Ready for next phase
 **Last Activity:** 2026-03-10
 
 **Progress:** [██████████] 95%
@@ -27,10 +27,10 @@ See: `.planning/PROJECT.md` (updated 2026-03-10)
 
 | Milestone | Phases | Requirements | Status |
 |-----------|--------|--------------|--------|
-| v9.3 | 5 (86-90) | 15 | Roadmap created |
+| v9.3 | 5 (86-90) | 15 | In Progress |
 | v9.2 | 4 (82-85) | 12 | Complete |
 | v9.1 | 5 (77-81) | 12 | Complete |
-| Phase 87 P01 | 5 min | 3 tasks | 9 files |
+| Phase 87 | 2 plans | Complete | Command consolidation done |
 
 ## Accumulated Context
 
@@ -53,6 +53,8 @@ See: `.planning/PROJECT.md` (updated 2026-03-10)
 - [85-01]: Bun detection order: bun --version first (3s timeout), then which bun fallback.
 - [85-01]: Show full details when Bun detected, install instructions when unavailable.
 - [Phase 87-01]: Created 8 subcommand wrapper commands to group 41 original commands into logical categories
+- [87-02]: Consolidated 50 slash commands into 11 (8 wrappers + 3 standalone) - 78% reduction
+- [87-02]: Removed bgsd-notifications from slash command surface (internal-only)
 
 ### Pending Todos
 
@@ -66,7 +68,7 @@ None yet.
 
 ## Session Continuity
 
-**Last session:** 2026-03-10T16:05:08.093Z
-**Stopped at:** Completed 87-01 command consolidation
-**Next step:** Run /bgsd-execute-phase 86 to continue with next plan
+**Last session:** 2026-03-10T16:10:00.000Z
+**Stopped at:** Completed 87-02 command consolidation plan
+**Next step:** Move to phase 88 (Quality & Context)
 
