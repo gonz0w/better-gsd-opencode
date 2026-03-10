@@ -107,6 +107,140 @@ describe('plugin parsers and tool registry', () => {
     // Should not throw
     mod.invalidateAll();
   });
+
+  // --- Backward Compatibility Tests ---
+  // These tests ensure parsers handle legacy/missing formats gracefully
+
+  test('parseState handles missing optional fields', async () => {
+    const mod = await import(pluginPath);
+    const { parseState, invalidateState } = mod;
+    const projectDir = path.join(__dirname, '..');
+    const statePath = path.join(projectDir, '.planning', 'STATE.md');
+    const backupPath = statePath + '.backup';
+    
+    try {
+      // Backup original
+      fs.copyFileSync(statePath, backupPath);
+      
+      // Create minimal STATE.md with only essential fields
+      const minimal = `# Project State
+
+## Current Position
+
+**Phase:** 99
+**Status:** Test
+`;
+      fs.writeFileSync(statePath, minimal);
+      invalidateState(projectDir);
+      
+      const state = parseState(projectDir);
+      assert.ok(state, 'should parse minimal STATE.md');
+      assert.strictEqual(state.phase, '99', 'should extract phase');
+      assert.strictEqual(state.status, 'Test', 'should extract status');
+      
+    } finally {
+      // Restore original
+      fs.renameSync(backupPath, statePath);
+      invalidateState(projectDir);
+    }
+  });
+
+  test('parseState handles extra unknown fields gracefully', async () => {
+    const mod = await import(pluginPath);
+    const { parseState, invalidateState } = mod;
+    const projectDir = path.join(__dirname, '..');
+    const statePath = path.join(projectDir, '.planning', 'STATE.md');
+    const backupPath = statePath + '.backup';
+    
+    try {
+      fs.copyFileSync(statePath, backupPath);
+      
+      // Add unknown fields
+      const withUnknown = fs.readFileSync(statePath, 'utf-8') + '\n\n**Unknown:** value\n**Another:** test\n';
+      fs.writeFileSync(statePath, withUnknown);
+      invalidateState(projectDir);
+      
+      const state = parseState(projectDir);
+      assert.ok(state, 'should parse STATE.md with unknown fields');
+      // Known fields should still work
+      assert.ok(state.phase, 'should still extract known fields');
+      
+    } finally {
+      fs.renameSync(backupPath, statePath);
+      invalidateState(projectDir);
+    }
+  });
+
+  test('parseRoadmap handles various milestone formats', async () => {
+    const mod = await import(pluginPath);
+    const { parseRoadmap, invalidateRoadmap } = mod;
+    const projectDir = path.join(__dirname, '..');
+    const roadmapPath = path.join(projectDir, '.planning', 'ROADMAP.md');
+    const backupPath = roadmapPath + '.backup';
+    
+    try {
+      fs.copyFileSync(roadmapPath, backupPath);
+      
+      // Test with different status markers
+      const mixedMilestones = `# Roadmap
+
+## Milestones
+
+- ✅ **v1.0 Complete** - First release
+- 🔵 **v2.0 Active** - Current work
+- 🔲 **v3.0 Pending** - Future
+
+## Phases
+
+### Phase 1: Foundation
+- [ ] Phase 1
+`;
+      fs.writeFileSync(roadmapPath, mixedMilestones);
+      invalidateRoadmap(projectDir);
+      
+      const roadmap = parseRoadmap(projectDir);
+      assert.ok(roadmap, 'should parse roadmap with mixed milestone markers');
+      assert.ok(roadmap.milestones.length >= 2, 'should extract milestones');
+      
+    } finally {
+      fs.renameSync(backupPath, roadmapPath);
+      invalidateRoadmap(projectDir);
+    }
+  });
+
+  test('parsePlan handles minimal frontmatter without tasks', async () => {
+    const mod = await import(pluginPath);
+    const { parsePlan, invalidatePlans } = mod;
+    const tmpDir = path.join(__dirname, '..', '.planning', 'phases');
+    
+    // Find an existing plan to test with
+    const phaseDirs = fs.readdirSync(tmpDir).filter(d => d.startsWith('01'));
+    if (phaseDirs.length === 0) {
+      console.log('SKIP: No phase directories found');
+      return;
+    }
+    
+    const planFile = path.join(tmpDir, phaseDirs[0], '01-01-PLAN.md');
+    if (!fs.existsSync(planFile)) {
+      console.log('SKIP: No 01-01-PLAN.md found');
+      return;
+    }
+    
+    const plan = parsePlan(planFile);
+    assert.ok(plan, 'should parse existing plan');
+    assert.ok(plan.frontmatter, 'should extract frontmatter');
+    assert.ok(Array.isArray(plan.tasks), 'tasks should be an array');
+  });
+
+  test('parsers return null for non-existent files without throwing', async () => {
+    const mod = await import(pluginPath);
+    const { parseState, parseRoadmap, parsePlan } = mod;
+    
+    // These should return null, not throw
+    assert.strictEqual(parseState('/nonexistent/path'), null, 'parseState should return null for missing file');
+    assert.strictEqual(parseRoadmap('/nonexistent/path'), null, 'parseRoadmap should return null for missing file');
+    assert.strictEqual(parsePlan('/nonexistent/path/PLAN.md'), null, 'parsePlan should return null for missing file');
+  });
 });
 
 describe('Plugin Tools', () => {
