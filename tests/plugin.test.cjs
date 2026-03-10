@@ -113,6 +113,29 @@ describe('Plugin Tools', () => {
   const pluginPath = path.join(__dirname, '..', 'plugin.js');
   let pluginModule;
 
+  async function runWithValidationModes(run) {
+    const originalFallback = process.env.BGSD_DEP_VALIBOT_FALLBACK;
+
+    try {
+      delete process.env.BGSD_DEP_VALIBOT_FALLBACK;
+      const primary = await run();
+
+      process.env.BGSD_DEP_VALIBOT_FALLBACK = '1';
+      const fallback = await run();
+
+      return {
+        primary: JSON.parse(primary),
+        fallback: JSON.parse(fallback),
+      };
+    } finally {
+      if (originalFallback === undefined) {
+        delete process.env.BGSD_DEP_VALIBOT_FALLBACK;
+      } else {
+        process.env.BGSD_DEP_VALIBOT_FALLBACK = originalFallback;
+      }
+    }
+  }
+
   // Load plugin module once for all tool tests
   test('load plugin module', async () => {
     pluginModule = await import(pluginPath);
@@ -347,6 +370,54 @@ describe('Plugin Tools', () => {
 
     assert.strictEqual(markerLines.length, 2, 'should emit one marker per validation call');
     assert.strictEqual(markerLines[0], markerLines[1], 'marker should be deterministic for repeated identical input');
+  });
+
+  test('bgsd_context keeps task coercion contract parity in forced fallback mode', async () => {
+    const mod = pluginModule || await import(pluginPath);
+    const plugin = await mod.BgsdPlugin({ directory: process.cwd() });
+
+    const results = await runWithValidationModes(() =>
+      plugin.tool.bgsd_context.execute({ task: '1' }, { directory: process.cwd() })
+    );
+
+    assert.deepStrictEqual(results.primary, results.fallback, 'task coercion output contract should match across engines');
+    assert.ok(results.primary.task, 'response should include task payload');
+    assert.strictEqual(results.primary.task.number, 1, 'string task arg should coerce to numeric task number');
+  });
+
+  test('bgsd_progress keeps enum validation envelope parity in forced fallback mode', async () => {
+    const mod = pluginModule || await import(pluginPath);
+    const plugin = await mod.BgsdPlugin({ directory: process.cwd() });
+
+    const results = await runWithValidationModes(() =>
+      plugin.tool.bgsd_progress.execute({ action: 'not-a-real-action' }, { directory: process.cwd() })
+    );
+
+    assert.deepStrictEqual(results.primary, results.fallback, 'enum validation envelope should match across engines');
+    assert.strictEqual(results.primary.error, 'validation_error', 'invalid enum should return validation_error');
+  });
+
+  test('migrated tools keep invalid and missing arg envelopes stable across engines', async () => {
+    const mod = pluginModule || await import(pluginPath);
+    const plugin = await mod.BgsdPlugin({ directory: process.cwd() });
+
+    const invalidContext = await runWithValidationModes(() =>
+      plugin.tool.bgsd_context.execute({ task: 'abc' }, { directory: process.cwd() })
+    );
+    assert.deepStrictEqual(invalidContext.primary, invalidContext.fallback, 'bgsd_context invalid-input envelope should match across engines');
+    assert.strictEqual(invalidContext.primary.error, 'validation_error');
+
+    const missingProgressAction = await runWithValidationModes(() =>
+      plugin.tool.bgsd_progress.execute({}, { directory: process.cwd() })
+    );
+    assert.deepStrictEqual(missingProgressAction.primary, missingProgressAction.fallback, 'bgsd_progress missing-action envelope should match across engines');
+    assert.strictEqual(missingProgressAction.primary.error, 'validation_error');
+
+    const missingProgressValue = await runWithValidationModes(() =>
+      plugin.tool.bgsd_progress.execute({ action: 'remove-blocker' }, { directory: process.cwd() })
+    );
+    assert.deepStrictEqual(missingProgressValue.primary, missingProgressValue.fallback, 'bgsd_progress missing-value envelope should match across engines');
+    assert.strictEqual(missingProgressValue.primary.error, 'validation_error');
   });
 
   // --- bgsd_validate response test ---

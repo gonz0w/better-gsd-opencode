@@ -68,13 +68,34 @@ function buildZodSchema(schemaSpec) {
   return z.object(shape);
 }
 
-function firstErrorMessage(result) {
+function formatEnumOptions(values) {
+  return values.map(value => `"${value}"`).join('|');
+}
+
+function getPathKey(issue) {
+  if (!issue || !Array.isArray(issue.path) || issue.path.length === 0) {
+    return null;
+  }
+
+  const segment = issue.path[0];
+  return segment && typeof segment.key === 'string' ? segment.key : null;
+}
+
+function firstErrorMessage(result, schemaSpec) {
   if (result.engine === 'valibot') {
     const firstIssue = result.issues && result.issues[0];
     const message = firstIssue && firstIssue.message ? firstIssue.message : 'Invalid arguments';
+    const fieldKey = getPathKey(firstIssue);
+    const fieldSpec = fieldKey && schemaSpec && schemaSpec.shape ? schemaSpec.shape[fieldKey] : null;
 
     if (message.includes('Expected number but received NaN')) {
       return 'Invalid input: expected number, received NaN';
+    }
+
+    if (fieldSpec && fieldSpec.type === 'enum' && Array.isArray(fieldSpec.values)) {
+      if (firstIssue.type === 'picklist' || (firstIssue.type === 'object' && firstIssue.received === 'undefined')) {
+        return `Invalid option: expected one of ${formatEnumOptions(fieldSpec.values)}`;
+      }
     }
 
     return message;
@@ -154,7 +175,7 @@ export function validateArgs(toolName, schemaSpec, input) {
       data: null,
       error: {
         code: 'validation_error',
-        message: firstErrorMessage({ ...result, engine }),
+        message: firstErrorMessage({ ...result, engine }, schemaSpec),
       },
     };
   }
@@ -172,7 +193,7 @@ export function validateArgs(toolName, schemaSpec, input) {
     data: null,
     error: {
       code: 'validation_error',
-      message: firstErrorMessage({ ...result, engine }),
+      message: firstErrorMessage({ ...result, engine }, schemaSpec),
     },
   };
 }
