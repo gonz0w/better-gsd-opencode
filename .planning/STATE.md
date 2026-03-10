@@ -9,9 +9,9 @@ See: `.planning/PROJECT.md` (updated 2026-03-09)
 
 ## Current Position
 
-**Phase:** 80 of 81 (SQLite Statement Cache Acceleration)
-**Current Plan:** Not started
-**Status:** Ready to plan
+**Phase:** 81 of 81 (Safe Adoption Controls and Regression Parity)
+**Current Plan:** 01 complete
+**Status:** Plan complete
 **Last Activity:** 2026-03-10
 
 **Progress:** [██████████] 100%
@@ -37,6 +37,7 @@ See: `.planning/PROJECT.md` (updated 2026-03-09)
 | Phase 79-startup-compile-cache-acceleration P01 | 5 min | 3 tasks | 4 files |
 | Phase 79-startup-compile-cache-acceleration P02 | 10 min | 3 tasks | 3 files |
 | Phase 80-sqlite-statement-cache-acceleration P01 | 8 min | 3 tasks | 1 file |
+| Phase 81-safe-adoption-controls-and-regression-parity P01 | 7 min | 3 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -63,6 +64,8 @@ See: `.planning/PROJECT.md` (updated 2026-03-09)
 - [Phase 79-03]: Fixed wrapper to skip flag on Node 22+ - benchmark shows 0% (neutral) vs previous -58% regression
 - [Phase 80-sqlite-statement-cache-acceleration]: Statement caching via createTagStore() reduces p50 latency by ~43%, p99 by ~22%
 - [Phase 80-sqlite-statement-cache-acceleration]: BGSD_SQLITE_STATEMENT_CACHE env var controls feature (default: enabled on Node 22.5+)
+- [Phase 81-safe-adoption-controls-and-regression-parity]: Added optimization flags section to CONFIG_SCHEMA with env var override support
+- [Phase 81-safe-adoption-controls-and-regression-parity]: Created util:settings command to display all config including optimization flags
 
 ### Pending Todos
 
@@ -75,6 +78,6 @@ None yet.
 
 ## Session Continuity
 
-**Last session:** 2026-03-10T04:04:00Z
-**Stopped at:** Completed 80-01-PLAN.md — Phase 80 Plan 01 complete
-**Next step:** Plan Phase 80 additional plans or proceed to Phase 81
+**Last session:** 2026-03-10T04:26:15Z
+**Stopped at:** Completed 81-01-PLAN.md — Phase 81 Plan 01 complete
+**Next step:** Phase 81 complete - milestone v9.1 ready for completion
