@@ -4069,7 +4069,7 @@ var require_roadmap = __commonJS({
           output2({ found: false, error: "ROADMAP.md not found" }, raw, "");
           return;
         }
-        const escapedPhase = phaseNum.replace(/\./g, "\\.");
+        const escapedPhase = phaseNum.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
         const phasePattern = new RegExp(
           `#{2,4}\\s*Phase\\s+${escapedPhase}:\\s*([^\\n]+)`,
           "i"
