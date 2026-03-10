@@ -36,6 +36,7 @@ const CONFIG_SCHEMA = {
   test_gate:                 { type: 'boolean', default: true,                            description: 'Block plan completion on test failure',            aliases: [], nested: null },
   context_window:            { type: 'number',  default: 200000,                          description: 'Context window size in tokens',                    aliases: [], nested: null },
   context_target_percent:    { type: 'number',  default: 50,                              description: 'Target context utilization percent (1-100)',        aliases: [], nested: null },
+  runtime:                   { type: 'string',  default: 'auto',                           description: 'Runtime to use (auto/bun/node)',                aliases: [], nested: null },
 
   // ─── RAG Research Pipeline ───
   rag_enabled:               { type: 'boolean', default: true,                            description: 'Enable RAG-powered research pipeline',              aliases: [], nested: { section: 'workflow', field: 'rag' } },
