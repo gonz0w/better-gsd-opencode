@@ -3,6 +3,69 @@
 const { COMMAND_HELP } = require('./lib/constants');
 const { error } = require('./lib/output');
 const { diagnoseCompileCache } = require('./lib/runtime-capabilities');
+const { detectBun, getCachedBunVersion, configGet, configSet } = require('./lib/cli-tools/bun-runtime');
+const { loadConfig } = require('./lib/config');
+
+// ─── Runtime Detection (Phase 89: Bun runtime detection with config persistence) ────────
+// Detect Bun at startup and show runtime banner.
+// Uses detectBun() for effective runtime preference (env var > config).
+// Caches detection result in config for faster subsequent runs.
+let _runtimeDetected = null;
+if (!process.env.BGSD_RUNTIME_DETECTED) {
+  try {
+    const bunStatus = detectBun();
+    // Use effective preference from detectBun (handles env var override correctly)
+    // If forced via env var or config, use that preference; otherwise default to 'auto'
+    let effectivePref = 'auto';
+    if (bunStatus.forced) {
+      // If forced, derive preference from available flag (false = node, true = bun)
+      effectivePref = bunStatus.available ? 'bun' : 'node';
+    } else if (bunStatus.available) {
+      effectivePref = 'bun';
+    }
+    _runtimeDetected = {
+      preference: effectivePref,
+      available: bunStatus.available,
+      version: bunStatus.version || getCachedBunVersion(),
+      path: bunStatus.path,
+      fromConfig: bunStatus.fromConfig || false,
+      forced: bunStatus.forced || false
+    };
+    // Mark as detected to prevent re-execution loops
+    process.env.BGSD_RUNTIME_DETECTED = 'true';
+  } catch (e) {
+    // Silent failure - fall back to Node.js
+    _runtimeDetected = { preference: 'auto', available: false, forced: false };
+    process.env.BGSD_RUNTIME_DETECTED = 'true';
+  }
+}
+
+/**
+ * Show runtime banner at startup
+ * @param {object} runtime - Runtime info from detection
+ * @param {boolean} verbose - Whether to show extra details
+ */
+function showRuntimeBanner(runtime, verbose = false) {
+  if (!runtime) return;
+  
+  const isBun = runtime.available && runtime.preference !== 'node';
+  const isFallback = runtime.preference === 'node' || (runtime.preference === 'auto' && !runtime.available);
+  
+  if (isBun && !runtime.fromConfig) {
+    // Bun detected and available (not from config forced)
+    console.log('[bGSD] Running with Bun v' + runtime.version);
+  } else if (isFallback && runtime.preference === 'node') {
+    // User forced Node.js
+    console.log('[bGSD] Falling back to Node.js');
+  } else if (verbose && isBun && runtime.fromConfig) {
+    // Verbose mode: show config-cached info
+    console.log('[bGSD] Using Bun (cached v' + runtime.version + ')');
+  }
+  
+  if (verbose && runtime.preference === 'auto' && !runtime.available && !isFallback) {
+    console.log('[bGSD] Bun not available, using Node.js');
+  }
+}
 
 // ─── Compile-cache guard (Phase 79: startup compile-cache acceleration) ────────
 // This runs at CLI startup to check if compile-cache should be enabled.
@@ -39,6 +102,7 @@ function lazyProfiler() { return _modules.profiler || (_modules.profiler = requi
 function lazyResearch() { return _modules.research || (_modules.research = require('./commands/research')); }
 function lazyTools() { return _modules.tools || (_modules.tools = require('./commands/tools')); }
 function lazyRuntime() { return _modules.runtime || (_modules.runtime = require('./commands/runtime')); }
+function lazyMeasure() { return _modules.measure || (_modules.measure = require('./commands/measure')); }
 
 
 async function main() {
@@ -89,6 +153,14 @@ async function main() {
   if (compactIdx !== -1) {
     global._gsdCompactMode = true;
     args.splice(compactIdx, 1);
+  }
+
+  // ─── Runtime Banner ─────────────────────────────────────────────────────────
+  // Show runtime info at startup (only in verbose mode or when running with Bun)
+  const isVerbose = global._gsdCompactMode === false;
+  const showBanner = isVerbose || (_runtimeDetected && _runtimeDetected.available);
+  if (showBanner) {
+    showRuntimeBanner(_runtimeDetected, isVerbose);
   }
 
   // Parse --manifest global flag for context manifest in compact output
@@ -899,8 +971,20 @@ Examples:
           } else {
             lazyRuntime().cmdRuntimeStatus(cwd, raw);
           }
+        } else if (subcommand === 'measure') {
+          // Check build-time feature flag
+          if (global.BGSD_INCLUDE_BENCHMARKS === false) {
+            error('Benchmarks are disabled in this build. Set INCLUDE_BENCHMARKS=true to enable.');
+          }
+          const binPathIdx = restArgs.indexOf('--bin');
+          // --verbose is a global flag - check global._gsdCompactMode
+          const isVerbose = global._gsdCompactMode === false;
+          lazyMeasure().cmdMeasure(cwd, {
+            verbose: isVerbose,
+            binPath: binPathIdx !== -1 ? restArgs[binPathIdx + 1] : 'bin/bgsd-tools.cjs'
+          }, raw);
         } else {
-          error(`Unknown util subcommand: ${subcommand}. Available: config-get, config-set, env, current-timestamp, list-todos, todo, memory, mcp, classify, frontmatter, progress, websearch, history-digest, trace-requirement, codebase, cache, agent, resolve-model, template, generate-slug, verify-path-exists, config-ensure-section, config-migrate, scaffold, phase-plan-index, state-snapshot, summary-extract, quick-summary, extract-sections, git, profiler, tools, runtime`);
+          error(`Unknown util subcommand: ${subcommand}. Available: config-get, config-set, env, current-timestamp, list-todos, todo, memory, mcp, classify, frontmatter, progress, websearch, history-digest, trace-requirement, codebase, cache, agent, resolve-model, template, generate-slug, verify-path-exists, config-ensure-section, config-migrate, scaffold, phase-plan-index, state-snapshot, summary-extract, quick-summary, extract-sections, git, profiler, tools, runtime, measure`);
         }
         break;
       }
@@ -964,6 +1048,21 @@ Examples:
     } else {
       lazyRuntime().cmdRuntimeStatus(cwd, raw);
     }
+    return;
+  }
+
+  if (command === 'measure') {
+    // Check build-time feature flag
+    if (global.BGSD_INCLUDE_BENCHMARKS === false) {
+      error('Benchmarks are disabled in this build. Set INCLUDE_BENCHMARKS=true to enable.');
+    }
+    const binPathIdx = remainingArgs.indexOf('--bin');
+    // --verbose is a global flag - check global._gsdCompactMode
+    const isVerbose = global._gsdCompactMode === false;
+    lazyMeasure().cmdMeasure(cwd, {
+      verbose: isVerbose,
+      binPath: binPathIdx !== -1 ? remainingArgs[binPathIdx + 1] : 'bin/bgsd-tools.cjs'
+    }, raw);
     return;
   }
 

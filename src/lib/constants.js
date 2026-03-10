@@ -36,6 +36,7 @@ const CONFIG_SCHEMA = {
   test_gate:                 { type: 'boolean', default: true,                            description: 'Block plan completion on test failure',            aliases: [], nested: null },
   context_window:            { type: 'number',  default: 200000,                          description: 'Context window size in tokens',                    aliases: [], nested: null },
   context_target_percent:    { type: 'number',  default: 50,                              description: 'Target context utilization percent (1-100)',        aliases: [], nested: null },
+  runtime:                   { type: 'string',  default: 'auto',                           description: 'Runtime to use (auto/bun/node)',                aliases: [], nested: null },
 
   // ─── RAG Research Pipeline ───
   rag_enabled:               { type: 'boolean', default: true,                            description: 'Enable RAG-powered research pipeline',              aliases: [], nested: { section: 'workflow', field: 'rag' } },
@@ -478,6 +479,16 @@ Subcommands:
   'verify:token-budget': `Usage: bgsd-tools verify:token-budget
 
 Show token counts for workflow files vs budgets.`,
+  'verify:orphans': `Usage: bgsd-tools verify:orphans
+
+Run reachability audit to find orphaned exports, files, workflows, templates, and config entries.
+
+Checks:
+  - Orphaned exports (functions/classes not imported by any file)
+  - Orphaned files (source files not imported by any other file)
+  - Orphaned workflows (workflows not referenced by commands/agents)
+  - Orphaned templates (templates not referenced by workflows/commands)
+  - Orphaned configs (skills referenced by agents that don't exist)`,
 
   // util namespace
   'util:config-get': `Usage: bgsd-tools util:config-get <key.path>
@@ -909,6 +920,25 @@ Examples:
   bgsd-tools research:nlm-report abc123 --prompt "Focus on security implications"`,
   'research:collect --resume': 'Resume interrupted research session from last completed stage',
   'research collect --resume': 'Resume interrupted research session from last completed stage',
+
+  'measure': `Usage: bgsd-tools measure [--verbose] [--bin <path>]
+
+Run plugin benchmark to measure performance metrics.
+
+This is a developer tool - undocumented in production builds.
+
+Options:
+  --verbose    Show full metrics including memory and context load times
+  --bin <path> Path to bgsd-tools binary (default: bin/bgsd-tools.cjs)
+
+Output:
+  Default: Table with startup times (cold/warm) and command execution times
+  --verbose: Full metrics table including memory and context load times
+
+Examples:
+  bgsd-tools measure
+  bgsd-tools measure --verbose
+  bgsd-tools measure --bin ./bin/bgsd-tools.cjs`,
 };
 
 module.exports = { MODEL_PROFILES, CONFIG_SCHEMA, COMMAND_HELP, VALID_TRAJECTORY_SCOPES };

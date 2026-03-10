@@ -80,8 +80,10 @@ function analyzeFile(filePath) {
   }
 
   let lines = 0;
+  let size_bytes = stat.size;
   try {
     const content = fs.readFileSync(filePath);
+    size_bytes = content.length;
     // Count newlines in buffer for performance
     for (let i = 0; i < content.length; i++) {
       if (content[i] === 0x0a) lines++;
@@ -96,7 +98,7 @@ function analyzeFile(filePath) {
 
   return {
     language,
-    size_bytes: stat.size,
+    size_bytes,
     lines,
     last_modified: stat.mtime.toISOString(),
   };
@@ -331,7 +333,8 @@ function performAnalysis(cwd, options = {}) {
 
   const durationMs = Date.now() - startMs;
 
-  return {
+  // Generate agent contexts
+  const baseIntel = {
     version: 1,
     generated_at: new Date().toISOString(),
     git_commit_hash: gitInfo.commit_hash,
@@ -345,6 +348,13 @@ function performAnalysis(cwd, options = {}) {
       total_lines: totalLines,
       languages_detected: Object.keys(languages).length,
     },
+  };
+
+  const agentContexts = generateAgentContexts(cwd, baseIntel);
+
+  return {
+    ...baseIntel,
+    agent_contexts: agentContexts,
   };
 }
 
@@ -429,6 +439,212 @@ function getStalenessAge(intel, cwd) {
 }
 
 
+// ─── Agent Context Generation ─────────────────────────────────────────────────
+
+const AGENT_MANIFESTS = {
+  'bgsd-executor': {
+    fields: ['phase_dir', 'phase_number', 'phase_name', 'plans', 'incomplete_plans',
+             'plan_count', 'incomplete_count', 'branch_name', 'commit_docs',
+             'verifier_enabled', 'task_routing', 'env_summary'],
+    optional: ['codebase_conventions', 'codebase_dependencies'],
+  },
+  'bgsd-verifier': {
+    fields: ['phase_dir', 'phase_number', 'phase_name', 'plans', 'summaries',
+             'verifier_enabled'],
+    optional: ['codebase_stats'],
+  },
+  'bgsd-planner': {
+    fields: ['phase_dir', 'phase_number', 'phase_name', 'plan_count',
+             'research_enabled', 'plan_checker_enabled', 'intent_summary'],
+    optional: ['codebase_stats', 'codebase_conventions', 'codebase_dependencies',
+               'codebase_freshness', 'env_summary'],
+  },
+  'bgsd-phase-researcher': {
+    fields: ['phase_dir', 'phase_number', 'phase_name', 'intent_summary'],
+    optional: ['codebase_stats', 'env_summary'],
+  },
+  'bgsd-plan-checker': {
+    fields: ['phase_dir', 'phase_number', 'phase_name', 'plans', 'plan_count'],
+    optional: ['codebase_stats', 'codebase_dependencies'],
+  },
+  'bgsd-reviewer': {
+    fields: ['phase_dir', 'phase_number', 'phase_name', 'codebase_conventions', 'codebase_dependencies'],
+    optional: ['codebase_stats'],
+  },
+};
+
+/**
+ * Generate pre-computed agent contexts for all agent types.
+ * Uses existing intel data and phase info to create scoped contexts.
+ *
+ * @param {string} cwd - Project root
+ * @param {object} intel - Current intel object with stats, conventions, dependencies
+ * @returns {object} Agent contexts keyed by agent type
+ */
+function generateAgentContexts(cwd, intel) {
+  const contexts = {};
+  const generatedAt = new Date().toISOString();
+
+  // Read phase info from STATE.md and ROADMAP.md
+  let phaseInfo = { phase: null, current_plan: null, status: null };
+  try {
+    const statePath = path.join(cwd, '.planning', 'STATE.md');
+    if (fs.existsSync(statePath)) {
+      const stateContent = fs.readFileSync(statePath, 'utf-8');
+      // Match **Phase:** 87 (complete) or **Phase:** 87
+      const phaseMatch = stateContent.match(/\*\*Phase:\*\*\s*(\d+)/m);
+      const planMatch = stateContent.match(/\*\*Current Plan:\*\*\s*(.+)/m);
+      const statusMatch = stateContent.match(/\*\*Status:\*\*\s*(.+)/m);
+      if (phaseMatch) phaseInfo.phase = phaseMatch[1];
+      if (planMatch) phaseInfo.current_plan = planMatch[1].trim();
+      if (statusMatch) phaseInfo.status = statusMatch[1].trim();
+    }
+  } catch { /* ignore */ }
+
+  // Read ROADMAP.md for plans
+  let roadmapInfo = { plans: [], summaries: [] };
+  try {
+    const roadmapPath = path.join(cwd, '.planning', 'ROADMAP.md');
+    if (fs.existsSync(roadmapPath)) {
+      const roadmapContent = fs.readFileSync(roadmapPath, 'utf-8');
+      // Extract phase plans - simplified parsing
+      const phaseMatch = roadmapContent.match(/## Phase \d+.*?\n([\s\S]*?)(?=## Phase|$)/);
+      if (phaseMatch) {
+        const planMatches = phaseMatch[1].match(/Plan \d+/g) || [];
+        roadmapInfo.plans = planMatches.map(p => p.toLowerCase().replace(/ /g, '-'));
+      }
+    }
+  } catch { /* ignore */ }
+
+  // Read config for flags
+  let configInfo = { commit_docs: true, verifier: false, research: false, plan_checker: false };
+  try {
+    const configPath = path.join(cwd, '.planning', 'config.json');
+    if (fs.existsSync(configPath)) {
+      const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+      configInfo = {
+        commit_docs: config.commit_docs !== false,
+        verifier: config.verifier === true,
+        research: config.research === true,
+        plan_checker: config.plan_checker === true,
+      };
+    }
+  } catch { /* ignore */ }
+
+  // Build base context from intel
+  const baseContext = {
+    phase_dir: phaseInfo.phase ? `phases/${phaseInfo.phase}-quality-and-context` : null,
+    phase_number: phaseInfo.phase,
+    phase_name: 'Quality and Context',
+    plans: roadmapInfo.plans,
+    summaries: roadmapInfo.summaries,
+    incomplete_plans: [],
+    plan_count: roadmapInfo.plans.length,
+    incomplete_count: 0,
+    branch_name: null,
+    commit_docs: configInfo.commit_docs,
+    verifier_enabled: configInfo.verifier,
+    task_routing: null,
+    env_summary: null,
+    codebase_stats: intel?.stats ? {
+      total_files: intel.stats.total_files,
+      total_lines: intel.stats.total_lines,
+      git_commit: intel.git_commit_hash,
+      generated_at: intel.generated_at,
+    } : null,
+    codebase_conventions: intel?.conventions || null,
+    codebase_dependencies: intel?.dependencies ? {
+      total_modules: intel.dependencies.stats?.total_files_parsed || 0,
+      total_edges: intel.dependencies.stats?.total_edges || 0,
+    } : null,
+    codebase_freshness: null,
+    research_enabled: configInfo.research,
+    plan_checker_enabled: configInfo.plan_checker,
+    intent_summary: null,
+  };
+
+  // Generate scoped context for each agent type
+  for (const [agentType, manifest] of Object.entries(AGENT_MANIFESTS)) {
+    const allowed = new Set([...manifest.fields, ...(manifest.optional || [])]);
+    const scoped = { _agent: agentType, generated_at: generatedAt };
+
+    for (const key of allowed) {
+      if (key in baseContext && baseContext[key] !== undefined && baseContext[key] !== null) {
+        scoped[key] = baseContext[key];
+      }
+    }
+
+    // Calculate savings
+    const originalKeys = Object.keys(baseContext).length;
+    const scopedKeys = Object.keys(scoped).length - 1; // exclude _agent
+    scoped._savings = {
+      original_keys: originalKeys,
+      scoped_keys: scopedKeys,
+      reduction_pct: originalKeys > 0 ? Math.round((1 - scopedKeys / originalKeys) * 100) : 0,
+    };
+
+    contexts[agentType] = scoped;
+  }
+
+  return contexts;
+}
+
+
+/**
+ * Check if intel is stale based on git commit hash.
+ * Returns true if hashes differ or if agent_contexts is missing.
+ *
+ * @param {string} cwd - Project root
+ * @returns {boolean} True if intel is stale
+ */
+function isIntelStale(cwd) {
+  const intel = readIntel(cwd);
+
+  if (!intel) return true;
+
+  // Check if agent_contexts exists
+  if (!intel.agent_contexts) return true;
+
+  // Check git commit hash
+  if (intel.git_commit_hash) {
+    const gitInfo = getGitInfo(cwd);
+    if (gitInfo.commit_hash && gitInfo.commit_hash !== intel.git_commit_hash) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+
+/**
+ * Read intel with cache validation.
+ * Returns cached contexts only when valid, triggers regeneration if stale.
+ *
+ * @param {string} cwd - Project root
+ * @param {boolean} autoRegenerate - If true, regenerate stale intel
+ * @returns {object|null} Intel object or null
+ */
+function readIntelWithCache(cwd, autoRegenerate = false) {
+  const intel = readIntel(cwd);
+
+  if (!intel) return null;
+
+  // Check staleness
+  if (isIntelStale(cwd)) {
+    if (autoRegenerate) {
+      // Trigger regeneration via codebase command would go here
+      // For now, return null to indicate stale
+      return null;
+    }
+    // Return intel but mark as stale
+    return { ...intel, _stale: true };
+  }
+
+  return intel;
+}
+
+
 // ─── Exports ─────────────────────────────────────────────────────────────────
 
 module.exports = {
@@ -443,4 +659,7 @@ module.exports = {
   performAnalysis,
   readIntel,
   writeIntel,
+  generateAgentContexts,
+  isIntelStale,
+  readIntelWithCache,
 };

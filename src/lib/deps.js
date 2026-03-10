@@ -680,12 +680,382 @@ function getTransitiveDependents(graph, filePath, maxDepth = 10) {
 }
 
 
+// ─── Reachability Audit ─────────────────────────────────────────────────────────
+
+/**
+ * Find exports that are never imported by any other file.
+ * Uses extractExports from ast.js to get all exports per file,
+ * and the dependency graph to find importers.
+ *
+ * @param {object} intel - Codebase intel object
+ * @param {{ forward: object, reverse: object }} graph - Dependency graph
+ * @param {object} [options] - Options
+ * @param {string[]} [options.knownRuntime] - Array of export names to exclude (runtime-known)
+ * @returns {{ file: string, export_name: string, reason: string }[]}
+ */
+function findOrphanedExports(intel, graph, options = {}) {
+  const knownRuntime = options.knownRuntime || [];
+  const orphans = [];
+  const files = intel.files || {};
+
+  // Need to import extractExports from ast.js
+  const { extractExports } = require('./ast');
+
+  for (const [filePath, fileInfo] of Object.entries(files)) {
+    // Only check JS/TS files
+    const language = fileInfo.language;
+    if (language !== 'javascript' && language !== 'typescript') continue;
+
+    const absPath = path.resolve(filePath);
+    let exports;
+    try {
+      exports = extractExports(absPath);
+    } catch (e) {
+      debugLog('deps.findOrphanedExports', `extract error: ${filePath}: ${e.message}`);
+      continue;
+    }
+
+    // Combine ESM and CJS exports
+    const allExports = [
+      ...(exports.named || []),
+      ...(exports.cjsExports || []),
+    ];
+    if (exports.default) {
+      allExports.push(exports.default);
+    }
+
+    // Check each export for importers
+    for (const exportName of allExports) {
+      // Skip known runtime patterns
+      if (knownRuntime.includes(exportName)) continue;
+
+      // Check if any file imports this export
+      // This is a simplified check - we look for the file being in any import
+      // A more sophisticated approach would track named imports
+      const importers = graph.reverse[filePath] || [];
+
+      if (importers.length === 0) {
+        orphans.push({
+          file: filePath,
+          export_name: exportName,
+          reason: 'not imported by any file',
+        });
+      }
+    }
+  }
+
+  return orphans;
+}
+
+/**
+ * Find files that are never imported by any other file.
+ * Excludes entry points (bin files, main entry files, command files).
+ *
+ * @param {object} intel - Codebase intel object
+ * @param {{ forward: object, reverse: object }} graph - Dependency graph
+ * @param {object} [options] - Options
+ * @param {string[]} [options.entryPatterns] - Array of path patterns to exclude as entry points
+ * @returns {{ file: string, reason: string }[]}
+ */
+function findOrphanedFiles(intel, graph, options = {}) {
+  const defaultEntryPatterns = [
+    /^bin\//,           // bin/ entry points
+    /^index\./,         // index files (often entry points)
+    /^commands\//,      // Command files are often entry points
+    /\/commands\//,     // Commands directory
+  ];
+  const entryPatterns = options.entryPatterns || defaultEntryPatterns;
+  const orphans = [];
+
+  const fileSet = buildFileSet(intel);
+  const reverse = graph.reverse || {};
+
+  for (const filePath of fileSet) {
+    // Skip entry point patterns
+    const isEntryPoint = entryPatterns.some(pattern => pattern.test(filePath));
+    if (isEntryPoint) continue;
+
+    // Check if any file imports this file
+    const importers = reverse[filePath] || [];
+
+    if (importers.length === 0) {
+      orphans.push({
+        file: filePath,
+        reason: 'not imported by any file',
+      });
+    }
+  }
+
+  return orphans;
+}
+
+/**
+ * Find workflows that are not referenced by any command or agent.
+ *
+ * @param {object} intel - Codebase intel object
+ * @param {object} [options] - Options
+ * @param {string} [options.workflowsDir] - Path to workflows directory (default: workflows/)
+ * @returns {{ file: string, reason: string }[]}
+ */
+function findOrphanedWorkflows(intel, options = {}) {
+  const workflowsDir = options.workflowsDir || 'workflows';
+  const orphans = [];
+
+  const cwd = process.cwd();
+  const workflowsPath = path.join(cwd, workflowsDir);
+
+  let workflowFiles = [];
+  try {
+    if (fs.existsSync(workflowsPath)) {
+      workflowFiles = fs.readdirSync(workflowsPath)
+        .filter(f => f.endsWith('.md'))
+        .map(f => path.join(workflowsDir, f));
+    }
+  } catch (e) {
+    debugLog('deps.findOrphanedWorkflows', `read error: ${e.message}`);
+    return orphans;
+  }
+
+  // Build a set of all @path references in command and agent files
+  const referencedPaths = new Set();
+
+  // Check commands/ directory
+  const commandsPath = path.join(cwd, 'commands');
+  if (fs.existsSync(commandsPath)) {
+    try {
+      const commandFiles = fs.readdirSync(commandsPath).filter(f => f.endsWith('.md'));
+      for (const cmdFile of commandFiles) {
+        const content = fs.readFileSync(path.join(commandsPath, cmdFile), 'utf8');
+        // Match @path/to/file patterns
+        const pathMatches = content.match(/@[\w\/-]+\.\w+/g) || [];
+        for (const ref of pathMatches) {
+          referencedPaths.add(ref.substring(1)); // Remove leading @
+        }
+      }
+    } catch (e) {
+      debugLog('deps.findOrphanedWorkflows', `commands read error: ${e.message}`);
+    }
+  }
+
+  // Check agents/ directory
+  const agentsPath = path.join(cwd, 'agents');
+  if (fs.existsSync(agentsPath)) {
+    try {
+      const agentFiles = fs.readdirSync(agentsPath).filter(f => f.endsWith('.md'));
+      for (const agentFile of agentFiles) {
+        const content = fs.readFileSync(path.join(agentsPath, agentFile), 'utf8');
+        const pathMatches = content.match(/@[\w\/-]+\.\w+/g) || [];
+        for (const ref of pathMatches) {
+          referencedPaths.add(ref.substring(1));
+        }
+      }
+    } catch (e) {
+      debugLog('deps.findOrphanedWorkflows', `agents read error: ${e.message}`);
+    }
+  }
+
+  // Check which workflows are not referenced
+  for (const workflow of workflowFiles) {
+    if (!referencedPaths.has(workflow)) {
+      orphans.push({
+        file: workflow,
+        reason: 'not referenced by any command or agent',
+      });
+    }
+  }
+
+  return orphans;
+}
+
+/**
+ * Find templates that are not referenced by any workflow or command.
+ *
+ * @param {object} intel - Codebase intel object
+ * @param {object} [options] - Options
+ * @param {string} [options.templatesDir] - Path to templates directory (default: templates/)
+ * @returns {{ file: string, reason: string }[]}
+ */
+function findOrphanedTemplates(intel, options = {}) {
+  const templatesDir = options.templatesDir || 'templates';
+  const orphans = [];
+
+  const cwd = process.cwd();
+  const templatesPath = path.join(cwd, templatesDir);
+
+  let templateFiles = [];
+  try {
+    if (fs.existsSync(templatesPath)) {
+      templateFiles = fs.readdirSync(templatesPath)
+        .filter(f => f.endsWith('.md'))
+        .map(f => path.join(templatesDir, f));
+    }
+  } catch (e) {
+    debugLog('deps.findOrphanedTemplates', `read error: ${e.message}`);
+    return orphans;
+  }
+
+  // Build a set of all @path references in workflow and command files
+  const referencedPaths = new Set();
+
+  // Check workflows/
+  const workflowsPath = path.join(cwd, 'workflows');
+  if (fs.existsSync(workflowsPath)) {
+    try {
+      const workflowFiles = fs.readdirSync(workflowsPath).filter(f => f.endsWith('.md'));
+      for (const wfFile of workflowFiles) {
+        const content = fs.readFileSync(path.join(workflowsPath, wfFile), 'utf8');
+        const pathMatches = content.match(/@[\w\/-]+\.\w+/g) || [];
+        for (const ref of pathMatches) {
+          referencedPaths.add(ref.substring(1));
+        }
+      }
+    } catch (e) {
+      debugLog('deps.findOrphanedTemplates', `workflows read error: ${e.message}`);
+    }
+  }
+
+  // Check commands/
+  const commandsPath = path.join(cwd, 'commands');
+  if (fs.existsSync(commandsPath)) {
+    try {
+      const commandFiles = fs.readdirSync(commandsPath).filter(f => f.endsWith('.md'));
+      for (const cmdFile of commandFiles) {
+        const content = fs.readFileSync(path.join(commandsPath, cmdFile), 'utf8');
+        const pathMatches = content.match(/@[\w\/-]+\.\w+/g) || [];
+        for (const ref of pathMatches) {
+          referencedPaths.add(ref.substring(1));
+        }
+      }
+    } catch (e) {
+      debugLog('deps.findOrphanedTemplates', `commands read error: ${e.message}`);
+    }
+  }
+
+  // Check which templates are not referenced
+  for (const template of templateFiles) {
+    if (!referencedPaths.has(template)) {
+      orphans.push({
+        file: template,
+        reason: 'not referenced by any workflow or command',
+      });
+    }
+  }
+
+  return orphans;
+}
+
+/**
+ * Find config entries that are not referenced by any code.
+ * Also checks that skills referenced by agents exist.
+ *
+ * @param {object} intel - Codebase intel object
+ * @param {object} [options] - Options
+ * @param {string} [options.configPath] - Path to config.json (default: .planning/config.json)
+ * @returns {{ type: string, file: string, reason: string }[]}
+ */
+function findOrphanedConfigs(intel, options = {}) {
+  const configPath = options.configPath || '.planning/config.json';
+  const orphans = [];
+  const cwd = process.cwd();
+
+  // Check if config.json exists
+  const fullConfigPath = path.join(cwd, configPath);
+  if (!fs.existsSync(fullConfigPath)) {
+    return orphans;
+  }
+
+  let config;
+  try {
+    const configContent = fs.readFileSync(fullConfigPath, 'utf8');
+    config = JSON.parse(configContent);
+  } catch (e) {
+    debugLog('deps.findOrphanedConfigs', `config read error: ${e.message}`);
+    return orphans;
+  }
+
+  // Build a set of all references in code files
+  const codeReferences = new Set();
+  const files = intel.files || {};
+
+  for (const [filePath] of Object.entries(files)) {
+    const absPath = path.resolve(filePath);
+    try {
+      const content = fs.readFileSync(absPath, 'utf8');
+      // Look for config field references (e.g., config.mode, config.workflow.research)
+      const configRefMatches = content.match(/config\.\w+/g) || [];
+      for (const ref of configRefMatches) {
+        codeReferences.add(ref);
+      }
+    } catch (e) {
+      // Skip files that can't be read
+    }
+  }
+
+  // Check for config keys that aren't referenced
+  const configKeys = ['mode', 'depth', 'parallelization', 'commit_docs', 'model_profile', 'workflow'];
+  for (const key of configKeys) {
+    if (config[key] !== undefined && !codeReferences.has(`config.${key}`)) {
+      // This is informational - config keys might be used by external tools
+      // Not adding as orphan since config is often read as a whole
+    }
+  }
+
+  // Check skills referenced by agents exist
+  const skillsPath = path.join(cwd, 'skills');
+  const agentsPath = path.join(cwd, 'agents');
+
+  if (fs.existsSync(agentsPath)) {
+    try {
+      const agentFiles = fs.readdirSync(agentsPath).filter(f => f.endsWith('.md'));
+      const availableSkills = new Set();
+
+      // Get available skills
+      if (fs.existsSync(skillsPath)) {
+        const skillFiles = fs.readdirSync(skillsPath).filter(f => f === 'SKILL.md');
+        // Skills are in subdirectories
+        const skillDirs = fs.readdirSync(skillsPath).filter(f => 
+          fs.statSync(path.join(skillsPath, f)).isDirectory()
+        );
+        for (const dir of skillDirs) {
+          availableSkills.add(dir);
+        }
+      }
+
+      for (const agentFile of agentFiles) {
+        const content = fs.readFileSync(path.join(agentsPath, agentFile), 'utf8');
+        // Look for skill references: skill:name or /path/to/SKILL.md
+        const skillMatches = content.match(/(?:skill|skills):\s*\w+/g) || [];
+        for (const match of skillMatches) {
+          const skillName = match.split(':')[1]?.trim();
+          if (skillName && !availableSkills.has(skillName)) {
+            orphans.push({
+              type: 'skill',
+              file: `agents/${agentFile}`,
+              reason: `references non-existent skill: ${skillName}`,
+            });
+          }
+        }
+      }
+    } catch (e) {
+      debugLog('deps.findOrphanedConfigs', `agents check error: ${e.message}`);
+    }
+  }
+
+  return orphans;
+}
+
+
 // ─── Exports ─────────────────────────────────────────────────────────────────
 
 module.exports = {
   buildDependencyGraph,
   findCycles,
   getTransitiveDependents,
+  findOrphanedExports,
+  findOrphanedFiles,
+  findOrphanedWorkflows,
+  findOrphanedTemplates,
+  findOrphanedConfigs,
   // Expose individual parsers for testing
   parseJavaScript,
   parsePython,

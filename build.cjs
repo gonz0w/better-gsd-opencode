@@ -25,6 +25,12 @@ const stripShebangPlugin = {
 async function build() {
   const start = Date.now();
 
+  // Feature flags - can be disabled via environment variables
+  const includeBenchmarks = process.env.INCLUDE_BENCHMARKS !== 'false';
+  console.log(`Feature flag: INCLUDE_BENCHMARKS=${includeBenchmarks ? 'true' : 'false'}`);
+
+  const benchFlag = includeBenchmarks ? 'true' : 'false';
+  
   const result = await esbuild.build({
     entryPoints: ['src/index.js'],
     outfile: 'bin/bgsd-tools.cjs',
@@ -34,7 +40,7 @@ async function build() {
     target: 'node18',
     external: ['node:*', 'child_process', 'fs', 'path', 'os', 'crypto', 'util', 'stream', 'events', 'buffer', 'url', 'querystring', 'http', 'https', 'net', 'tls', 'zlib'],  // Bundle npm deps (tokenx), externalize Node.js built-ins only
     banner: {
-      js: '#!/usr/bin/env node',
+      js: '#!/usr/bin/env node\nglobal.BGSD_INCLUDE_BENCHMARKS = ' + benchFlag + ';',
     },
     minify: false,  // Keep readable for debugging
     sourcemap: false,

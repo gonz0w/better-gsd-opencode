@@ -40,7 +40,7 @@ If `$FULL_MODE`:
 
 Parse `<bgsd-context>` JSON for: `planner_model`, `executor_model`, `checker_model`, `verifier_model`, `commit_docs`, `next_num`, `slug`, `date`, `timestamp`, `quick_dir`, `task_dir`, `roadmap_exists`, `planning_exists`.
 
-**If `roadmap_exists` false:** Error — run `/bgsd-new-project` first.
+**If `roadmap_exists` false:** Error — run `/bgsd plan project` first.
 
 ---
 

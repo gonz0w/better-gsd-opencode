@@ -47,7 +47,7 @@ export const bgsd_plan = {
       if (!projectState) {
         return JSON.stringify({
           status: 'no_project',
-          message: 'No .planning/ directory found. Run /bgsd-new-project to initialize a project.',
+          message: 'No .planning/ directory found. Run /bgsd plan project to initialize a project.',
         });
       }
 

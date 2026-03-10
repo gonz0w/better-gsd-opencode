@@ -2,7 +2,7 @@
 
 A structured project planning and execution system for [OpenCode](https://github.com/opencode-ai/opencode). bGSD turns AI-assisted coding from ad-hoc prompting into milestone-driven development with planning, execution, verification, and memory that persists across sessions.
 
-**762 tests** | **Zero runtime dependencies** | **41 slash commands** | **100+ CLI operations** | **10 specialized AI agents** | **11 milestones shipped**
+**762 tests** | **Zero runtime dependencies** | **11 slash commands** | **100+ CLI operations** | **10 specialized AI agents** | **v9.3 milestone shipped**
 
 > **Note:** bGSD creates a `~/.config/oc` symlink pointing to `~/.config/opencode` to work around a path mangling issue in the Anthropic auth module. This is created automatically during installation.
 
@@ -64,25 +64,25 @@ See the **[Getting Started Guide](docs/getting-started.md)** for the full walkth
 **Easy Flow** — Let bGSD drive. Answer questions, approve plans, watch execution:
 
 ```
-/bgsd-new-project           # Answer "what do you want to build?"
-                            # bGSD creates requirements, roadmap, phases
-/bgsd-plan-phase 1           # bGSD creates executable plans for phase 1
-/bgsd-execute-phase 1        # bGSD builds it, commits per-task, verifies
-/bgsd-progress               # See where things stand, get routed to next action
+/bgsd plan project           # Answer "what do you want to build?"
+                             # bGSD creates requirements, roadmap, phases
+/bgsd plan phase 1           # bGSD creates executable plans for phase 1
+/bgsd exec phase 1           # bGSD builds it, commits per-task, verifies
+/bgsd session progress       # See where things stand, get routed to next action
 ```
 
 **Expert Flow** — Control every decision. Research domains, discuss assumptions, tune agents:
 
 ```
-/bgsd-map-codebase                       # Analyze existing code first (brownfield)
-/bgsd-new-project                        # Full questioning + parallel research
-/bgsd-discuss-phase 1                    # Lock down implementation decisions
-/bgsd-list-phase-assumptions 1           # See what the AI assumes before planning
-/bgsd-research-phase 1                   # Deep domain research
-/bgsd-plan-phase 1 --research            # Plan with integrated research
-/bgsd-execute-phase 1                    # Execute with wave parallelism
-/bgsd-verify-work 1                      # Manual UAT testing
-/bgsd-audit-milestone                    # Cross-phase integration check
+/bgsd util map                        # Analyze existing code first (brownfield)
+/bgsd plan project                    # Full questioning + parallel research
+/bgsd plan discuss 1                  # Lock down implementation decisions
+/bgsd plan assumptions 1              # See what the AI assumes before planning
+/bgsd plan research 1                # Deep domain research
+/bgsd plan phase 1 --research        # Plan with integrated research
+/bgsd exec phase 1                   # Execute with wave parallelism
+/bgsd verify-work 1                  # Manual UAT testing
+/bgsd milestone audit                # Cross-phase integration check
 ```
 
 ---
@@ -144,12 +144,12 @@ bGSD includes **41 slash commands** across project lifecycle, planning, executio
 
 | Command | What It Does |
 |---------|-------------|
-| `/bgsd-new-project` | Initialize project: questioning, research, roadmap |
-| `/bgsd-plan-phase [N]` | Create executable plans for a phase |
-| `/bgsd-execute-phase N` | Execute all plans in a phase |
-| `/bgsd-progress` | View progress, get routed to next action |
-| `/bgsd-quick` | Execute small tasks with bGSD guarantees |
-| `/bgsd-github-ci` | Push, create PR, run code scanning, fix loop, auto-merge |
+| `/bgsd plan project` | Initialize project: questioning, research, roadmap |
+| `/bgsd plan phase [N]` | Create executable plans for a phase |
+| `/bgsd exec phase N` | Execute all plans in a phase |
+| `/bgsd session progress` | View progress, get routed to next action |
+| `/bgsd quick` | Execute small tasks with bGSD guarantees |
+| `/bgsd exec ci` | Push, create PR, run code scanning, fix loop, auto-merge |
 
 ---
 

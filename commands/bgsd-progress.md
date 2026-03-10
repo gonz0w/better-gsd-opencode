@@ -1,17 +1,18 @@
 ---
-description: Check project progress, show context, and route to next action (execute or plan)
+description: Backward-compatible wrapper for progress command
 ---
 <objective>
-Check project progress, summarize recent work and what's ahead, then intelligently route to the next action - either executing an existing plan or creating the next one.
-
-Provides situational awareness before continuing work.
+Show project progress and route to next action.
 </objective>
 
 <execution_context>
-@__OPENCODE_CONFIG__/bgsd-oc/workflows/progress.md
+Routes to: progress workflow
 </execution_context>
 
+<context>
+$ARGUMENTS: Passed to progress workflow
+</context>
+
 <process>
-Execute the progress workflow from @__OPENCODE_CONFIG__/bgsd-oc/workflows/progress.md end-to-end.
-Preserve all routing logic (Routes A through F) and edge case handling.
+Route to progress workflow with all arguments.
 </process>

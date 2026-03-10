@@ -13,7 +13,7 @@ const { extractFrontmatter } = require('../lib/frontmatter');
 const { execGit } = require('../lib/git');
 const { estimateTokens, estimateJsonTokens, checkBudget } = require('../lib/context');
 const { readIntel } = require('../lib/codebase-intel');
-const { getTransitiveDependents } = require('../lib/deps');
+const { getTransitiveDependents, findOrphanedExports, findOrphanedFiles, findOrphanedWorkflows, findOrphanedTemplates, findOrphanedConfigs, buildDependencyGraph } = require('../lib/deps');
 const { banner, sectionHeader, formatTable, summaryLine, actionHint, color, SYMBOLS, progressBar, colorByPercent } = require('../lib/format');
 
 function cmdSessionDiff(cwd, raw) {
@@ -1963,6 +1963,43 @@ function cmdTestCoverage(cwd, raw) {
   }, raw);
 }
 
+// ─── Orphan Audit ───────────────────────────────────────────────────────────────
+
+function cmdAuditOrphans(cwd, raw) {
+  // Load codebase intel
+  const intel = readIntel(cwd);
+  if (!intel) {
+    error('Codebase intel not found. Run "bgsd-tools util:codebase analyze" first.');
+  }
+
+  // Build dependency graph
+  const graph = buildDependencyGraph(intel);
+
+  // Run all orphan detection functions
+  const orphanedExports = findOrphanedExports(intel, graph);
+  const orphanedFiles = findOrphanedFiles(intel, graph);
+  const orphanedWorkflows = findOrphanedWorkflows(intel);
+  const orphanedTemplates = findOrphanedTemplates(intel);
+  const orphanedConfigs = findOrphanedConfigs(intel);
+
+  // Output results
+  output({
+    orphaned_exports: orphanedExports,
+    orphaned_files: orphanedFiles,
+    orphaned_workflows: orphanedWorkflows,
+    orphaned_templates: orphanedTemplates,
+    orphaned_configs: orphanedConfigs,
+    summary: {
+      total_orphans: orphanedExports.length + orphanedFiles.length + orphanedWorkflows.length + orphanedTemplates.length + orphanedConfigs.length,
+      exports_count: orphanedExports.length,
+      files_count: orphanedFiles.length,
+      workflows_count: orphanedWorkflows.length,
+      templates_count: orphanedTemplates.length,
+      configs_count: orphanedConfigs.length,
+    }
+  }, raw);
+}
+
 function cmdSessionSummary(cwd, raw) {
   const pd = path.join(cwd, '.planning');
   const sc = safeReadFile(path.join(pd, 'STATE.md'));
@@ -2062,5 +2099,6 @@ module.exports = {
   cmdExtractSections,
   cmdTokenBudget,
   cmdTestCoverage,
+  cmdAuditOrphans,
   cmdSessionSummary,
 };

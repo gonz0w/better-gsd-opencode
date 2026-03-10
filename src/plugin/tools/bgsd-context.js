@@ -44,7 +44,7 @@ export const bgsd_context = {
       if (!projectState) {
         return JSON.stringify({
           status: 'no_project',
-          message: 'No .planning/ directory found. Run /bgsd-new-project to initialize a project.',
+          message: 'No .planning/ directory found. Run /bgsd plan project to initialize a project.',
         });
       }
 
@@ -53,7 +53,7 @@ export const bgsd_context = {
       if (!plans || plans.length === 0) {
         return JSON.stringify({
           error: 'validation_error',
-          message: 'No plans found for current phase. Run /bgsd-plan-phase to create plans.',
+          message: 'No plans found for current phase. Run /bgsd plan phase to create plans.',
         });
       }
 

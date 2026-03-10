@@ -1,15 +1,16 @@
 {
   "version": 1,
-  "generated_at": "2026-03-10T03:08:13.237Z",
-  "git_commit_hash": "70132a4cb778b578a2e5aa4deb6707624256826d",
+  "generated_at": "2026-03-10T18:09:23.315Z",
+  "git_commit_hash": "b0f59dd7e1241559c117e43691e85fea2db48751",
   "git_branch": "main",
-  "analysis_duration_ms": 67,
+  "analysis_duration_ms": 83,
   "source_dirs": [
     ".",
     "agents",
     "bin",
     "commands",
     "docs",
+    "scripts",
     "src",
     "templates",
     "test",
@@ -18,19 +19,19 @@
   ],
   "languages": {
     "markdown": {
-      "count": 177,
+      "count": 147,
       "extensions": [
         ".md"
       ],
-      "lines": 30241
+      "lines": 29450
     },
     "javascript": {
-      "count": 95,
+      "count": 112,
       "extensions": [
         ".cjs",
         ".js"
       ],
-      "lines": 108446
+      "lines": 114626
     },
     "shell": {
       "count": 1,
@@ -44,7 +45,7 @@
       "extensions": [
         ".json"
       ],
-      "lines": 3603
+      "lines": 3574
     }
   },
   "files": {
@@ -60,11 +61,17 @@
       "lines": 109,
       "last_modified": "2026-03-09T04:28:37.821Z"
     },
+    "COMMAND_CONSOLIDATION.md": {
+      "language": "markdown",
+      "size_bytes": 5482,
+      "lines": 140,
+      "last_modified": "2026-03-10T16:03:40.269Z"
+    },
     "README.md": {
       "language": "markdown",
-      "size_bytes": 8458,
+      "size_bytes": 8459,
       "lines": 190,
-      "last_modified": "2026-03-08T19:42:06.452Z"
+      "last_modified": "2026-03-10T17:30:15.814Z"
     },
     "VERSION": {
       "language": null,
@@ -86,9 +93,15 @@
     },
     "baseline.cjs": {
       "language": "javascript",
-      "size_bytes": 10021,
-      "lines": 273,
-      "last_modified": "2026-03-10T03:07:52.625Z"
+      "size_bytes": 10504,
+      "lines": 265,
+      "last_modified": "2026-03-10T03:09:08.561Z"
+    },
+    "benchmark-compile-cache.cjs": {
+      "language": "javascript",
+      "size_bytes": 4158,
+      "lines": 128,
+      "last_modified": "2026-03-10T03:36:38.688Z"
     },
     "build.cjs": {
       "language": "javascript",
@@ -100,13 +113,13 @@
       "language": "shell",
       "size_bytes": 6120,
       "lines": 199,
-      "last_modified": "2026-03-09T22:52:58.893Z"
+      "last_modified": "2026-03-10T03:16:42.245Z"
     },
     "install.js": {
       "language": "javascript",
       "size_bytes": 8962,
       "lines": 299,
-      "last_modified": "2026-03-09T22:52:50.858Z"
+      "last_modified": "2026-03-10T03:16:42.245Z"
     },
     "lessons.md": {
       "language": "markdown",
@@ -128,15 +141,15 @@
     },
     "package.json": {
       "language": "json",
-      "size_bytes": 2217,
-      "lines": 67,
-      "last_modified": "2026-03-10T02:18:29.673Z"
+      "size_bytes": 2266,
+      "lines": 68,
+      "last_modified": "2026-03-10T14:31:32.416Z"
     },
     "plugin.js": {
       "language": "javascript",
-      "size_bytes": 629939,
+      "size_bytes": 629949,
       "lines": 17075,
-      "last_modified": "2026-03-10T02:58:41.104Z"
+      "last_modified": "2026-03-10T18:09:19.439Z"
     },
     "agents/bgsd-codebase-mapper.md": {
       "language": "markdown",
@@ -198,11 +211,17 @@
       "lines": 244,
       "last_modified": "2026-03-09T04:11:56.534Z"
     },
+    "bin/bgsd": {
+      "language": null,
+      "size_bytes": 1046,
+      "lines": 25,
+      "last_modified": "2026-03-10T03:46:05.991Z"
+    },
     "bin/bgsd-tools.cjs": {
       "language": "javascript",
-      "size_bytes": 1407266,
-      "lines": 35133,
-      "last_modified": "2026-03-10T02:58:41.067Z"
+      "size_bytes": 1476319,
+      "lines": 36982,
+      "last_modified": "2026-03-10T18:09:19.399Z"
     },
     "bin/format.test.cjs": {
       "language": "javascript",
@@ -212,57 +231,15 @@
     },
     "bin/manifest.json": {
       "language": "json",
-      "size_bytes": 6040,
-      "lines": 171,
-      "last_modified": "2026-03-10T02:58:41.230Z"
+      "size_bytes": 4862,
+      "lines": 141,
+      "last_modified": "2026-03-10T18:09:19.576Z"
     },
-    "commands/bgsd-add-phase.md": {
+    "commands/bgsd-config.md": {
       "language": "markdown",
-      "size_bytes": 1053,
-      "lines": 37,
-      "last_modified": "2026-03-09T04:23:18.050Z"
-    },
-    "commands/bgsd-add-todo.md": {
-      "language": "markdown",
-      "size_bytes": 1087,
-      "lines": 40,
-      "last_modified": "2026-03-09T04:23:18.050Z"
-    },
-    "commands/bgsd-audit-milestone.md": {
-      "language": "markdown",
-      "size_bytes": 1102,
-      "lines": 27,
-      "last_modified": "2026-03-09T04:23:18.050Z"
-    },
-    "commands/bgsd-check-todos.md": {
-      "language": "markdown",
-      "size_bytes": 1140,
-      "lines": 38,
-      "last_modified": "2026-03-09T04:23:18.050Z"
-    },
-    "commands/bgsd-cleanup.md": {
-      "language": "markdown",
-      "size_bytes": 566,
-      "lines": 17,
-      "last_modified": "2026-03-09T04:23:18.050Z"
-    },
-    "commands/bgsd-codebase-impact.md": {
-      "language": "markdown",
-      "size_bytes": 437,
-      "lines": 14,
-      "last_modified": "2026-03-09T04:23:18.050Z"
-    },
-    "commands/bgsd-complete-milestone.md": {
-      "language": "markdown",
-      "size_bytes": 4397,
-      "lines": 129,
-      "last_modified": "2026-03-09T04:23:18.050Z"
-    },
-    "commands/bgsd-context-budget.md": {
-      "language": "markdown",
-      "size_bytes": 441,
-      "lines": 14,
-      "last_modified": "2026-03-09T04:23:18.051Z"
+      "size_bytes": 878,
+      "lines": 33,
+      "last_modified": "2026-03-10T16:03:08.467Z"
     },
     "commands/bgsd-debug.md": {
       "language": "markdown",
@@ -270,23 +247,11 @@
       "lines": 28,
       "last_modified": "2026-03-09T04:23:18.051Z"
     },
-    "commands/bgsd-discuss-phase.md": {
+    "commands/bgsd-exec.md": {
       "language": "markdown",
-      "size_bytes": 2847,
-      "lines": 73,
-      "last_modified": "2026-03-09T04:23:18.051Z"
-    },
-    "commands/bgsd-execute-phase.md": {
-      "language": "markdown",
-      "size_bytes": 1285,
+      "size_bytes": 738,
       "lines": 30,
-      "last_modified": "2026-03-10T01:15:27.154Z"
-    },
-    "commands/bgsd-github-ci.md": {
-      "language": "markdown",
-      "size_bytes": 1065,
-      "lines": 29,
-      "last_modified": "2026-03-09T04:23:18.051Z"
+      "last_modified": "2026-03-10T16:02:19.729Z"
     },
     "commands/bgsd-health.md": {
       "language": "markdown",
@@ -294,173 +259,41 @@
       "lines": 15,
       "last_modified": "2026-03-09T04:23:18.051Z"
     },
-    "commands/bgsd-help.md": {
+    "commands/bgsd-milestone.md": {
       "language": "markdown",
-      "size_bytes": 587,
-      "lines": 21,
-      "last_modified": "2026-03-09T04:23:18.051Z"
-    },
-    "commands/bgsd-insert-phase.md": {
-      "language": "markdown",
-      "size_bytes": 977,
-      "lines": 26,
-      "last_modified": "2026-03-09T04:23:18.051Z"
-    },
-    "commands/bgsd-list-phase-assumptions.md": {
-      "language": "markdown",
-      "size_bytes": 1363,
-      "lines": 39,
-      "last_modified": "2026-03-09T04:23:18.051Z"
-    },
-    "commands/bgsd-map-codebase.md": {
-      "language": "markdown",
-      "size_bytes": 2435,
-      "lines": 62,
-      "last_modified": "2026-03-09T04:23:18.052Z"
-    },
-    "commands/bgsd-new-milestone.md": {
-      "language": "markdown",
-      "size_bytes": 1525,
-      "lines": 35,
-      "last_modified": "2026-03-10T01:15:36.044Z"
-    },
-    "commands/bgsd-new-project.md": {
-      "language": "markdown",
-      "size_bytes": 1255,
-      "lines": 33,
-      "last_modified": "2026-03-10T01:15:31.404Z"
-    },
-    "commands/bgsd-notifications.md": {
-      "language": "markdown",
-      "size_bytes": 713,
-      "lines": 14,
-      "last_modified": "2026-03-09T18:24:59.048Z"
-    },
-    "commands/bgsd-pause-work.md": {
-      "language": "markdown",
-      "size_bytes": 980,
-      "lines": 33,
-      "last_modified": "2026-03-09T04:23:18.052Z"
-    },
-    "commands/bgsd-plan-milestone-gaps.md": {
-      "language": "markdown",
-      "size_bytes": 936,
-      "lines": 26,
-      "last_modified": "2026-03-09T04:23:18.052Z"
-    },
-    "commands/bgsd-plan-phase.md": {
-      "language": "markdown",
-      "size_bytes": 1218,
-      "lines": 31,
-      "last_modified": "2026-03-10T01:15:22.717Z"
-    },
-    "commands/bgsd-progress.md": {
-      "language": "markdown",
-      "size_bytes": 638,
-      "lines": 17,
-      "last_modified": "2026-03-09T04:23:18.052Z"
-    },
-    "commands/bgsd-quick.md": {
-      "language": "markdown",
-      "size_bytes": 1177,
-      "lines": 30,
-      "last_modified": "2026-03-09T04:23:18.052Z"
-    },
-    "commands/bgsd-reapply-patches.md": {
-      "language": "markdown",
-      "size_bytes": 3120,
-      "lines": 109,
-      "last_modified": "2026-03-09T04:23:18.053Z"
-    },
-    "commands/bgsd-remove-phase.md": {
-      "language": "markdown",
-      "size_bytes": 886,
-      "lines": 24,
-      "last_modified": "2026-03-09T04:23:18.053Z"
-    },
-    "commands/bgsd-research-phase.md": {
-      "language": "markdown",
-      "size_bytes": 1166,
+      "size_bytes": 934,
       "lines": 32,
-      "last_modified": "2026-03-09T04:23:18.053Z"
+      "last_modified": "2026-03-10T16:02:28.057Z"
     },
-    "commands/bgsd-resume-work.md": {
+    "commands/bgsd-plan.md": {
       "language": "markdown",
-      "size_bytes": 1041,
-      "lines": 33,
-      "last_modified": "2026-03-09T04:23:18.053Z"
+      "size_bytes": 1061,
+      "lines": 34,
+      "last_modified": "2026-03-10T16:02:15.722Z"
     },
-    "commands/bgsd-rollback-info.md": {
+    "commands/bgsd-roadmap.md": {
       "language": "markdown",
-      "size_bytes": 383,
-      "lines": 14,
-      "last_modified": "2026-03-09T04:23:18.053Z"
-    },
-    "commands/bgsd-search-decisions.md": {
-      "language": "markdown",
-      "size_bytes": 445,
-      "lines": 14,
-      "last_modified": "2026-03-09T04:23:18.053Z"
-    },
-    "commands/bgsd-search-lessons.md": {
-      "language": "markdown",
-      "size_bytes": 437,
-      "lines": 14,
-      "last_modified": "2026-03-09T04:23:18.053Z"
-    },
-    "commands/bgsd-session-diff.md": {
-      "language": "markdown",
-      "size_bytes": 392,
-      "lines": 14,
-      "last_modified": "2026-03-09T04:23:18.053Z"
-    },
-    "commands/bgsd-set-profile.md": {
-      "language": "markdown",
-      "size_bytes": 849,
-      "lines": 28,
-      "last_modified": "2026-03-09T04:23:18.054Z"
-    },
-    "commands/bgsd-settings.md": {
-      "language": "markdown",
-      "size_bytes": 928,
+      "size_bytes": 789,
       "lines": 30,
-      "last_modified": "2026-03-09T04:23:18.054Z"
+      "last_modified": "2026-03-10T16:02:23.290Z"
     },
-    "commands/bgsd-test-run.md": {
+    "commands/bgsd-session.md": {
       "language": "markdown",
-      "size_bytes": 441,
-      "lines": 14,
-      "last_modified": "2026-03-09T04:23:18.054Z"
+      "size_bytes": 762,
+      "lines": 30,
+      "last_modified": "2026-03-10T16:02:32.391Z"
     },
-    "commands/bgsd-trace-requirement.md": {
+    "commands/bgsd-todo.md": {
       "language": "markdown",
-      "size_bytes": 453,
-      "lines": 14,
-      "last_modified": "2026-03-09T04:23:18.054Z"
+      "size_bytes": 645,
+      "lines": 28,
+      "last_modified": "2026-03-10T16:03:03.807Z"
     },
-    "commands/bgsd-update.md": {
+    "commands/bgsd-util.md": {
       "language": "markdown",
-      "size_bytes": 903,
-      "lines": 33,
-      "last_modified": "2026-03-09T04:23:18.054Z"
-    },
-    "commands/bgsd-validate-config.md": {
-      "language": "markdown",
-      "size_bytes": 427,
-      "lines": 14,
-      "last_modified": "2026-03-09T04:23:18.054Z"
-    },
-    "commands/bgsd-validate-deps.md": {
-      "language": "markdown",
-      "size_bytes": 436,
-      "lines": 14,
-      "last_modified": "2026-03-09T04:23:18.054Z"
-    },
-    "commands/bgsd-velocity.md": {
-      "language": "markdown",
-      "size_bytes": 446,
-      "lines": 14,
-      "last_modified": "2026-03-09T04:23:18.054Z"
+      "size_bytes": 2069,
+      "lines": 56,
+      "last_modified": "2026-03-10T16:03:15.436Z"
     },
     "commands/bgsd-verify-work.md": {
       "language": "markdown",
@@ -512,9 +345,9 @@
     },
     "docs/milestones.md": {
       "language": "markdown",
-      "size_bytes": 16569,
-      "lines": 269,
-      "last_modified": "2026-03-03T02:05:19.708Z"
+      "size_bytes": 19655,
+      "lines": 328,
+      "last_modified": "2026-03-10T17:30:44.812Z"
     },
     "docs/planning-system.md": {
       "language": "markdown",
@@ -546,6 +379,12 @@
       "lines": 269,
       "last_modified": "2026-03-08T19:41:21.021Z"
     },
+    "scripts/codeql-check.cjs": {
+      "language": "javascript",
+      "size_bytes": 2725,
+      "lines": 83,
+      "last_modified": "2026-03-10T14:31:45.404Z"
+    },
     "src/index.js": {
       "language": "javascript",
       "size_bytes": 81,
@@ -560,9 +399,9 @@
     },
     "src/router.js": {
       "language": "javascript",
-      "size_bytes": 47212,
-      "lines": 930,
-      "last_modified": "2026-03-09T03:51:29.951Z"
+      "size_bytes": 49500,
+      "lines": 974,
+      "last_modified": "2026-03-10T13:57:37.793Z"
     },
     "templates/DEBUG.md": {
       "language": "markdown",
@@ -682,7 +521,7 @@
       "language": "markdown",
       "size_bytes": 8522,
       "lines": 265,
-      "last_modified": "2026-03-09T18:26:09.372Z"
+      "last_modified": "2026-03-10T03:16:42.250Z"
     },
     "templates/verification-report.md": {
       "language": "markdown",
@@ -698,9 +537,9 @@
     },
     "tests/codebase.test.cjs": {
       "language": "javascript",
-      "size_bytes": 102476,
-      "lines": 2332,
-      "last_modified": "2026-03-10T03:06:29.230Z"
+      "size_bytes": 104508,
+      "lines": 2375,
+      "last_modified": "2026-03-10T03:10:48.943Z"
     },
     "tests/contracts.test.cjs": {
       "language": "javascript",
@@ -722,9 +561,9 @@
     },
     "tests/infra.test.cjs": {
       "language": "javascript",
-      "size_bytes": 43547,
-      "lines": 982,
-      "last_modified": "2026-03-09T22:10:45.625Z"
+      "size_bytes": 43677,
+      "lines": 983,
+      "last_modified": "2026-03-10T04:44:51.244Z"
     },
     "tests/init.test.cjs": {
       "language": "javascript",
@@ -734,9 +573,9 @@
     },
     "tests/integration.test.cjs": {
       "language": "javascript",
-      "size_bytes": 25230,
-      "lines": 526,
-      "last_modified": "2026-03-09T22:10:45.627Z"
+      "size_bytes": 25406,
+      "lines": 533,
+      "last_modified": "2026-03-10T04:44:42.295Z"
     },
     "tests/intent.test.cjs": {
       "language": "javascript",
@@ -776,9 +615,9 @@
     },
     "tests/plugin.test.cjs": {
       "language": "javascript",
-      "size_bytes": 23487,
-      "lines": 487,
-      "last_modified": "2026-03-10T01:37:09.762Z"
+      "size_bytes": 28181,
+      "lines": 621,
+      "last_modified": "2026-03-10T04:31:14.904Z"
     },
     "tests/state.test.cjs": {
       "language": "javascript",
@@ -808,7 +647,7 @@
       "language": "markdown",
       "size_bytes": 2941,
       "lines": 109,
-      "last_modified": "2026-03-09T18:25:29.531Z"
+      "last_modified": "2026-03-10T03:16:42.250Z"
     },
     "workflows/add-todo.md": {
       "language": "markdown",
@@ -950,15 +789,15 @@
     },
     "workflows/help.md": {
       "language": "markdown",
-      "size_bytes": 9401,
-      "lines": 276,
-      "last_modified": "2026-03-09T04:57:14.366Z"
+      "size_bytes": 8040,
+      "lines": 243,
+      "last_modified": "2026-03-10T16:09:11.608Z"
     },
     "workflows/insert-phase.md": {
       "language": "markdown",
       "size_bytes": 3766,
       "lines": 127,
-      "last_modified": "2026-03-09T18:25:28.642Z"
+      "last_modified": "2026-03-10T03:16:42.251Z"
     },
     "workflows/list-phase-assumptions.md": {
       "language": "markdown",
@@ -1000,7 +839,7 @@
       "language": "markdown",
       "size_bytes": 7228,
       "lines": 174,
-      "last_modified": "2026-03-10T01:15:43.834Z"
+      "last_modified": "2026-03-10T03:16:42.251Z"
     },
     "workflows/progress.md": {
       "language": "markdown",
@@ -1018,7 +857,7 @@
       "language": "markdown",
       "size_bytes": 4301,
       "lines": 152,
-      "last_modified": "2026-03-09T18:25:27.733Z"
+      "last_modified": "2026-03-10T03:16:42.251Z"
     },
     "workflows/research-phase.md": {
       "language": "markdown",
@@ -1054,7 +893,7 @@
       "language": "markdown",
       "size_bytes": 11671,
       "lines": 513,
-      "last_modified": "2026-03-09T18:25:30.144Z"
+      "last_modified": "2026-03-10T03:16:42.251Z"
     },
     "workflows/update.md": {
       "language": "markdown",
@@ -1216,7 +1055,7 @@
       "language": "markdown",
       "size_bytes": 8373,
       "lines": 41,
-      "last_modified": "2026-03-10T02:58:41.228Z"
+      "last_modified": "2026-03-10T18:09:19.573Z"
     },
     "skills/state-update-protocol/SKILL.md": {
       "language": "markdown",
@@ -1276,7 +1115,7 @@
       "language": "javascript",
       "size_bytes": 76933,
       "lines": 2066,
-      "last_modified": "2026-03-09T22:22:56.882Z"
+      "last_modified": "2026-03-10T03:16:42.249Z"
     },
     "src/commands/init.js": {
       "language": "javascript",
@@ -1304,33 +1143,39 @@
     },
     "src/commands/misc.js": {
       "language": "javascript",
-      "size_bytes": 56288,
-      "lines": 1626,
-      "last_modified": "2026-03-09T18:26:20.341Z"
+      "size_bytes": 61530,
+      "lines": 1795,
+      "last_modified": "2026-03-10T11:45:10.316Z"
     },
     "src/commands/phase.js": {
       "language": "javascript",
-      "size_bytes": 34601,
-      "lines": 998,
-      "last_modified": "2026-03-02T16:59:27.123Z"
+      "size_bytes": 43365,
+      "lines": 1249,
+      "last_modified": "2026-03-10T11:45:10.317Z"
     },
     "src/commands/profiler.js": {
       "language": "javascript",
       "size_bytes": 11469,
       "lines": 355,
-      "last_modified": "2026-03-09T18:24:57.044Z"
+      "last_modified": "2026-03-10T03:16:42.249Z"
     },
     "src/commands/research.js": {
       "language": "javascript",
       "size_bytes": 68786,
       "lines": 2002,
-      "last_modified": "2026-03-09T22:53:03.525Z"
+      "last_modified": "2026-03-10T03:16:42.250Z"
     },
     "src/commands/roadmap.js": {
       "language": "javascript",
-      "size_bytes": 11071,
+      "size_bytes": 11115,
       "lines": 300,
-      "last_modified": "2026-03-02T14:28:58.997Z"
+      "last_modified": "2026-03-10T11:45:10.317Z"
+    },
+    "src/commands/runtime.js": {
+      "language": "javascript",
+      "size_bytes": 4315,
+      "lines": 149,
+      "last_modified": "2026-03-10T13:56:44.220Z"
     },
     "src/commands/state.js": {
       "language": "javascript",
@@ -1338,11 +1183,17 @@
       "lines": 714,
       "last_modified": "2026-03-07T03:10:23.862Z"
     },
+    "src/commands/tools.js": {
+      "language": "javascript",
+      "size_bytes": 2098,
+      "lines": 70,
+      "last_modified": "2026-03-10T12:31:37.729Z"
+    },
     "src/commands/trajectory.js": {
       "language": "javascript",
       "size_bytes": 35420,
       "lines": 996,
-      "last_modified": "2026-03-09T22:22:33.820Z"
+      "last_modified": "2026-03-10T03:16:42.250Z"
     },
     "src/commands/verify.js": {
       "language": "javascript",
@@ -1364,15 +1215,15 @@
     },
     "src/lib/cache.js": {
       "language": "javascript",
-      "size_bytes": 15082,
-      "lines": 629,
-      "last_modified": "2026-03-09T03:52:25.704Z"
+      "size_bytes": 21045,
+      "lines": 752,
+      "last_modified": "2026-03-10T03:59:32.295Z"
     },
     "src/lib/codebase-intel.js": {
       "language": "javascript",
-      "size_bytes": 14525,
-      "lines": 446,
-      "last_modified": "2026-03-10T02:55:49.050Z"
+      "size_bytes": 22036,
+      "lines": 663,
+      "last_modified": "2026-03-10T18:09:15.298Z"
     },
     "src/lib/config.js": {
       "language": "javascript",
@@ -1382,9 +1233,9 @@
     },
     "src/lib/constants.js": {
       "language": "javascript",
-      "size_bytes": 41029,
-      "lines": 906,
-      "last_modified": "2026-03-09T03:51:53.275Z"
+      "size_bytes": 43101,
+      "lines": 924,
+      "last_modified": "2026-03-10T18:09:14.443Z"
     },
     "src/lib/context.js": {
       "language": "javascript",
@@ -1400,9 +1251,9 @@
     },
     "src/lib/deps.js": {
       "language": "javascript",
-      "size_bytes": 20768,
-      "lines": 695,
-      "last_modified": "2026-03-07T03:07:38.975Z"
+      "size_bytes": 33058,
+      "lines": 1065,
+      "last_modified": "2026-03-10T18:07:00.701Z"
     },
     "src/lib/format.js": {
       "language": "javascript",
@@ -1458,6 +1309,12 @@
       "lines": 75,
       "last_modified": "2026-03-07T03:07:55.448Z"
     },
+    "src/lib/runtime-capabilities.js": {
+      "language": "javascript",
+      "size_bytes": 6164,
+      "lines": 195,
+      "last_modified": "2026-03-10T03:26:15.403Z"
+    },
     "src/plugin/advisory-guardrails.js": {
       "language": "javascript",
       "size_bytes": 15356,
@@ -1502,9 +1359,9 @@
     },
     "src/plugin/notification.js": {
       "language": "javascript",
-      "size_bytes": 6532,
-      "lines": 226,
-      "last_modified": "2026-03-09T14:57:06.582Z"
+      "size_bytes": 6589,
+      "lines": 227,
+      "last_modified": "2026-03-10T11:45:10.317Z"
     },
     "src/plugin/project-state.js": {
       "language": "javascript",
@@ -1640,9 +1497,75 @@
     },
     "src/lib/adapters/discovery.js": {
       "language": "javascript",
-      "size_bytes": 11091,
-      "lines": 418,
-      "last_modified": "2026-03-10T02:55:56.563Z"
+      "size_bytes": 13075,
+      "lines": 459,
+      "last_modified": "2026-03-10T03:10:28.913Z"
+    },
+    "src/lib/cli-tools/bat.js": {
+      "language": "javascript",
+      "size_bytes": 5725,
+      "lines": 242,
+      "last_modified": "2026-03-10T13:17:30.837Z"
+    },
+    "src/lib/cli-tools/bun-runtime.js": {
+      "language": "javascript",
+      "size_bytes": 4614,
+      "lines": 196,
+      "last_modified": "2026-03-10T13:56:09.217Z"
+    },
+    "src/lib/cli-tools/detector.js": {
+      "language": "javascript",
+      "size_bytes": 4172,
+      "lines": 182,
+      "last_modified": "2026-03-10T12:29:41.050Z"
+    },
+    "src/lib/cli-tools/fallback.js": {
+      "language": "javascript",
+      "size_bytes": 2952,
+      "lines": 106,
+      "last_modified": "2026-03-10T12:30:40.911Z"
+    },
+    "src/lib/cli-tools/fd.js": {
+      "language": "javascript",
+      "size_bytes": 3914,
+      "lines": 143,
+      "last_modified": "2026-03-10T12:50:18.911Z"
+    },
+    "src/lib/cli-tools/gh.js": {
+      "language": "javascript",
+      "size_bytes": 6263,
+      "lines": 236,
+      "last_modified": "2026-03-10T14:27:51.981Z"
+    },
+    "src/lib/cli-tools/index.js": {
+      "language": "javascript",
+      "size_bytes": 4780,
+      "lines": 184,
+      "last_modified": "2026-03-10T13:20:21.939Z"
+    },
+    "src/lib/cli-tools/install-guidance.js": {
+      "language": "javascript",
+      "size_bytes": 5255,
+      "lines": 196,
+      "last_modified": "2026-03-10T13:56:24.024Z"
+    },
+    "src/lib/cli-tools/jq.js": {
+      "language": "javascript",
+      "size_bytes": 3963,
+      "lines": 153,
+      "last_modified": "2026-03-10T12:50:43.865Z"
+    },
+    "src/lib/cli-tools/ripgrep.js": {
+      "language": "javascript",
+      "size_bytes": 3959,
+      "lines": 152,
+      "last_modified": "2026-03-10T12:49:32.462Z"
+    },
+    "src/lib/cli-tools/yq.js": {
+      "language": "javascript",
+      "size_bytes": 6646,
+      "lines": 246,
+      "last_modified": "2026-03-10T13:17:05.680Z"
     },
     "src/lib/recovery/stuck-detector.js": {
       "language": "javascript",
@@ -1655,6 +1578,12 @@
       "size_bytes": 3513,
       "lines": 139,
       "last_modified": "2026-03-07T03:07:56.557Z"
+    },
+    "src/lib/utils/parity-check.js": {
+      "language": "javascript",
+      "size_bytes": 7514,
+      "lines": 259,
+      "last_modified": "2026-03-10T04:29:58.369Z"
     },
     "src/plugin/parsers/config.js": {
       "language": "javascript",
@@ -1688,9 +1617,9 @@
     },
     "src/plugin/parsers/roadmap.js": {
       "language": "javascript",
-      "size_bytes": 6559,
+      "size_bytes": 6609,
       "lines": 220,
-      "last_modified": "2026-03-09T03:05:10.444Z"
+      "last_modified": "2026-03-10T11:45:10.317Z"
     },
     "src/plugin/parsers/state.js": {
       "language": "javascript",
@@ -1700,33 +1629,33 @@
     },
     "src/plugin/tools/bgsd-context.js": {
       "language": "javascript",
-      "size_bytes": 3778,
+      "size_bytes": 3779,
       "lines": 113,
-      "last_modified": "2026-03-10T00:34:50.495Z"
+      "last_modified": "2026-03-10T12:15:40.671Z"
     },
     "src/plugin/tools/bgsd-plan.js": {
       "language": "javascript",
-      "size_bytes": 4016,
+      "size_bytes": 4017,
       "lines": 122,
-      "last_modified": "2026-03-10T00:24:35.907Z"
+      "last_modified": "2026-03-10T12:15:22.570Z"
     },
     "src/plugin/tools/bgsd-progress.js": {
       "language": "javascript",
-      "size_bytes": 12384,
+      "size_bytes": 12385,
       "lines": 364,
-      "last_modified": "2026-03-10T00:35:24.013Z"
+      "last_modified": "2026-03-10T12:15:57.004Z"
     },
     "src/plugin/tools/bgsd-status.js": {
       "language": "javascript",
-      "size_bytes": 3518,
+      "size_bytes": 3519,
       "lines": 108,
-      "last_modified": "2026-03-10T00:34:39.892Z"
+      "last_modified": "2026-03-10T12:15:32.437Z"
     },
     "src/plugin/tools/bgsd-validate.js": {
       "language": "javascript",
-      "size_bytes": 9322,
+      "size_bytes": 9323,
       "lines": 224,
-      "last_modified": "2026-03-10T00:35:00.648Z"
+      "last_modified": "2026-03-10T12:15:48.862Z"
     },
     "src/plugin/tools/index.js": {
       "language": "javascript",
@@ -1748,15 +1677,136 @@
     }
   },
   "stats": {
-    "total_files": 283,
-    "total_lines": 142498,
+    "total_files": 271,
+    "total_lines": 147883,
     "languages_detected": 4
+  },
+  "agent_contexts": {
+    "bgsd-executor": {
+      "_agent": "bgsd-executor",
+      "generated_at": "2026-03-10T18:09:23.315Z",
+      "phase_dir": "phases/87-quality-and-context",
+      "phase_number": "87",
+      "phase_name": "Quality and Context",
+      "plans": [],
+      "incomplete_plans": [],
+      "plan_count": 0,
+      "incomplete_count": 0,
+      "commit_docs": true,
+      "verifier_enabled": false,
+      "_savings": {
+        "original_keys": 20,
+        "scoped_keys": 10,
+        "reduction_pct": 50
+      }
+    },
+    "bgsd-verifier": {
+      "_agent": "bgsd-verifier",
+      "generated_at": "2026-03-10T18:09:23.315Z",
+      "phase_dir": "phases/87-quality-and-context",
+      "phase_number": "87",
+      "phase_name": "Quality and Context",
+      "plans": [],
+      "summaries": [],
+      "verifier_enabled": false,
+      "codebase_stats": {
+        "total_files": 271,
+        "total_lines": 147883,
+        "git_commit": "b0f59dd7e1241559c117e43691e85fea2db48751",
+        "generated_at": "2026-03-10T18:09:23.315Z"
+      },
+      "_savings": {
+        "original_keys": 20,
+        "scoped_keys": 8,
+        "reduction_pct": 60
+      }
+    },
+    "bgsd-planner": {
+      "_agent": "bgsd-planner",
+      "generated_at": "2026-03-10T18:09:23.315Z",
+      "phase_dir": "phases/87-quality-and-context",
+      "phase_number": "87",
+      "phase_name": "Quality and Context",
+      "plan_count": 0,
+      "research_enabled": false,
+      "plan_checker_enabled": false,
+      "codebase_stats": {
+        "total_files": 271,
+        "total_lines": 147883,
+        "git_commit": "b0f59dd7e1241559c117e43691e85fea2db48751",
+        "generated_at": "2026-03-10T18:09:23.315Z"
+      },
+      "_savings": {
+        "original_keys": 20,
+        "scoped_keys": 8,
+        "reduction_pct": 60
+      }
+    },
+    "bgsd-phase-researcher": {
+      "_agent": "bgsd-phase-researcher",
+      "generated_at": "2026-03-10T18:09:23.315Z",
+      "phase_dir": "phases/87-quality-and-context",
+      "phase_number": "87",
+      "phase_name": "Quality and Context",
+      "codebase_stats": {
+        "total_files": 271,
+        "total_lines": 147883,
+        "git_commit": "b0f59dd7e1241559c117e43691e85fea2db48751",
+        "generated_at": "2026-03-10T18:09:23.315Z"
+      },
+      "_savings": {
+        "original_keys": 20,
+        "scoped_keys": 5,
+        "reduction_pct": 75
+      }
+    },
+    "bgsd-plan-checker": {
+      "_agent": "bgsd-plan-checker",
+      "generated_at": "2026-03-10T18:09:23.315Z",
+      "phase_dir": "phases/87-quality-and-context",
+      "phase_number": "87",
+      "phase_name": "Quality and Context",
+      "plans": [],
+      "plan_count": 0,
+      "codebase_stats": {
+        "total_files": 271,
+        "total_lines": 147883,
+        "git_commit": "b0f59dd7e1241559c117e43691e85fea2db48751",
+        "generated_at": "2026-03-10T18:09:23.315Z"
+      },
+      "_savings": {
+        "original_keys": 20,
+        "scoped_keys": 7,
+        "reduction_pct": 65
+      }
+    },
+    "bgsd-reviewer": {
+      "_agent": "bgsd-reviewer",
+      "generated_at": "2026-03-10T18:09:23.315Z",
+      "phase_dir": "phases/87-quality-and-context",
+      "phase_number": "87",
+      "phase_name": "Quality and Context",
+      "codebase_stats": {
+        "total_files": 271,
+        "total_lines": 147883,
+        "git_commit": "b0f59dd7e1241559c117e43691e85fea2db48751",
+        "generated_at": "2026-03-10T18:09:23.315Z"
+      },
+      "_savings": {
+        "original_keys": 20,
+        "scoped_keys": 5,
+        "reduction_pct": 75
+      }
+    }
   },
   "dependencies": {
     "forward": {
       "baseline.cjs": [
         "src/lib/adapters/discovery.js",
         "plugin.js"
+      ],
+      "benchmark-compile-cache.cjs": [
+        "src/lib/runtime-capabilities.js"
       ],
       "bin/format.test.cjs": [
         "src/lib/format.js"
@@ -1767,6 +1817,7 @@
       "src/router.js": [
         "src/lib/constants.js",
         "src/lib/output.js",
+        "src/lib/runtime-capabilities.js",
         "src/commands/state.js",
         "src/commands/roadmap.js",
         "src/commands/phase.js",
@@ -1787,6 +1838,8 @@
         "src/commands/agent.js",
         "src/commands/profiler.js",
         "src/commands/research.js",
+        "src/commands/tools.js",
+        "src/commands/runtime.js",
         "src/lib/profiler.js"
       ],
       "tests/agent.test.cjs": [
@@ -1931,7 +1984,8 @@
         "src/lib/helpers.js",
         "src/lib/frontmatter.js",
         "src/lib/git.js",
-        "src/lib/codebase-intel.js"
+        "src/lib/codebase-intel.js",
+        "src/lib/utils/parity-check.js"
       ],
       "src/commands/phase.js": [
         "src/lib/output.js",
@@ -1951,12 +2005,22 @@
         "src/lib/helpers.js",
         "src/lib/frontmatter.js"
       ],
+      "src/commands/runtime.js": [
+        "src/lib/cli-tools/bun-runtime.js",
+        "src/lib/cli-tools/install-guidance.js",
+        "src/lib/output.js"
+      ],
       "src/commands/state.js": [
         "src/lib/output.js",
         "src/lib/config.js",
         "src/lib/helpers.js",
         "src/lib/git.js",
         "src/lib/format.js"
+      ],
+      "src/commands/tools.js": [
+        "src/lib/cli-tools/detector.js",
+        "src/lib/cli-tools/install-guidance.js",
+        "src/lib/output.js"
       ],
       "src/commands/trajectory.js": [
         "src/lib/output.js",
@@ -2006,7 +2070,8 @@
       ],
       "src/lib/deps.js": [
         "src/lib/output.js",
-        "src/lib/codebase-intel.js"
+        "src/lib/codebase-intel.js",
+        "src/lib/ast.js"
       ],
       "src/lib/git.js": [
         "src/lib/output.js",
@@ -2096,8 +2161,45 @@
         "src/lib/output.js",
         "src/lib/git.js"
       ],
+      "src/lib/cli-tools/bat.js": [
+        "src/lib/cli-tools/fallback.js"
+      ],
+      "src/lib/cli-tools/fallback.js": [
+        "src/lib/cli-tools/detector.js",
+        "src/lib/cli-tools/install-guidance.js"
+      ],
+      "src/lib/cli-tools/fd.js": [
+        "src/lib/cli-tools/fallback.js"
+      ],
+      "src/lib/cli-tools/gh.js": [
+        "src/lib/cli-tools/fallback.js"
+      ],
+      "src/lib/cli-tools/index.js": [
+        "src/lib/cli-tools/ripgrep.js",
+        "src/lib/cli-tools/fd.js",
+        "src/lib/cli-tools/jq.js",
+        "src/lib/cli-tools/yq.js",
+        "src/lib/cli-tools/bat.js",
+        "src/lib/cli-tools/gh.js",
+        "src/lib/cli-tools/detector.js",
+        "src/lib/cli-tools/fallback.js",
+        "src/lib/cli-tools/install-guidance.js"
+      ],
+      "src/lib/cli-tools/jq.js": [
+        "src/lib/cli-tools/fallback.js"
+      ],
+      "src/lib/cli-tools/ripgrep.js": [
+        "src/lib/cli-tools/detector.js",
+        "src/lib/cli-tools/fallback.js"
+      ],
+      "src/lib/cli-tools/yq.js": [
+        "src/lib/cli-tools/fallback.js"
+      ],
       "src/lib/recovery/stuck-detector.js": [
         "src/lib/review/severity.js"
+      ],
+      "src/lib/utils/parity-check.js": [
+        "src/lib/adapters/discovery.js"
       ],
       "src/plugin/parsers/index.js": [
         "src/plugin/parsers/state.js",
@@ -2147,11 +2249,16 @@
         "baseline.cjs",
         "tests/codebase.test.cjs",
         "src/lib/ast.js",
-        "src/lib/codebase-intel.js"
+        "src/lib/codebase-intel.js",
+        "src/lib/utils/parity-check.js"
       ],
       "plugin.js": [
         "baseline.cjs",
         "tests/plugin-advisory-guardrails.test.cjs"
+      ],
+      "src/lib/runtime-capabilities.js": [
+        "benchmark-compile-cache.cjs",
+        "src/router.js"
       ],
       "src/lib/format.js": [
         "bin/format.test.cjs",
@@ -2193,7 +2300,9 @@
         "src/commands/phase.js",
         "src/commands/research.js",
         "src/commands/roadmap.js",
+        "src/commands/runtime.js",
         "src/commands/state.js",
+        "src/commands/tools.js",
         "src/commands/trajectory.js",
         "src/commands/verify.js",
         "src/commands/worktree.js",
@@ -2291,6 +2400,12 @@
       "src/commands/research.js": [
         "src/router.js",
         "src/commands/init.js"
+      ],
+      "src/commands/tools.js": [
+        "src/router.js"
+      ],
+      "src/commands/runtime.js": [
+        "src/router.js"
       ],
       "src/lib/profiler.js": [
         "src/router.js",
@@ -2401,11 +2516,30 @@
       ],
       "src/lib/ast.js": [
         "src/commands/codebase.js",
-        "src/lib/context.js"
+        "src/lib/context.js",
+        "src/lib/deps.js"
       ],
       "src/lib/regex-cache.js": [
         "src/commands/features.js",
         "src/lib/helpers.js"
+      ],
+      "src/lib/utils/parity-check.js": [
+        "src/commands/misc.js"
+      ],
+      "src/lib/cli-tools/bun-runtime.js": [
+        "src/commands/runtime.js"
+      ],
+      "src/lib/cli-tools/install-guidance.js": [
+        "src/commands/runtime.js",
+        "src/commands/tools.js",
+        "src/lib/cli-tools/fallback.js",
+        "src/lib/cli-tools/index.js"
+      ],
+      "src/lib/cli-tools/detector.js": [
+        "src/commands/tools.js",
+        "src/lib/cli-tools/fallback.js",
+        "src/lib/cli-tools/index.js",
+        "src/lib/cli-tools/ripgrep.js"
       ],
       "src/plugin/logger.js": [
         "src/plugin/advisory-guardrails.js",
@@ -2500,6 +2634,33 @@
         "src/plugin/project-state.js",
         "src/plugin/parsers/index.js"
       ],
+      "src/lib/cli-tools/fallback.js": [
+        "src/lib/cli-tools/bat.js",
+        "src/lib/cli-tools/fd.js",
+        "src/lib/cli-tools/gh.js",
+        "src/lib/cli-tools/index.js",
+        "src/lib/cli-tools/jq.js",
+        "src/lib/cli-tools/ripgrep.js",
+        "src/lib/cli-tools/yq.js"
+      ],
+      "src/lib/cli-tools/ripgrep.js": [
+        "src/lib/cli-tools/index.js"
+      ],
+      "src/lib/cli-tools/fd.js": [
+        "src/lib/cli-tools/index.js"
+      ],
+      "src/lib/cli-tools/jq.js": [
+        "src/lib/cli-tools/index.js"
+      ],
+      "src/lib/cli-tools/yq.js": [
+        "src/lib/cli-tools/index.js"
+      ],
+      "src/lib/cli-tools/bat.js": [
+        "src/lib/cli-tools/index.js"
+      ],
+      "src/lib/cli-tools/gh.js": [
+        "src/lib/cli-tools/index.js"
+      ],
       "src/lib/review/severity.js": [
         "src/lib/recovery/stuck-detector.js"
       ],
@@ -2530,14 +2691,14 @@
       ]
     },
     "stats": {
-      "total_files_parsed": 95,
-      "total_edges": 249,
+      "total_files_parsed": 112,
+      "total_edges": 280,
       "languages_parsed": [
         "javascript"
       ],
       "parse_errors": 0
     },
-    "built_at": "2026-03-10T13:20:26.900Z"
+    "built_at": "2026-03-10T18:12:29.885Z"
   },
   "conventions": {
     "naming": {
@@ -2546,13 +2707,14 @@
         ".": {
           "dominant_pattern": "kebab-case",
           "confidence": 100,
-          "file_count": 2,
+          "file_count": 3,
           "patterns": {
             "kebab-case": {
-              "count": 2,
+              "count": 3,
               "examples": [
                 "audit-commands",
-                "audit-exports"
+                "audit-exports",
+                "benchmark-compile-cache"
               ]
             }
           }
@@ -2575,13 +2737,14 @@
         "src/lib": {
           "dominant_pattern": "kebab-case",
           "confidence": 100,
-          "file_count": 2,
+          "file_count": 3,
           "patterns": {
             "kebab-case": {
-              "count": 2,
+              "count": 3,
               "examples": [
                 "codebase-intel",
-                "regex-cache"
+                "regex-cache",
+                "runtime-capabilities"
               ]
             }
           }
@@ -2597,6 +2760,20 @@
                 "advisory-guardrails",
                 "command-enricher",
                 "context-builder"
+              ]
+            }
+          }
+        },
+        "src/lib/cli-tools": {
+          "dominant_pattern": "kebab-case",
+          "confidence": 100,
+          "file_count": 2,
+          "patterns": {
+            "kebab-case": {
+              "count": 2,
+              "examples": [
+                "bun-runtime",
+                "install-guidance"
               ]
             }
           }
@@ -2621,17 +2798,17 @@
     "file_organization": {
       "structure_type": "nested",
       "max_depth": 4,
-      "avg_depth": 2.4,
+      "avg_depth": 2.5,
       "test_placement": "separate-directory",
       "patterns": [
         {
           "pattern": "nested structure",
-          "detail": "max depth 4, avg depth 2.4",
+          "detail": "max depth 4, avg depth 2.5",
           "confidence": 100
         }
       ]
     },
     "frameworks": [],
-    "extracted_at": "2026-03-10T03:09:42.829Z"
+    "extracted_at": "2026-03-10T18:10:11.785Z"
   }
 }
