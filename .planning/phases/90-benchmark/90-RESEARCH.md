@@ -16,6 +16,8 @@ Phase 90 builds a plugin benchmark adapter for cross-plugin comparison and captu
 
 The existing `benchmarkStartup`, `benchmarkFileIO`, `benchmarkNested`, and `benchmarkHTTPServer` functions provide a solid foundation that can be extended to measure plugin-specific operations.
 
+**Plan status:** 90-01-PLAN.md exists with 4 tasks ready for execution.
+
 **Primary recommendation:** Extend the existing `bun-runtime.js` benchmark infrastructure to create a dedicated `plugin-benchmark.js` module that measures plugin load time, command execution, context loading, and memory usage. Use build-time feature flags to control inclusion in production builds.
 
 ---
@@ -216,6 +218,25 @@ function formatTable(headers, rows) {
 
 4. **Should the benchmark module be in the bundled output?** Decision: build-time feature flag controls this.
 
+## Implementation Notes
+
+**Plan already created:** 90-01-PLAN.md exists with 4 tasks:
+- Task 1: Create plugin-benchmark.js module
+- Task 2: Create /bgsd-measure command
+- Task 3: Build-time feature flag
+- Task 4: Capture baseline metrics
+
+**Existing infrastructure confirmed:**
+- `benchmarkStartup()` function exists at line 1315 in bin/bgsd-tools.cjs
+- Uses `process.hrtime.bigint()` for high-resolution timing
+- Uses `execFileSync` with array args for subprocess timing
+- Multiple workload types already implemented (file I/O, nested, HTTP)
+
+**Verification approach:**
+- Build-time feature flag: Use esbuild `define` option
+- Cold/Warm: Measure with cleared module cache vs cached modules
+- Context load: Time loading of STATE.md, ROADMAP.md, REQUIREMENTS.md, PROJECT.md
+
 ---
 
 ## Sources
@@ -245,6 +266,7 @@ function formatTable(headers, rows) {
 - Context load measurement: MEDIUM (need to define scope)
 
 **Research date:** 2026-03-10
+**Re-researched:** 2026-03-10 (re-research)
 **Valid until:** Phase 90 completion
 
 ---
