@@ -33,7 +33,8 @@ function benchmarkStartup(compileCacheEnv) {
   for (let i = 0; i < RUNS; i++) {
     const start = Date.now();
     try {
-      execSync(`node bin/bgsd-tools.cjs ${COMMAND}`, {
+      // Use wrapper script (bin/bgsd) which applies compile-cache flag
+      execSync(`./bin/bgsd ${COMMAND}`, {
         encoding: 'utf-8',
         timeout: 10000,
         stdio: ['pipe', 'pipe', 'pipe'],
