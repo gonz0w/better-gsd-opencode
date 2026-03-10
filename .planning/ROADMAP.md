@@ -6,7 +6,7 @@ This milestone expands CLI tool integrations for faster operations and explores 
 
 ## Milestones
 
-- ⏳ **v9.2 CLI Tool Integrations & Runtime Modernization** - Phases 82-85 (in progress)
+- ✅ **v9.2 CLI Tool Integrations & Runtime Modernization** - Phases 82-85 (completed 2026-03-10)
 - ✅ **v9.1 Performance Acceleration** - Phases 77-81 (completed 2026-03-10) — see `.planning/milestones/v9.1-ROADMAP.md`
 - ✅ Previous milestones shipped - see `.planning/MILESTONES.md`
 
@@ -85,7 +85,7 @@ This milestone expands CLI tool integrations for faster operations and explores 
   2. User can view documentation of Bun compatibility and known limitations with the plugin
   3. User can run a benchmark command comparing Node.js vs Bun startup time for the plugin
 
-**Plans:** TBD
+**Plans:** 1/1 plans complete ✓
 
 ---
 
@@ -96,7 +96,7 @@ This milestone expands CLI tool integrations for faster operations and explores 
 | 82. Tool Detection Infrastructure | 1/1 | Complete    | 2026-03-10 |
 | 83. Search & Discovery | 1/1 | Complete    | 2026-03-10 |
 | 84. Extended Tools | 1/1 | Complete    | 2026-03-10 |
-| 85. Runtime Exploration | 0/1 | Not started | - |
+| 85. Runtime Exploration | 1/1 | Complete    | 2026-03-10 |
 
 ---
 
@@ -107,15 +107,15 @@ This milestone expands CLI tool integrations for faster operations and explores 
 | CLI-01: Tool detection with caching | Phase 82 | ✅ Complete |
 | CLI-02: Install instructions when unavailable | Phase 82 | ✅ Complete |
 | CLI-03: Graceful fallback to Node.js | Phase 82 | ✅ Complete |
-| CLI-04: ripgrep with --json output | Phase 83 | Pending |
-| CLI-05: fd with .gitignore respect | Phase 83 | Pending |
-| CLI-06: jq for JSON processing | Phase 83 | Pending |
+| CLI-04: ripgrep with --json output | Phase 83 | ✅ Complete |
+| CLI-05: fd with .gitignore respect | Phase 83 | ✅ Complete |
+| CLI-06: jq for JSON processing | Phase 83 | ✅ Complete |
 | CLI-07: yq for YAML processing | Phase 84 | ✅ Complete |
 | CLI-08: bat for syntax-highlighted output | Phase 84 | ✅ Complete |
 | CLI-09: gh CLI for GitHub operations | Phase 84 | ✅ Complete |
-| RUNT-01: Bun runtime detection | Phase 85 | Pending |
-| RUNT-02: Bun compatibility documentation | Phase 85 | Pending |
-| RUNT-03: Node vs Bun benchmark | Phase 85 | Pending |
+| RUNT-01: Bun runtime detection | Phase 85 | ✅ Complete |
+| RUNT-02: Bun compatibility documentation | Phase 85 | ✅ Complete |
+| RUNT-03: Node vs Bun benchmark | Phase 85 | ✅ Complete |
 
 ---
 

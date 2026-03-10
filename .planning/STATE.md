@@ -9,12 +9,12 @@ See: `.planning/PROJECT.md` (updated 2026-03-10)
 
 ## Current Position
 
-**Phase:** 84-extended-tools
-**Current Plan:** Not started
-**Status:** Ready to plan
+**Phase:** 85-runtime-exploration
+**Current Plan:** 01 (complete)
+**Status:** Phase complete
 **Last Activity:** 2026-03-10
 
-**Progress:** v9.2 CLI Tool Integrations - Phase 84 complete
+**Progress:** [██████████] 100%
 
 ## Performance Metrics
 
@@ -42,6 +42,9 @@ See: `.planning/PROJECT.md` (updated 2026-03-10)
 - [82-01]: 5-minute TTL cache balances freshness with performance.
 - [83-01]: Used ripgrep --json for structured output parsing.
 - [83-01]: Used fd --glob for proper glob pattern handling.
+- [85-01]: Bun runtime detection uses session cache (Map, not persisted).
+- [85-01]: Bun detection order: bun --version first (3s timeout), then which bun fallback.
+- [85-01]: Show full details when Bun detected, install instructions when unavailable.
 
 ### Pending Todos
 
@@ -55,7 +58,7 @@ None yet.
 
 ## Session Continuity
 
-**Last session:** 2026-03-10T13:44:10.357Z
-**Stopped at:** Phase 85 context gathered
-**Next step:** Ready for Phase 85: Runtime Exploration
+**Last session:** 2026-03-10T13:58:00Z
+**Stopped at:** Completed Phase 85-01: Runtime Exploration
+**Next step:** v9.2 milestone complete - ready for verification
 
