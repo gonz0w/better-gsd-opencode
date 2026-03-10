@@ -53,7 +53,7 @@ export const bgsd_progress = {
   },
 
   async execute(args, context) {
-    const projectDir = context.directory || process.cwd();
+    const projectDir = context?.directory || process.cwd();
     const lockDir = join(projectDir, '.planning', '.lock');
 
     try {

@@ -9,9 +9,9 @@
 
 #### Tool Detection & Infrastructure
 
-- [ ] **CLI-01**: Plugin can detect available CLI tools (ripgrep, fd, jq, etc.) with caching
-- [ ] **CLI-02**: Plugin shows clear install instructions when CLI tool is unavailable
-- [ ] **CLI-03**: Plugin gracefully degrades to existing Node.js implementations when CLI tools unavailable
+- [x] **CLI-01**: Plugin can detect available CLI tools (ripgrep, fd, jq, etc.) with caching
+- [x] **CLI-02**: Plugin shows clear install instructions when CLI tool is unavailable
+- [x] **CLI-03**: Plugin gracefully degrades to existing Node.js implementations when CLI tools unavailable
 
 #### Search & Discovery
 
