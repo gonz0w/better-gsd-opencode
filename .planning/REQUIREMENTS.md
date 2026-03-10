@@ -46,21 +46,21 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| AGNT-01 - Agent zero overlap | TBD | Pending |
-| AGNT-02 - Agent boundaries validated | TBD | Pending |
-| AGNT-03 - Handoff contracts | TBD | Pending |
-| CMND-01 - Subcommand groups | TBD | Pending |
-| CMND-02 - Stale commands removed | TBD | Pending |
-| CMND-03 - Overlapping consolidated | TBD | Pending |
-| CMND-04 - Internal not exposed | TBD | Pending |
-| CTXT-01 - Deterministic context | TBD | Pending |
-| CTXT-02 - Zero orphaned code | TBD | Pending |
-| CTXT-03 - Dead code audit | TBD | Pending |
-| RUNT-01 - Bun integration | TBD | Pending |
-| RUNT-02 - Backward compatibility | TBD | Pending |
-| RUNT-03 - Bundle size | TBD | Pending |
-| BENCH-01 - Benchmark adapter | TBD | Pending |
-| BENCH-02 - Baseline metrics | TBD | Pending |
+| AGNT-01 - Agent zero overlap | Phase 86 | Pending |
+| AGNT-02 - Agent boundaries validated | Phase 86 | Pending |
+| AGNT-03 - Handoff contracts | Phase 86 | Pending |
+| CMND-01 - Subcommand groups | Phase 87 | Pending |
+| CMND-02 - Stale commands removed | Phase 87 | Pending |
+| CMND-03 - Overlapping consolidated | Phase 87 | Pending |
+| CMND-04 - Internal not exposed | Phase 87 | Pending |
+| CTXT-01 - Deterministic context | Phase 88 | Pending |
+| CTXT-02 - Zero orphaned code | Phase 88 | Pending |
+| CTXT-03 - Dead code audit | Phase 88 | Pending |
+| RUNT-01 - Bun integration | Phase 89 | Pending |
+| RUNT-02 - Backward compatibility | Phase 89 | Pending |
+| RUNT-03 - Bundle size | Phase 89 | Pending |
+| BENCH-01 - Benchmark adapter | Phase 90 | Pending |
+| BENCH-02 - Baseline metrics | Phase 90 | Pending |
 
 ---
 
