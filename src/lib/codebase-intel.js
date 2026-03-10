@@ -22,7 +22,7 @@ function INTEL_PATH(cwd) {
 
 function getDiscoveryOptions() {
   return {
-    mode: process.env.BGSD_DISCOVERY_MODE === 'optimized' ? 'optimized' : 'legacy',
+    mode: process.env.BGSD_DISCOVERY_MODE === 'legacy' ? 'legacy' : 'optimized',
     shadowCompare: process.env.BGSD_DISCOVERY_SHADOW === '1',
   };
 }

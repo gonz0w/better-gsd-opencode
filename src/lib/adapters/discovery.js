@@ -7,7 +7,7 @@ const ignore = require('ignore');
 const { debugLog } = require('../output');
 const { execGit } = require('../git');
 
-const DEFAULT_MODE = process.env.BGSD_DISCOVERY_MODE === 'optimized' ? 'optimized' : 'legacy';
+const DEFAULT_MODE = process.env.BGSD_DISCOVERY_MODE === 'legacy' ? 'legacy' : 'optimized';
 
 const LANGUAGE_MAP = {
   '.js': 'javascript', '.cjs': 'javascript', '.mjs': 'javascript',
@@ -394,6 +394,16 @@ function optimizedWalkSourceFiles(cwd, sourceDirs, skipDirs) {
   return files;
 }
 
+/**
+ * Return the runtime-active discovery mode string.
+ * Useful for diagnostics and tests that need to verify optimized-by-default behavior.
+ *
+ * @returns {'optimized'|'legacy'}
+ */
+function getActiveMode() {
+  return DEFAULT_MODE;
+}
+
 module.exports = {
   LANGUAGE_MAP,
   SKIP_DIRS,
@@ -404,4 +414,5 @@ module.exports = {
   legacyWalkSourceFiles,
   optimizedGetSourceDirs,
   optimizedWalkSourceFiles,
+  getActiveMode,
 };
