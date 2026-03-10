@@ -654,11 +654,15 @@ function cmdValidateHealth(cwd, options, raw) {
               fs.renameSync(tempPath, statePath);
               repairActions.push({ action: repair, success: true, path: 'STATE.md' });
             } catch (err) {
-              // If temp file exists, try to remove and retry once
+              // If temp file creation failed, try direct write
               try {
                 if (fs.existsSync(tempPath)) {
                   fs.unlinkSync(tempPath);
                 }
+              } catch {
+                // Ignore cleanup errors
+              }
+              try {
                 fs.writeFileSync(statePath, stateContent, { encoding: 'utf-8' });
                 repairActions.push({ action: repair, success: true, path: 'STATE.md' });
               } catch (retryErr) {

@@ -92,11 +92,12 @@ function configSet(keyPath, value) {
   }
   const config = readConfig();
   const keys = keyPath.split('.');
+  const forbidden = ['__proto__', 'constructor', 'prototype'];
   let current = config;
   for (let i = 0; i < keys.length - 1; i++) {
     const key = keys[i];
-    if (Object.prototype.hasOwnProperty.call(Object.prototype, key)) {
-      continue;
+    if (forbidden.includes(key)) {
+      return false;
     }
     if (current[key] === undefined || typeof current[key] !== 'object') {
       current[key] = {};
@@ -104,7 +105,7 @@ function configSet(keyPath, value) {
     current = current[key];
   }
   const lastKey = keys[keys.length - 1];
-  if (!Object.prototype.hasOwnProperty.call(Object.prototype, lastKey)) {
+  if (!forbidden.includes(lastKey)) {
     current[lastKey] = value;
   }
   return writeConfig(config);

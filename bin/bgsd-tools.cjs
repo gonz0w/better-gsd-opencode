@@ -1225,11 +1225,12 @@ var require_bun_runtime = __commonJS({
       }
       const config = readConfig();
       const keys = keyPath.split(".");
+      const forbidden = ["__proto__", "constructor", "prototype"];
       let current = config;
       for (let i = 0; i < keys.length - 1; i++) {
         const key = keys[i];
-        if (Object.prototype.hasOwnProperty.call(Object.prototype, key)) {
-          continue;
+        if (forbidden.includes(key)) {
+          return false;
         }
         if (current[key] === void 0 || typeof current[key] !== "object") {
           current[key] = {};
@@ -1237,7 +1238,7 @@ var require_bun_runtime = __commonJS({
         current = current[key];
       }
       const lastKey = keys[keys.length - 1];
-      if (!Object.prototype.hasOwnProperty.call(Object.prototype, lastKey)) {
+      if (!forbidden.includes(lastKey)) {
         current[lastKey] = value;
       }
       return writeConfig(config);
@@ -6439,6 +6440,9 @@ var require_verify = __commonJS({
                     if (fs.existsSync(tempPath)) {
                       fs.unlinkSync(tempPath);
                     }
+                  } catch {
+                  }
+                  try {
                     fs.writeFileSync(statePath, stateContent2, { encoding: "utf-8" });
                     repairActions.push({ action: repair, success: true, path: "STATE.md" });
                   } catch (retryErr) {
