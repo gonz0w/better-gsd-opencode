@@ -38,6 +38,79 @@ Requirements for v9.1 Performance Acceleration & Plugin Benchmarking milestone (
 - **PERF-01**: Competitive plugin benchmark adapter for cross-plugin comparison
 - **PERF-02**: Expanded telemetry/APM export path for performance observability
 
+### Runtime Modernization (v9.2 Backlog)
+
+- **RUNT-04**: User can run CLI with Bun runtime for faster startup (~3-5x) and reduced memory usage
+- **RUNT-05**: User can use Bun as build tool for faster bundling compared to esbuild
+- **RUNT-06**: User can use pnpm for faster package installation and reduced disk usage
+
+### CLI Tool Integration (v9.2 Backlog)
+
+#### Search and Grep Tools
+- **CLI-01**: Plugin can use ripgrep (rg) for 5-10x faster content searching with PCRE2 support
+- **CLI-02**: Plugin can use ugrep for fastest grep alternative with pattern flexibility
+- **CLI-03**: Plugin can auto-detect available grep tool and fall back to Node equivalents
+
+#### File Discovery Tools
+- **CLI-04**: Plugin can use fd for faster file traversal with simpler syntax than find
+- **CLI-05**: Plugin can use fd's ignore integration for consistent .gitignore handling
+
+#### Fuzzy Finding Tools
+- **CLI-06**: Plugin can integrate with fzf for interactive file/command selection
+- **CLI-07**: Plugin can use fzf-preview for enhanced interactive workflows
+
+#### Utility Tools
+- **CLI-08**: Plugin can use bat for syntax-highlighted file output
+- **CLI-09**: Plugin can detect CLI tool availability and provide setup hints
+- **CLI-10**: Plugin can gracefully degrade when CLI tools are unavailable
+
+#### Git TUI Tools
+- **CLI-11**: Plugin can integrate with lazygit for terminal git workflow
+- **CLI-12**: Plugin can use gh CLI for GitHub operations (PRs, issues, releases)
+- **CLI-13**: Plugin can use gitui for faster terminal git operations
+
+#### Data Processing Tools
+- **CLI-14**: Plugin can use jq for JSON processing and filtering
+- **CLI-15**: Plugin can use yq for YAML processing
+- **CLI-16**: Plugin can use xq for XML processing
+
+#### HTTP/Network Tools
+- **CLI-17**: Plugin can use httpie/curlie for human-friendly HTTP requests
+- **CLI-18**: Plugin can use xh for fast Rust-based HTTP client
+
+#### Diff and Merge Tools
+- **CLI-19**: Plugin can use diff-so-fancy for prettier git diffs
+- **CLI-20**: Plugin can use icdiff for side-by-side diffs in CI/automation
+
+#### Text Transformation Tools
+- **CLI-21**: Plugin can use sd for intuitive sed replacement
+- **CLI-22**: Plugin can use toree for advanced find-and-replace
+
+#### System Monitoring Tools
+- **CLI-23**: Plugin can use btop/htop for system resource monitoring
+- **CLI-24**: Plugin can use lsof for port and file descriptor analysis
+
+#### Documentation Tools
+- **CLI-25**: Plugin can use tldr for simplified man pages
+- **CLI-26**: Plugin can use cheat for community-driven command examples
+
+#### Process Management Tools
+- **CLI-27**: Plugin can use procs for modern process viewer
+- **CLI-28**: Plugin can use fdclone for find improvements
+
+### Library and Ecosystem Exploration (v9.2 Backlog)
+
+- **LIB-01**: Researcher explores alternative libraries and non-code enhancements to elevate plugin to world-class status. Areas to investigate:
+  - **Validation**: runtypes, arktype, msgpack/protobuf for serialization
+  - **Markdown/Docs**: unified/remark, marked, shiki for AST processing
+  - **Git**: isomorphic-git (pure JS git), simple-git CLI wrapper
+  - **Caching**: keyv, stale-while-revalidate patterns
+  - **Observability**: opentelemetry, pino for JSON logging
+  - **AI/Semantic**: @xenova/transformers, vectra for local embeddings
+  - **Config**: cosmiconfig for flexible loading
+  - **IPC**: chokidar for file watching, electron-store for persistence
+  - **Non-library**: Plugin marketplace, benchmark suite, security audit, performance regression CI, contribution guidelines, health telemetry
+
 ## Out of Scope
 
 | Feature | Reason |

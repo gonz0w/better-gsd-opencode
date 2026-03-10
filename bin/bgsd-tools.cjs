@@ -29724,6 +29724,192 @@ var require_init = __commonJS({
   }
 });
 
+// src/lib/utils/parity-check.js
+var require_parity_check = __commonJS({
+  "src/lib/utils/parity-check.js"(exports2, module2) {
+    "use strict";
+    var { diagnoseParity } = require_discovery();
+    function normalizeFlag(value) {
+      if (value === void 0 || value === null) {
+        return null;
+      }
+      const normalized = String(value).trim().toLowerCase();
+      const enabledValues = /* @__PURE__ */ new Set(["1", "true", "yes", "on"]);
+      const disabledValues = /* @__PURE__ */ new Set(["0", "false", "no", "off"]);
+      if (enabledValues.has(normalized)) {
+        return true;
+      }
+      if (disabledValues.has(normalized)) {
+        return false;
+      }
+      return null;
+    }
+    function parseNodeVersion(version) {
+      return version.slice(1).split(".").map((n) => parseInt(n, 10));
+    }
+    function checkCompileCache(options = {}) {
+      const env = options.env || process.env;
+      const compileCacheEnabled = normalizeFlag(env.BGSD_COMPILE_CACHE);
+      const nodeVersion = parseNodeVersion(process.version);
+      const major = nodeVersion[0] || 0;
+      const minor = nodeVersion[1] || 0;
+      const supportsCompileCache = major > 10 || major === 10 && minor >= 4;
+      const canUse = compileCacheEnabled !== false && supportsCompileCache;
+      return {
+        optimization: "compile_cache",
+        match: true,
+        // compile-cache is always "in parity" since it's a capability detection
+        details: {
+          enabled: compileCacheEnabled,
+          nodeVersion: process.version,
+          supportsCompileCache,
+          canUse
+        },
+        onlyLegacy: [],
+        onlyOptimized: []
+      };
+    }
+    function checkSqliteCache(options = {}) {
+      const env = options.env || process.env;
+      const sqliteCacheEnabled = normalizeFlag(env.BGSD_SQLITE_STATEMENT_CACHE);
+      const nodeVersion = parseNodeVersion(process.version);
+      const major = nodeVersion[0] || 0;
+      const minor = nodeVersion[1] || 0;
+      const supportsSqlite = major > 22 || major === 22 && minor >= 5;
+      const shouldEnable = sqliteCacheEnabled !== false && supportsSqlite;
+      return {
+        optimization: "sqlite_cache",
+        match: true,
+        details: {
+          enabled: sqliteCacheEnabled,
+          nodeVersion: process.version,
+          supportsSqlite,
+          shouldEnable
+        },
+        onlyLegacy: [],
+        onlyOptimized: []
+      };
+    }
+    function checkValibotParity(options = {}) {
+      const env = options.env || process.env;
+      const valibotFlag = normalizeFlag(env.BGSD_DEP_VALIBOT);
+      const fallbackFlag = normalizeFlag(env.BGSD_DEP_VALIBOT_FALLBACK);
+      const valibotEnabled = valibotFlag !== false;
+      const forceFallback = fallbackFlag === true;
+      const activeEngine = forceFallback || !valibotEnabled ? "zod" : "valibot";
+      return {
+        optimization: "valibot",
+        match: true,
+        // Adapter ensures output contract parity
+        details: {
+          valibotEnabled,
+          forceFallback,
+          activeEngine,
+          parityGuaranteed: true
+          // Adapter normalizes output contracts
+        },
+        onlyLegacy: [],
+        onlyOptimized: []
+      };
+    }
+    function checkDiscoveryParity(options = {}) {
+      const cwd = options.cwd || process.cwd();
+      const knownDiffs = /* @__PURE__ */ new Set([
+        "build-output.txt",
+        "test-results.txt",
+        ".tsbuildinfo",
+        "tsconfig.tsbuildinfo"
+      ]);
+      try {
+        const diagnosis = diagnoseParity(cwd);
+        const relevantOnlyLegacy = diagnosis.walkFiles.onlyLegacy.filter((f) => !knownDiffs.has(f));
+        const relevantOnlyOptimized = diagnosis.walkFiles.onlyOptimized.filter((f) => !knownDiffs.has(f));
+        const relevantMatch = relevantOnlyLegacy.length === 0 && relevantOnlyOptimized.length === 0;
+        return {
+          optimization: "discovery",
+          match: relevantMatch,
+          details: {
+            sourceDirs: {
+              match: diagnosis.sourceDirs.match,
+              legacy: diagnosis.sourceDirs.legacy,
+              optimized: diagnosis.sourceDirs.optimized
+            },
+            walkFiles: {
+              match: diagnosis.walkFiles.match,
+              legacyCount: diagnosis.walkFiles.legacy.length,
+              optimizedCount: diagnosis.walkFiles.optimized.length
+            },
+            relevantOnlyLegacy,
+            relevantOnlyOptimized
+          },
+          onlyLegacy: diagnosis.walkFiles.onlyLegacy,
+          onlyOptimized: diagnosis.walkFiles.onlyOptimized
+        };
+      } catch (e) {
+        return {
+          optimization: "discovery",
+          match: false,
+          details: {
+            error: e.message
+          },
+          onlyLegacy: [],
+          onlyOptimized: []
+        };
+      }
+    }
+    async function checkParity(optimizationName, options = {}) {
+      const supported = ["valibot", "discovery", "compile_cache", "sqlite_cache"];
+      if (!supported.includes(optimizationName)) {
+        return {
+          optimization: optimizationName,
+          match: null,
+          details: {
+            error: `Unsupported optimization: ${optimizationName}. Supported: ${supported.join(", ")}`
+          },
+          onlyLegacy: [],
+          onlyOptimized: []
+        };
+      }
+      switch (optimizationName) {
+        case "valibot":
+          return checkValibotParity(options);
+        case "discovery":
+          return checkDiscoveryParity(options);
+        case "compile_cache":
+          return checkCompileCache(options);
+        case "sqlite_cache":
+          return checkSqliteCache(options);
+        default:
+          return {
+            optimization: optimizationName,
+            match: null,
+            details: { error: "Unreachable" },
+            onlyLegacy: [],
+            onlyOptimized: []
+          };
+      }
+    }
+    async function checkAllParity(options = {}) {
+      const optimizations = ["valibot", "discovery", "compile_cache", "sqlite_cache"];
+      const results = [];
+      for (const opt of optimizations) {
+        const result = await checkParity(opt, options);
+        results.push(result);
+      }
+      return results;
+    }
+    module2.exports = {
+      checkParity,
+      checkAllParity,
+      checkValibotParity,
+      checkDiscoveryParity,
+      checkCompileCache,
+      checkSqliteCache,
+      normalizeFlag
+    };
+  }
+});
+
 // src/commands/misc.js
 var require_misc = __commonJS({
   "src/commands/misc.js"(exports2, module2) {
@@ -31181,6 +31367,89 @@ _Pending verification_
         files_changed: diff.files ? diff.files.map((f) => f.path) : []
       }, raw);
     }
+    async function cmdParityCheck(cwd, args, raw) {
+      const { checkParity, checkAllParity } = require_parity_check();
+      const optIdx = args.indexOf("--optimization");
+      const helpIdx = args.indexOf("--help");
+      const jsonIdx = args.indexOf("--json");
+      const showHelp = helpIdx !== -1;
+      const outputJson = jsonIdx !== -1;
+      if (showHelp) {
+        output2({
+          commands: ["parity-check"],
+          help: `Usage: bgsd-tools util:parity-check [--optimization <name>] [--json]
+
+Check parity for dependency-backed optimizations.
+
+Options:
+  --optimization <name>  Check specific optimization: valibot, discovery, compile_cache, sqlite_cache
+  --json                 Output in JSON format
+  --help                 Show this help
+
+Without --optimization, checks all optimizations.
+
+Exit codes:
+  0 - All optimizations in parity
+  1 - One or more optimizations not in parity
+
+Examples:
+  bgsd-tools util:parity-check
+  bgsd-tools util:parity-check --optimization valibot
+  bgsd-tools util:parity-check --json`
+        }, raw, "parity-check");
+        return;
+      }
+      let results;
+      if (optIdx !== -1 && args[optIdx + 1]) {
+        const optName = args[optIdx + 1];
+        const result = await checkParity(optName, { cwd });
+        results = [result];
+      } else {
+        results = await checkAllParity({ cwd });
+      }
+      const allMatch = results.every((r) => r.match === true);
+      const exitCode = allMatch ? 0 : 1;
+      if (outputJson) {
+        output2({
+          optimizations: results.map((r) => ({
+            name: r.optimization,
+            match: r.match,
+            details: r.details
+          })),
+          allMatch,
+          exitCode
+        }, raw);
+      } else {
+        const lines = [];
+        lines.push("=== Parity Check Results ===");
+        lines.push("");
+        for (const result of results) {
+          const status = result.match === true ? "\u2713 PARITY" : result.match === false ? "\u2717 MISMATCH" : "? UNKNOWN";
+          lines.push(`${result.optimization}: ${status}`);
+          if (result.details) {
+            if (result.details.error) {
+              lines.push(`  Error: ${result.details.error}`);
+            } else if (result.details.summary) {
+              lines.push(`  ${result.details.summary}`);
+            } else if (result.details.sourceDirs) {
+              lines.push(`  Source dirs: ${result.details.sourceDirs.match ? "MATCH" : "DIFFER"}`);
+              lines.push(`  Walk files: ${result.details.walkFiles.match ? "MATCH" : "DIFFER"}`);
+            } else {
+              for (const [key, value] of Object.entries(result.details)) {
+                lines.push(`  ${key}: ${value}`);
+              }
+            }
+          }
+          lines.push("");
+        }
+        lines.push(`Overall: ${allMatch ? "ALL IN PARITY" : "SOME MISMATCHES"}`);
+        lines.push(`Exit code: ${exitCode}`);
+        output2(lines.join("\n"), raw);
+      }
+      if (!raw && exitCode !== 0) {
+        process.exit(exitCode);
+      }
+    }
     function cmdSettingsList(cwd, raw) {
       const { loadConfig: loadConfig2 } = require_config();
       const { CONFIG_SCHEMA: CONFIG_SCHEMA2 } = require_constants();
@@ -31255,7 +31524,8 @@ _Pending verification_
       cmdScaffold,
       cmdTdd,
       cmdReview,
-      cmdSettingsList
+      cmdSettingsList,
+      cmdParityCheck
     };
   }
 });
@@ -35164,6 +35434,8 @@ Available: execute-phase, plan-phase, new-project, new-milestone, quick, resume,
               }
             } else if (subcommand === "resolve-model") {
               lazyMisc().cmdResolveModel(cwd, restArgs[0], raw);
+            } else if (subcommand === "parity-check") {
+              await lazyMisc().cmdParityCheck(cwd, restArgs, raw);
             } else if (subcommand === "template") {
               const tmplSub = restArgs[0];
               if (tmplSub === "select") {

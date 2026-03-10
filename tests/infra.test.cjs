@@ -377,6 +377,7 @@ describe('config-migrate command', () => {
       planning: { commit_docs: true, search_gitignored: false },
       git: { branching_strategy: 'none', phase_branch_template: 'gsd/phase-{phase}-{slug}', milestone_branch_template: 'gsd/{milestone}-{slug}' },
       workflow: { research: true, plan_check: true, verifier: true, rag: true, rag_timeout: 30 },
+      optimization: { valibot: true, valibot_fallback: false, discovery: 'optimized', compile_cache: false, sqlite_cache: true },
       ytdlp_path: '',
       nlm_path: '',
       mcp_config_path: '',
