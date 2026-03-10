@@ -310,6 +310,259 @@ function benchmarkStartup(scriptPath, runs = 10) {
 }
 
 /**
+ * Benchmark file I/O operations comparing Node.js vs Bun
+ * Tests: read multiple files, parse contents, write temp files, delete
+ * @param {string} cwd - Working directory
+ * @param {number} runs - Number of runs (default 10)
+ * @returns {object} - { node: number, bun: number, speedup: number }
+ */
+function benchmarkFileIO(cwd, runs = 10) {
+  const ioScript = `
+const fs = require('fs');
+const path = require('path');
+
+// Read multiple files
+const dirs = ['src/lib', 'src/commands', 'bin', 'templates', 'workflows'];
+let content = '';
+for (const dir of dirs) {
+  try {
+    const files = fs.readdirSync(dir, { withFileTypes: true });
+    for (const f of files) {
+      if (f.isFile() && (f.name.endsWith('.js') || f.name.endsWith('.json') || f.name.endsWith('.md'))) {
+        const filePath = path.join(dir, f.name);
+        content += fs.readFileSync(filePath, 'utf-8').substring(0, 500);
+      }
+    }
+  } catch {}
+}
+
+// Write temp file
+const tempPath = '.bgsd-io-temp.json';
+fs.writeFileSync(tempPath, JSON.stringify({ size: content.length, timestamp: Date.now() }));
+
+// Read temp file
+const tempData = JSON.parse(fs.readFileSync(tempPath, 'utf-8'));
+
+// Delete temp file
+fs.unlinkSync(tempPath);
+
+console.log('Processed', content.length, 'bytes');
+`;
+
+  const scriptPath = path.join(cwd, '.bgsd-io-benchmark.cjs');
+  fs.writeFileSync(scriptPath, ioScript);
+  
+  const results = { node: [], bun: [] };
+  
+  // Benchmark Node.js
+  for (let i = 0; i < runs; i++) {
+    const start = Date.now();
+    try {
+      execFileSync('node', [scriptPath], { stdio: 'pipe', timeout: 10000, cwd });
+      results.node.push(Date.now() - start);
+    } catch {}
+  }
+  
+  // Benchmark Bun
+  const bunStatus = detectBun();
+  if (bunStatus.available) {
+    for (let i = 0; i < runs; i++) {
+      const start = Date.now();
+      try {
+        execFileSync('bun', [scriptPath], { stdio: 'pipe', timeout: 10000, cwd });
+        results.bun.push(Date.now() - start);
+      } catch {}
+    }
+  }
+  
+  // Cleanup
+  try { fs.unlinkSync(scriptPath); } catch {}
+  try { fs.unlinkSync(path.join(cwd, '.bgsd-io-temp.json')); } catch {}
+  
+  const avgNode = results.node.length > 0 ? results.node.reduce((a, b) => a + b, 0) / results.node.length : 0;
+  const avgBun = results.bun.length > 0 ? results.bun.reduce((a, b) => a + b, 0) / results.bun.length : 0;
+  const speedup = avgBun > 0 ? avgNode / avgBun : 0;
+  
+  return {
+    node: parseFloat(avgNode.toFixed(2)),
+    bun: parseFloat(avgBun.toFixed(2)),
+    speedup: parseFloat(speedup.toFixed(2)),
+    nodeRuns: results.node.length,
+    bunRuns: results.bun.length
+  };
+}
+
+/**
+ * Benchmark nested directory traversal comparing Node.js vs Bun
+ * Tests: recursive walk, read multiple file types, aggregate data
+ * @param {string} cwd - Working directory
+ * @param {number} runs - Number of runs (default 10)
+ * @returns {object} - { node: number, bun: number, speedup: number }
+ */
+function benchmarkNested(cwd, runs = 10) {
+  const nestedScript = `
+const fs = require('fs');
+const path = require('path');
+
+function walkDir(dir, extensions) {
+  let files = [];
+  try {
+    const entries = fs.readdirSync(dir, { withFileTypes: true });
+    for (const entry of entries) {
+      const fullPath = path.join(dir, entry.name);
+      if (entry.isDirectory() && !entry.name.startsWith('.') && entry.name !== 'node_modules') {
+        files = files.concat(walkDir(fullPath, extensions));
+      } else if (entry.isFile() && extensions.some(ext => entry.name.endsWith(ext))) {
+        try {
+          const stats = fs.statSync(fullPath);
+          files.push({ path: fullPath, size: stats.size });
+        } catch {}
+      }
+    }
+  } catch {}
+  return files;
+}
+
+const extensions = ['.js', '.json', '.md', '.cjs', '.mjs'];
+const allFiles = walkDir('src', extensions);
+
+// Aggregate data
+const totalSize = allFiles.reduce((sum, f) => sum + f.size, 0);
+const byExt = {};
+for (const f of allFiles) {
+  const ext = path.extname(f.path);
+  byExt[ext] = (byExt[ext] || 0) + 1;
+}
+
+console.log('Found', allFiles.length, 'files,', totalSize, 'bytes');
+`;
+
+  const scriptPath = path.join(cwd, '.bgsd-nested-benchmark.cjs');
+  fs.writeFileSync(scriptPath, nestedScript);
+  
+  const results = { node: [], bun: [] };
+  
+  // Benchmark Node.js
+  for (let i = 0; i < runs; i++) {
+    const start = Date.now();
+    try {
+      execFileSync('node', [scriptPath], { stdio: 'pipe', timeout: 15000, cwd });
+      results.node.push(Date.now() - start);
+    } catch {}
+  }
+  
+  // Benchmark Bun
+  const bunStatus = detectBun();
+  if (bunStatus.available) {
+    for (let i = 0; i < runs; i++) {
+      const start = Date.now();
+      try {
+        execFileSync('bun', [scriptPath], { stdio: 'pipe', timeout: 15000, cwd });
+        results.bun.push(Date.now() - start);
+      } catch {}
+    }
+  }
+  
+  // Cleanup
+  try { fs.unlinkSync(scriptPath); } catch {}
+  
+  const avgNode = results.node.length > 0 ? results.node.reduce((a, b) => a + b, 0) / results.node.length : 0;
+  const avgBun = results.bun.length > 0 ? results.bun.reduce((a, b) => a + b, 0) / results.bun.length : 0;
+  const speedup = avgBun > 0 ? avgNode / avgBun : 0;
+  
+  return {
+    node: parseFloat(avgNode.toFixed(2)),
+    bun: parseFloat(avgBun.toFixed(2)),
+    speedup: parseFloat(speedup.toFixed(2)),
+    nodeRuns: results.node.length,
+    bunRuns: results.bun.length
+  };
+}
+
+/**
+ * Benchmark HTTP server startup and request cycle comparing Node.js vs Bun
+ * Tests: start server, make request, shutdown, full cycle
+ * @param {string} cwd - Working directory
+ * @param {number} runs - Number of runs (default 10)
+ * @returns {object} - { node: number, bun: number, speedup: number }
+ */
+function benchmarkHTTPServer(cwd, runs = 10) {
+  const httpScript = `
+const http = require('http');
+
+const server = http.createServer((req, res) => {
+  res.writeHead(200, { 'Content-Type': 'application/json' });
+  res.end(JSON.stringify({ ok: true, timestamp: Date.now() }));
+});
+
+server.listen(0, () => {
+  const port = server.address().port;
+  
+  // Make request to self
+  const req = http.request({
+    hostname: 'localhost',
+    port: port,
+    path: '/',
+    method: 'GET'
+  }, (res) => {
+    let data = '';
+    res.on('data', chunk => data += chunk);
+    res.on('end', () => {
+      server.close();
+    });
+  });
+  
+  req.on('error', () => {
+    server.close();
+  });
+  
+  req.end();
+});
+`;
+
+  const scriptPath = path.join(cwd, '.bgsd-http-benchmark.cjs');
+  fs.writeFileSync(scriptPath, httpScript);
+  
+  const results = { node: [], bun: [] };
+  
+  // Benchmark Node.js
+  for (let i = 0; i < runs; i++) {
+    const start = Date.now();
+    try {
+      execFileSync('node', [scriptPath], { stdio: 'pipe', timeout: 10000, cwd });
+      results.node.push(Date.now() - start);
+    } catch {}
+  }
+  
+  // Benchmark Bun
+  const bunStatus = detectBun();
+  if (bunStatus.available) {
+    for (let i = 0; i < runs; i++) {
+      const start = Date.now();
+      try {
+        execFileSync('bun', [scriptPath], { stdio: 'pipe', timeout: 10000, cwd });
+        results.bun.push(Date.now() - start);
+      } catch {}
+    }
+  }
+  
+  // Cleanup
+  try { fs.unlinkSync(scriptPath); } catch {}
+  
+  const avgNode = results.node.length > 0 ? results.node.reduce((a, b) => a + b, 0) / results.node.length : 0;
+  const avgBun = results.bun.length > 0 ? results.bun.reduce((a, b) => a + b, 0) / results.bun.length : 0;
+  const speedup = avgBun > 0 ? avgNode / avgBun : 0;
+  
+  return {
+    node: parseFloat(avgNode.toFixed(2)),
+    bun: parseFloat(avgBun.toFixed(2)),
+    speedup: parseFloat(speedup.toFixed(2)),
+    nodeRuns: results.node.length,
+    bunRuns: results.bun.length
+  };
+}
+
+/**
  * Clear the session cache
  * Useful for testing or forcing re-detection
  */
@@ -337,6 +590,9 @@ module.exports = {
   detectBun,
   isRunningUnderBun,
   benchmarkStartup,
+  benchmarkFileIO,
+  benchmarkNested,
+  benchmarkHTTPServer,
   clearCache,
   getCachedResult,
   getCachedBunVersion,
