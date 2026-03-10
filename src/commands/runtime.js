@@ -84,8 +84,8 @@ for (const dir of dirs) {
 console.log('Processed', count, 'files');
 `;
   
-  // Write temp script
-  const scriptPath = path.join(cwd, '.bgsd-benchmark-temp.js');
+  // Write temp script (use .cjs extension for CommonJS compatibility)
+  const scriptPath = path.join(cwd, '.bgsd-benchmark-temp.cjs');
   fs.writeFileSync(scriptPath, testScript);
   
   const lines = [];
@@ -123,19 +123,22 @@ console.log('Processed', count, 'files');
     }
   }
   
-  // Cleanup temp script
-  try {
-    fs.unlinkSync(scriptPath);
-  } catch {}
+  // Run benchmark once and reuse results
+  const benchmarkResults = bunStatus.available ? benchmarkStartup(scriptPath, runs) : { node: null, bun: null, speedup: null };
   
   const result = {
     runs: runs,
     bunAvailable: bunStatus.available,
-    node: bunStatus.available ? benchmarkStartup(scriptPath, runs).node : null,
-    bun: bunStatus.available ? benchmarkStartup(scriptPath, runs).bun : null,
-    speedup: bunStatus.available ? benchmarkStartup(scriptPath, runs).speedup : null
+    node: benchmarkResults.node,
+    bun: benchmarkResults.bun,
+    speedup: benchmarkResults.speedup
   };
-  
+
+  // Cleanup temp script after benchmark
+  try {
+    fs.unlinkSync(scriptPath);
+  } catch {}
+
   if (raw) {
     output(result, raw);
   } else {
