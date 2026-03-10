@@ -10,11 +10,11 @@ See: `.planning/PROJECT.md` (updated 2026-03-09)
 ## Current Position
 
 **Phase:** 78 of 81 (File Discovery and Ignore Optimization)
-**Current Plan:** 03
-**Status:** In progress
-**Last Activity:** 2026-03-10 - Completed 78-02 optimized discovery default cutover
+**Current Plan:** Complete (3 of 3)
+**Status:** Phase complete
+**Last Activity:** 2026-03-10 - Completed 78-03 parity evidence and safety controls
 
-**Progress:** [███████░░░] 67%
+**Progress:** [██████████] 100%
 
 ## Performance Metrics
 
@@ -33,6 +33,7 @@ See: `.planning/PROJECT.md` (updated 2026-03-09)
 | Phase 77 P03 | 6 min | 3 tasks | 1 file |
 | Phase 78 P01 | 6 min | 3 tasks | 5 files |
 | Phase 78 P02 | 3 min | 3 tasks | 5 files |
+| Phase 78 P03 | 11 min | 3 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -49,6 +50,8 @@ See: `.planning/PROJECT.md` (updated 2026-03-09)
 - [Phase 77]: Added explicit `bgsd_progress` adapter wiring evidence without direct fallback flag reads in tool code
 - [Phase 78]: Discovery hotspots now route through a dual-path adapter — Enable fast-glob and in-process ignore rollout behind a parity-safe legacy default
 - [Phase 78]: Optimized discovery is now the default runtime path — legacy mode available via BGSD_DISCOVERY_MODE=legacy for diagnosis
+- [Phase 78]: Source-dir detection is fully equivalent between legacy and optimized; file walk filters gitignored files as an intentional improvement
+- [Phase 78]: diagnoseParity() export added for structured mismatch triage with onlyLegacy/onlyOptimized diffs
 
 ### Pending Todos
 
@@ -61,6 +64,6 @@ None yet.
 
 ## Session Continuity
 
-**Last session:** 2026-03-10T02:58:49Z
-**Stopped at:** Completed 78-02-PLAN.md
-**Next step:** Execute `78-03-PLAN.md` for remaining scan optimization work
+**Last session:** 2026-03-10T03:12:39Z
+**Stopped at:** Completed 78-03-PLAN.md — Phase 78 complete
+**Next step:** Plan Phase 79 or verify Phase 78 completion
