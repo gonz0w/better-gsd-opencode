@@ -34926,6 +34926,595 @@ ${BOLD}Results:${RESET}
   }
 });
 
+// src/lib/cli-tools/detector.js
+var require_detector = __commonJS({
+  "src/lib/cli-tools/detector.js"(exports2, module2) {
+    var { execFileSync } = require("child_process");
+    var toolCache = /* @__PURE__ */ new Map();
+    var CACHE_TTL_MS = 5 * 60 * 1e3;
+    var TOOLS = {
+      ripgrep: {
+        name: "ripgrep",
+        aliases: ["rg"],
+        description: "Ultra-fast grep alternative that respects .gitignore"
+      },
+      fd: {
+        name: "fd",
+        aliases: ["fd-find"],
+        description: "Fast find alternative that respects .gitignore"
+      },
+      jq: {
+        name: "jq",
+        aliases: [],
+        description: "Lightweight JSON processor"
+      },
+      yq: {
+        name: "yq",
+        aliases: [],
+        description: "YAML processor"
+      },
+      bat: {
+        name: "bat",
+        aliases: [],
+        description: "Syntax-highlighted cat alternative"
+      },
+      gh: {
+        name: "gh",
+        aliases: [],
+        description: "GitHub CLI"
+      }
+    };
+    function isCacheValid(cached) {
+      if (!cached || !cached.timestamp) return false;
+      return Date.now() - cached.timestamp < CACHE_TTL_MS;
+    }
+    function detectTool(toolName) {
+      const normalizedName = toolName.toLowerCase();
+      const cacheKey = normalizedName;
+      if (toolCache.has(cacheKey)) {
+        const cached = toolCache.get(cacheKey);
+        if (isCacheValid(cached)) {
+          return cached.result;
+        }
+      }
+      let toolConfig = null;
+      let primaryName = normalizedName;
+      for (const [key, config] of Object.entries(TOOLS)) {
+        if (key === normalizedName || config.aliases.includes(normalizedName)) {
+          toolConfig = config;
+          primaryName = key;
+          break;
+        }
+      }
+      if (!toolConfig) {
+        return {
+          available: false,
+          name: toolName,
+          error: "Unknown tool"
+        };
+      }
+      const namesToTry = [toolConfig.name, ...toolConfig.aliases];
+      let result = {
+        available: false,
+        name: primaryName,
+        description: toolConfig.description
+      };
+      for (const binaryName of namesToTry) {
+        try {
+          const path = execFileSync("which", [binaryName], {
+            encoding: "utf8",
+            stdio: ["pipe", "pipe", "pipe"]
+          }).trim();
+          if (path) {
+            result.available = true;
+            result.path = path;
+            try {
+              const version = execFileSync(binaryName, ["--version"], {
+                encoding: "utf8",
+                stdio: ["pipe", "pipe", "pipe"],
+                timeout: 3e3
+              }).trim().split("\n")[0];
+              result.version = version;
+            } catch {
+            }
+            break;
+          }
+        } catch {
+          continue;
+        }
+      }
+      toolCache.set(cacheKey, {
+        result,
+        timestamp: Date.now()
+      });
+      return result;
+    }
+    function getToolStatus() {
+      const status = {};
+      for (const toolName of Object.keys(TOOLS)) {
+        const result = detectTool(toolName);
+        status[toolName] = {
+          available: result.available,
+          path: result.path || null,
+          name: result.name,
+          description: TOOLS[toolName].description,
+          version: result.version || null
+        };
+      }
+      return status;
+    }
+    function clearCache() {
+      toolCache.clear();
+    }
+    module2.exports = {
+      TOOLS,
+      detectTool,
+      getToolStatus,
+      clearCache
+    };
+  }
+});
+
+// src/lib/cli-tools/install-guidance.js
+var require_install_guidance = __commonJS({
+  "src/lib/cli-tools/install-guidance.js"(exports2, module2) {
+    var TOOL_CONFIG = {
+      ripgrep: {
+        name: "ripgrep",
+        aliases: ["rg"],
+        description: "Ultra-fast grep alternative that respects .gitignore",
+        website: "https://github.com/BurntSushi/ripgrep",
+        install: {
+          darwin: "brew install ripgrep",
+          linux: "sudo apt install ripgrep",
+          win32: "winget install BurntSushi.ripgrep.MSVC"
+        },
+        alternatives: "grep (built-in, but slower)"
+      },
+      fd: {
+        name: "fd",
+        aliases: ["fd-find"],
+        description: "Fast find alternative that respects .gitignore",
+        website: "https://github.com/sharkdp/fd",
+        install: {
+          darwin: "brew install fd",
+          linux: "sudo apt install fd-find",
+          win32: "winget install sharkdp.fd"
+        },
+        alternatives: "find (built-in)"
+      },
+      jq: {
+        name: "jq",
+        aliases: [],
+        description: "Lightweight JSON processor",
+        website: "https://jqlang.github.io/jq/",
+        install: {
+          darwin: "brew install jq",
+          linux: "sudo apt install jq",
+          win32: "winget install jqlang.jq"
+        },
+        alternatives: "Node.js JSON transforms"
+      },
+      yq: {
+        name: "yq",
+        aliases: [],
+        description: "YAML processor",
+        website: "https://github.com/mikefarah/yq",
+        install: {
+          darwin: "brew install yq",
+          linux: "sudo apt install yq",
+          win32: "winget install\u9ED1\u5D0E\u4E00\u62A4.yq"
+        },
+        alternatives: "Node.js yaml parser (js-yaml)"
+      },
+      bat: {
+        name: "bat",
+        aliases: [],
+        description: "Syntax-highlighted cat alternative",
+        website: "https://github.com/sharkdp/bat",
+        install: {
+          darwin: "brew install bat",
+          linux: "sudo apt install bat",
+          win32: "winget install sharkdp.bat"
+        },
+        alternatives: "cat (built-in, no highlighting)"
+      },
+      gh: {
+        name: "gh",
+        aliases: [],
+        description: "GitHub CLI",
+        website: "https://cli.github.com/",
+        install: {
+          darwin: "brew install gh",
+          linux: "sudo apt install gh",
+          win32: "winget install GitHub.cli"
+        },
+        alternatives: "GitHub web interface"
+      },
+      bun: {
+        name: "bun",
+        aliases: [],
+        description: "Fast JavaScript runtime",
+        website: "https://bun.sh",
+        install: {
+          darwin: "curl -fsSL https://bun.sh/install | bash",
+          linux: "curl -fsSL https://bun.sh/install | bash",
+          win32: 'powershell -c "irm bun.sh/install.ps1|iex"'
+        },
+        alternatives: "Node.js (built-in)",
+        additionalInstall: {
+          darwin: "brew install oven-sh/bun/bun",
+          linux: "npm install -g bun",
+          win32: "scoop install bun"
+        }
+      }
+    };
+    function getPlatform() {
+      const platform = process.platform;
+      if (platform === "darwin" || platform === "linux" || platform === "win32") {
+        return platform;
+      }
+      return "linux";
+    }
+    function getInstallGuidance(toolName) {
+      const normalizedName = toolName.toLowerCase();
+      let toolConfig = null;
+      for (const [key, config] of Object.entries(TOOL_CONFIG)) {
+        if (key === normalizedName || config.aliases.includes(normalizedName)) {
+          toolConfig = config;
+          break;
+        }
+      }
+      if (!toolConfig) {
+        return null;
+      }
+      const platform = getPlatform();
+      const installCommand = toolConfig.install[platform];
+      return {
+        name: toolConfig.name,
+        description: toolConfig.description,
+        website: toolConfig.website,
+        installCommand,
+        installInstructions: formatInstallInstructions(toolConfig, platform),
+        platform,
+        alternatives: toolConfig.alternatives
+      };
+    }
+    function formatInstallInstructions(toolConfig, platform) {
+      const lines = [];
+      lines.push(`=== ${toolConfig.name} ===`);
+      lines.push(`Description: ${toolConfig.description}`);
+      lines.push(`Website: ${toolConfig.website}`);
+      lines.push("");
+      lines.push("Install:");
+      lines.push(`  ${toolConfig.install[platform]}`);
+      lines.push("");
+      lines.push(`Alternatives: ${toolConfig.alternatives}`);
+      return lines.join("\n");
+    }
+    function getInstallCommand(toolName) {
+      const guidance = getInstallGuidance(toolName);
+      return guidance ? guidance.installCommand : null;
+    }
+    function getAllToolConfig() {
+      return TOOL_CONFIG;
+    }
+    module2.exports = {
+      TOOL_CONFIG,
+      getInstallGuidance,
+      getInstallCommand,
+      getAllToolConfig,
+      getPlatform
+    };
+  }
+});
+
+// src/commands/tools.js
+var require_tools = __commonJS({
+  "src/commands/tools.js"(exports2, module2) {
+    "use strict";
+    var { getToolStatus } = require_detector();
+    var { getInstallGuidance } = require_install_guidance();
+    var { output: output2 } = require_output();
+    function cmdToolsStatus(cwd, raw) {
+      const status = getToolStatus();
+      const available = [];
+      const unavailable = [];
+      for (const [toolName, toolInfo] of Object.entries(status)) {
+        if (toolInfo.available) {
+          available.push({ name: toolName, ...toolInfo });
+        } else {
+          unavailable.push({ name: toolName, ...toolInfo });
+        }
+      }
+      const lines = [];
+      lines.push("=== CLI Tool Status ===");
+      lines.push("");
+      if (available.length > 0) {
+        lines.push("Available:");
+        for (const tool of available) {
+          const version = tool.version ? ` (${tool.version.split("\n")[0]})` : "";
+          lines.push(`  \u2713 ${tool.name.padEnd(8)} ${tool.path || "-".padEnd(20)} ${tool.description}${version}`);
+        }
+        lines.push("");
+      }
+      if (unavailable.length > 0) {
+        lines.push("Unavailable:");
+        for (const tool of unavailable) {
+          const guidance = getInstallGuidance(tool.name);
+          const installCmd = guidance ? guidance.installCommand : "N/A";
+          lines.push(`  \u2717 ${tool.name.padEnd(8)} -`.padEnd(30) + ` ${tool.description}`);
+          lines.push(`                 Install: ${installCmd}`);
+        }
+      }
+      const result = {
+        available: available.map((t) => ({ name: t.name, path: t.path, version: t.version })),
+        unavailable: unavailable.map((t) => ({ name: t.name, installCommand: getInstallGuidance(t.name)?.installCommand })),
+        summary: {
+          total: Object.keys(status).length,
+          availableCount: available.length,
+          unavailableCount: unavailable.length
+        }
+      };
+      if (raw) {
+        output2(result, raw);
+      } else {
+        console.log(lines.join("\n"));
+      }
+    }
+    module2.exports = {
+      cmdToolsStatus
+    };
+  }
+});
+
+// src/lib/cli-tools/bun-runtime.js
+var require_bun_runtime = __commonJS({
+  "src/lib/cli-tools/bun-runtime.js"(exports2, module2) {
+    var { execFileSync } = require("child_process");
+    var sessionCache = /* @__PURE__ */ new Map();
+    function detectBun() {
+      const cacheKey = "bun";
+      if (sessionCache.has(cacheKey)) {
+        return sessionCache.get(cacheKey);
+      }
+      let result = {
+        available: false,
+        name: "bun"
+      };
+      try {
+        const version = execFileSync("bun", ["--version"], {
+          encoding: "utf8",
+          stdio: ["pipe", "pipe", "pipe"],
+          timeout: 3e3
+        }).trim();
+        if (version) {
+          result.available = true;
+          result.version = version;
+          try {
+            const path = execFileSync("which", ["bun"], {
+              encoding: "utf8",
+              stdio: ["pipe", "pipe", "pipe"]
+            }).trim();
+            result.path = path;
+          } catch {
+          }
+          sessionCache.set(cacheKey, result);
+          return result;
+        }
+      } catch {
+      }
+      try {
+        const path = execFileSync("which", ["bun"], {
+          encoding: "utf8",
+          stdio: ["pipe", "pipe", "pipe"]
+        }).trim();
+        if (path) {
+          result.available = true;
+          result.path = path;
+        }
+      } catch {
+      }
+      sessionCache.set(cacheKey, result);
+      return result;
+    }
+    function isRunningUnderBun() {
+      if (process.versions && process.versions.bun) {
+        return { isBun: true, version: process.versions.bun };
+      }
+      try {
+        if (typeof Bun !== "undefined") {
+          return { isBun: true, version: Bun.version };
+        }
+      } catch {
+      }
+      try {
+        if (globalThis && "Bun" in globalThis) {
+          return { isBun: true, version: globalThis.Bun?.version };
+        }
+      } catch {
+      }
+      return { isBun: false };
+    }
+    function benchmarkStartup(scriptPath, runs = 10) {
+      const results = {
+        node: [],
+        bun: []
+      };
+      for (let i = 0; i < runs; i++) {
+        const start = Date.now();
+        try {
+          execFileSync("node", [scriptPath], {
+            stdio: "pipe",
+            timeout: 5e3
+          });
+          results.node.push(Date.now() - start);
+        } catch {
+        }
+      }
+      const bunStatus = detectBun();
+      if (bunStatus.available) {
+        for (let i = 0; i < runs; i++) {
+          const start = Date.now();
+          try {
+            execFileSync("bun", [scriptPath], {
+              stdio: "pipe",
+              timeout: 5e3
+            });
+            results.bun.push(Date.now() - start);
+          } catch {
+          }
+        }
+      }
+      const avgNode = results.node.length > 0 ? results.node.reduce((a, b) => a + b, 0) / results.node.length : 0;
+      const avgBun = results.bun.length > 0 ? results.bun.reduce((a, b) => a + b, 0) / results.bun.length : 0;
+      const speedup = avgBun > 0 ? avgNode / avgBun : 0;
+      return {
+        node: parseFloat(avgNode.toFixed(2)),
+        bun: parseFloat(avgBun.toFixed(2)),
+        speedup: parseFloat(speedup.toFixed(2)),
+        nodeRuns: results.node.length,
+        bunRuns: results.bun.length
+      };
+    }
+    function clearCache() {
+      sessionCache.clear();
+    }
+    function getCachedResult() {
+      return sessionCache.get("bun") || null;
+    }
+    module2.exports = {
+      detectBun,
+      isRunningUnderBun,
+      benchmarkStartup,
+      clearCache,
+      getCachedResult
+    };
+  }
+});
+
+// src/commands/runtime.js
+var require_runtime = __commonJS({
+  "src/commands/runtime.js"(exports2, module2) {
+    "use strict";
+    var path = require("path");
+    var fs = require("fs");
+    var { detectBun, isRunningUnderBun, benchmarkStartup } = require_bun_runtime();
+    var { getInstallGuidance } = require_install_guidance();
+    var { output: output2 } = require_output();
+    function cmdRuntimeStatus(cwd, raw) {
+      const bunStatus = detectBun();
+      const runningUnder = isRunningUnderBun();
+      const lines = [];
+      lines.push("=== Bun Runtime Status ===");
+      lines.push("");
+      if (bunStatus.available) {
+        lines.push("Status: Available \u2713");
+        lines.push(`Version: ${bunStatus.version || "unknown"}`);
+        lines.push(`Path: ${bunStatus.path || "unknown"}`);
+        lines.push("Bun is ready to use");
+      } else {
+        lines.push("Status: Not available \u2717");
+        lines.push("");
+        const guidance = getInstallGuidance("bun");
+        if (guidance) {
+          lines.push("Install Instructions:");
+          lines.push(`  ${guidance.installCommand}`);
+          lines.push("");
+          lines.push(`Alternatives: ${guidance.alternatives}`);
+        }
+      }
+      if (runningUnder.isBun) {
+        lines.push("");
+        lines.push(`Currently running under Bun v${runningUnder.version}`);
+      }
+      const result = {
+        available: bunStatus.available,
+        version: bunStatus.version || null,
+        path: bunStatus.path || null,
+        runningUnderBun: runningUnder.isBun,
+        runningVersion: runningUnder.version || null,
+        installCommand: bunStatus.available ? null : getInstallGuidance("bun")?.installCommand
+      };
+      if (raw) {
+        output2(result, raw);
+      } else {
+        console.log(lines.join("\n"));
+      }
+    }
+    function cmdRuntimeBenchmark(cwd, raw, args = {}) {
+      const runs = args.runs || 10;
+      const testScript = `
+const fs = require('fs');
+const path = require('path');
+const { execSync } = require('child_process');
+// Simple workload - read a few files
+const dirs = ['src/lib', 'src/commands', 'bin'];
+let count = 0;
+for (const dir of dirs) {
+  try {
+    const files = fs.readdirSync(dir);
+    for (const f of files) {
+      if (f.endsWith('.js')) count++;
+    }
+  } catch {}
+}
+console.log('Processed', count, 'files');
+`;
+      const scriptPath = path.join(cwd, ".bgsd-benchmark-temp.js");
+      fs.writeFileSync(scriptPath, testScript);
+      const lines = [];
+      lines.push("=== Runtime Benchmark ===");
+      lines.push("");
+      lines.push(`Running ${runs} iterations...`);
+      lines.push("");
+      const bunStatus = detectBun();
+      if (!bunStatus.available) {
+        lines.push("Bun is not available. Install Bun to run benchmark.");
+        lines.push("");
+        const guidance = getInstallGuidance("bun");
+        if (guidance) {
+          lines.push(`Install: ${guidance.installCommand}`);
+        }
+      } else {
+        const results = benchmarkStartup(scriptPath, runs);
+        lines.push(`Node.js: ${results.node}ms (${results.nodeRuns} successful runs)`);
+        lines.push(`Bun: ${results.bun}ms (${results.bunRuns} successful runs)`);
+        lines.push("");
+        if (results.node > 0 && results.bun > 0) {
+          if (results.speedup >= 1) {
+            lines.push(`Bun is ${results.speedup}x faster than Node.js`);
+          } else {
+            lines.push(`Node.js is ${(1 / results.speedup).toFixed(2)}x faster than Bun`);
+          }
+        } else if (results.node > 0 && results.bun === 0) {
+          lines.push("Bun runs failed - cannot compare");
+        }
+      }
+      try {
+        fs.unlinkSync(scriptPath);
+      } catch {
+      }
+      const result = {
+        runs,
+        bunAvailable: bunStatus.available,
+        node: bunStatus.available ? benchmarkStartup(scriptPath, runs).node : null,
+        bun: bunStatus.available ? benchmarkStartup(scriptPath, runs).bun : null,
+        speedup: bunStatus.available ? benchmarkStartup(scriptPath, runs).speedup : null
+      };
+      if (raw) {
+        output2(result, raw);
+      } else {
+        console.log(lines.join("\n"));
+      }
+    }
+    module2.exports = {
+      cmdRuntimeStatus,
+      cmdRuntimeBenchmark
+    };
+  }
+});
+
 // src/router.js
 var require_router = __commonJS({
   "src/router.js"(exports2, module2) {
@@ -34994,6 +35583,12 @@ var require_router = __commonJS({
     }
     function lazyResearch() {
       return _modules.research || (_modules.research = require_research());
+    }
+    function lazyTools() {
+      return _modules.tools || (_modules.tools = require_tools());
+    }
+    function lazyRuntime() {
+      return _modules.runtime || (_modules.runtime = require_runtime());
     }
     async function main2() {
       const args = process.argv.slice(2);
@@ -35812,8 +36407,19 @@ Examples:
               } else {
                 error(`Unknown profiler subcommand: ${profSub}. Available: compare, cache-speedup`);
               }
+            } else if (subcommand === "tools") {
+              lazyTools().cmdToolsStatus(cwd, raw);
+            } else if (subcommand === "runtime") {
+              const runtimeSub = restArgs[0];
+              if (runtimeSub === "benchmark") {
+                const runsIdx = restArgs.indexOf("--runs");
+                const runs = runsIdx !== -1 ? parseInt(restArgs[runsIdx + 1], 10) : 10;
+                lazyRuntime().cmdRuntimeBenchmark(cwd, raw, { runs });
+              } else {
+                lazyRuntime().cmdRuntimeStatus(cwd, raw);
+              }
             } else {
-              error(`Unknown util subcommand: ${subcommand}. Available: config-get, config-set, env, current-timestamp, list-todos, todo, memory, mcp, classify, frontmatter, progress, websearch, history-digest, trace-requirement, codebase, cache, agent, resolve-model, template, generate-slug, verify-path-exists, config-ensure-section, config-migrate, scaffold, phase-plan-index, state-snapshot, summary-extract, quick-summary, extract-sections, git, profiler`);
+              error(`Unknown util subcommand: ${subcommand}. Available: config-get, config-set, env, current-timestamp, list-todos, todo, memory, mcp, classify, frontmatter, progress, websearch, history-digest, trace-requirement, codebase, cache, agent, resolve-model, template, generate-slug, verify-path-exists, config-ensure-section, config-migrate, scaffold, phase-plan-index, state-snapshot, summary-extract, quick-summary, extract-sections, git, profiler, tools, runtime`);
             }
             break;
           }
@@ -35860,6 +36466,17 @@ Examples:
           // Unknown namespace
           default:
             error(`Unknown namespace: ${namespace}. Available namespaces: init, plan, execute, verify, util, research, cache`);
+        }
+        return;
+      }
+      if (command === "runtime") {
+        const runtimeSub = remainingArgs[0];
+        if (runtimeSub === "benchmark") {
+          const runsIdx = remainingArgs.indexOf("--runs");
+          const runs = runsIdx !== -1 ? parseInt(remainingArgs[runsIdx + 1], 10) : 10;
+          lazyRuntime().cmdRuntimeBenchmark(cwd, raw, { runs });
+        } else {
+          lazyRuntime().cmdRuntimeStatus(cwd, raw);
         }
         return;
       }

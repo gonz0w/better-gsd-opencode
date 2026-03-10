@@ -15512,7 +15512,7 @@ var bgsd_status = {
           message: parsedArgs.error.message
         });
       }
-      const projectDir = context.directory || process.cwd();
+      const projectDir = context?.directory || process.cwd();
       const projectState = getProjectState(projectDir);
       if (!projectState) {
         return JSON.stringify({
@@ -15596,7 +15596,7 @@ var bgsd_plan = {
           message: parsedArgs.error.message
         });
       }
-      const projectDir = context.directory || process.cwd();
+      const projectDir = context?.directory || process.cwd();
       const projectState = getProjectState(projectDir);
       if (!projectState) {
         return JSON.stringify({
@@ -15683,7 +15683,7 @@ var bgsd_context = {
           message: parsedArgs.error.message
         });
       }
-      const projectDir = context.directory || process.cwd();
+      const projectDir = context?.directory || process.cwd();
       const projectState = getProjectState(projectDir);
       if (!projectState) {
         return JSON.stringify({
@@ -15757,7 +15757,7 @@ var bgsd_validate = {
           message: parsedArgs.error.message
         });
       }
-      const projectDir = context.directory || process.cwd();
+      const projectDir = context?.directory || process.cwd();
       const projectState = getProjectState(projectDir);
       if (!projectState) {
         return JSON.stringify({
@@ -15934,7 +15934,7 @@ var bgsd_progress = {
     }
   },
   async execute(args, context) {
-    const projectDir = context.directory || process.cwd();
+    const projectDir = context?.directory || process.cwd();
     const lockDir = join10(projectDir, ".planning", ".lock");
     try {
       const parsedArgs = validateArgs("bgsd_progress", PROGRESS_ARGS_SCHEMA, args);

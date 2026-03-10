@@ -1,6 +1,6 @@
 **Revision:** 12
 **Created:** 2026-02-25
-**Updated:** 2026-03-09
+**Updated:** 2026-03-10
 
 <objective>
 An intelligent agent orchestration engine for building large-scale software with a deeply embedded plugin experience. This milestone emphasizes rigorous performance benchmarking against modern OpenCode plugins, targeted latency reduction, and selective adoption of dependencies/new technology where measurable speed gains justify complexity.
@@ -31,6 +31,9 @@ An intelligent agent orchestration engine for building large-scale software with
 - DO-43 [P2]: Advisory guardrails catch convention violations and suggest test runs via tool interception — graduating to blocks for critical safety
 - DO-44 [P2]: Phase transitions, milestone completion, and stuck detection trigger visible notifications
 - DO-45 [P1]: Compaction preserves full project context (decisions, blockers, current task, intent) — not just STATE.md
+- DO-46 [P1]: CLI tool integrations operational — ripgrep, fd, fzf, bat, gh, lazygit, jq, yq available and discoverable
+- DO-47 [P1]: Bun runtime validated — 3-5x startup improvement demonstrated with backward compatibility
+- DO-48 [P2]: Plugin benchmark adapter built — cross-plugin comparison framework operational
 </outcomes>
 
 <criteria>
@@ -79,6 +82,10 @@ Orchestration should feel invisible — the right agent gets the right task with
 </health>
 
 <history>
+### v9.2 — 2026-03-10
+- **Added** outcomes: DO-46 (CLI tool integrations), DO-47 (Bun runtime), DO-48 (plugin benchmark adapter).
+  - Reason: Milestone v9.2: CLI Tool Integrations & Runtime Modernization
+
 ### v9.0 — 2026-03-09
 - **Modified** objective: Added deeply embedded editor experience through plugin hooks as a first-class architectural concern.
   - Reason: Milestone v9.0: Plugin is the primary integration surface for UX

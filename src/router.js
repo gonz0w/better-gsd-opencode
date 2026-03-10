@@ -37,6 +37,8 @@ function lazyCache() { return _modules.cache || (_modules.cache = require('./com
 function lazyAgent() { return _modules.agent || (_modules.agent = require('./commands/agent')); }
 function lazyProfiler() { return _modules.profiler || (_modules.profiler = require('./commands/profiler')); }
 function lazyResearch() { return _modules.research || (_modules.research = require('./commands/research')); }
+function lazyTools() { return _modules.tools || (_modules.tools = require('./commands/tools')); }
+function lazyRuntime() { return _modules.runtime || (_modules.runtime = require('./commands/runtime')); }
 
 
 async function main() {
@@ -886,8 +888,19 @@ Examples:
           } else {
             error(`Unknown profiler subcommand: ${profSub}. Available: compare, cache-speedup`);
           }
+        } else if (subcommand === 'tools') {
+          lazyTools().cmdToolsStatus(cwd, raw);
+        } else if (subcommand === 'runtime') {
+          const runtimeSub = restArgs[0];
+          if (runtimeSub === 'benchmark') {
+            const runsIdx = restArgs.indexOf('--runs');
+            const runs = runsIdx !== -1 ? parseInt(restArgs[runsIdx + 1], 10) : 10;
+            lazyRuntime().cmdRuntimeBenchmark(cwd, raw, { runs });
+          } else {
+            lazyRuntime().cmdRuntimeStatus(cwd, raw);
+          }
         } else {
-          error(`Unknown util subcommand: ${subcommand}. Available: config-get, config-set, env, current-timestamp, list-todos, todo, memory, mcp, classify, frontmatter, progress, websearch, history-digest, trace-requirement, codebase, cache, agent, resolve-model, template, generate-slug, verify-path-exists, config-ensure-section, config-migrate, scaffold, phase-plan-index, state-snapshot, summary-extract, quick-summary, extract-sections, git, profiler`);
+          error(`Unknown util subcommand: ${subcommand}. Available: config-get, config-set, env, current-timestamp, list-todos, todo, memory, mcp, classify, frontmatter, progress, websearch, history-digest, trace-requirement, codebase, cache, agent, resolve-model, template, generate-slug, verify-path-exists, config-ensure-section, config-migrate, scaffold, phase-plan-index, state-snapshot, summary-extract, quick-summary, extract-sections, git, profiler, tools, runtime`);
         }
         break;
       }
@@ -939,6 +952,19 @@ Examples:
         error(`Unknown namespace: ${namespace}. Available namespaces: init, plan, execute, verify, util, research, cache`);
     }
     return; // Exit after handling namespaced command
+  }
+
+  // Standalone commands (no namespace prefix)
+  if (command === 'runtime') {
+    const runtimeSub = remainingArgs[0];
+    if (runtimeSub === 'benchmark') {
+      const runsIdx = remainingArgs.indexOf('--runs');
+      const runs = runsIdx !== -1 ? parseInt(remainingArgs[runsIdx + 1], 10) : 10;
+      lazyRuntime().cmdRuntimeBenchmark(cwd, raw, { runs });
+    } else {
+      lazyRuntime().cmdRuntimeStatus(cwd, raw);
+    }
+    return;
   }
 
   // No command matched any namespace — unknown

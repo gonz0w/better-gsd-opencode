@@ -38,7 +38,7 @@ export const bgsd_context = {
         });
       }
 
-      const projectDir = context.directory || process.cwd();
+      const projectDir = context?.directory || process.cwd();
       const projectState = getProjectState(projectDir);
 
       if (!projectState) {
