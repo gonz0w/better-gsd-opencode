@@ -2,7 +2,7 @@
 
 A structured project planning and execution system for [OpenCode](https://github.com/opencode-ai/opencode). bGSD turns AI-assisted coding from ad-hoc prompting into milestone-driven development with planning, execution, verification, and memory that persists across sessions.
 
-**762 tests** | **Zero runtime dependencies** | **41 slash commands** | **100+ CLI operations** | **10 specialized AI agents** | **11 milestones shipped**
+**762 tests** | **Zero runtime dependencies** | **11 slash commands** | **100+ CLI operations** | **10 specialized AI agents** | **v9.3 milestone shipped**
 
 > **Note:** bGSD creates a `~/.config/oc` symlink pointing to `~/.config/opencode` to work around a path mangling issue in the Anthropic auth module. This is created automatically during installation.
 
