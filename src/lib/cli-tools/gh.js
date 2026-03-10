@@ -215,7 +215,8 @@ function checkAuth(options = {}) {
       
       // Parse auth status - check for logged in indicator
       // gh auth status returns "Logged in to github.com as user..." on success
-      const isLoggedIn = output.includes('Logged in to') && output.includes('.github.com');
+      // Use regex to match the specific format and prevent arbitrary URL matches
+      const isLoggedIn = /^Logged in to github\.com as\b/m.test(output);
       return { authenticated: isLoggedIn, status: output.trim() };
     },
     () => {
