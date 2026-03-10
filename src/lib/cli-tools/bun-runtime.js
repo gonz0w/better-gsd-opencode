@@ -95,12 +95,18 @@ function configSet(keyPath, value) {
   let current = config;
   for (let i = 0; i < keys.length - 1; i++) {
     const key = keys[i];
+    if (Object.prototype.hasOwnProperty.call(Object.prototype, key)) {
+      continue;
+    }
     if (current[key] === undefined || typeof current[key] !== 'object') {
       current[key] = {};
     }
     current = current[key];
   }
-  current[keys[keys.length - 1]] = value;
+  const lastKey = keys[keys.length - 1];
+  if (!Object.prototype.hasOwnProperty.call(Object.prototype, lastKey)) {
+    current[lastKey] = value;
+  }
   return writeConfig(config);
 }
 

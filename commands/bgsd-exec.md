@@ -5,13 +5,13 @@ description: Group command for execution operations - phase, quick, ci
 Router command that delegates to specific execution workflows based on first argument.
 
 **Usage:**
-- /bgsd exec phase [phase] → bgsd-execute-phase
-- /bgsd exec quick → bgsd-quick
-- /bgsd exec ci → bgsd-github-ci
+- /bgsd exec phase [phase] → execute-phase
+- /bgsd exec quick → quick
+- /bgsd exec ci → github-ci
 </objective>
 
 <execution_context>
-Routes to: bgsd-execute-phase, bgsd-quick, bgsd-github-ci
+Routes to: execute-phase, quick, github-ci
 </execution_context>
 
 <context>
@@ -22,9 +22,9 @@ $ARGUMENTS: First word is subcommand, rest are passed to target
 Parse first argument to determine target command, then route.
 
 Subcommands:
-- phase → bgsd-execute-phase
-- quick → bgsd-quick
-- ci → bgsd-github-ci
+- phase → execute-phase
+- quick → quick
+- ci → github-ci
 
 Route all arguments to the target command unchanged.
 </process>

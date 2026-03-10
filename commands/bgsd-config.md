@@ -5,14 +5,14 @@ description: Group command for configuration operations - settings, profile, val
 Router command that delegates to specific config workflows based on first argument.
 
 **Usage:**
-- /bgsd config → bgsd-settings
-- /bgsd config settings → bgsd-settings
-- /bgsd config profile → bgsd-set-profile
-- /bgsd config validate → bgsd-validate-config
+- /bgsd config → settings
+- /bgsd config settings → settings
+- /bgsd config profile → set-profile
+- /bgsd config validate → cmd-validate-config
 </objective>
 
 <execution_context>
-Routes to: bgsd-settings, bgsd-set-profile, bgsd-validate-config
+Routes to: settings, set-profile, cmd-validate-config
 </execution_context>
 
 <context>
@@ -23,11 +23,11 @@ $ARGUMENTS: First word is subcommand, rest are passed to target
 Parse first argument to determine target command, then route.
 
 Subcommands:
-- settings → bgsd-settings
-- profile → bgsd-set-profile
-- validate → bgsd-validate-config
+- settings → settings
+- profile → set-profile
+- validate → cmd-validate-config
 
-If no subcommand provided, default to bgsd-settings.
+If no subcommand provided, default to settings.
 
 Route all arguments to the target command unchanged.
 </process>

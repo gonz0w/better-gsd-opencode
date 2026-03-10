@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, statSync, appendFileSync, copyFileSync, writeFileSync, openSync, ftruncateSync, closeSync } from 'fs';
+import { existsSync, mkdirSync, statSync, fstatSync, appendFileSync, copyFileSync, writeFileSync, openSync, ftruncateSync, closeSync } from 'fs';
 import { join } from 'path';
 import { randomBytes } from 'crypto';
 
@@ -34,7 +34,8 @@ export function createLogger(logDir) {
 
   function rotate() {
     try {
-      const stat = statSync(logPath);
+      const fd = openSync(logPath, 'r+');
+      const stat = fstatSync(fd);
       if (stat.size >= MAX_LOG_SIZE) {
         try {
           copyFileSync(logPath, rotatedPath);
@@ -42,15 +43,14 @@ export function createLogger(logDir) {
           // Concurrent copy - ignore
         }
         try {
-          const fd = openSync(logPath, 'r+');
           ftruncateSync(fd, 0);
-          closeSync(fd);
         } catch {
-          // File might not exist or be locked - ignore
+          // Truncate failed - ignore
         }
       }
+      closeSync(fd);
     } catch {
-      // File doesn't exist yet or can't stat — no rotation needed
+      // File doesn't exist or can't open - no rotation needed
     }
   }
 

@@ -133,10 +133,6 @@ These commands are not part of the subcommand groups:
 | `/bgsd health` | Project health check |
 | `/bgsd verify-work [phase]` | Conversational UAT — extract testable deliverables |
 
-## Backward Compatibility
-
-The old individual commands are deprecated but still accessible during the transition period. Use the new subcommand structure for better organization.
-
 ## Files & Structure
 
 ```

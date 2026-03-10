@@ -22,7 +22,7 @@
   - [x] 89-02: Backward compatibility and bundle size validation
   - [x] 89-03: Runtime banner fix for forced Node.js
   - [x] 89-04: Gap closure - extended benchmark with realistic workloads
-- [ ] **Phase 90: Benchmark** - Plugin adapter, baseline metrics
+- [x] **Phase 90: Benchmark** - Plugin adapter, baseline metrics (completed 2026-03-10)
 
 ## Phase Details
 
@@ -93,7 +93,7 @@ Plans:
   1. Plugin benchmark adapter built for cross-plugin comparison
   2. Baseline metrics captured for v9.3
   3. Benchmark can measure startup time, command execution, context loading
-**Plans**: 1/1 plan complete
+**Plans**: 1/1 plans complete
 
 Plans:
 - [x] 90-01: Benchmark adapter and baseline capture
@@ -106,9 +106,9 @@ Plans:
 | 87. Command Consolidation | 3/3 | Complete    | 2026-03-10 | - |
 | 88. Quality & Context | 1/2 | In Progress|  | - |
 | 89. Runtime Bun Migration | v9.3 | Complete    | 2026-03-10 | - |
-| 90. Benchmark | v9.3 | 1/1 | Complete | 2026-03-10 |
+| 90. Benchmark | v9.3 | Complete    | 2026-03-10 | 2026-03-10 |
 
 ---
 
 *Roadmap created: 2026-03-10*
-*Ready for planning: /bgsd-plan-phase*
+*Ready for planning: /bgsd plan phase*

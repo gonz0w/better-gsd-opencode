@@ -16,7 +16,7 @@
 - Added event-driven sync features: idle validation auto-fix, `.planning/` file watcher cache invalidation, and stuck/loop notifications
 - Added advisory guardrails with 27-test coverage and bug fixes for path filtering and guard condition precedence
 
-**What's next:** Ready for next milestone — `/bgsd-new-milestone`
+**What's next:** Ready for next milestone — `/bgsd milestone new`
 
 **Archives:**
 - `.planning/milestones/v9.0-ROADMAP.md`
@@ -42,7 +42,7 @@
 - Added pre-commit test gate to executor workflow for zero tolerance on test regressions
 - All 17/17 requirements delivered, 0 new test failures introduced
 
-**What's next:** Ready for next milestone — `/bgsd-new-milestone`
+**What's next:** Ready for next milestone — `/bgsd milestone new`
 
 **Archives:**
 - `.planning/milestones/v8.3-ROADMAP.md`
@@ -68,7 +68,7 @@
 - Created RACI matrix (23 lifecycle steps, 12 handoff contracts) validating clean separation across all 9 agents — zero merge candidates
 - All 22 requirements delivered, 0 new test failures introduced
 
-**What's next:** Ready for next milestone — `/bgsd-new-milestone`
+**What's next:** Ready for next milestone — `/bgsd milestone new`
 
 **Archives:**
 - `.planning/milestones/v8.2-ROADMAP.md`

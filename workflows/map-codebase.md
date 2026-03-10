@@ -273,7 +273,7 @@ Created .planning/codebase/:
 
 **Initialize project** — use codebase context for planning
 
-`/bgsd-new-project`
+`/bgsd plan project`
 
 <sub>`/clear` first → fresh context window</sub>
 

@@ -25,11 +25,11 @@ Manage and deliver high-quality software with high-quality documentation, while 
 
 ## Next Milestone Goals
 
-- TBD — Run `/bgsd-new-milestone` to define next goals
+- TBD — Run `/bgsd milestone new` to define next goals
 
 ## No Active Milestone
 
-> Roadmap cleared. Run `/bgsd-new-milestone` to start a new planning cycle.
+> Roadmap cleared. Run `/bgsd milestone new` to start a new planning cycle.
 
 <details>
 <summary>Previous: v9.2 CLI Tool Integrations & Runtime Modernization (shipped 2026-03-10)</summary>

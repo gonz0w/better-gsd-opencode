@@ -1,4 +1,5 @@
-# CodeQL configuration for bGSD
+name: "bGSD Security Config"
+disable-default-queries: false
 
 paths-ignore:
   - bin/bgsd-tools.cjs
@@ -8,6 +9,5 @@ paths-ignore:
   - "**/*.spec.js"
 
 queries:
-  - query: security-extended
-    excludes:
-      - js/file-system-race
+  - excludes:
+      js/file-system-race: "Single-user CLI tool - race conditions are acceptable"

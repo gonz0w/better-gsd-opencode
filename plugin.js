@@ -671,7 +671,7 @@ import { join as join2 } from "path";
 import { randomBytes as randomBytes2 } from "crypto";
 
 // src/plugin/logger.js
-import { existsSync, mkdirSync, statSync, appendFileSync, copyFileSync, writeFileSync, openSync, ftruncateSync, closeSync } from "fs";
+import { existsSync, mkdirSync, statSync, fstatSync, appendFileSync, copyFileSync, writeFileSync, openSync, ftruncateSync, closeSync } from "fs";
 import { join } from "path";
 import { randomBytes } from "crypto";
 var MAX_LOG_SIZE = 512 * 1024;
@@ -688,16 +688,19 @@ function createLogger(logDir) {
   }
   function rotate() {
     try {
-      const stat = statSync(logPath);
+      const fd = openSync(logPath, "r+");
+      const stat = fstatSync(fd);
       if (stat.size >= MAX_LOG_SIZE) {
         try {
           copyFileSync(logPath, rotatedPath);
-          const fd = openSync(logPath, "r+");
+        } catch {
+        }
+        try {
           ftruncateSync(fd, 0);
-          closeSync(fd);
         } catch {
         }
       }
+      closeSync(fd);
     } catch {
     }
   }

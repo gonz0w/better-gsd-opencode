@@ -5,26 +5,26 @@ description: Group command for utility operations - map, cleanup, help, update, 
 Router command that delegates to specific utility workflows based on first argument.
 
 **Usage:**
-- /bgsd util map → bgsd-map-codebase
-- /bgsd util cleanup → bgsd-cleanup
-- /bgsd util help → bgsd-help
-- /bgsd util update → bgsd-update
-- /bgsd util velocity → bgsd-velocity
-- /bgsd util validate-deps → bgsd-validate-deps
-- /bgsd util test-run → bgsd-test-run
-- /bgsd util trace [req] → bgsd-trace-requirement
-- /bgsd util search-decisions [query] → bgsd-search-decisions
-- /bgsd util search-lessons [query] → bgsd-search-lessons
-- /bgsd util session-diff → bgsd-session-diff
-- /bgsd util rollback-info → bgsd-rollback-info
-- /bgsd util context-budget → bgsd-context-budget
-- /bgsd util impact → bgsd-codebase-impact
-- /bgsd util patches → bgsd-reapply-patches
-- /bgsd util health → bgsd-health
+- /bgsd util map → map-codebase
+- /bgsd util cleanup → cleanup
+- /bgsd util help → help
+- /bgsd util update → update
+- /bgsd util velocity → cmd-velocity
+- /bgsd util validate-deps → cmd-validate-deps
+- /bgsd util test-run → cmd-test-run
+- /bgsd util trace [req] → cmd-trace-requirement
+- /bgsd util search-decisions [query] → cmd-search-decisions
+- /bgsd util search-lessons [query] → cmd-search-lessons
+- /bgsd util session-diff → cmd-session-diff
+- /bgsd util rollback-info → cmd-rollback-info
+- /bgsd util context-budget → cmd-context-budget
+- /bgsd util impact → cmd-codebase-impact
+- /bgsd util patches → cleanup
+- /bgsd util health → health
 </objective>
 
 <execution_context>
-Routes to: bgsd-map-codebase, bgsd-cleanup, bgsd-help, bgsd-update, bgsd-velocity, bgsd-validate-deps, bgsd-test-run, bgsd-trace-requirement, bgsd-search-decisions, bgsd-search-lessons, bgsd-session-diff, bgsd-rollback-info, bgsd-context-budget, bgsd-codebase-impact, bgsd-reapply-patches, bgsd-health
+Routes to: map-codebase, cleanup, help, update, cmd-velocity, cmd-validate-deps, cmd-test-run, cmd-trace-requirement, cmd-search-decisions, cmd-search-lessons, cmd-session-diff, cmd-rollback-info, cmd-context-budget, cmd-codebase-impact, health
 </execution_context>
 
 <context>
@@ -35,22 +35,22 @@ $ARGUMENTS: First word is subcommand, rest are passed to target
 Parse first argument to determine target command, then route.
 
 Subcommands:
-- map → bgsd-map-codebase
-- cleanup → bgsd-cleanup
-- help → bgsd-help
-- update → bgsd-update
-- velocity → bgsd-velocity
-- validate-deps → bgsd-validate-deps
-- test-run → bgsd-test-run
-- trace → bgsd-trace-requirement
-- search-decisions → bgsd-search-decisions
-- search-lessons → bgsd-search-lessons
-- session-diff → bgsd-session-diff
-- rollback-info → bgsd-rollback-info
-- context-budget → bgsd-context-budget
-- impact → bgsd-codebase-impact
-- patches → bgsd-reapply-patches
-- health → bgsd-health
+- map → map-codebase
+- cleanup → cleanup
+- help → help
+- update → update
+- velocity → cmd-velocity
+- validate-deps → cmd-validate-deps
+- test-run → cmd-test-run
+- trace → cmd-trace-requirement
+- search-decisions → cmd-search-decisions
+- search-lessons → cmd-search-lessons
+- session-diff → cmd-session-diff
+- rollback-info → cmd-rollback-info
+- context-budget → cmd-context-budget
+- impact → cmd-codebase-impact
+- patches → cleanup
+- health → health
 
 Route all arguments to the target command unchanged.
 </process>
