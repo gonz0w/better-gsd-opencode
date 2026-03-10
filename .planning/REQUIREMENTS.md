@@ -10,8 +10,8 @@ Requirements for v9.1 Performance Acceleration & Plugin Benchmarking milestone (
 ### Validation Engine Modernization
 
 - [ ] **VALD-01**: User can run plugin tools with lower schema-validation overhead by replacing Zod hot-path usage with a lighter validator engine.
-- [ ] **VALD-02**: User receives identical tool behavior and output contracts after validator migration.
-- [ ] **VALD-03**: Maintainer can enable fallback to legacy validation path if compatibility issues appear.
+- [x] **VALD-02**: User receives identical tool behavior and output contracts after validator migration.
+- [x] **VALD-03**: Maintainer can enable fallback to legacy validation path if compatibility issues appear.
 
 ### File Discovery and Ignore Optimization
 
@@ -51,8 +51,8 @@ Requirements for v9.1 Performance Acceleration & Plugin Benchmarking milestone (
 | Requirement | Phase | Status | Test Command |
 |-------------|-------|--------|--------------|
 | VALD-01 | Phase 77 | Pending | npm test |
-| VALD-02 | Phase 77 | Pending | npm test |
-| VALD-03 | Phase 77 | Pending | npm test |
+| VALD-02 | Phase 77 | Complete | npm test |
+| VALD-03 | Phase 77 | Complete | npm test |
 | SCAN-01 | Phase 78 | Pending | npm test |
 | SCAN-02 | Phase 78 | Pending | npm test |
 | SCAN-03 | Phase 78 | Pending | npm test |
