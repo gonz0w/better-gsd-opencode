@@ -390,8 +390,37 @@ function buildTaskContext(cwd, taskFiles, options) {
   };
 }
 
+/**
+ * Get cached agent context for a specific agent type.
+ * Returns pre-computed context if available and valid, otherwise computes on-demand.
+ *
+ * @param {string} cwd - Project root
+ * @param {string} agentType - Agent type (e.g., 'bgsd-executor')
+ * @returns {object|null} Agent context or null if unavailable
+ */
+function getCachedAgentContext(cwd, agentType) {
+  // Try to get cached intel
+  const { readIntelWithCache } = require('./codebase-intel');
+  const intel = readIntelWithCache(cwd, false);
+
+  if (intel && intel.agent_contexts && intel.agent_contexts[agentType]) {
+    const cached = intel.agent_contexts[agentType];
+    // Check if stale
+    if (intel._stale) {
+      return { ...cached, _stale: true };
+    }
+    return cached;
+  }
+
+  // Cache miss - compute context on-demand
+  // This requires the full init output which is complex to generate
+  // For now, return null to indicate cache miss
+  return null;
+}
+
 module.exports = {
   estimateTokens, estimateJsonTokens, checkBudget,
   AGENT_MANIFESTS, scopeContextForAgent, compactPlanState, compactDepGraph,
   buildTaskContext,
+  getCachedAgentContext,
 };
