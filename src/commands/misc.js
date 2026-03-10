@@ -1594,6 +1594,65 @@ function cmdReview(cwd, args, raw) {
   }, raw);
 }
 
+function cmdSettingsList(cwd, raw) {
+  const { loadConfig } = require('../lib/config');
+  const { CONFIG_SCHEMA } = require('../lib/constants');
+  
+  const config = loadConfig(cwd);
+  
+  // Build output with all config keys including optimization flags
+  const outputLines = [];
+  outputLines.push('=== bGSD Settings ===');
+  outputLines.push('');
+  
+  // Group keys by category
+  const categories = {
+    'General': ['model_profile', 'mode', 'depth', 'commit_docs', 'test_gate', 'context_window', 'context_target_percent'],
+    'Workflow': ['research', 'plan_checker', 'verifier', 'parallelization', 'brave_search'],
+    'Git': ['branching_strategy', 'phase_branch_template', 'milestone_branch_template'],
+    'Research': ['rag_enabled', 'rag_timeout', 'ytdlp_path', 'nlm_path', 'mcp_config_path'],
+    'Optimization': ['optimization_valibot', 'optimization_valibot_fallback', 'optimization_discovery', 'optimization_compile_cache', 'optimization_sqlite_cache'],
+  };
+  
+  for (const [category, keys] of Object.entries(categories)) {
+    outputLines.push(`--- ${category} ---`);
+    for (const key of keys) {
+      const def = CONFIG_SCHEMA[key];
+      if (!def) continue;
+      
+      const value = config[key];
+      const desc = def.description || '';
+      const env = def.env ? ` (env: ${def.env})` : '';
+      
+      outputLines.push(`${key}: ${value}${env} - ${desc}`);
+    }
+    outputLines.push('');
+  }
+  
+  const outputText = outputLines.join('\n');
+  
+  // Output as both structured data and text
+  const structured = {
+    categories: {},
+  };
+  
+  for (const [category, keys] of Object.entries(categories)) {
+    structured.categories[category] = {};
+    for (const key of keys) {
+      if (config[key] !== undefined) {
+        const def = CONFIG_SCHEMA[key];
+        structured.categories[category][key] = {
+          value: config[key],
+          description: def?.description || '',
+          env_var: def?.env || null,
+        };
+      }
+    }
+  }
+  
+  output(structured, raw, outputText);
+}
+
 module.exports = {
   cmdGenerateSlug,
   cmdCurrentTimestamp,
@@ -1623,4 +1682,5 @@ module.exports = {
   cmdScaffold,
   cmdTdd,
   cmdReview,
+  cmdSettingsList,
 };

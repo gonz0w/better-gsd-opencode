@@ -562,6 +562,8 @@ async function main() {
           lazyMisc().cmdConfigGet(cwd, restArgs[0], raw);
         } else if (subcommand === 'config-set') {
           lazyMisc().cmdConfigSet(cwd, restArgs[0], restArgs[1], raw);
+        } else if (subcommand === 'settings') {
+          lazyMisc().cmdSettingsList(cwd, raw);
         } else if (subcommand === 'env') {
           const envSub = restArgs[0];
           if (envSub === 'scan') {

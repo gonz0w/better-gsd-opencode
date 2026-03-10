@@ -62,7 +62,14 @@ var require_constants = __commonJS({
       rag_timeout: { type: "number", default: 30, description: "Per-tool research timeout in seconds", aliases: [], nested: { section: "workflow", field: "rag_timeout" } },
       ytdlp_path: { type: "string", default: "", description: "Path to yt-dlp binary (auto-detects if empty)", aliases: [], nested: null },
       nlm_path: { type: "string", default: "", description: "Path to notebooklm-py binary (auto-detects if empty)", aliases: [], nested: null },
-      mcp_config_path: { type: "string", default: "", description: "Path to MCP server config file (auto-detects if empty)", aliases: [], nested: null }
+      mcp_config_path: { type: "string", default: "", description: "Path to MCP server config file (auto-detects if empty)", aliases: [], nested: null },
+      // ─── Dependency-Backed Optimizations ───
+      optimization: { type: "object", default: {}, description: "Optimization flags for dependency-backed features", aliases: [], nested: null },
+      optimization_valibot: { type: "boolean", default: true, description: "Use valibot for schema validation", aliases: [], nested: { section: "optimization", field: "valibot" }, env: "BGSD_DEP_VALIBOT" },
+      optimization_valibot_fallback: { type: "boolean", default: false, description: "Force zod fallback for validation", aliases: [], nested: { section: "optimization", field: "valibot_fallback" }, env: "BGSD_DEP_VALIBOT_FALLBACK" },
+      optimization_discovery: { type: "string", default: "optimized", description: "File discovery mode", aliases: [], nested: { section: "optimization", field: "discovery" }, env: "BGSD_DISCOVERY_MODE", values: ["optimized", "legacy"] },
+      optimization_compile_cache: { type: "boolean", default: false, description: "Enable Node.js compile-cache", aliases: [], nested: { section: "optimization", field: "compile_cache" }, env: "BGSD_COMPILE_CACHE" },
+      optimization_sqlite_cache: { type: "boolean", default: true, description: "SQLite statement caching", aliases: [], nested: { section: "optimization", field: "sqlite_cache" }, env: "BGSD_SQLITE_STATEMENT_CACHE" }
     };
     var COMMAND_HELP = {
       "util:codebase context": `Usage: bgsd-tools codebase context --files <file1> [file2] ... [--plan <path>]
@@ -31174,6 +31181,51 @@ _Pending verification_
         files_changed: diff.files ? diff.files.map((f) => f.path) : []
       }, raw);
     }
+    function cmdSettingsList(cwd, raw) {
+      const { loadConfig: loadConfig2 } = require_config();
+      const { CONFIG_SCHEMA: CONFIG_SCHEMA2 } = require_constants();
+      const config = loadConfig2(cwd);
+      const outputLines = [];
+      outputLines.push("=== bGSD Settings ===");
+      outputLines.push("");
+      const categories = {
+        "General": ["model_profile", "mode", "depth", "commit_docs", "test_gate", "context_window", "context_target_percent"],
+        "Workflow": ["research", "plan_checker", "verifier", "parallelization", "brave_search"],
+        "Git": ["branching_strategy", "phase_branch_template", "milestone_branch_template"],
+        "Research": ["rag_enabled", "rag_timeout", "ytdlp_path", "nlm_path", "mcp_config_path"],
+        "Optimization": ["optimization_valibot", "optimization_valibot_fallback", "optimization_discovery", "optimization_compile_cache", "optimization_sqlite_cache"]
+      };
+      for (const [category, keys] of Object.entries(categories)) {
+        outputLines.push(`--- ${category} ---`);
+        for (const key of keys) {
+          const def = CONFIG_SCHEMA2[key];
+          if (!def) continue;
+          const value = config[key];
+          const desc = def.description || "";
+          const env = def.env ? ` (env: ${def.env})` : "";
+          outputLines.push(`${key}: ${value}${env} - ${desc}`);
+        }
+        outputLines.push("");
+      }
+      const outputText = outputLines.join("\n");
+      const structured = {
+        categories: {}
+      };
+      for (const [category, keys] of Object.entries(categories)) {
+        structured.categories[category] = {};
+        for (const key of keys) {
+          if (config[key] !== void 0) {
+            const def = CONFIG_SCHEMA2[key];
+            structured.categories[category][key] = {
+              value: config[key],
+              description: def?.description || "",
+              env_var: def?.env || null
+            };
+          }
+        }
+      }
+      output2(structured, raw, outputText);
+    }
     module2.exports = {
       cmdGenerateSlug,
       cmdCurrentTimestamp,
@@ -31202,7 +31254,8 @@ _Pending verification_
       cmdTodoComplete,
       cmdScaffold,
       cmdTdd,
-      cmdReview
+      cmdReview,
+      cmdSettingsList
     };
   }
 });
@@ -34929,6 +34982,8 @@ Available: execute-phase, plan-phase, new-project, new-milestone, quick, resume,
               lazyMisc().cmdConfigGet(cwd, restArgs[0], raw);
             } else if (subcommand === "config-set") {
               lazyMisc().cmdConfigSet(cwd, restArgs[0], restArgs[1], raw);
+            } else if (subcommand === "settings") {
+              lazyMisc().cmdSettingsList(cwd, raw);
             } else if (subcommand === "env") {
               const envSub = restArgs[0];
               if (envSub === "scan") {
