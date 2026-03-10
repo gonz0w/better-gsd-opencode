@@ -1,0 +1,21 @@
+#!/bin/sh
+# bGSD Wrapper Script - Applies compile-cache flag before spawning Node
+# Usage: ./bin/bgsd [args...]
+# Environment: BGSD_COMPILE_CACHE=1 enables compile-cache (default: disabled)
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+CLI="$SCRIPT_DIR/bgsd-tools.cjs"
+
+# Check if compile-cache should be enabled
+if [ "${BGSD_COMPILE_CACHE:-0}" = "1" ]; then
+  # Check Node version supports compile-cache (Node 10.4+)
+  NODE_VERSION=$(node --version | sed 's/v//' | cut -d. -f1)
+  if [ "${NODE_VERSION:-0}" -ge 10 ]; then
+    # Try with compile-cache flag; if unsupported, fall back gracefully
+    # Node 22+ has compile-cache enabled by default, so flag may not exist
+    node --experimental-code-cache "$CLI" "$@" 2>/dev/null && exit $?
+  fi
+fi
+
+# Fallback: run without compile-cache
+exec node "$CLI" "$@"
