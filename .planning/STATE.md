@@ -10,9 +10,9 @@ See: `.planning/PROJECT.md` (updated 2026-03-10)
 ## Current Position
 
 **Phase:** 89 (in progress)
-**Current Plan:** 01 (complete)
+**Current Plan:** 02 (complete)
 **Status:** Ready for next plan
-**Last Activity:** 2026-03-10 - Completed plan 89-01: Bun runtime detection with config persistence
+**Last Activity:** 2026-03-10 - Completed plan 89-02: Runtime fallback config and benchmark validation
 
 **Progress:** [██████████] 100%
 
@@ -38,6 +38,7 @@ See: `.planning/PROJECT.md` (updated 2026-03-10)
 
 - [88-02]: Created reachability audit system with verify:orphans CLI command for detecting orphaned exports, files, workflows, templates, and config entries.
 - [89-01]: Bun runtime detection with config persistence - detection result cached in .planning/config.json as 'bun.detected', runtime preference stored as 'runtime' key (auto/bun/node), startup banner shows runtime info in verbose mode.
+- [89-02]: Runtime fallback via BGSD_RUNTIME env var and config - forced flag added to detectBun(), env var takes precedence over config, benchmark command fixed for ES module compatibility.
 - [86-02]: Handoff contracts documented in RACI skill with inputs, outputs, preconditions for all 10 agent pairs.
 - [86-01]: Agent manifest audit found zero capability conflicts - all agents share foundational tools (read, write, bash, grep, glob) and skills (project-context, structured-returns), but each has distinct primary responsibility.
 - [86-01]: Created verify:agents command for automated boundary validation.
@@ -77,7 +78,7 @@ None yet.
 
 ## Session Continuity
 
-**Last session:** 2026-03-10T18:45:00.000Z
-**Stopped at:** Completed 89-01-PLAN.md - Bun runtime detection with config persistence
+**Last session:** 2026-03-10T18:45:10.000Z
+**Stopped at:** Completed 89-02-PLAN.md - Runtime fallback config and benchmark validation
 **Next step:** Continue with remaining phase 89 plans or move to phase 90 (benchmark)
 
