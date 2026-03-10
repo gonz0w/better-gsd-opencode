@@ -10,11 +10,11 @@ See: `.planning/PROJECT.md` (updated 2026-03-09)
 ## Current Position
 
 **Phase:** 78 of 81 (File Discovery and Ignore Optimization)
-**Current Plan:** Not started
-**Status:** Ready for planning
-**Last Activity:** 2026-03-10 - Completed 77-03 gap-closure verification for validation fallback parity
+**Current Plan:** 02
+**Status:** In progress
+**Last Activity:** 2026-03-10 - Completed 78-01 discovery adapter and hotspot wiring
 
-**Progress:** [██░░░░░░░░] 20%
+**Progress:** [███████░░░] 67%
 
 ## Performance Metrics
 
@@ -31,6 +31,7 @@ See: `.planning/PROJECT.md` (updated 2026-03-09)
 | Phase 77-validation-engine-modernization P01 | 2 min | 3 tasks | 6 files |
 | Phase 77 P02 | 12 min | 3 tasks | 7 files |
 | Phase 77 P03 | 6 min | 3 tasks | 1 file |
+| Phase 78 P01 | 6 min | 3 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -45,6 +46,7 @@ See: `.planning/PROJECT.md` (updated 2026-03-09)
 - [Phase 77]: Recorded VALD-01 baseline evidence with 34.48% modern-path improvement against forced fallback
 - [Phase 77]: Stabilized `bgsd_context` fallback parity by using a deterministic fixture project for task-context coercion tests
 - [Phase 77]: Added explicit `bgsd_progress` adapter wiring evidence without direct fallback flag reads in tool code
+- [Phase 78]: Discovery hotspots now route through a dual-path adapter — Enable fast-glob and in-process ignore rollout behind a parity-safe legacy default
 
 ### Pending Todos
 
@@ -57,6 +59,6 @@ None yet.
 
 ## Session Continuity
 
-**Last session:** 2026-03-10T01:38:03Z
-**Stopped at:** Completed 77-03-PLAN.md
-**Next step:** Run `/bgsd-plan-phase 78` to create execution plans for scan/ignore optimization
+**Last session:** 2026-03-10T02:27:34.135Z
+**Stopped at:** Completed 78-01-PLAN.md
+**Next step:** Execute `78-02-PLAN.md` to switch optimized discovery defaults and add migration guardrails

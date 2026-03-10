@@ -15,9 +15,9 @@ Requirements for v9.1 Performance Acceleration & Plugin Benchmarking milestone (
 
 ### File Discovery and Ignore Optimization
 
-- [ ] **SCAN-01**: User can run file-heavy commands faster via optimized traversal (`fast-glob`) in discovery hotspots.
-- [ ] **SCAN-02**: User can avoid repeated ignore subprocess overhead by using in-process ignore matching (`ignore`).
-- [ ] **SCAN-03**: Maintainer can preserve exact file-selection parity with legacy scan behavior.
+- [x] **SCAN-01**: User can run file-heavy commands faster via optimized traversal (`fast-glob`) in discovery hotspots.
+- [x] **SCAN-02**: User can avoid repeated ignore subprocess overhead by using in-process ignore matching (`ignore`).
+- [x] **SCAN-03**: Maintainer can preserve exact file-selection parity with legacy scan behavior.
 
 ### Startup and Cache Runtime Gains
 
@@ -53,9 +53,9 @@ Requirements for v9.1 Performance Acceleration & Plugin Benchmarking milestone (
 | VALD-01 | Phase 77 | Complete | npm test |
 | VALD-02 | Phase 77 | Complete | npm test |
 | VALD-03 | Phase 77 | Complete | npm test |
-| SCAN-01 | Phase 78 | Pending | npm test |
-| SCAN-02 | Phase 78 | Pending | npm test |
-| SCAN-03 | Phase 78 | Pending | npm test |
+| SCAN-01 | Phase 78 | Complete | npm test |
+| SCAN-02 | Phase 78 | Complete | npm test |
+| SCAN-03 | Phase 78 | Complete | npm test |
 | RUNT-01 | Phase 79 | Pending | npm test |
 | RUNT-02 | Phase 80 | Pending | npm test |
 | RUNT-03 | Phase 79 | Pending | npm test |
