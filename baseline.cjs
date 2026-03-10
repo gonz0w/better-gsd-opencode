@@ -20,7 +20,7 @@ const timings = [];
 for (let i = 0; i < RUNS; i++) {
   const start = Date.now();
   try {
-    execSync('node bin/gsd-tools.cjs current-timestamp --raw', {
+    execSync('node bin/bgsd-tools.cjs util:current-timestamp --raw', {
       encoding: 'utf-8',
       timeout: 10000,
       stdio: ['pipe', 'pipe', 'pipe'],
@@ -37,8 +37,35 @@ for (let i = 0; i < RUNS; i++) {
 const sorted = [...timings].sort((a, b) => a - b);
 const median = sorted[Math.floor(sorted.length / 2)];
 
+// --- 1b. VALD-01 validation hot-path timing (median of 5 runs) ---
+const valdRuns = [];
+const VALIDATION_BATCH = 200;
+const valdCommand = `node --input-type=module -e "import('./plugin.js').then(async (mod) => { const plugin = await mod.BgsdPlugin({ directory: process.cwd() }); const start = Date.now(); for (let i = 0; i < ${VALIDATION_BATCH}; i++) { await plugin.tool.bgsd_plan.execute({ phase: '77' }, { directory: process.cwd() }); } process.stdout.write(String(Date.now() - start)); process.exit(0); }).catch((err) => { console.error(err.message); process.exit(1); });"`;
+
+for (let i = 0; i < RUNS; i++) {
+  try {
+    const output = execSync(valdCommand, {
+      encoding: 'utf-8',
+      timeout: 20000,
+      stdio: ['pipe', 'pipe', 'pipe'],
+      shell: true,
+    });
+    const elapsed = parseInt(String(output).trim(), 10);
+    if (!Number.isFinite(elapsed)) {
+      throw new Error('non-numeric VALD benchmark output');
+    }
+    valdRuns.push(elapsed);
+  } catch (err) {
+    console.error(`VALD-01 run ${i + 1} failed: ${err.message}`);
+    process.exit(1);
+  }
+}
+
+const valdSorted = [...valdRuns].sort((a, b) => a - b);
+const valdMedian = valdSorted[Math.floor(valdSorted.length / 2)];
+
 // --- 2. Bundle size ---
-const bundlePath = 'bin/gsd-tools.cjs';
+const bundlePath = 'bin/bgsd-tools.cjs';
 const bundleStat = fs.statSync(bundlePath);
 const bundleSizeBytes = bundleStat.size;
 const bundleSizeKb = Math.round(bundleSizeBytes / 1024);
@@ -55,7 +82,7 @@ if (fs.existsSync('/proc/self/io')) {
       const fs = require('fs');
       const { execSync } = require('child_process');
       const before = fs.readFileSync('/proc/self/io', 'utf-8');
-      execSync('node bin/gsd-tools.cjs init plan-phase 1', { encoding: 'utf-8', timeout: 10000, stdio: ['pipe', 'pipe', 'pipe'] });
+      execSync('node bin/bgsd-tools.cjs init:plan-phase 1', { encoding: 'utf-8', timeout: 10000, stdio: ['pipe', 'pipe', 'pipe'] });
       const after = fs.readFileSync('/proc/self/io', 'utf-8');
       const parse = (s) => {
         const m = {};
@@ -85,7 +112,7 @@ if (fs.existsSync('/proc/self/io')) {
 if (fsReadCount === null) {
   try {
     const straceOut = execSync(
-      'strace -c -e trace=openat node bin/gsd-tools.cjs init plan-phase 1 2>&1 >/dev/null',
+      'strace -c -e trace=openat node bin/bgsd-tools.cjs init:plan-phase 1 2>&1 >/dev/null',
       { encoding: 'utf-8', timeout: 15000, stdio: ['pipe', 'pipe', 'pipe'], shell: true }
     );
     const openatMatch = straceOut.match(/(\d+)\s+[\d.]+\s+[\d.]+\s+\d+\s+\d+\s+openat/);
@@ -135,6 +162,9 @@ const baselines = {
   timestamp: new Date().toISOString(),
   init_timing_ms: median,
   init_timing_runs: timings,
+  vald01_timing_ms: valdMedian,
+  vald01_timing_runs: valdRuns,
+  vald01_batch_size: VALIDATION_BATCH,
   bundle_size_kb: bundleSizeKb,
   bundle_size_bytes: bundleSizeBytes,
   fs_read_count: fsReadCount,
@@ -150,6 +180,7 @@ fs.writeFileSync(outPath, JSON.stringify(baselines, null, 2) + '\n');
 // --- 6. Console output ---
 console.log('Performance Baselines:');
 console.log(`  Init timing:    ${median}ms (median of ${RUNS} runs)`);
+console.log(`  VALD-01 timing: ${valdMedian}ms (median of ${RUNS} runs, batch=${VALIDATION_BATCH})`);
 console.log(`  Bundle size:    ${bundleSizeKb}KB`);
 console.log(`  Source files:   ${sourceFiles.length} files, ${totalLines} lines`);
 console.log(`  Node version:   ${process.version}`);
