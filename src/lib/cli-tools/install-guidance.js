@@ -80,6 +80,23 @@ const TOOL_CONFIG = {
       win32: 'winget install GitHub.cli'
     },
     alternatives: 'GitHub web interface'
+  },
+  bun: {
+    name: 'bun',
+    aliases: [],
+    description: 'Fast JavaScript runtime',
+    website: 'https://bun.sh',
+    install: {
+      darwin: 'curl -fsSL https://bun.sh/install | bash',
+      linux: 'curl -fsSL https://bun.sh/install | bash',
+      win32: 'powershell -c "irm bun.sh/install.ps1|iex"'
+    },
+    alternatives: 'Node.js (built-in)',
+    additionalInstall: {
+      darwin: 'brew install oven-sh/bun/bun',
+      linux: 'npm install -g bun',
+      win32: 'scoop install bun'
+    }
   }
 };
 
