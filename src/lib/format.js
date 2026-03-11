@@ -535,7 +535,7 @@ class Spinner {
 
   _write(text) {
     process.stderr.write(text);
-    this._lastLine = text.replace('\r', '');
+    this._lastLine = text.replace(/\r/g, '');
   }
 }
 
@@ -743,7 +743,7 @@ class ProgressTracker {
 
   _output(text) {
     process.stderr.write(text);
-    this._lastOutput = text.replace('\r', '');
+    this._lastOutput = text.replace(/\r/g, '');
   }
 
   _handleCancel() {
