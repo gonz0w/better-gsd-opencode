@@ -8,5 +8,6 @@ module.exports = {
   milestone: require('./milestone'),
   quality: require('./quality'),
   burndown: require('./burndown'),
-  sparkline: require('./sparkline')
+  sparkline: require('./sparkline'),
+  dashboard: require('./dashboard')
 };
