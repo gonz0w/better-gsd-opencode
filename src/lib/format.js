@@ -22,16 +22,58 @@ function isTTY() {
   return !!process.stdout.isTTY;
 }
 
-// ─── Color Utility (~2KB picocolors pattern) ─────────────────────────────────
+// ─── Color Mode Configuration ─────────────────────────────────────────────────
 
-const _colorEnabled = (() => {
+// CLI flag and environment priority: --no-color > --force-color > NO_COLOR > auto-detect
+let _colorMode = 'auto'; // 'auto' | 'force' | 'disable'
+
+function setColorMode(mode) {
+  if (mode === 'auto' || mode === 'force' || mode === 'disable') {
+    _colorMode = mode;
+  }
+}
+
+function getColorMode() {
+  return _colorMode;
+}
+
+/**
+ * Parse CLI arguments for color flags.
+ * Call at CLI startup with process.argv.
+ */
+function parseColorFlags(argv = process.argv) {
+  const args = argv.slice(2); // Skip node and script name
+  
+  if (args.includes('--no-color')) {
+    setColorMode('disable');
+  } else if (args.includes('--force-color')) {
+    setColorMode('force');
+  } else if (args.includes('--color')) {
+    setColorMode('force');
+  }
+  
+  return _colorMode;
+}
+
+function _computeColorEnabled() {
+  // --no-color has highest priority
+  if (_colorMode === 'disable') return false;
+  // --force-color forces colors on
+  if (_colorMode === 'force') return true;
   // NO_COLOR standard (no-color.org)
   if ('NO_COLOR' in process.env) return false;
   // Non-TTY (piped output)
   if (!process.stdout.isTTY) return false;
   // FORCE_COLOR override
   if (process.env.FORCE_COLOR) return true;
+  // Default: enable for TTY
   return true;
+}
+
+// ─── Color Utility (~2KB picocolors pattern) ─────────────────────────────────
+
+const _colorEnabled = (() => {
+  return _computeColorEnabled();
 })();
 
 function _wrap(open, close) {
@@ -399,6 +441,340 @@ function listWithTruncation(items, maxItems = 10, showAll = false) {
   return lines.join('\n');
 }
 
+// ─── Spinner Class ────────────────────────────────────────────────────────────
+
+const SPINNER_FRAMES = ['|', '/', '-', '\\'];
+
+/**
+ * ASCII spinner for indeterminate progress.
+ * Uses stderr to not interfere with stdout table output.
+ */
+class Spinner {
+  constructor(options = {}) {
+    this.frames = options.frames || SPINNER_FRAMES;
+    this.interval = options.interval || 100;
+    this.message = '';
+    this._interval = null;
+    this._frameIndex = 0;
+    this._lastLine = '';
+  }
+
+  /**
+   * Start the spinner with a message.
+   * @param {string} message - Initial message to display
+   */
+  start(message = 'Working...') {
+    this.message = message;
+    this._frameIndex = 0;
+    
+    // Clear any existing spinner
+    this.stop();
+    
+    // Write initial line
+    this._write('\r' + this._frame() + ' ' + message);
+    
+    // Start animation interval
+    this._interval = setInterval(() => {
+      this._write('\r' + this._frame() + ' ' + this.message);
+    }, this.interval);
+  }
+
+  /**
+   * Stop the spinner with an optional final message.
+   * @param {string} [message] - Final message to display
+   */
+  stop(message) {
+    if (this._interval) {
+      clearInterval(this._interval);
+      this._interval = null;
+    }
+    
+    if (message !== undefined) {
+      this.message = message;
+    }
+    
+    // Clear the spinner line and show final message
+    if (this.message) {
+      this._write('\r' + ' '.repeat(this._lastLine.length) + '\r' + this.message);
+    } else {
+      this._write('\r' + ' '.repeat(this._lastLine.length) + '\r');
+    }
+  }
+
+  /**
+   * Update the spinner message.
+   * @param {string} message - New message
+   */
+  update(message) {
+    this.message = message;
+    if (this._interval) {
+      this._write('\r' + this._frame() + ' ' + message);
+    }
+  }
+
+  /**
+   * Clear the spinner completely.
+   */
+  clear() {
+    this.stop();
+    this._write('');
+  }
+
+  _frame() {
+    return this.frames[this._frameIndex++ % this.frames.length];
+  }
+
+  _write(text) {
+    process.stderr.write(text);
+    this._lastLine = text.replace('\r', '');
+  }
+}
+
+// ─── ProgressTracker Class ────────────────────────────────────────────────────
+
+let _globalProgressTracker = null;
+let _cancelHandler = null;
+
+/**
+ * Manages nested progress tracking with up to 3 levels.
+ * Supports cancellation via Ctrl+C.
+ */
+class ProgressTracker {
+  constructor(options = {}) {
+    this.tasks = new Map();
+    this._taskIdCounter = 0;
+    this._currentParent = null;
+    this._updateInterval = options.updateInterval || 100;
+    this._lastOutput = '';
+    this._isActive = false;
+    
+    // Bind cancellation handler
+    this._handleCancel = this._handleCancel.bind(this);
+  }
+
+  /**
+   * Start a new task.
+   * @param {string} label - Task label
+   * @param {number} [percent=0] - Initial progress (0-100)
+   * @param {string} [parentId] - Parent task ID for nesting
+   * @returns {string} Task ID
+   */
+  startTask(label, percent = 0, parentId = null) {
+    const id = String(++this._taskIdCounter);
+    const task = {
+      id,
+      label,
+      percent: Math.max(0, Math.min(100, percent)),
+      parent: parentId || this._currentParent,
+      children: [],
+      createdAt: Date.now(),
+    };
+    
+    // Register as child of parent
+    if (task.parent && this.tasks.has(task.parent)) {
+      this.tasks.get(task.parent).children.push(id);
+    }
+    
+    this.tasks.set(id, task);
+    this._currentParent = id;
+    this._render();
+    
+    return id;
+  }
+
+  /**
+   * Start a subtask of the current task.
+   * @param {string} label - Subtask label
+   * @param {number} [percent=0] - Initial progress
+   * @returns {string} Subtask ID
+   */
+  startSubtask(label, percent = 0) {
+    return this.startTask(label, percent, this._currentParent);
+  }
+
+  /**
+   * Update task progress.
+   * @param {string} id - Task ID
+   * @param {number} percent - Progress (0-100)
+   * @param {string} [label] - Optional new label
+   */
+  update(id, percent, label) {
+    const task = this.tasks.get(id);
+    if (!task) return;
+    
+    task.percent = Math.max(0, Math.min(100, percent));
+    if (label !== undefined) {
+      task.label = label;
+    }
+    
+    this._render();
+  }
+
+  /**
+   * Complete a task.
+   * @param {string} id - Task ID
+   * @param {number} [percent=100] - Final progress
+   */
+  complete(id, percent = 100) {
+    this.update(id, percent);
+    const task = this.tasks.get(id);
+    if (task) {
+      task.completed = true;
+    }
+    
+    // Restore parent context
+    if (task && task.parent) {
+      this._currentParent = task.parent;
+    } else {
+      this._currentParent = null;
+    }
+    
+    this._render();
+  }
+
+  /**
+   * Cancel the current task (and all children).
+   * @param {string} [id] - Task ID to cancel (defaults to current)
+   */
+  cancel(id) {
+    const taskId = id || this._currentParent;
+    const task = this.tasks.get(taskId);
+    if (!task) return;
+    
+    task.cancelled = true;
+    this._render();
+    this._output(color.red(`\n[CANCELLED] ${this._getTaskLabel(task)}\n`));
+    this.clear();
+  }
+
+  /**
+   * Clear all tasks and stop rendering.
+   */
+  clear() {
+    this.tasks.clear();
+    this._currentParent = null;
+    this._isActive = false;
+    this._output('\r' + ' '.repeat(this._lastOutput.length) + '\r');
+    this._lastOutput = '';
+    
+    // Remove signal handler
+    if (_cancelHandler) {
+      process.removeListener('SIGINT', _cancelHandler);
+      _cancelHandler = null;
+    }
+  }
+
+  /**
+   * Get the combined progress of a task and its children.
+   * @param {string} id - Task ID
+   * @returns {number} Combined progress (0-100)
+   */
+  getCombinedProgress(id) {
+    const task = this.tasks.get(id);
+    if (!task) return 0;
+    
+    if (task.children.length === 0) {
+      return task.percent;
+    }
+    
+    // Calculate weighted average of children
+    let totalWeight = 0;
+    let weightedSum = 0;
+    
+    for (const childId of task.children) {
+      const child = this.tasks.get(childId);
+      if (child && !child.cancelled) {
+        const weight = 1; // Equal weight per child
+        totalWeight += weight;
+        weightedSum += this.getCombinedProgress(childId) * weight;
+      }
+    }
+    
+    return totalWeight > 0 ? Math.round(weightedSum / totalWeight) : task.percent;
+  }
+
+  /**
+   * Get full label including parent path.
+   * @param {Object} task - Task object
+   * @returns {string} Full label path
+   */
+  _getTaskLabel(task) {
+    if (!task.parent) return task.label;
+    const parent = this.tasks.get(task.parent);
+    if (!parent) return task.label;
+    return this._getTaskLabel(parent) + ' > ' + task.label;
+  }
+
+  /**
+   * Render the current progress state.
+   */
+  _render() {
+    if (this.tasks.size === 0) return;
+    
+    // Find root tasks (no parent)
+    const roots = [];
+    for (const [id, task] of this.tasks) {
+      if (!task.parent && !task.completed && !task.cancelled) {
+        roots.push(task);
+      }
+    }
+    
+    if (roots.length === 0) return;
+    
+    const parts = [];
+    for (const root of roots) {
+      const combined = this.getCombinedProgress(root.id);
+      const label = this._getTaskLabel(root);
+      parts.push(`${label} (${combined}%)`);
+    }
+    
+    const output = progressBar(0) + ' ' + parts.join(' | ');
+    this._output('\r' + output);
+  }
+
+  _output(text) {
+    process.stderr.write(text);
+    this._lastOutput = text.replace('\r', '');
+  }
+
+  _handleCancel() {
+    this.cancel();
+    process.exit(130);
+  }
+
+  /**
+   * Install Ctrl+C handler for cancellation.
+   * Call this when starting a long-running operation.
+   */
+  installHandler() {
+    if (!_cancelHandler) {
+      _cancelHandler = this._handleCancel;
+      process.on('SIGINT', _cancelHandler);
+    }
+    this._isActive = true;
+  }
+
+  /**
+   * Remove Ctrl+C handler.
+   */
+  removeHandler() {
+    if (_cancelHandler) {
+      process.removeListener('SIGINT', _cancelHandler);
+      _cancelHandler = null;
+    }
+  }
+}
+
+/**
+ * Get or create the global progress tracker instance.
+ */
+function getProgressTracker() {
+  if (!_globalProgressTracker) {
+    _globalProgressTracker = new ProgressTracker();
+  }
+  return _globalProgressTracker;
+}
+
 // ─── Exports ─────────────────────────────────────────────────────────────────
 
 module.exports = {
@@ -409,6 +785,9 @@ module.exports = {
   // Color
   color,
   colorByPercent,
+  setColorMode,
+  getColorMode,
+  parseColorFlags,
 
   // Symbols
   SYMBOLS,
@@ -428,4 +807,11 @@ module.exports = {
   summaryLine,
   actionHint,
   listWithTruncation,
+
+  // Spinner
+  Spinner,
+
+  // ProgressTracker
+  ProgressTracker,
+  getProgressTracker,
 };
