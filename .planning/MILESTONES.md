@@ -1,6 +1,34 @@
 # Milestones
 
-## ✅ v9.0 Embedded Plugin Experience (Shipped: 2026-03-09)
+## ✅ v9.3 Quality, Performance & Agent Sharpening (Shipped: 2026-03-10)
+
+**Delivered:** Agent sharpening with zero-overlap validation, command consolidation (78% reduction), deterministic context loading, Bun runtime integration, and benchmark adapter.
+
+**Phases completed:** 5 phases (86-90), 12 plans
+**Commits:** 20 | **Files changed:** 109 | **Lines:** +11,434 / -5,079
+**Timeline:** 1 day (2026-03-10)
+
+**Key accomplishments:**
+- Agent manifest audit found zero capability conflicts - verify:agents command created for automated boundary validation
+- Handoff contracts documented in RACI skill with inputs, outputs, preconditions for all 10 agent pairs
+- Created 8 subcommand wrapper commands organizing 41 slash commands into logical groups
+- Consolidated 50 slash commands into 11 (8 wrappers + 3 standalone) - 78% reduction
+- Deterministic context loading with git-hash cache invalidation for 6 agent types (50% token reduction)
+- Reachability audit system with verify:orphans CLI command
+- Bun runtime detection with config persistence and startup banner
+- Runtime fallback via BGSD_RUNTIME env var - 1.2-1.6x speedup measured
+- Plugin benchmark adapter with /bgsd-measure command capturing startup, execution, memory, context load metrics
+
+**What's next:** Ready for next milestone — `/bgsd milestone new`
+
+**Archives:**
+- `.planning/milestones/v9.3-ROADMAP.md`
+- `.planning/milestones/v9.3-REQUIREMENTS.md`
+- `.planning/milestones/v9.3-DOCS.md`
+
+---
+
+## ✅ v9.2 CLI Tool Integrations & Runtime Modernization (Shipped: 2026-03-10)
 
 **Delivered:** Deep plugin integration with always-on context injection, native LLM tools, event-driven state synchronization, and advisory guardrails.
 
@@ -315,4 +343,76 @@
 
 ---
 
+
+
+## v9.3 Quality, Performance & Agent Sharpening (Shipped: 2026-03-10)
+
+**Phases completed:** 5 phases, 12 plans, 0 tasks
+
+**Key accomplishments:**
+- Agent manifest audit complete with zero capability conflict - each agent has distinct primary responsibility
+- Handoff contracts documented with inputs, outputs, preconditions - all 10 agent pairs covered
+- Created 8 subcommand wrapper commands organizing 41 slash commands into logical groups with routing
+- Consolidated 50 slash commands into 11 (8 wrappers + 3 standalone), removed internal-only commands, updated help docs
+- Gap closure: documented routing approach (host editor native) and marked CMND requirements complete
+- Deterministic context loading with git-hash cache invalidation for 6 agent types
+- Reachability audit system with verify:orphans CLI command to detect orphaned exports, files, workflows, templates, and config entries
+- Bun runtime detection with config persistence and startup banner for 3-5x startup improvement
+- Runtime fallback config and benchmark command working - 1.6x speedup measured (below 3-5x target)
+- Runtime banner correctly shows '[bGSD] Falling back to Node.js' when BGSD_RUNTIME=node
+- Extended benchmark with file I/O, nested traversal, and HTTP server tests showing realistic 1.2-1.6x improvement range
+- Plugin benchmark adapter with /bgsd-measure command capturing startup, execution, memory, and context load metrics
+
+---
+
+
+## v10.0 v10.0 (Shipped: 2026-03-11)
+
+**Phases completed:** 5 phases, 9 plans, 6 tasks
+
+**Key accomplishments:**
+- Enhanced format.js with CLI color control flags, Spinner class, and nested ProgressTracker
+- Created error.js module with structured error classes and formatted output with recovery suggestions
+- Created debug.js module with trace, context dump, and state inspection utilities
+- Integrated format.js, error.js, and debug.js into main CLI with working color and debug flags
+- Enhanced planner skills with dependency detection, task sizing feedback loop, and parallelization analysis
+- Added CLI commands for dependency analysis, scope estimation, and parallelization warnings
+- Added execution intelligence modules for autonomous deviation recovery, complexity-based checkpoint decisions, and stuck/loop pattern detection
+
+---
+
+
+## v10.0 v10.0 (Shipped: 2026-03-11)
+
+**Phases completed:** 5 phases, 9 plans, 6 tasks
+
+**Key accomplishments:**
+- Enhanced format.js with CLI color control flags, Spinner class, and nested ProgressTracker
+- Created error.js module with structured error classes and formatted output with recovery suggestions
+- Created debug.js module with trace, context dump, and state inspection utilities
+- Integrated format.js, error.js, and debug.js into main CLI with working color and debug flags
+- Enhanced planner skills with dependency detection, task sizing feedback loop, and parallelization analysis
+- Added CLI commands for dependency analysis, scope estimation, and parallelization warnings
+- Added execution intelligence modules for autonomous deviation recovery, complexity-based checkpoint decisions, and stuck/loop pattern detection
+
+---
+
+
+## v10.0 v10.0 (Shipped: 2026-03-11)
+
+**Phases completed:** 7 phases, 12 plans, 6 tasks
+
+**Key accomplishments:**
+- Enhanced format.js with CLI color control flags, Spinner class, and nested ProgressTracker
+- Created error.js module with structured error classes and formatted output with recovery suggestions
+- Created debug.js module with trace, context dump, and state inspection utilities
+- Integrated format.js, error.js, and debug.js into main CLI with working color and debug flags
+- Enhanced planner skills with dependency detection, task sizing feedback loop, and parallelization analysis
+- Added CLI commands for dependency analysis, scope estimation, and parallelization warnings
+- Added execution intelligence modules for autonomous deviation recovery, complexity-based checkpoint decisions, and stuck/loop pattern detection
+- Structured handoff context transfer, shared context registry, and contract verification for multi-agent collaboration
+- Implemented CLI contextual help with command history, autocomplete hints, and examples
+- Reduced bundle size by ~50% through minification and tree-shaking
+
+---
 

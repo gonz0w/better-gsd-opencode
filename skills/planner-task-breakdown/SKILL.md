@@ -117,6 +117,90 @@ Record in `user_setup` frontmatter. Only include what the agent literally cannot
 - <skill:planner-checkpoints /> — Checkpoint task type guidelines
 - <skill:planner-scope-estimation /> — Context budget per task
 
+<!-- section: execution_feedback -->
+### Execution Feedback Loop
+
+Track actual execution time per task to improve future sizing estimates:
+
+**1. Capture execution time:**
+- Record task start and end timestamps
+- Store in `.planning/metrics/task-times.json`
+- Format: `{ "plan": "92-01", "task": 1, "duration_seconds": 1800, "files": 3, "phase": "92" }`
+
+**2. Use historical data:**
+- When sizing new tasks, consult task-times.json
+- Look for tasks with similar file counts and complexity
+- Adjust estimates based on actual vs predicted time
+
+**3. Improvement cycle:**
+- After each phase, analyze task-time variance
+- Identify patterns in over/underestimation
+- Refine sizing heuristics based on evidence
+<!-- /section -->
+
+<!-- section: sizing_cli -->
+### Sizing CLI Command
+
+Use the CLI tool for automated scope estimation:
+
+```bash
+bgsd-tools util:estimate-scope <plan-path>
+```
+
+**Output includes:**
+- Plan identifier
+- Number of tasks
+- File count
+- Complexity rating (low/medium/high/very_high)
+- Context estimate as percentage of budget
+- Whether within 50% budget target
+- Recommendations for splitting if needed
+
+**Example output:**
+```json
+{
+  "plan": "92-01",
+  "tasks": 3,
+  "files": 8,
+  "complexity": "high",
+  "context_estimate": "45%",
+  "within_budget": true,
+  "recommendations": ["Consider splitting if >50%"]
+}
+```
+
+Run during planning to validate task sizing before execution.
+<!-- /section -->
+
+<!-- section: specificity_checklist -->
+### Specificity Checklist
+
+Every task must pass these specificity checks:
+
+**Files field:**
+- [ ] Exact paths, no wildcards like "relevant files"
+- [ ] No "the auth files" or "component files"
+- [ ] Full paths from project root
+
+**Action field:**
+- [ ] Specific implementation, not vague "make it work"
+- [ ] Includes WHAT to do and WHY (technology choice rationale)
+- [ ] No "add authentication" — specify JWT, OAuth, etc.
+- [ ] No "create API" — specify endpoint, method, payload
+
+**Verify field:**
+- [ ] Command to run, not "test it"
+- [ ] Specific expected output or behavior
+- [ ] Pass/fail criteria clearly defined
+
+**Done field:**
+- [ ] Measurable criteria, not "complete"
+- [ ] Success state clearly defined
+- [ ] Can be validated programmatically
+
+**Specificity test:** Could a different agent instance execute this without asking clarifying questions?
+<!-- /section -->
+
 ## Examples
 
 See planner agent's `<task_breakdown>` section for the original comprehensive reference.

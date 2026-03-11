@@ -2,113 +2,181 @@
 
 ## Milestones
 
+- 🔵 **v10.0 Agent Intelligence & UX** - Phases 91-97 (in progress)
+  - Phase 91: Rich TTY Output & Error Handling ✅
+  - Phase 92: Planning Intelligence ✅
+  - Phase 93: Verification Intelligence ✅
+  - Phase 94: Execution Intelligence ✅
+  - Phase 95: Interactive Workflows ✅
+- ✅ **v9.3 Quality, Performance & Agent Sharpening** - Phases 86-90 (2026-03-10) — see `.planning/milestones/v9.3-ROADMAP.md`
 - ✅ **v9.2 CLI Tool Integrations & Runtime Modernization** - Phases 82-85 (2026-03-10) — see `.planning/milestones/v9.2-ROADMAP.md`
-- 🚧 **v9.3 Quality, Performance & Agent Sharpening** - Phases 86-90 (in progress)
-- 📋 **v10.0** - Future major release
 
 ---
 
 ## Phases
 
-- [x] **Phase 86: Agent Sharpening** - Zero overlap, validated boundaries, handoff contracts (completed 2026-03-10)
-- [x] **Phase 87: Command Consolidation** - Subcommand groups, reduced surface, stale removal (completed 2026-03-10)
-- [ ] **Phase 88: Quality & Context** - Deterministic context, zero orphaned code
-  - **Plans**: 2/2 plans complete
-  - [x] 88-01: Deterministic context loading for agents
-  - [x] 88-02: Reachability audit system
-- [x] **Phase 89: Runtime Bun Migration** - Bun integration with backward compatibility (in progress)
-  - **Plans**: 4/4 plans complete
-  - [x] 89-01: Bun runtime detection with config persistence
-  - [x] 89-02: Backward compatibility and bundle size validation
-  - [x] 89-03: Runtime banner fix for forced Node.js
-  - [x] 89-04: Gap closure - extended benchmark with realistic workloads
-- [x] **Phase 90: Benchmark** - Plugin adapter, baseline metrics (completed 2026-03-10)
-
-## Phase Details
-
-### Phase 86: Agent Sharpening
-**Goal**: Each agent has single clear responsibility, validated boundaries, and documented handoff contracts
-**Depends on**: Nothing (first phase)
-**Requirements**: AGNT-01, AGNT-02, AGNT-03
-**Success Criteria** (what must be TRUE):
-  1. Each agent has a single, documented responsibility in its manifest
-  2. Agent role boundaries are validated — no two agents claim the same capability
-  3. Agent handoff contracts are documented and enforced
-  4. Agent context loading is minimal — each agent loads only what it needs
-**Plans**: 2/2 plans complete
-
-Plans:
-- [x] 86-01: Agent manifest audit and overlap resolution
-- [x] 86-02: Handoff contract documentation and enforcement
-
-### Phase 87: Command Consolidation
-**Goal**: Slash command surface reduced through subcommand groups and stale removal
-**Depends on**: Phase 86
-**Requirements**: CMND-01, CMND-02, CMND-03, CMND-04
-**Success Criteria** (what must be TRUE):
-  1. Commands organized into logical subcommand groups (e.g., /bgsd plan, /bgsd exec)
-  2. Stale commands removed from slash command surface
-  3. Overlapping commands consolidated into single entry points
-  4. Internal-only functions not exposed as slash commands
-**Plans**: 3/3 plans complete
-
-Plans:
-- [x] 87-01: Subcommand group restructuring
-- [x] 87-02: Stale and overlapping command cleanup
-- [x] 87-03: Command routing implementation (gap closure - host editor native)
-
-### Phase 88: Quality & Context
-**Goal**: Deterministic context loading and zero orphaned code
-**Depends on**: Phase 87
-**Requirements**: CTXT-01, CTXT-02, CTXT-03
-**Success Criteria** (what must be TRUE):
-  1. Context loading is deterministic — agents receive pre-computed context, not search-and-discover
-  2. Zero orphaned code — every function, export, workflow, template, and config entry is reachable
-  3. Dead code audit produces zero orphaned items
-  4. Codebase has clear import/export relationships
-**Plans**: 1/2 plans executed
-- [x] 88-01: Deterministic context implementation
-- [x] 88-02: Orphaned code audit and cleanup
-
-### Phase 89: Runtime Bun Migration
-**Goal**: Bun runtime fully integrated with backward compatibility maintained
-**Depends on**: Phase 88
-**Requirements**: RUNT-01, RUNT-02, RUNT-03
-**Success Criteria** (what must be TRUE):
-  1. Bun runtime fully integrated — 3-5x startup improvement demonstrated
-  2. Projects without Bun work exactly as before (backward compatible)
-  3. Bundle size not significantly increased by Bun support
-  4. Bun detection and fallback work correctly
-**Plans**: 4/4 plans complete
-- [x] 89-01: Bun runtime integration (config persistence, startup banner)
-- [x] 89-02: Backward compatibility and bundle size validation
-- [x] 89-03: Runtime banner fix for forced Node.js
-- [x] 89-04: Gap closure - extended benchmark with realistic workloads
-
-### Phase 90: Benchmark
-**Goal**: Plugin benchmark adapter built and baseline metrics captured
-**Depends on**: Phase 89
-**Requirements**: BENCH-01, BENCH-02
-**Success Criteria** (what must be TRUE):
-  1. Plugin benchmark adapter built for cross-plugin comparison
-  2. Baseline metrics captured for v9.3
-  3. Benchmark can measure startup time, command execution, context loading
-**Plans**: 1/1 plans complete
-
-Plans:
-- [x] 90-01: Benchmark adapter and baseline capture
-
-## Progress
-
-| Phase | Milestone | Plans Complete | Status | Completed |
-|-------|-----------|----------------|--------|-----------|
-| 86. Agent Sharpening | v9.3 | Complete    | 2026-03-10 | 2026-03-10 |
-| 87. Command Consolidation | 3/3 | Complete    | 2026-03-10 | - |
-| 88. Quality & Context | 1/2 | In Progress|  | - |
-| 89. Runtime Bun Migration | v9.3 | Complete    | 2026-03-10 | - |
-| 90. Benchmark | v9.3 | Complete    | 2026-03-10 | 2026-03-10 |
+- [x] **Phase 91: Rich TTY Output & Error Handling** — Complete ✅
+- [x] **Phase 92: Planning Intelligence** — Complete ✅
+- [x] **Phase 93: Verification Intelligence** — Complete ✅
+- [x] **Phase 94: Execution Intelligence** — Complete ✅
+- [x] **Phase 95: Interactive Workflows** — Complete ✅
+- [x] **Phase 96: Multi-Agent Collaboration** — Better handoffs (completed 2026-03-11)
+- [ ] **Phase 97: UX Polish** — Command improvements and error handling
 
 ---
 
-*Roadmap created: 2026-03-10*
-*Ready for planning: /bgsd plan phase*
+*Roadmap updated: 2026-03-11*
+*Ready for: /bgsd plan phase 96*
+
+---
+
+# Phase Details
+
+
+**Goal:** Foundation layer — enhanced formatting and context-rich error handling
+
+**Depends on:** Nothing (first phase)
+
+**Requirements:** UX-01, UX-02, UX-03, UX-10, UX-11, UX-12, PERF-01, PERF-02
+
+**Success Criteria** (what must be TRUE):
+1. Commands produce color-coded output when TTY detected
+2. Tables render with proper alignment and styling
+3. Progress indicators show for long operations
+4. Error messages include actionable recovery suggestions
+5. Debug helpers available (trace, context dump)
+6. Errors include relevant context (file, line, recent changes)
+
+**Plans:**
+- ✅ 91-01: format.js enhancements (CLI flags, Spinner, ProgressTracker)
+- ✅ 91-02: error.js module (BgsdError, formatting, utilities)
+- ✅ 91-03: debug.js module (trace, context dump, inspection)
+- ✅ 91-04: Integration (main CLI with new modules)
+
+**Completed:** 2026-03-11
+
+---
+
+
+**Goal:** Better task decomposition with dependency detection and sizing
+
+**Depends on:** Phase 91 (uses enhanced formatting)
+
+**Requirements:** AGENT-01, AGENT-02, AGENT-03
+
+**Success Criteria** (what must be TRUE):
+1. Planner produces task decomposition with clear dependency chains
+2. Tasks sized using 15-60 minute heuristic automatically
+3. Independent tasks grouped for parallel execution
+
+**Plans:**
+- ✅ 92-01: Enhance planner skills (dependency detection, task sizing, parallelization)
+- ✅ 92-02: Add CLI commands (analyze-deps, estimate-scope, plan-wave enhancements)
+
+---
+
+
+**Goal:** Smarter verification with regression detection
+
+**Depends on:** Phase 92 (planning outputs)
+
+**Requirements:** AGENT-04, AGENT-05, AGENT-06
+
+**Success Criteria** (what must be TRUE):
+1. Verifier automatically detects regression patterns in code changes
+2. Edge case suggestions provided based on project patterns
+3. Coverage analysis identifies untested paths
+
+**Plans:**
+- ✅ 93-01: Enhanced verification with regression detection, edge cases, coverage analysis
+
+---
+
+
+**Goal:** Autonomous deviation handling and recovery
+
+**Depends on:** Phase 93 (verification context)
+
+**Requirements:** AGENT-07, AGENT-08, AGENT-09
+
+**Success Criteria** (what must be TRUE):
+1. Executor handles common deviations autonomously with recovery
+2. Checkpoint decisions made based on task complexity
+3. Stuck/loop patterns detected and pivots suggested
+
+**Plans:**
+- ✅ 94-01: Execution Intelligence (deviation recovery, checkpoint decisions, loop detection)
+
+**Completed:** 2026-03-11
+
+---
+
+
+**Goal:** Guided prompts and wizards for complex tasks
+
+**Depends on:** Phase 91 (TTY foundation)
+
+**Requirements:** UX-04, UX-05, UX-06, PERF-05, PERF-06
+
+**Success Criteria** (what must be TRUE):
+1. Complex commands support guided prompts
+2. Interactive mode available for multi-step tasks
+3. User can abort workflows gracefully
+4. Compaction preserves full context (decisions, blockers, intent)
+
+**Plans:**
+- ✅ 95-01: Interactive workflows with prompts, wizards, and enhanced compaction
+
+**Completed:** 2026-03-11
+
+---
+
+
+**Goal:** Better handoffs between agents
+
+**Depends on:** Phases 92, 93, 94 (agent capabilities)
+
+**Requirements:** AGENT-10, AGENT-11, AGENT-12
+
+**Success Criteria** (what must be TRUE):
+1. Agent handoffs include structured context transfer
+2. Shared context enables collaboration on related tasks
+3. Handoff contracts verified before transfer
+
+**Plans:**
+1/1 plans complete
+
+---
+
+
+**Goal:** Command improvements and final UX enhancements
+
+**Depends on:** Phase 91 (foundation), Phase 95 (interactive)
+
+**Requirements:** UX-07, UX-08, UX-09, PERF-03, PERF-04
+
+**Success Criteria** (what must be TRUE):
+1. Help includes contextual suggestions based on recent commands
+2. Command discoverability improved with autocomplete hints
+3. Examples included in help for common use cases
+4. Bundle size reduced beyond v9.3 baseline
+
+**Plans:**
+- 97-01: Help system enhancements (UX-07, UX-08, UX-09)
+- 97-02: Bundle size reduction (PERF-03, PERF-04)
+
+---
+
+## Coverage Map
+
+| Phase | Requirements | Count |
+|-------|--------------|-------|
+| 91 | UX-01, UX-02, UX-03, UX-10, UX-11, UX-12, PERF-01, PERF-02 | 8 |
+| 92 | AGENT-01, AGENT-02, AGENT-03 | 3 |
+| 93 | AGENT-04, AGENT-05, AGENT-06 | 3 |
+| 94 | AGENT-07, AGENT-08, AGENT-09 | 3 |
+| 95 | UX-04, UX-05, UX-06, PERF-05, PERF-06 | 5 |
+| 96 | 1/1 | Complete   | 2026-03-11 | 97 | UX-07, UX-08, UX-09, PERF-03, PERF-04 | 5 |
+
+**Total: 30 requirements across 7 phases**
+

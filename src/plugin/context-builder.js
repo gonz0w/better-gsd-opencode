@@ -10,6 +10,118 @@ import { countTokens, TOKEN_BUDGET } from './token-budget.js';
  * Both use cached ProjectState data — no file I/O in hot paths.
  */
 
+// =============================================================================
+// Trajectory Block Builder
+// =============================================================================
+
+/**
+ * Build a trajectory block showing phase progression and plan completion history.
+ * Target: ~100-200 tokens.
+ * 
+ * @param {Object} state - Project state
+ * @param {Array} plans - Array of plan objects
+ * @returns {string|null} Trajectory XML block, or null if no data
+ */
+function buildTrajectoryBlock(state, plans) {
+  try {
+    const parts = [];
+    
+    // Phase progression - completed phases from roadmap
+    if (state && state.phase) {
+      // Extract current phase number
+      const phaseMatch = state.phase.match(/^(\d+)/);
+      if (phaseMatch) {
+        parts.push(`Current: Phase ${phaseMatch[1]}`);
+      }
+    }
+    
+    // Completed plans - find plans that were executed
+    if (plans && plans.length > 0) {
+      const completedPlans = [];
+      const executedPlans = [];
+      
+      for (const plan of plans) {
+        if (plan.executed || plan.completed) {
+          completedPlans.push(plan.frontmatter?.plan || '?');
+        }
+        if (plan.executed) {
+          executedPlans.push(plan.frontmatter?.plan || '?');
+        }
+      }
+      
+      if (completedPlans.length > 0) {
+        parts.push(`Completed: ${completedPlans.join(', ')}`);
+      }
+      if (executedPlans.length > 0) {
+        parts.push(`Executed: ${executedPlans.join(', ')}`);
+      }
+    }
+    
+    if (parts.length === 0) return null;
+    
+    return `<trajectory>\n${parts.join('\n')}\n</trajectory>`;
+  } catch {
+    return null;
+  }
+}
+
+// =============================================================================
+// Sacred Data Block Builder  
+// =============================================================================
+
+/**
+ * Build a sacred data block with protected project information.
+ * Includes: INTENT objectives, ROADMAP current phase, critical decisions.
+ * Target: ~150-250 tokens.
+ * 
+ * @param {Object} intent - Intent object with objectives
+ * @param {Object} roadmap - Roadmap object with current phase
+ * @returns {string|null} Sacred XML block, or null if no data
+ */
+function buildSacredBlock(intent, roadmap) {
+  try {
+    const parts = [];
+    
+    // Intent objectives (DO-XX items)
+    if (intent && intent.objective) {
+      parts.push(`Objective: ${intent.objective}`);
+    }
+    
+    // Additional intent items (key outcomes)
+    if (intent && intent.items && intent.items.length > 0) {
+      const keyItems = intent.items.slice(0, 3);  // Limit to 3 key items
+      for (const item of keyItems) {
+        if (item.id && item.id.startsWith('DO-')) {
+          parts.push(`${item.id}: ${item.text || item.description || ''}`);
+        }
+      }
+    }
+    
+    // Current milestone from roadmap
+    if (roadmap && roadmap.currentMilestone) {
+      const ms = roadmap.currentMilestone;
+      parts.push(`Milestone: ${ms.version || ms.name || 'Current'}`);
+      if (ms.status) {
+        parts.push(`Status: ${ms.status}`);
+      }
+    }
+    
+    // Current phase from roadmap
+    if (roadmap && roadmap.phases) {
+      const currentPhase = roadmap.phases.find(p => p.status === 'current');
+      if (currentPhase) {
+        parts.push(`Phase: ${currentPhase.num}: ${currentPhase.name}`);
+      }
+    }
+    
+    if (parts.length === 0) return null;
+    
+    return `<sacred>\n${parts.join('\n')}\n</sacred>`;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Build the system prompt injection string.
  * Returns a compact <bgsd> tag with current project state.
@@ -122,11 +234,13 @@ export function buildSystemPrompt(cwd) {
  * Preserves full project awareness across context window resets.
  *
  * Blocks (per CONTEXT.md):
+ * - <sacred>: Critical project data (intent, roadmap, key decisions) - FIRST
  * - <project>: Core value + tech stack (1 line each from PROJECT.md)
  * - <task-state>: Phase, plan, current task name + files
  * - <decisions>: Last 3 decisions from STATE.md
  * - <intent>: Objective from INTENT.md
  * - <session>: Session continuity hint (stopped_at, next_step)
+ * - <trajectory>: Phase progression and plan completion history
  *
  * Uses `task-state` (not `task`) as tag name to avoid XML parser conflicts
  * with PLAN.md task tags.
@@ -150,8 +264,17 @@ export function buildCompactionContext(cwd) {
     return null;
   }
 
-  const { state, project, intent, plans, currentPhase } = projectState;
+  const { state, project, intent, plans, currentPhase, roadmap } = projectState;
   const blocks = [];
+
+  // <sacred> block: Critical project data (MOST IMPORTANT - first)
+  // Includes: INTENT objectives, ROADMAP current phase, critical decisions
+  try {
+    const sacredBlock = buildSacredBlock(intent, roadmap);
+    if (sacredBlock) {
+      blocks.push(sacredBlock);
+    }
+  } catch { /* skip block on failure */ }
 
   // <project> block: Core value + Tech stack
   try {
@@ -245,6 +368,14 @@ export function buildCompactionContext(cwd) {
           blocks.push(`<session>\n${parts.join('\n')}\n</session>`);
         }
       }
+    }
+  } catch { /* skip block on failure */ }
+
+  // <trajectory> block: Phase progression and plan completion history
+  try {
+    const trajectoryBlock = buildTrajectoryBlock(state, plans);
+    if (trajectoryBlock) {
+      blocks.push(trajectoryBlock);
     }
   } catch { /* skip block on failure */ }
 

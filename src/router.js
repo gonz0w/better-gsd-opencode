@@ -1,10 +1,12 @@
 'use strict';
 
 const { COMMAND_HELP } = require('./lib/constants');
-const { error } = require('./lib/output');
+const { error, output } = require('./lib/output');
 const { diagnoseCompileCache } = require('./lib/runtime-capabilities');
 const { detectBun, getCachedBunVersion, configGet, configSet } = require('./lib/cli-tools/bun-runtime');
 const { loadConfig } = require('./lib/config');
+const format = require('./lib/format');
+const debug = require('./lib/debug');
 
 // ─── Runtime Detection (Phase 89: Bun runtime detection with config persistence) ────────
 // Detect Bun at startup and show runtime banner.
@@ -103,6 +105,7 @@ function lazyResearch() { return _modules.research || (_modules.research = requi
 function lazyTools() { return _modules.tools || (_modules.tools = require('./commands/tools')); }
 function lazyRuntime() { return _modules.runtime || (_modules.runtime = require('./commands/runtime')); }
 function lazyMeasure() { return _modules.measure || (_modules.measure = require('./commands/measure')); }
+function lazyRecovery() { return _modules.recovery || (_modules.recovery = require('./lib/recovery')); }
 
 
 async function main() {
@@ -154,6 +157,14 @@ async function main() {
     global._gsdCompactMode = true;
     args.splice(compactIdx, 1);
   }
+
+  // ─── Debug/Trace Flags (Phase 91: Rich TTY Output & Error Handling) ───────────
+  // Parse --debug and --trace flags (pass args to allow flag removal)
+  debug.parseDebugFlags(args);
+
+  // Parse color flags (--color, --no-color, --force-color)
+  // Pass args array so flags can be removed before command extraction
+  format.parseColorFlags(args);
 
   // ─── Runtime Banner ─────────────────────────────────────────────────────────
   // Show runtime info at startup (only in verbose mode or when running with Bun)
@@ -239,6 +250,9 @@ async function main() {
   if (namespace) {
     const subCmd = remainingArgs[0] || '';
     const restArgs = remainingArgs.slice(1);
+    
+    // Track command for history (Phase 97: UX Polish)
+    trackCommandHistory(namespace, subCmd, restArgs);
     
     switch (namespace) {
       // init namespace
@@ -361,7 +375,8 @@ async function main() {
               }
               milestoneName = nameArgs.join(' ') || null;
             }
-            lazyPhase().cmdMilestoneComplete(cwd, restArgs[1], { name: milestoneName, archivePhases }, raw);
+            const forceFlag = restArgs.includes('--force');
+            lazyPhase().cmdMilestoneComplete(cwd, restArgs[1], { name: milestoneName, archivePhases, force: forceFlag }, raw);
           } else {
             error('Unknown milestone subcommand. Available: complete');
           }
@@ -464,7 +479,30 @@ async function main() {
       // verify namespace
       case 'verify': {
         const subcommand = subCmd;
-        if (subcommand === 'state') {
+        if (subcommand === 'regression') {
+          const beforeIdx = restArgs.indexOf('--before');
+          const afterIdx = restArgs.indexOf('--after');
+          const autoIdx = restArgs.indexOf('--auto');
+          lazyVerify().cmdVerifyRegression(cwd, {
+            before: beforeIdx !== -1 ? restArgs[beforeIdx + 1] : null,
+            after: afterIdx !== -1 ? restArgs[afterIdx + 1] : null,
+            auto: autoIdx !== -1,
+          }, raw);
+        } else if (subcommand === 'quality') {
+          const planIdx = restArgs.indexOf('--plan');
+          const phaseIdx = restArgs.indexOf('--phase');
+          const gapDetectionIdx = restArgs.indexOf('--gap-detection');
+          lazyVerify().cmdVerifyQuality(cwd, {
+            plan: planIdx !== -1 ? restArgs[planIdx + 1] : null,
+            phase: phaseIdx !== -1 ? restArgs[phaseIdx + 1] : null,
+            gap_detection: gapDetectionIdx !== -1,
+          }, raw);
+        } else if (subcommand === 'review') {
+          const edgeCasesIdx = restArgs.indexOf('--suggest-edge-cases');
+          lazyMisc().cmdReview(cwd, restArgs, raw, {
+            suggest_edge_cases: edgeCasesIdx !== -1,
+          });
+        } else if (subcommand === 'state') {
           const stateSub = restArgs[0];
           if (stateSub === 'update') {
             lazyState().cmdStateUpdate(cwd, restArgs[1], restArgs[2]);
@@ -551,9 +589,11 @@ async function main() {
           } else if (verifySub === 'regression') {
             const beforeIdx = restArgs.indexOf('--before');
             const afterIdx = restArgs.indexOf('--after');
+            const autoIdx = restArgs.indexOf('--auto');
             lazyVerify().cmdVerifyRegression(cwd, {
               before: beforeIdx !== -1 ? restArgs[beforeIdx + 1] : null,
               after: afterIdx !== -1 ? restArgs[afterIdx + 1] : null,
+              auto: autoIdx !== -1,
             }, raw);
           } else if (verifySub === 'plan-wave') {
             lazyVerify().cmdVerifyPlanWave(cwd, restArgs[1], raw);
@@ -762,6 +802,10 @@ async function main() {
           lazyMisc().cmdHistoryDigest(cwd, hdOptions, raw);
         } else if (subcommand === 'trace-requirement') {
           lazyFeatures().cmdTraceRequirement(cwd, restArgs[0], raw);
+        } else if (subcommand === 'analyze-deps') {
+          lazyFeatures().cmdAnalyzeDeps(cwd, restArgs[0], raw);
+        } else if (subcommand === 'estimate-scope') {
+          lazyFeatures().cmdEstimateScope(cwd, restArgs[0], raw);
         } else if (subcommand === 'codebase') {
           const cbSub = restArgs[0];
           if (cbSub === 'analyze') {
@@ -983,8 +1027,150 @@ Examples:
             verbose: isVerbose,
             binPath: binPathIdx !== -1 ? restArgs[binPathIdx + 1] : 'bin/bgsd-tools.cjs'
           }, raw);
+        } else if (subcommand === 'recovery') {
+          const recoverySub = restArgs[0];
+          const recoveryMod = lazyRecovery();
+          if (recoverySub === 'analyze') {
+            // util:recovery analyze <deviation-text>
+            const deviation = restArgs.slice(1).join(' ');
+            const recovery = recoveryMod.createAutoRecovery();
+            const classification = recovery.classifyDeviation(deviation);
+            output({
+              deviation,
+              classification: {
+                type: classification.type,
+                rule: classification.rule,
+                description: classification.description,
+                canAutoFix: classification.strategy?.canAutoFix
+              }
+            }, raw);
+          } else if (recoverySub === 'checkpoint') {
+            // util:recovery checkpoint <task-json>
+            const taskJson = restArgs.slice(1).join(' ');
+            let task;
+            try {
+              task = taskJson ? JSON.parse(taskJson) : {};
+            } catch (e) {
+              // If not JSON, treat as simple task
+              task = { type: taskJson || 'auto' };
+            }
+            const advisor = recoveryMod.createCheckpointAdvisor();
+            const result = advisor.analyze(task);
+            output({
+              task,
+              complexityScore: result.analysis.totalScore,
+              breakdown: result.analysis.breakdown,
+              recommendation: {
+                type: result.recommendation.recommended,
+                description: result.recommendation.description,
+                rationale: result.recommendation.rationale
+              }
+            }, raw);
+          } else if (recoverySub === 'stuck') {
+            // util:recovery stuck <task-id>
+            const taskId = restArgs[1] || 'default';
+            const detector = recoveryMod.createLoopDetector();
+            const status = detector.getStatus(taskId);
+            output({
+              taskId,
+              isStuck: status.isStuck,
+              attempts: status.attempts,
+              retryCount: status.retryCount,
+              lastError: status.lastError
+            }, raw);
+          } else if (!recoverySub || recoverySub === '--help' || recoverySub === '-h') {
+            process.stderr.write(`Usage: bgsd-tools util:recovery <subcommand> [options]
+
+Execution intelligence - recovery and checkpoint management.
+
+Subcommands:
+  analyze <deviation>    Classify a deviation using the 4-rule framework
+  checkpoint <task-json> Analyze task complexity and recommend checkpoint type
+  stuck <task-id>       Check if a task is stuck in a loop
+
+Examples:
+  bgsd-tools util:recovery analyze "Cannot read property 'foo' of undefined"
+  bgsd-tools util:recovery checkpoint '{"files":["a.js","b.js"],"type":"auto","dependsOn":["t1"]}'
+  bgsd-tools util:recovery stuck task-123
+`);
+          } else {
+            error(`Unknown recovery subcommand: ${recoverySub}. Available: analyze, checkpoint, stuck`);
+          }
+        } else if (subcommand === 'history') {
+          // util:history - Command history tracking (Phase 97: UX Polish)
+          const historyMod = require('./lib/helpContext');
+          const clearIdx = restArgs.indexOf('--clear');
+          const limitIdx = restArgs.indexOf('--limit');
+          const contextIdx = restArgs.indexOf('--context');
+          const suggestIdx = restArgs.indexOf('--suggest');
+          
+          if (clearIdx !== -1) {
+            const result = historyMod.clearHistory();
+            output(result, raw);
+          } else if (contextIdx !== -1) {
+            const suggestions = historyMod.getContextualSuggestions();
+            output(suggestions, raw);
+          } else if (suggestIdx !== -1) {
+            const input = restArgs[suggestIdx + 1] || '';
+            const discoveryMod = require('./lib/commandDiscovery');
+            const hints = discoveryMod.getAutocompleteHints(input);
+            const similar = discoveryMod.getSimilarCommands(input);
+            output({ hints, similar }, raw);
+          } else {
+            const limit = limitIdx !== -1 ? parseInt(restArgs[limitIdx + 1], 10) : 10;
+            const format = restArgs.includes('--json') ? 'json' : 'text';
+            
+            if (format === 'json') {
+              const history = historyMod.getRecentCommands(limit);
+              output({ commands: history, count: history.length }, raw);
+            } else {
+              const outputStr = historyMod.showHistory(limit);
+              output(outputStr, raw);
+            }
+          }
+        } else if (subcommand === 'examples') {
+          // util:examples - Show command examples (Phase 97: UX Polish)
+          const examplesMod = require('./lib/helpExamples');
+          const workflowsIdx = restArgs.indexOf('--workflows');
+          const verboseIdx = restArgs.indexOf('--verbose');
+          const verbose = verboseIdx !== -1;
+          
+          if (workflowsIdx !== -1) {
+            const workflows = examplesMod.getCommonWorkflows();
+            const formatted = workflows.map(w => examplesMod.formatWorkflow(w, verbose)).join('\n\n');
+            output({ workflows, formatted }, raw);
+            return;
+          }
+          
+          const command = restArgs[0];
+          if (!command) {
+            output({
+              message: 'Usage: util:examples <command> [--workflows] [--verbose]',
+              examples: 'Try: util:examples plan:phase',
+              workflows: examplesMod.getCommonWorkflows().slice(0, 3).map(w => ({
+                name: w.name,
+                steps: w.steps
+              }))
+            }, raw);
+            return;
+          }
+          
+          const [namespace, cmd] = command.split(':');
+          const examples = examplesMod.getExamples(namespace, cmd);
+          
+          if (examples.length === 0) {
+            output({ 
+              command, 
+              message: `No examples found for ${command}`,
+              available: examplesMod.getCommonWorkflows().map(w => w.name)
+            }, raw);
+            return;
+          }
+          
+          const formatted = examples.map(ex => examplesMod.formatExample(ex, verbose)).join('\n');
+          output({ command, examples, formatted }, raw);
         } else {
-          error(`Unknown util subcommand: ${subcommand}. Available: config-get, config-set, env, current-timestamp, list-todos, todo, memory, mcp, classify, frontmatter, progress, websearch, history-digest, trace-requirement, codebase, cache, agent, resolve-model, template, generate-slug, verify-path-exists, config-ensure-section, config-migrate, scaffold, phase-plan-index, state-snapshot, summary-extract, quick-summary, extract-sections, git, profiler, tools, runtime, measure`);
+          error(`Unknown util subcommand: ${subcommand}. Available: config-get, config-set, env, current-timestamp, list-todos, todo, memory, mcp, classify, frontmatter, progress, websearch, history-digest, trace-requirement, codebase, cache, agent, resolve-model, template, generate-slug, verify-path-exists, config-ensure-section, config-migrate, scaffold, phase-plan-index, state-snapshot, summary-extract, quick-summary, extract-sections, git, profiler, tools, runtime, measure, recovery, history, examples`);
         }
         break;
       }
@@ -1068,6 +1254,20 @@ Examples:
 
   // No command matched any namespace — unknown
   error(`Unknown command: ${command}. Use namespace:command syntax. Available namespaces: init, plan, execute, verify, util, research, cache`);
+}
+
+// Track command execution in history (Phase 97: UX Polish)
+function trackCommandHistory(namespace, command, args) {
+  try {
+    const { trackCommand } = require('./lib/helpContext');
+    // Don't track the history command itself to avoid noise
+    if (namespace === 'util' && (command === 'history' || command === 'examples')) {
+      return;
+    }
+    trackCommand(namespace, command, args);
+  } catch (e) {
+    // Silent fail - don't break commands if tracking fails
+  }
 }
 
 module.exports = { main };

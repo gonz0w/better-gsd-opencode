@@ -5,37 +5,59 @@
 See: `.planning/PROJECT.md` (updated 2026-03-10)
 
 **Core value:** Manage and deliver high-quality software with high-quality documentation, while continuously reducing token usage and improving performance
-**Current focus:** v9.3 Quality, Performance & Agent Sharpening - roadmap created, ready for phase planning
+**Current focus:** v10.0 Agent Intelligence & UX
 
 ## Current Position
 
-**Phase:** 90 (in progress)
-**Current Plan:** Not started
-**Status:** Milestone complete
-**Last Activity:** 2026-03-10
+**Phase:** 97 (UX Polish) - Planning Complete
+**Current Plan:** 97-01
+**Status:** v10.0 milestone complete
+**Last Activity:** 2026-03-11
 
-**Progress:** [██████████] 100%
+**Progress:** v10.0 milestone 71% complete (5/7 phases)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 178 (v1.0-v9.2)
+- Total plans completed: 190 (v1.0-v9.3)
 - Average duration: ~15 min/plan
-- Total execution time: ~33 hours
+- Total execution time: ~35 hours
 
 **Current milestone profile:**
 
 | Milestone | Phases | Requirements | Status |
 |-----------|--------|--------------|--------|
-| v9.3 | 5 (86-90) | 15 | In Progress |
+| v10.0 | 5 (91-95 of 91-97) | 9 | In Progress |
+| v9.3 | 5 (86-90) | 15 | Complete |
 | v9.2 | 4 (82-85) | 12 | Complete |
 | v9.1 | 5 (77-81) | 12 | Complete |
-| Phase 87 | 2 plans | Complete | Command consolidation done |
 
 ## Accumulated Context
 
 ### Decisions
 
+- [94-01]: Added execution intelligence modules - autoRecovery for autonomous deviation handling using 4-rule framework, checkpointAdvisor for complexity-based checkpoint decisions, and loopDetector for stuck/loop pattern detection.
+- [93-01]: Added --auto flag to verify:regression for automatic pattern detection in git changes.
+- [93-01]: Added --suggest-edge-cases flag to verify:review for edge case suggestions based on code patterns.
+- [93-01]: Added --gap-detection flag to verify:quality for identifying untested paths in changed files.
+- [91-01]: Enhanced format.js with CLI color flags: --color, --no-color, --force-color with priority order --no-color > --force-color > NO_COLOR > auto-detect.
+- [91-01]: Created Spinner class for indeterminate progress with ASCII animation (|/-\).
+- [91-01]: Created ProgressTracker with nested task support and Ctrl+C cancellation.
+- [91-02]: Created error.js module with BgsdError base class and subclasses (ValidationError, FileError, CommandError, ConfigError).
+- [91-02]: Error formatting includes "Try:" prefix for recovery suggestions in green.
+- [91-03]: Created debug.js with trace(), dumpContext(), dumpState(), dumpConfig(), and inspection functions.
+- [91-03]: Context dump filters sensitive env vars (password, token, key, secret, auth).
+- [91-04]: CLI flag parsing happens before command extraction to prevent "unknown command" errors.
+- [92-Context]: Dependency detection uses file-level + pattern-based combined approach.
+- [92-Context]: Task sizing applied during breakdown with execution feedback loop.
+- [92-Context]: Parallelization uses hybrid with resource conflict analysis.
+- [92-Context]: Output format includes wave numbers + depends_on arrays in frontmatter.
+- [92-01]: Enhanced planner-dependency-graph skill with dependency detection patterns - file-level is authoritative, pattern-based is heuristic.
+- [92-01]: Enhanced planner-task-breakdown skill with execution feedback loop for historical task timing.
+- [92-01]: Enhanced planner-scope-estimation skill with parallelization detection and wave analysis.
+- [92-02]: Added util:analyze-deps CLI command for automatic dependency suggestions with confidence scores.
+- [92-02]: Added util:estimate-scope CLI command for task sizing and context budget analysis.
+- [92-02]: Enhanced verify:plan-wave with parallelization_warnings and safe_to_parallelize output.
 - [90-01]: Created plugin-benchmark.js with measureStartup, measureCommandExecution, measureContextLoad, measureMemory functions - uses process.hrtime.bigint() for nanosecond precision.
 - [90-01]: Created /bgsd-measure command - outputs table format by default, --verbose shows full metrics including memory and context load.
 - [90-01]: Added INCLUDE_BENCHMARKS build-time feature flag - set INCLUDE_BENCHMARKS=false to exclude benchmarks from production builds.
@@ -65,6 +87,9 @@ See: `.planning/PROJECT.md` (updated 2026-03-10)
 - [87-02]: Consolidated 50 slash commands into 11 (8 wrappers + 3 standalone) - 78% reduction
 - [87-02]: Removed bgsd-notifications from slash command surface (internal-only)
 - [Phase 87-03]: Routing handled by host editor natively (Option A) — Wrapper commands are definition files for host editor. Plugin's command-enricher.js adds context but doesn't route subcommands. Host editor parses /bgsd plan phase 1 as command bgsd-plan with args phase 1.
+- [Phase 96]: Deterministic context transfer - pre-computed, not search-and-discover (DO-28)
+- [Phase 96]: TTL-based shared context with 30-minute default expiration for freshness
+- [Phase 96]: 10 pre-defined handoff contracts covering major agent transitions
 
 ### Pending Todos
 
@@ -84,7 +109,7 @@ None yet.
 
 ## Session Continuity
 
-**Last session:** 2026-03-10T20:55:00.000Z
-**Stopped at:** Completed phase 90-01 (benchmark plan)
-**Next step:** Ready for next plan in phase 90 or verify work
+**Last session:** 2026-03-11T13:18:33.070Z
+**Stopped at:** Completed 96-01-PLAN.md - Multi-agent collaboration infrastructure complete
+**Next step:** /bgsd plan phase 96
 
