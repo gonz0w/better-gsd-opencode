@@ -2,9 +2,12 @@
 
 ## Milestones
 
-- ✅ **v10.0 Agent Intelligence & UX** - Phases 91-92 (2026-03-11) — Complete ✅
+- 🔵 **v10.0 Agent Intelligence & UX** - Phases 91-97 (in progress)
   - Phase 91: Rich TTY Output & Error Handling ✅
   - Phase 92: Planning Intelligence ✅
+  - Phase 93: Verification Intelligence ✅
+  - Phase 94: Execution Intelligence ✅
+  - Phase 95: Interactive Workflows ✅
 - ✅ **v9.3 Quality, Performance & Agent Sharpening** - Phases 86-90 (2026-03-10) — see `.planning/milestones/v9.3-ROADMAP.md`
 - ✅ **v9.2 CLI Tool Integrations & Runtime Modernization** - Phases 82-85 (2026-03-10) — see `.planning/milestones/v9.2-ROADMAP.md`
 
@@ -15,15 +18,15 @@
 - [x] **Phase 91: Rich TTY Output & Error Handling** — Complete ✅
 - [x] **Phase 92: Planning Intelligence** — Complete ✅
 - [x] **Phase 93: Verification Intelligence** — Complete ✅
-- [ ] **Phase 94: Execution Intelligence** — Deviation handling
-- [ ] **Phase 95: Interactive Workflows** — Prompts and wizards
+- [x] **Phase 94: Execution Intelligence** — Complete ✅
+- [x] **Phase 95: Interactive Workflows** — Complete ✅
 - [ ] **Phase 96: Multi-Agent Collaboration** — Better handoffs
 - [ ] **Phase 97: UX Polish** — Command improvements and error handling
 
 ---
 
 *Roadmap updated: 2026-03-11*
-*Ready for: /bgsd plan phase 92*
+*Ready for: /bgsd plan phase 96*
 
 ---
 
@@ -106,7 +109,9 @@
 3. Stuck/loop patterns detected and pivots suggested
 
 **Plans:**
-- [ ] 94-01: Execution Intelligence (deviation recovery, checkpoint decisions, loop detection)
+- ✅ 94-01: Execution Intelligence (deviation recovery, checkpoint decisions, loop detection)
+
+**Completed:** 2026-03-11
 
 ---
 
@@ -124,7 +129,10 @@
 3. User can abort workflows gracefully
 4. Compaction preserves full context (decisions, blockers, intent)
 
-**Plans:** TBD
+**Plans:**
+- ✅ 95-01: Interactive workflows with prompts, wizards, and enhanced compaction
+
+**Completed:** 2026-03-11
 
 ---
 
@@ -141,7 +149,8 @@
 2. Shared context enables collaboration on related tasks
 3. Handoff contracts verified before transfer
 
-**Plans:** TBD
+**Plans:**
+- ✅ 96-01: Multi-Agent Collaboration (handoff context, shared context, contract verification)
 
 ---
 
