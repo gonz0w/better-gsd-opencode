@@ -91,7 +91,9 @@
 2. User sees milestone completion percentage with visual indicator (e.g., "Milestone: 65% complete")
 3. User sees quality grades displayed with visual indicators (e.g., "Quality: A ████████")
 
-**Plans:** TBD
+**Plans:**
+- ✅ 100-01: Visualization core modules (progress, milestone, quality)
+- ✅ 100-02: Unified API and integration
 
 ---
 
