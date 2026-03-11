@@ -168,7 +168,9 @@
 3. Examples included in help for common use cases
 4. Bundle size reduced beyond v9.3 baseline
 
-**Plans:** TBD
+**Plans:**
+- 97-01: Help system enhancements (UX-07, UX-08, UX-09)
+- 97-02: Bundle size reduction (PERF-03, PERF-04)
 
 ---
 
