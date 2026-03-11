@@ -772,6 +772,10 @@ async function main() {
           lazyMisc().cmdHistoryDigest(cwd, hdOptions, raw);
         } else if (subcommand === 'trace-requirement') {
           lazyFeatures().cmdTraceRequirement(cwd, restArgs[0], raw);
+        } else if (subcommand === 'analyze-deps') {
+          lazyFeatures().cmdAnalyzeDeps(cwd, restArgs[0], raw);
+        } else if (subcommand === 'estimate-scope') {
+          lazyFeatures().cmdEstimateScope(cwd, restArgs[0], raw);
         } else if (subcommand === 'codebase') {
           const cbSub = restArgs[0];
           if (cbSub === 'analyze') {

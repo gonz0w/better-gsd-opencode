@@ -1036,6 +1036,119 @@ function cmdTraceRequirement(cwd, reqId, raw) {
   output(trace, raw);
 }
 
+function cmdAnalyzeDeps(cwd, phasePath, raw) {
+  if (!phasePath) {
+    error('phase directory path required');
+  }
+
+  const fullPath = path.isAbsolute(phasePath) ? phasePath : path.join(cwd, phasePath);
+  let files;
+  try {
+    files = fs.readdirSync(fullPath);
+  } catch (e) {
+    debugLog('util.analyzeDeps', 'readdir failed', e);
+    output({ error: 'Cannot read phase directory', path: phasePath }, raw);
+    return;
+  }
+
+  const planFiles = files.filter(f => f.match(/-PLAN\.md$/i)).sort();
+  const dirName = path.basename(fullPath);
+  const phaseMatch = dirName.match(/^(\d+(?:\.\d+)?)/);
+  const phaseNum = phaseMatch ? phaseMatch[1] : dirName;
+
+  const plans = [];
+  for (const planFile of planFiles) {
+    const content = safeReadFile(path.join(fullPath, planFile));
+    if (!content) continue;
+    const fm = extractFrontmatter(content);
+    const planId = planFile.replace(/-PLAN\.md$/i, '');
+    let filesModified = [];
+    if (Array.isArray(fm.files_modified)) {
+      filesModified = fm.files_modified;
+    } else if (typeof fm.files_modified === 'string' && fm.files_modified.trim()) {
+      filesModified = [fm.files_modified];
+    }
+    plans.push({ id: planId, files: filesModified });
+  }
+
+  const suggestions = [];
+  for (let i = 0; i < plans.length; i++) {
+    for (let j = i + 1; j < plans.length; j++) {
+      const planA = plans[i];
+      const planB = plans[j];
+      const overlap = planA.files.filter(f => planB.files.includes(f));
+      for (const file of overlap) {
+        suggestions.push({
+          from: planA.id.replace(/^(\d+)-(\d+).*/, '$1-$2'),
+          to: planB.id.replace(/^(\d+)-(\d+).*/, '$1-$2'),
+          file,
+          confidence: 100,
+          reason: `${planA.id} writes, ${planB.id} reads`,
+        });
+      }
+    }
+  }
+
+  output({ phase: phaseNum, suggestions }, raw);
+}
+
+function cmdEstimateScope(cwd, planPath, raw) {
+  if (!planPath) {
+    error('plan file path required');
+  }
+
+  const fullPath = path.isAbsolute(planPath) ? planPath : path.join(cwd, planPath);
+  const content = safeReadFile(fullPath);
+  if (!content) {
+    output({ error: 'Cannot read plan file', path: planPath }, raw);
+    return;
+  }
+
+  const fm = extractFrontmatter(content);
+  const planId = path.basename(fullPath).replace(/-PLAN\.md$/i, '');
+
+  const tasks = content.match(/<task type="/g) || [];
+  const taskCount = tasks.length;
+
+  let filesModified = [];
+  if (Array.isArray(fm.files_modified)) {
+    filesModified = fm.files_modified;
+  } else if (typeof fm.files_modified === 'string' && fm.files_modified.trim()) {
+    filesModified = [fm.files_modified];
+  }
+  const fileCount = filesModified.length;
+
+  let complexity = 'low';
+  if (fileCount >= 7 || taskCount >= 5) {
+    complexity = 'high';
+  } else if (fileCount >= 4 || taskCount >= 3) {
+    complexity = 'medium';
+  }
+
+  const baseContext = 10;
+  const complexityFactor = complexity === 'high' ? 15 : complexity === 'medium' ? 10 : 5;
+  const taskOverhead = taskCount * 5;
+  const contextEstimate = baseContext + (fileCount * complexityFactor) + taskOverhead;
+  const withinBudget = contextEstimate <= 50;
+
+  const recommendations = [];
+  if (contextEstimate > 50) {
+    recommendations.push('Split into multiple plans - exceeds 50% context budget');
+  } else if (contextEstimate > 40 && complexity === 'high') {
+    recommendations.push('Consider splitting if complexity increases');
+  }
+
+  output({
+    plan: planId,
+    tasks: taskCount,
+    files: fileCount,
+    complexity,
+    context_estimate: `${Math.min(contextEstimate, 100)}%`,
+    within_budget: withinBudget,
+    recommendations,
+  }, raw);
+}
+
 function cmdValidateConfig(cwd, raw) {
   const configPath = path.join(cwd, '.planning', 'config.json');
 
@@ -2094,6 +2207,8 @@ module.exports = {
   cmdRollbackInfo,
   cmdVelocity,
   cmdTraceRequirement,
+  cmdAnalyzeDeps,
+  cmdEstimateScope,
   cmdValidateConfig,
   cmdQuickTaskSummary,
   cmdExtractSections,

@@ -1692,6 +1692,984 @@ var require_config = __commonJS({
   }
 });
 
+// src/lib/format.js
+var require_format = __commonJS({
+  "src/lib/format.js"(exports2, module2) {
+    "use strict";
+    function getTerminalWidth() {
+      return process.stdout.columns || 80;
+    }
+    function isTTY() {
+      return !!process.stdout.isTTY;
+    }
+    var _colorMode = "auto";
+    function setColorMode(mode) {
+      if (mode === "auto" || mode === "force" || mode === "disable") {
+        _colorMode = mode;
+      }
+    }
+    function getColorMode() {
+      return _colorMode;
+    }
+    function parseColorFlags(args) {
+      if (!Array.isArray(args)) {
+        args = (args || process.argv).slice(2);
+      }
+      if (args.includes("--no-color")) {
+        setColorMode("disable");
+        const idx = args.indexOf("--no-color");
+        args.splice(idx, 1);
+      } else if (args.includes("--force-color")) {
+        setColorMode("force");
+        const idx = args.indexOf("--force-color");
+        args.splice(idx, 1);
+      } else if (args.includes("--color")) {
+        setColorMode("force");
+        const idx = args.indexOf("--color");
+        args.splice(idx, 1);
+      }
+      return _colorMode;
+    }
+    function _computeColorEnabled() {
+      if (_colorMode === "disable") return false;
+      if (_colorMode === "force") return true;
+      if ("NO_COLOR" in process.env) return false;
+      if (!process.stdout.isTTY) return false;
+      if (process.env.FORCE_COLOR) return true;
+      return true;
+    }
+    var _colorEnabled = (() => {
+      return _computeColorEnabled();
+    })();
+    function _wrap(open, close) {
+      if (!_colorEnabled) return (s) => String(s);
+      return (s) => `\x1B[${open}m${s}\x1B[${close}m`;
+    }
+    var color = {
+      enabled: _colorEnabled,
+      // Modifiers
+      bold: _wrap("1", "22"),
+      dim: _wrap("2", "22"),
+      underline: _wrap("4", "24"),
+      // Colors
+      red: _wrap("31", "39"),
+      green: _wrap("32", "39"),
+      yellow: _wrap("33", "39"),
+      blue: _wrap("34", "39"),
+      magenta: _wrap("35", "39"),
+      cyan: _wrap("36", "39"),
+      white: _wrap("37", "39"),
+      gray: _wrap("90", "39")
+    };
+    function colorByPercent(percent) {
+      if (percent <= 33) return color.red;
+      if (percent <= 66) return color.yellow;
+      return color.green;
+    }
+    var SYMBOLS = {
+      check: "\u2713",
+      // ✓
+      cross: "\u2717",
+      // ✗
+      progress: "\u25B6",
+      // ▶
+      pending: "\u25CB",
+      // ○
+      warning: "\u26A0",
+      // ⚠
+      arrow: "\u2192",
+      // →
+      bullet: "\u2022",
+      // •
+      dash: "\u2500",
+      // ─
+      heavyDash: "\u2501"
+      // ━
+    };
+    var _ansiRegex = /\x1b\[[0-9;]*m/g;
+    function stripAnsi(text) {
+      return String(text).replace(_ansiRegex, "");
+    }
+    function truncate(text, maxWidth) {
+      const str = String(text);
+      const visible = stripAnsi(str);
+      if (visible.length <= maxWidth) return str;
+      if (maxWidth <= 1) return "\u2026";
+      return visible.slice(0, maxWidth - 1) + "\u2026";
+    }
+    function relativeTime(dateStr) {
+      const then = new Date(dateStr);
+      if (isNaN(then.getTime())) return String(dateStr);
+      const now = /* @__PURE__ */ new Date();
+      const diffMs = now - then;
+      const diffSec = Math.floor(diffMs / 1e3);
+      const diffMin = Math.floor(diffSec / 60);
+      const diffHr = Math.floor(diffMin / 60);
+      const diffDay = Math.floor(diffHr / 24);
+      if (diffSec < 0) return "in the future";
+      if (diffSec < 60) return "just now";
+      if (diffMin < 60) return `${diffMin}m ago`;
+      if (diffHr < 24) return `${diffHr}h ago`;
+      if (diffDay === 1) return "yesterday";
+      if (diffDay < 30) return `${diffDay} days ago`;
+      if (diffDay < 365) {
+        const months = Math.floor(diffDay / 30);
+        return `${months} month${months > 1 ? "s" : ""} ago`;
+      }
+      const years = Math.floor(diffDay / 365);
+      return `${years} year${years > 1 ? "s" : ""} ago`;
+    }
+    function pad(text, width, align = "left") {
+      const str = String(text);
+      const visible = stripAnsi(str);
+      const diff = width - visible.length;
+      if (diff <= 0) return str;
+      if (align === "right") return " ".repeat(diff) + str;
+      if (align === "center") {
+        const left = Math.floor(diff / 2);
+        const right = diff - left;
+        return " ".repeat(left) + str + " ".repeat(right);
+      }
+      return str + " ".repeat(diff);
+    }
+    function formatTable(headers, rows, options = {}) {
+      const {
+        maxWidth = getTerminalWidth(),
+        truncate: doTruncate = true,
+        borders = false,
+        indent = 1,
+        colorFn = null,
+        maxRows = 10,
+        showAll = false
+      } = options;
+      if (!headers || headers.length === 0) return "";
+      const indentStr = " ".repeat(indent);
+      const colGap = 2;
+      const colCount = headers.length;
+      const colWidths = headers.map((h) => stripAnsi(String(h)).length);
+      for (const row of rows) {
+        for (let i = 0; i < colCount; i++) {
+          const cellLen = stripAnsi(String(row[i] || "")).length;
+          if (cellLen > colWidths[i]) colWidths[i] = cellLen;
+        }
+      }
+      const totalGap = (colCount - 1) * colGap + indent;
+      const availableWidth = maxWidth - totalGap;
+      const totalColWidth = colWidths.reduce((a, b) => a + b, 0);
+      if (totalColWidth > availableWidth && availableWidth > 0) {
+        const ratio = availableWidth / totalColWidth;
+        for (let i = 0; i < colCount; i++) {
+          colWidths[i] = Math.max(4, Math.floor(colWidths[i] * ratio));
+        }
+      }
+      const headerCells = headers.map(
+        (h, i) => color.bold(pad(truncateCell(String(h), colWidths[i], doTruncate), colWidths[i]))
+      );
+      const headerLine = indentStr + headerCells.join(" ".repeat(colGap));
+      const sepWidth = colWidths.reduce((a, b) => a + b, 0) + (colCount - 1) * colGap;
+      const separator = indentStr + SYMBOLS.dash.repeat(sepWidth);
+      const displayRows = !showAll && rows.length > maxRows ? rows.slice(0, maxRows) : rows;
+      const rowLines = displayRows.map((row, rowIdx) => {
+        const cells = [];
+        for (let i = 0; i < colCount; i++) {
+          let cellText = String(row[i] != null ? row[i] : "");
+          cellText = truncateCell(cellText, colWidths[i], doTruncate);
+          if (colorFn) {
+            cellText = colorFn(row[i], i, rowIdx);
+            cellText = truncateCell(String(cellText), colWidths[i], doTruncate);
+          }
+          cells.push(pad(cellText, colWidths[i]));
+        }
+        return indentStr + cells.join(" ".repeat(colGap));
+      });
+      const lines = [headerLine, separator, ...rowLines];
+      if (!showAll && rows.length > maxRows) {
+        const remaining = rows.length - maxRows;
+        lines.push(indentStr + color.dim(`... and ${remaining} more (use --all to see full list)`));
+      }
+      return lines.join("\n");
+    }
+    function truncateCell(text, maxWidth, doTruncate) {
+      if (!doTruncate) return text;
+      return truncate(text, maxWidth);
+    }
+    function progressBar(percent, width = 20) {
+      const pct = Math.max(0, Math.min(100, Math.round(percent)));
+      const filled = Math.round(pct / 100 * width);
+      const empty = width - filled;
+      const bar = "\u2588".repeat(filled) + "\u2591".repeat(empty);
+      const colorFn = colorByPercent(pct);
+      const pctStr = String(pct).padStart(3) + "%";
+      return `${colorFn(pctStr)} [${colorFn(bar)}]`;
+    }
+    function sectionHeader(label) {
+      const termWidth = getTerminalWidth();
+      const prefix = SYMBOLS.heavyDash.repeat(2) + " ";
+      const labelStr = color.bold(color.cyan(label));
+      const labelLen = stripAnsi(label).length;
+      const suffixLen = Math.max(4, termWidth - 2 - 1 - labelLen - 1);
+      const suffix = " " + SYMBOLS.heavyDash.repeat(suffixLen);
+      return prefix + labelStr + suffix;
+    }
+    function banner(title, options = {}) {
+      const { completion = false } = options;
+      const termWidth = getTerminalWidth();
+      if (completion) {
+        const rule2 = SYMBOLS.heavyDash.repeat(Math.min(termWidth, 60));
+        const line = `${SYMBOLS.check} ${title}`;
+        return [
+          color.green(rule2),
+          color.bold(color.green(line)),
+          color.green(rule2)
+        ].join("\n");
+      }
+      const prefix = color.dim("bGSD") + " " + color.cyan(SYMBOLS.progress) + " ";
+      const titleStr = color.bold(title);
+      const ruleLen = Math.min(termWidth, 60);
+      const rule = color.dim(SYMBOLS.dash.repeat(ruleLen));
+      return prefix + titleStr + "\n" + rule;
+    }
+    var _boxPrefixes = {
+      info: { fn: color.cyan, label: "INFO" },
+      warning: { fn: color.yellow, label: "WARNING" },
+      error: { fn: color.red, label: "ERROR" },
+      success: { fn: color.green, label: "SUCCESS" }
+    };
+    function box(content, type = "info") {
+      const termWidth = getTerminalWidth();
+      const ruleLen = Math.min(termWidth, 60);
+      const cfg = _boxPrefixes[type] || _boxPrefixes.info;
+      const topRule = cfg.fn(SYMBOLS.dash.repeat(ruleLen));
+      const prefix = cfg.fn(color.bold(cfg.label + ":"));
+      const bottomRule = cfg.fn(SYMBOLS.dash.repeat(ruleLen));
+      return [topRule, prefix + " " + content, bottomRule].join("\n");
+    }
+    function summaryLine(text) {
+      const ruleLen = Math.min(getTerminalWidth(), 60);
+      const rule = color.dim(SYMBOLS.dash.repeat(ruleLen));
+      return rule + "\n" + color.bold(text);
+    }
+    function actionHint(text) {
+      return color.dim(SYMBOLS.arrow + " " + text);
+    }
+    function listWithTruncation(items, maxItems = 10, showAll = false) {
+      if (!items || items.length === 0) return "";
+      const display = !showAll && items.length > maxItems ? items.slice(0, maxItems) : items;
+      const lines = display.map((item, i) => ` ${i + 1}. ${item}`);
+      if (!showAll && items.length > maxItems) {
+        const remaining = items.length - maxItems;
+        lines.push(color.dim(` ... and ${remaining} more (use --all to see full list)`));
+      }
+      return lines.join("\n");
+    }
+    var SPINNER_FRAMES = ["|", "/", "-", "\\"];
+    var Spinner = class {
+      constructor(options = {}) {
+        this.frames = options.frames || SPINNER_FRAMES;
+        this.interval = options.interval || 100;
+        this.message = "";
+        this._interval = null;
+        this._frameIndex = 0;
+        this._lastLine = "";
+      }
+      /**
+       * Start the spinner with a message.
+       * @param {string} message - Initial message to display
+       */
+      start(message = "Working...") {
+        this.message = message;
+        this._frameIndex = 0;
+        this.stop();
+        this._write("\r" + this._frame() + " " + message);
+        this._interval = setInterval(() => {
+          this._write("\r" + this._frame() + " " + this.message);
+        }, this.interval);
+      }
+      /**
+       * Stop the spinner with an optional final message.
+       * @param {string} [message] - Final message to display
+       */
+      stop(message) {
+        if (this._interval) {
+          clearInterval(this._interval);
+          this._interval = null;
+        }
+        if (message !== void 0) {
+          this.message = message;
+        }
+        if (this.message) {
+          this._write("\r" + " ".repeat(this._lastLine.length) + "\r" + this.message);
+        } else {
+          this._write("\r" + " ".repeat(this._lastLine.length) + "\r");
+        }
+      }
+      /**
+       * Update the spinner message.
+       * @param {string} message - New message
+       */
+      update(message) {
+        this.message = message;
+        if (this._interval) {
+          this._write("\r" + this._frame() + " " + message);
+        }
+      }
+      /**
+       * Clear the spinner completely.
+       */
+      clear() {
+        this.stop();
+        this._write("");
+      }
+      _frame() {
+        return this.frames[this._frameIndex++ % this.frames.length];
+      }
+      _write(text) {
+        process.stderr.write(text);
+        this._lastLine = text.replace("\r", "");
+      }
+    };
+    var _globalProgressTracker = null;
+    var _cancelHandler = null;
+    var ProgressTracker = class {
+      constructor(options = {}) {
+        this.tasks = /* @__PURE__ */ new Map();
+        this._taskIdCounter = 0;
+        this._currentParent = null;
+        this._updateInterval = options.updateInterval || 100;
+        this._lastOutput = "";
+        this._isActive = false;
+        this._handleCancel = this._handleCancel.bind(this);
+      }
+      /**
+       * Start a new task.
+       * @param {string} label - Task label
+       * @param {number} [percent=0] - Initial progress (0-100)
+       * @param {string} [parentId] - Parent task ID for nesting
+       * @returns {string} Task ID
+       */
+      startTask(label, percent = 0, parentId = null) {
+        const id = String(++this._taskIdCounter);
+        const task = {
+          id,
+          label,
+          percent: Math.max(0, Math.min(100, percent)),
+          parent: parentId || this._currentParent,
+          children: [],
+          createdAt: Date.now()
+        };
+        if (task.parent && this.tasks.has(task.parent)) {
+          this.tasks.get(task.parent).children.push(id);
+        }
+        this.tasks.set(id, task);
+        this._currentParent = id;
+        this._render();
+        return id;
+      }
+      /**
+       * Start a subtask of the current task.
+       * @param {string} label - Subtask label
+       * @param {number} [percent=0] - Initial progress
+       * @returns {string} Subtask ID
+       */
+      startSubtask(label, percent = 0) {
+        return this.startTask(label, percent, this._currentParent);
+      }
+      /**
+       * Update task progress.
+       * @param {string} id - Task ID
+       * @param {number} percent - Progress (0-100)
+       * @param {string} [label] - Optional new label
+       */
+      update(id, percent, label) {
+        const task = this.tasks.get(id);
+        if (!task) return;
+        task.percent = Math.max(0, Math.min(100, percent));
+        if (label !== void 0) {
+          task.label = label;
+        }
+        this._render();
+      }
+      /**
+       * Complete a task.
+       * @param {string} id - Task ID
+       * @param {number} [percent=100] - Final progress
+       */
+      complete(id, percent = 100) {
+        this.update(id, percent);
+        const task = this.tasks.get(id);
+        if (task) {
+          task.completed = true;
+        }
+        if (task && task.parent) {
+          this._currentParent = task.parent;
+        } else {
+          this._currentParent = null;
+        }
+        this._render();
+      }
+      /**
+       * Cancel the current task (and all children).
+       * @param {string} [id] - Task ID to cancel (defaults to current)
+       */
+      cancel(id) {
+        const taskId = id || this._currentParent;
+        const task = this.tasks.get(taskId);
+        if (!task) return;
+        task.cancelled = true;
+        this._render();
+        this._output(color.red(`
+[CANCELLED] ${this._getTaskLabel(task)}
+`));
+        this.clear();
+      }
+      /**
+       * Clear all tasks and stop rendering.
+       */
+      clear() {
+        this.tasks.clear();
+        this._currentParent = null;
+        this._isActive = false;
+        this._output("\r" + " ".repeat(this._lastOutput.length) + "\r");
+        this._lastOutput = "";
+        if (_cancelHandler) {
+          process.removeListener("SIGINT", _cancelHandler);
+          _cancelHandler = null;
+        }
+      }
+      /**
+       * Get the combined progress of a task and its children.
+       * @param {string} id - Task ID
+       * @returns {number} Combined progress (0-100)
+       */
+      getCombinedProgress(id) {
+        const task = this.tasks.get(id);
+        if (!task) return 0;
+        if (task.children.length === 0) {
+          return task.percent;
+        }
+        let totalWeight = 0;
+        let weightedSum = 0;
+        for (const childId of task.children) {
+          const child = this.tasks.get(childId);
+          if (child && !child.cancelled) {
+            const weight = 1;
+            totalWeight += weight;
+            weightedSum += this.getCombinedProgress(childId) * weight;
+          }
+        }
+        return totalWeight > 0 ? Math.round(weightedSum / totalWeight) : task.percent;
+      }
+      /**
+       * Get full label including parent path.
+       * @param {Object} task - Task object
+       * @returns {string} Full label path
+       */
+      _getTaskLabel(task) {
+        if (!task.parent) return task.label;
+        const parent = this.tasks.get(task.parent);
+        if (!parent) return task.label;
+        return this._getTaskLabel(parent) + " > " + task.label;
+      }
+      /**
+       * Render the current progress state.
+       */
+      _render() {
+        if (this.tasks.size === 0) return;
+        const roots = [];
+        for (const [id, task] of this.tasks) {
+          if (!task.parent && !task.completed && !task.cancelled) {
+            roots.push(task);
+          }
+        }
+        if (roots.length === 0) return;
+        const parts = [];
+        for (const root of roots) {
+          const combined = this.getCombinedProgress(root.id);
+          const label = this._getTaskLabel(root);
+          parts.push(`${label} (${combined}%)`);
+        }
+        const output2 = progressBar(0) + " " + parts.join(" | ");
+        this._output("\r" + output2);
+      }
+      _output(text) {
+        process.stderr.write(text);
+        this._lastOutput = text.replace("\r", "");
+      }
+      _handleCancel() {
+        this.cancel();
+        process.exit(130);
+      }
+      /**
+       * Install Ctrl+C handler for cancellation.
+       * Call this when starting a long-running operation.
+       */
+      installHandler() {
+        if (!_cancelHandler) {
+          _cancelHandler = this._handleCancel;
+          process.on("SIGINT", _cancelHandler);
+        }
+        this._isActive = true;
+      }
+      /**
+       * Remove Ctrl+C handler.
+       */
+      removeHandler() {
+        if (_cancelHandler) {
+          process.removeListener("SIGINT", _cancelHandler);
+          _cancelHandler = null;
+        }
+      }
+    };
+    function getProgressTracker() {
+      if (!_globalProgressTracker) {
+        _globalProgressTracker = new ProgressTracker();
+      }
+      return _globalProgressTracker;
+    }
+    module2.exports = {
+      // Terminal
+      getTerminalWidth,
+      isTTY,
+      // Color
+      color,
+      colorByPercent,
+      setColorMode,
+      getColorMode,
+      parseColorFlags,
+      // Symbols
+      SYMBOLS,
+      // Helpers
+      stripAnsi,
+      truncate,
+      relativeTime,
+      pad,
+      // Renderers
+      formatTable,
+      progressBar,
+      sectionHeader,
+      banner,
+      box,
+      summaryLine,
+      actionHint,
+      listWithTruncation,
+      // Spinner
+      Spinner,
+      // ProgressTracker
+      ProgressTracker,
+      getProgressTracker
+    };
+  }
+});
+
+// src/lib/error.js
+var require_error = __commonJS({
+  "src/lib/error.js"(exports2, module2) {
+    "use strict";
+    var format = require_format();
+    var BgsdError = class extends Error {
+      /**
+       * @param {Object} options
+       * @param {string} options.type - Error category (ValidationError, FileError, CommandError, ConfigError)
+       * @param {string} options.message - User-friendly error message
+       * @param {string} [options.file] - File path where error occurred
+       * @param {number} [options.line] - Line number
+       * @param {string} [options.suggestion] - Recovery action
+       * @param {string} [options.code] - Error code for programmatic handling
+       */
+      constructor(options) {
+        const message = typeof options === "string" ? options : options.message;
+        super(message);
+        this.name = "BgsdError";
+        this.type = options.type || "Error";
+        this.message = message;
+        this.file = options.file || null;
+        this.line = options.line || null;
+        this.suggestion = options.suggestion || null;
+        this.code = options.code || null;
+        Error.captureStackTrace(this, this.constructor);
+      }
+    };
+    var ValidationError = class extends BgsdError {
+      constructor(options) {
+        super({ ...options, type: "ValidationError" });
+        this.name = "ValidationError";
+      }
+    };
+    var FileError = class extends BgsdError {
+      constructor(options) {
+        super({ ...options, type: "FileError" });
+        this.name = "FileError";
+      }
+    };
+    var CommandError = class extends BgsdError {
+      constructor(options) {
+        super({ ...options, type: "CommandError" });
+        this.name = "CommandError";
+      }
+    };
+    var ConfigError = class extends BgsdError {
+      constructor(options) {
+        super({ ...options, type: "ConfigError" });
+        this.name = "ConfigError";
+      }
+    };
+    function formatError(error, options = {}) {
+      const { verbose = false, isWarning = false } = options;
+      const prefix = isWarning ? "[WARN]" : "[ERROR]";
+      const prefixColor = isWarning ? format.color.yellow : format.color.red;
+      const typeColor = format.color.bold;
+      const lines = [];
+      lines.push(prefixColor(prefix) + " " + typeColor(error.type || "Error") + ": " + error.message);
+      if (error.file) {
+        let fileInfo = "File: " + error.file;
+        if (error.line) {
+          fileInfo += ":" + error.line;
+        }
+        lines.push("       " + format.color.dim(fileInfo));
+      }
+      if (error.suggestion) {
+        lines.push("       " + format.color.green("Try: ") + error.suggestion);
+      }
+      if (error.code) {
+        lines.push("       " + format.color.dim("Code: " + error.code));
+      }
+      if (verbose && error.stack) {
+        lines.push("");
+        lines.push(format.color.dim(error.stack));
+      }
+      return lines.join("\n");
+    }
+    function formatErrors(errors, options = {}) {
+      if (!Array.isArray(errors) || errors.length === 0) {
+        return "";
+      }
+      if (errors.length === 1) {
+        return formatError(errors[0], options);
+      }
+      const lines = [];
+      lines.push(format.color.bold(`Found ${errors.length} errors:
+`));
+      for (let i = 0; i < errors.length; i++) {
+        lines.push(formatError(errors[i], options));
+        if (i < errors.length - 1) {
+          lines.push("");
+        }
+      }
+      return lines.join("\n");
+    }
+    function createErrorHandler(commandName) {
+      return (error) => {
+        const isWarning = error.isWarning || false;
+        const exitCode = isWarning ? 0 : 1;
+        const formatted = formatError(error, { verbose: process.argv.includes("--verbose") });
+        process.stderr.write(formatted + "\n");
+        process.exit(exitCode);
+      };
+    }
+    function wrapAsync(fn) {
+      return async (...args) => {
+        try {
+          return await fn(...args);
+        } catch (error) {
+          const handler = createErrorHandler(fn.name || "unknown");
+          handler(error);
+        }
+      };
+    }
+    function isBgsdError(error) {
+      return error instanceof BgsdError;
+    }
+    function getErrorCode(error) {
+      if (error instanceof BgsdError && error.code) {
+        return error.code;
+      }
+      return "UNKNOWN";
+    }
+    module2.exports = {
+      // Error Classes
+      BgsdError,
+      ValidationError,
+      FileError,
+      CommandError,
+      ConfigError,
+      // Formatting
+      formatError,
+      formatErrors,
+      // Utilities
+      createErrorHandler,
+      wrapAsync,
+      isBgsdError,
+      getErrorCode
+    };
+  }
+});
+
+// src/lib/debug.js
+var require_debug = __commonJS({
+  "src/lib/debug.js"(exports2, module2) {
+    "use strict";
+    var fs = require("fs");
+    var path = require("path");
+    var format = require_format();
+    var error = require_error();
+    var _debugEnabled = false;
+    var _traceEnabled = false;
+    var _traceBuffer = [];
+    var MAX_TRACE_ENTRIES = 100;
+    function trace(message, data, level = "info") {
+      if (!_debugEnabled && !_traceEnabled) return;
+      const entry = {
+        timestamp: (/* @__PURE__ */ new Date()).toISOString(),
+        level,
+        message,
+        data: data !== void 0 ? data : null,
+        stack: level === "error" ? new Error().stack : null
+      };
+      _traceBuffer.push(entry);
+      if (_traceBuffer.length > MAX_TRACE_ENTRIES) {
+        _traceBuffer.shift();
+      }
+      const levelColors = {
+        debug: format.color.gray,
+        info: format.color.blue,
+        warn: format.color.yellow,
+        error: format.color.red
+      };
+      const colorFn = levelColors[level] || format.color.blue;
+      const prefix = colorFn(`[${level.toUpperCase()}]`);
+      const timeStr = format.color.dim((/* @__PURE__ */ new Date()).toISOString());
+      let output2 = `${timeStr} ${prefix} ${message}`;
+      if (data !== void 0) {
+        output2 += " " + format.color.dim(JSON.stringify(data, null, 2));
+      }
+      process.stderr.write(output2 + "\n");
+    }
+    function traceError(err) {
+      const errObj = err instanceof error.BgsdError ? err : new error.BgsdError({
+        type: "Error",
+        message: err.message,
+        suggestion: err.suggestion
+      });
+      trace(err.message, {
+        type: errObj.type,
+        code: errObj.code,
+        file: errObj.file,
+        line: errObj.line,
+        stack: err.stack
+      }, "error");
+      return error.formatError(errObj);
+    }
+    function traceStack(depth = 10) {
+      const stack = new Error().stack;
+      const frames = stack.split("\n").slice(3, 3 + depth);
+      return frames.map((f) => f.trim());
+    }
+    function getTrace() {
+      return [..._traceBuffer];
+    }
+    function clearTrace() {
+      _traceBuffer = [];
+    }
+    var SECRET_PATTERNS = [
+      /password/i,
+      /secret/i,
+      /token/i,
+      /key/i,
+      /api[_-]?key/i,
+      /auth/i
+    ];
+    function _filterEnv(env) {
+      const filtered = {};
+      for (const [key, value] of Object.entries(env)) {
+        const isSecret = SECRET_PATTERNS.some((pattern) => pattern.test(key));
+        filtered[key] = isSecret ? "***REDACTED***" : value;
+      }
+      return filtered;
+    }
+    function dumpContext(options = {}) {
+      const {
+        includeEnv = true,
+        includeFiles = true
+      } = options;
+      const lines = [];
+      lines.push(format.sectionHeader("Context Dump"));
+      lines.push(format.color.bold("Working Directory:") + " " + process.cwd());
+      lines.push(format.color.bold("Node Version:") + " " + process.version);
+      lines.push(format.color.bold("Command:") + " " + process.argv.join(" "));
+      if (includeEnv) {
+        lines.push("");
+        lines.push(format.color.bold("Environment (filtered):"));
+        const env = _filterEnv(process.env);
+        const envLines = Object.entries(env).slice(0, 20).map(([k, v]) => `  ${k}=${v}`);
+        lines.push(envLines.join("\n"));
+        if (Object.keys(env).length > 20) {
+          lines.push(format.color.dim("  ... and " + (Object.keys(env).length - 20) + " more"));
+        }
+      }
+      const statePath = path.join(process.cwd(), ".planning", "STATE.md");
+      if (fs.existsSync(statePath)) {
+        lines.push("");
+        lines.push(format.color.bold("Current Planning State:"));
+        try {
+          const stateContent = fs.readFileSync(statePath, "utf-8");
+          const phaseMatch = stateContent.match(/\*\*Phase:\*\* (\d+)/);
+          const statusMatch = stateContent.match(/\*\*Status:\*\* ([^\n]+)/);
+          if (phaseMatch) {
+            lines.push(`  Phase: ${phaseMatch[1]}`);
+          }
+          if (statusMatch) {
+            lines.push(`  Status: ${statusMatch[1]}`);
+          }
+        } catch (e) {
+          lines.push(format.color.dim("  (Unable to read STATE.md)"));
+        }
+      }
+      return lines.join("\n");
+    }
+    function dumpState() {
+      const statePath = path.join(process.cwd(), ".planning", "STATE.md");
+      if (!fs.existsSync(statePath)) {
+        return format.color.yellow("STATE.md not found");
+      }
+      try {
+        const content = fs.readFileSync(statePath, "utf-8");
+        return format.box("Current project state from STATE.md\n\n" + format.color.dim(content.slice(0, 500)), "info");
+      } catch (e) {
+        return format.color.red("Error reading STATE.md: " + e.message);
+      }
+    }
+    function dumpConfig() {
+      const configPath = path.join(process.cwd(), ".planning", "config.json");
+      if (!fs.existsSync(configPath)) {
+        return format.color.yellow("Config not found");
+      }
+      try {
+        const config = JSON.parse(fs.readFileSync(configPath, "utf-8"));
+        return format.box("Current configuration\n\n" + format.color.dim(JSON.stringify(config, null, 2)), "info");
+      } catch (e) {
+        return format.color.red("Error reading config: " + e.message);
+      }
+    }
+    function inspectState() {
+      const statePath = path.join(process.cwd(), ".planning", "STATE.md");
+      if (!fs.existsSync(statePath)) {
+        return null;
+      }
+      try {
+        const content = fs.readFileSync(statePath, "utf-8");
+        return { content, path: statePath };
+      } catch (e) {
+        return null;
+      }
+    }
+    function inspectPhase(phaseNum) {
+      const phaseDir = path.join(process.cwd(), ".planning", "phases");
+      const phaseStr = String(phaseNum).padStart(2, "0");
+      let targetDir = null;
+      try {
+        const dirs = fs.readdirSync(phaseDir);
+        targetDir = dirs.find((d) => d.startsWith(phaseStr + "-"));
+      } catch (e) {
+        return null;
+      }
+      if (!targetDir) {
+        return null;
+      }
+      const phasePath = path.join(phaseDir, targetDir);
+      const contextPath = path.join(phasePath, phaseStr + "-CONTEXT.md");
+      if (!fs.existsSync(contextPath)) {
+        return { path: phasePath, exists: true, hasContext: false };
+      }
+      try {
+        const content = fs.readFileSync(contextPath, "utf-8");
+        return { path: phasePath, content, hasContext: true };
+      } catch (e) {
+        return null;
+      }
+    }
+    function inspectRoadmap() {
+      const roadmapPath = path.join(process.cwd(), ".planning", "ROADMAP.md");
+      if (!fs.existsSync(roadmapPath)) {
+        return null;
+      }
+      try {
+        const content = fs.readFileSync(roadmapPath, "utf-8");
+        return { content, path: roadmapPath };
+      } catch (e) {
+        return null;
+      }
+    }
+    function inspectPlans(phaseNum) {
+      const phaseDir = path.join(process.cwd(), ".planning", "phases");
+      const phaseStr = String(phaseNum).padStart(2, "0");
+      try {
+        const dirs = fs.readdirSync(phaseDir);
+        const targetDir = dirs.find((d) => d.startsWith(phaseStr + "-"));
+        if (!targetDir) {
+          return [];
+        }
+        const plansPath = path.join(phaseDir, targetDir);
+        const files = fs.readdirSync(plansPath);
+        return files.filter((f) => f.endsWith("-PLAN.md")).sort();
+      } catch (e) {
+        return [];
+      }
+    }
+    function parseDebugFlags(args) {
+      if (!Array.isArray(args)) {
+        args = (args || process.argv).slice(2);
+      }
+      const debugIdx = args.indexOf("--debug");
+      const traceIdx = args.indexOf("--trace");
+      _debugEnabled = debugIdx !== -1;
+      _traceEnabled = traceIdx !== -1;
+      if (_traceEnabled) {
+        _debugEnabled = true;
+      }
+      if (_debugEnabled && !args.includes("--no-color")) {
+        format.setColorMode("force");
+      }
+      if (traceIdx !== -1) {
+        args.splice(traceIdx, 1);
+      }
+      if (debugIdx !== -1) {
+        args.splice(debugIdx, 1);
+      }
+      return {
+        debug: _debugEnabled,
+        trace: _traceEnabled
+      };
+    }
+    function isDebugEnabled() {
+      return _debugEnabled;
+    }
+    function isTraceEnabled() {
+      return _traceEnabled;
+    }
+    module2.exports = {
+      // Trace
+      trace,
+      traceError,
+      traceStack,
+      getTrace,
+      clearTrace,
+      // Context
+      dumpContext,
+      dumpState,
+      dumpConfig,
+      // Inspection
+      inspectState,
+      inspectPhase,
+      inspectRoadmap,
+      inspectPlans,
+      // Flags
+      parseDebugFlags,
+      isDebugEnabled,
+      isTraceEnabled
+    };
+  }
+});
+
 // src/lib/regex-cache.js
 var require_regex_cache = __commonJS({
   "src/lib/regex-cache.js"(exports2, module2) {
@@ -3651,270 +4629,6 @@ var require_git = __commonJS({
       return { created: true, branch: bn, pushed: false };
     }
     module2.exports = { execGit, structuredLog, diffSummary, blame, branchInfo, selectiveRewind, trajectoryBranch };
-  }
-});
-
-// src/lib/format.js
-var require_format = __commonJS({
-  "src/lib/format.js"(exports2, module2) {
-    "use strict";
-    function getTerminalWidth() {
-      return process.stdout.columns || 80;
-    }
-    function isTTY() {
-      return !!process.stdout.isTTY;
-    }
-    var _colorEnabled = (() => {
-      if ("NO_COLOR" in process.env) return false;
-      if (!process.stdout.isTTY) return false;
-      if (process.env.FORCE_COLOR) return true;
-      return true;
-    })();
-    function _wrap(open, close) {
-      if (!_colorEnabled) return (s) => String(s);
-      return (s) => `\x1B[${open}m${s}\x1B[${close}m`;
-    }
-    var color = {
-      enabled: _colorEnabled,
-      // Modifiers
-      bold: _wrap("1", "22"),
-      dim: _wrap("2", "22"),
-      underline: _wrap("4", "24"),
-      // Colors
-      red: _wrap("31", "39"),
-      green: _wrap("32", "39"),
-      yellow: _wrap("33", "39"),
-      blue: _wrap("34", "39"),
-      magenta: _wrap("35", "39"),
-      cyan: _wrap("36", "39"),
-      white: _wrap("37", "39"),
-      gray: _wrap("90", "39")
-    };
-    function colorByPercent(percent) {
-      if (percent <= 33) return color.red;
-      if (percent <= 66) return color.yellow;
-      return color.green;
-    }
-    var SYMBOLS = {
-      check: "\u2713",
-      // ✓
-      cross: "\u2717",
-      // ✗
-      progress: "\u25B6",
-      // ▶
-      pending: "\u25CB",
-      // ○
-      warning: "\u26A0",
-      // ⚠
-      arrow: "\u2192",
-      // →
-      bullet: "\u2022",
-      // •
-      dash: "\u2500",
-      // ─
-      heavyDash: "\u2501"
-      // ━
-    };
-    var _ansiRegex = /\x1b\[[0-9;]*m/g;
-    function stripAnsi(text) {
-      return String(text).replace(_ansiRegex, "");
-    }
-    function truncate(text, maxWidth) {
-      const str = String(text);
-      const visible = stripAnsi(str);
-      if (visible.length <= maxWidth) return str;
-      if (maxWidth <= 1) return "\u2026";
-      return visible.slice(0, maxWidth - 1) + "\u2026";
-    }
-    function relativeTime(dateStr) {
-      const then = new Date(dateStr);
-      if (isNaN(then.getTime())) return String(dateStr);
-      const now = /* @__PURE__ */ new Date();
-      const diffMs = now - then;
-      const diffSec = Math.floor(diffMs / 1e3);
-      const diffMin = Math.floor(diffSec / 60);
-      const diffHr = Math.floor(diffMin / 60);
-      const diffDay = Math.floor(diffHr / 24);
-      if (diffSec < 0) return "in the future";
-      if (diffSec < 60) return "just now";
-      if (diffMin < 60) return `${diffMin}m ago`;
-      if (diffHr < 24) return `${diffHr}h ago`;
-      if (diffDay === 1) return "yesterday";
-      if (diffDay < 30) return `${diffDay} days ago`;
-      if (diffDay < 365) {
-        const months = Math.floor(diffDay / 30);
-        return `${months} month${months > 1 ? "s" : ""} ago`;
-      }
-      const years = Math.floor(diffDay / 365);
-      return `${years} year${years > 1 ? "s" : ""} ago`;
-    }
-    function pad(text, width, align = "left") {
-      const str = String(text);
-      const visible = stripAnsi(str);
-      const diff = width - visible.length;
-      if (diff <= 0) return str;
-      if (align === "right") return " ".repeat(diff) + str;
-      if (align === "center") {
-        const left = Math.floor(diff / 2);
-        const right = diff - left;
-        return " ".repeat(left) + str + " ".repeat(right);
-      }
-      return str + " ".repeat(diff);
-    }
-    function formatTable(headers, rows, options = {}) {
-      const {
-        maxWidth = getTerminalWidth(),
-        truncate: doTruncate = true,
-        borders = false,
-        indent = 1,
-        colorFn = null,
-        maxRows = 10,
-        showAll = false
-      } = options;
-      if (!headers || headers.length === 0) return "";
-      const indentStr = " ".repeat(indent);
-      const colGap = 2;
-      const colCount = headers.length;
-      const colWidths = headers.map((h) => stripAnsi(String(h)).length);
-      for (const row of rows) {
-        for (let i = 0; i < colCount; i++) {
-          const cellLen = stripAnsi(String(row[i] || "")).length;
-          if (cellLen > colWidths[i]) colWidths[i] = cellLen;
-        }
-      }
-      const totalGap = (colCount - 1) * colGap + indent;
-      const availableWidth = maxWidth - totalGap;
-      const totalColWidth = colWidths.reduce((a, b) => a + b, 0);
-      if (totalColWidth > availableWidth && availableWidth > 0) {
-        const ratio = availableWidth / totalColWidth;
-        for (let i = 0; i < colCount; i++) {
-          colWidths[i] = Math.max(4, Math.floor(colWidths[i] * ratio));
-        }
-      }
-      const headerCells = headers.map(
-        (h, i) => color.bold(pad(truncateCell(String(h), colWidths[i], doTruncate), colWidths[i]))
-      );
-      const headerLine = indentStr + headerCells.join(" ".repeat(colGap));
-      const sepWidth = colWidths.reduce((a, b) => a + b, 0) + (colCount - 1) * colGap;
-      const separator = indentStr + SYMBOLS.dash.repeat(sepWidth);
-      const displayRows = !showAll && rows.length > maxRows ? rows.slice(0, maxRows) : rows;
-      const rowLines = displayRows.map((row, rowIdx) => {
-        const cells = [];
-        for (let i = 0; i < colCount; i++) {
-          let cellText = String(row[i] != null ? row[i] : "");
-          cellText = truncateCell(cellText, colWidths[i], doTruncate);
-          if (colorFn) {
-            cellText = colorFn(row[i], i, rowIdx);
-            cellText = truncateCell(String(cellText), colWidths[i], doTruncate);
-          }
-          cells.push(pad(cellText, colWidths[i]));
-        }
-        return indentStr + cells.join(" ".repeat(colGap));
-      });
-      const lines = [headerLine, separator, ...rowLines];
-      if (!showAll && rows.length > maxRows) {
-        const remaining = rows.length - maxRows;
-        lines.push(indentStr + color.dim(`... and ${remaining} more (use --all to see full list)`));
-      }
-      return lines.join("\n");
-    }
-    function truncateCell(text, maxWidth, doTruncate) {
-      if (!doTruncate) return text;
-      return truncate(text, maxWidth);
-    }
-    function progressBar(percent, width = 20) {
-      const pct = Math.max(0, Math.min(100, Math.round(percent)));
-      const filled = Math.round(pct / 100 * width);
-      const empty = width - filled;
-      const bar = "\u2588".repeat(filled) + "\u2591".repeat(empty);
-      const colorFn = colorByPercent(pct);
-      const pctStr = String(pct).padStart(3) + "%";
-      return `${colorFn(pctStr)} [${colorFn(bar)}]`;
-    }
-    function sectionHeader(label) {
-      const termWidth = getTerminalWidth();
-      const prefix = SYMBOLS.heavyDash.repeat(2) + " ";
-      const labelStr = color.bold(color.cyan(label));
-      const labelLen = stripAnsi(label).length;
-      const suffixLen = Math.max(4, termWidth - 2 - 1 - labelLen - 1);
-      const suffix = " " + SYMBOLS.heavyDash.repeat(suffixLen);
-      return prefix + labelStr + suffix;
-    }
-    function banner(title, options = {}) {
-      const { completion = false } = options;
-      const termWidth = getTerminalWidth();
-      if (completion) {
-        const rule2 = SYMBOLS.heavyDash.repeat(Math.min(termWidth, 60));
-        const line = `${SYMBOLS.check} ${title}`;
-        return [
-          color.green(rule2),
-          color.bold(color.green(line)),
-          color.green(rule2)
-        ].join("\n");
-      }
-      const prefix = color.dim("bGSD") + " " + color.cyan(SYMBOLS.progress) + " ";
-      const titleStr = color.bold(title);
-      const ruleLen = Math.min(termWidth, 60);
-      const rule = color.dim(SYMBOLS.dash.repeat(ruleLen));
-      return prefix + titleStr + "\n" + rule;
-    }
-    var _boxPrefixes = {
-      info: { fn: color.cyan, label: "INFO" },
-      warning: { fn: color.yellow, label: "WARNING" },
-      error: { fn: color.red, label: "ERROR" },
-      success: { fn: color.green, label: "SUCCESS" }
-    };
-    function box(content, type = "info") {
-      const termWidth = getTerminalWidth();
-      const ruleLen = Math.min(termWidth, 60);
-      const cfg = _boxPrefixes[type] || _boxPrefixes.info;
-      const topRule = cfg.fn(SYMBOLS.dash.repeat(ruleLen));
-      const prefix = cfg.fn(color.bold(cfg.label + ":"));
-      const bottomRule = cfg.fn(SYMBOLS.dash.repeat(ruleLen));
-      return [topRule, prefix + " " + content, bottomRule].join("\n");
-    }
-    function summaryLine(text) {
-      const ruleLen = Math.min(getTerminalWidth(), 60);
-      const rule = color.dim(SYMBOLS.dash.repeat(ruleLen));
-      return rule + "\n" + color.bold(text);
-    }
-    function actionHint(text) {
-      return color.dim(SYMBOLS.arrow + " " + text);
-    }
-    function listWithTruncation(items, maxItems = 10, showAll = false) {
-      if (!items || items.length === 0) return "";
-      const display = !showAll && items.length > maxItems ? items.slice(0, maxItems) : items;
-      const lines = display.map((item, i) => ` ${i + 1}. ${item}`);
-      if (!showAll && items.length > maxItems) {
-        const remaining = items.length - maxItems;
-        lines.push(color.dim(` ... and ${remaining} more (use --all to see full list)`));
-      }
-      return lines.join("\n");
-    }
-    module2.exports = {
-      // Terminal
-      getTerminalWidth,
-      isTTY,
-      // Color
-      color,
-      colorByPercent,
-      // Symbols
-      SYMBOLS,
-      // Helpers
-      stripAnsi,
-      truncate,
-      relativeTime,
-      pad,
-      // Renderers
-      formatTable,
-      progressBar,
-      sectionHeader,
-      banner,
-      box,
-      summaryLine,
-      actionHint,
-      listWithTruncation
-    };
   }
 });
 
@@ -6395,16 +7109,6 @@ var require_verify = __commonJS({
                 break;
               }
               case "regenerateState": {
-                let backupPath;
-                if (fs.existsSync(statePath)) {
-                  const timestamp = (/* @__PURE__ */ new Date()).toISOString().replace(/[:.]/g, "-").slice(0, 19);
-                  backupPath = `${statePath}.bak-${timestamp}`;
-                  try {
-                    fs.copyFileSync(statePath, backupPath);
-                    repairActions.push({ action: "backupState", success: true, path: backupPath });
-                  } catch {
-                  }
-                }
                 const milestone = getMilestoneInfo(cwd);
                 let stateContent2 = `# Session State
 
@@ -6430,25 +7134,8 @@ var require_verify = __commonJS({
 `;
                 stateContent2 += `- ${(/* @__PURE__ */ new Date()).toISOString().split("T")[0]}: STATE.md regenerated by /gsd:health --repair
 `;
-                const tempPath = `${statePath}.tmp${Date.now()}`;
-                try {
-                  fs.writeFileSync(tempPath, stateContent2, { encoding: "utf-8", flag: "wx" });
-                  fs.renameSync(tempPath, statePath);
-                  repairActions.push({ action: repair, success: true, path: "STATE.md" });
-                } catch (err) {
-                  try {
-                    if (fs.existsSync(tempPath)) {
-                      fs.unlinkSync(tempPath);
-                    }
-                  } catch {
-                  }
-                  try {
-                    fs.writeFileSync(statePath, stateContent2, { encoding: "utf-8" });
-                    repairActions.push({ action: repair, success: true, path: "STATE.md" });
-                  } catch (retryErr) {
-                    repairActions.push({ action: repair, success: false, error: retryErr.message });
-                  }
-                }
+                fs.writeFileSync(statePath, stateContent2, { encoding: "utf-8" });
+                repairActions.push({ action: repair, success: true, path: "STATE.md" });
                 break;
               }
             }
@@ -7093,11 +7780,25 @@ var require_verify = __commonJS({
           }
         }
       }
+      const parallelizationWarnings = [];
+      for (const conflict of conflicts) {
+        const plansStr = conflict.plans.join(" and ");
+        parallelizationWarnings.push({
+          wave: conflict.wave,
+          reason: `Plans ${plansStr} both modify ${conflict.file}`,
+          recommendation: "Run sequentially or merge into single plan"
+        });
+      }
+      const allPlanIds = Object.values(plansByWave).flatMap((plans) => plans.map((p) => p.id));
+      const conflictedPlanIds = new Set(conflicts.flatMap((c) => c.plans));
+      const safeToParallelize = allPlanIds.filter((id) => !conflictedPlanIds.has(id));
       const verdict = conflicts.length > 0 ? "conflicts_found" : "clean";
       output2({
         phase: phaseNum,
         waves,
         conflicts,
+        parallelization_warnings: parallelizationWarnings,
+        safe_to_parallelize: safeToParallelize,
         verdict
       }, raw, verdict);
     }
@@ -14937,7 +15638,7 @@ var require_entry = __commonJS({
 });
 
 // node_modules/fast-glob/out/providers/filters/error.js
-var require_error = __commonJS({
+var require_error2 = __commonJS({
   "node_modules/fast-glob/out/providers/filters/error.js"(exports2) {
     "use strict";
     Object.defineProperty(exports2, "__esModule", { value: true });
@@ -14997,7 +15698,7 @@ var require_provider = __commonJS({
     var path = require("path");
     var deep_1 = require_deep();
     var entry_1 = require_entry();
-    var error_1 = require_error();
+    var error_1 = require_error2();
     var entry_2 = require_entry2();
     var Provider = class {
       constructor(_settings) {
@@ -33616,6 +34317,104 @@ var require_features = __commonJS({
       }
       output2(trace, raw);
     }
+    function cmdAnalyzeDeps(cwd, phasePath, raw) {
+      if (!phasePath) {
+        error("phase directory path required");
+      }
+      const fullPath = path.isAbsolute(phasePath) ? phasePath : path.join(cwd, phasePath);
+      let files;
+      try {
+        files = fs.readdirSync(fullPath);
+      } catch (e) {
+        debugLog("util.analyzeDeps", "readdir failed", e);
+        output2({ error: "Cannot read phase directory", path: phasePath }, raw);
+        return;
+      }
+      const planFiles = files.filter((f) => f.match(/-PLAN\.md$/i)).sort();
+      const dirName = path.basename(fullPath);
+      const phaseMatch = dirName.match(/^(\d+(?:\.\d+)?)/);
+      const phaseNum = phaseMatch ? phaseMatch[1] : dirName;
+      const plans = [];
+      for (const planFile of planFiles) {
+        const content = safeReadFile(path.join(fullPath, planFile));
+        if (!content) continue;
+        const fm = extractFrontmatter(content);
+        const planId = planFile.replace(/-PLAN\.md$/i, "");
+        let filesModified = [];
+        if (Array.isArray(fm.files_modified)) {
+          filesModified = fm.files_modified;
+        } else if (typeof fm.files_modified === "string" && fm.files_modified.trim()) {
+          filesModified = [fm.files_modified];
+        }
+        plans.push({ id: planId, files: filesModified });
+      }
+      const suggestions = [];
+      for (let i = 0; i < plans.length; i++) {
+        for (let j = i + 1; j < plans.length; j++) {
+          const planA = plans[i];
+          const planB = plans[j];
+          const overlap = planA.files.filter((f) => planB.files.includes(f));
+          for (const file of overlap) {
+            suggestions.push({
+              from: planA.id.replace(/^(\d+)-(\d+).*/, "$1-$2"),
+              to: planB.id.replace(/^(\d+)-(\d+).*/, "$1-$2"),
+              file,
+              confidence: 100,
+              reason: `${planA.id} writes, ${planB.id} reads`
+            });
+          }
+        }
+      }
+      output2({ phase: phaseNum, suggestions }, raw);
+    }
+    function cmdEstimateScope(cwd, planPath, raw) {
+      if (!planPath) {
+        error("plan file path required");
+      }
+      const fullPath = path.isAbsolute(planPath) ? planPath : path.join(cwd, planPath);
+      const content = safeReadFile(fullPath);
+      if (!content) {
+        output2({ error: "Cannot read plan file", path: planPath }, raw);
+        return;
+      }
+      const fm = extractFrontmatter(content);
+      const planId = path.basename(fullPath).replace(/-PLAN\.md$/i, "");
+      const tasks = content.match(/<task type="/g) || [];
+      const taskCount = tasks.length;
+      let filesModified = [];
+      if (Array.isArray(fm.files_modified)) {
+        filesModified = fm.files_modified;
+      } else if (typeof fm.files_modified === "string" && fm.files_modified.trim()) {
+        filesModified = [fm.files_modified];
+      }
+      const fileCount = filesModified.length;
+      let complexity = "low";
+      if (fileCount >= 7 || taskCount >= 5) {
+        complexity = "high";
+      } else if (fileCount >= 4 || taskCount >= 3) {
+        complexity = "medium";
+      }
+      const baseContext = 10;
+      const complexityFactor = complexity === "high" ? 15 : complexity === "medium" ? 10 : 5;
+      const taskOverhead = taskCount * 5;
+      const contextEstimate = baseContext + fileCount * complexityFactor + taskOverhead;
+      const withinBudget = contextEstimate <= 50;
+      const recommendations = [];
+      if (contextEstimate > 50) {
+        recommendations.push("Split into multiple plans - exceeds 50% context budget");
+      } else if (contextEstimate > 40 && complexity === "high") {
+        recommendations.push("Consider splitting if complexity increases");
+      }
+      output2({
+        plan: planId,
+        tasks: taskCount,
+        files: fileCount,
+        complexity,
+        context_estimate: `${Math.min(contextEstimate, 100)}%`,
+        within_budget: withinBudget,
+        recommendations
+      }, raw);
+    }
     function cmdValidateConfig(cwd, raw) {
       const configPath = path.join(cwd, ".planning", "config.json");
       if (!fs.existsSync(configPath)) {
@@ -34468,6 +35267,8 @@ Improved: ${improved} | Unchanged: ${unchanged} | Worsened: ${worsened}
       cmdRollbackInfo,
       cmdVelocity,
       cmdTraceRequirement,
+      cmdAnalyzeDeps,
+      cmdEstimateScope,
       cmdValidateConfig,
       cmdQuickTaskSummary,
       cmdExtractSections,
@@ -36619,6 +37420,8 @@ var require_router = __commonJS({
     var { diagnoseCompileCache } = require_runtime_capabilities();
     var { detectBun, getCachedBunVersion, configGet, configSet } = require_bun_runtime();
     var { loadConfig } = require_config();
+    var format = require_format();
+    var debug = require_debug();
     var _runtimeDetected = null;
     if (!process.env.BGSD_RUNTIME_DETECTED) {
       try {
@@ -36763,6 +37566,8 @@ var require_router = __commonJS({
         global._gsdCompactMode = true;
         args.splice(compactIdx, 1);
       }
+      debug.parseDebugFlags(args);
+      format.parseColorFlags(args);
       const isVerbose = global._gsdCompactMode === false;
       const showBanner = isVerbose || _runtimeDetected && _runtimeDetected.available;
       if (showBanner) {
@@ -37353,6 +38158,10 @@ Available: execute-phase, plan-phase, new-project, new-milestone, quick, resume,
               lazyMisc().cmdHistoryDigest(cwd, hdOptions, raw);
             } else if (subcommand === "trace-requirement") {
               lazyFeatures().cmdTraceRequirement(cwd, restArgs[0], raw);
+            } else if (subcommand === "analyze-deps") {
+              lazyFeatures().cmdAnalyzeDeps(cwd, restArgs[0], raw);
+            } else if (subcommand === "estimate-scope") {
+              lazyFeatures().cmdEstimateScope(cwd, restArgs[0], raw);
             } else if (subcommand === "codebase") {
               const cbSub = restArgs[0];
               if (cbSub === "analyze") {

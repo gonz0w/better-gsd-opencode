@@ -1411,12 +1411,30 @@ function cmdVerifyPlanWave(cwd, phasePath, raw) {
     }
   }
 
+  // Build parallelization warnings
+  const parallelizationWarnings = [];
+  for (const conflict of conflicts) {
+    const plansStr = conflict.plans.join(' and ');
+    parallelizationWarnings.push({
+      wave: conflict.wave,
+      reason: `Plans ${plansStr} both modify ${conflict.file}`,
+      recommendation: 'Run sequentially or merge into single plan',
+    });
+  }
+
+  // Determine which plans can run in parallel
+  const allPlanIds = Object.values(plansByWave).flatMap(plans => plans.map(p => p.id));
+  const conflictedPlanIds = new Set(conflicts.flatMap(c => c.plans));
+  const safeToParallelize = allPlanIds.filter(id => !conflictedPlanIds.has(id));
+
   const verdict = conflicts.length > 0 ? 'conflicts_found' : 'clean';
 
   output({
     phase: phaseNum,
     waves,
     conflicts,
+    parallelization_warnings: parallelizationWarnings,
+    safe_to_parallelize: safeToParallelize,
     verdict,
   }, raw, verdict);
 }
