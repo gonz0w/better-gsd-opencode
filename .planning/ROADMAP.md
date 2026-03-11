@@ -2,12 +2,9 @@
 
 ## Milestones
 
-- 🔵 **v10.0 Agent Intelligence & UX** - Phases 91-97 (in progress)
+- ✅ **v10.0 Agent Intelligence & UX** - Phases 91-92 (2026-03-11) — Complete ✅
   - Phase 91: Rich TTY Output & Error Handling ✅
   - Phase 92: Planning Intelligence ✅
-  - Phase 93: Verification Intelligence ✅
-  - Phase 94: Execution Intelligence ✅
-  - Phase 95: Interactive Workflows ✅
 - ✅ **v9.3 Quality, Performance & Agent Sharpening** - Phases 86-90 (2026-03-10) — see `.planning/milestones/v9.3-ROADMAP.md`
 - ✅ **v9.2 CLI Tool Integrations & Runtime Modernization** - Phases 82-85 (2026-03-10) — see `.planning/milestones/v9.2-ROADMAP.md`
 
@@ -18,20 +15,21 @@
 - [x] **Phase 91: Rich TTY Output & Error Handling** — Complete ✅
 - [x] **Phase 92: Planning Intelligence** — Complete ✅
 - [x] **Phase 93: Verification Intelligence** — Complete ✅
-- [x] **Phase 94: Execution Intelligence** — Complete ✅
-- [x] **Phase 95: Interactive Workflows** — Complete ✅
+- [ ] **Phase 94: Execution Intelligence** — Deviation handling
+- [ ] **Phase 95: Interactive Workflows** — Prompts and wizards
 - [ ] **Phase 96: Multi-Agent Collaboration** — Better handoffs
 - [ ] **Phase 97: UX Polish** — Command improvements and error handling
 
 ---
 
 *Roadmap updated: 2026-03-11*
-*Ready for: /bgsd plan phase 96*
+*Ready for: /bgsd plan phase 92*
 
 ---
 
 # Phase Details
 
+## Phase 91: Rich TTY Output & Error Handling
 
 **Goal:** Foundation layer — enhanced formatting and context-rich error handling
 
@@ -57,6 +55,7 @@
 
 ---
 
+## Phase 92: Planning Intelligence
 
 **Goal:** Better task decomposition with dependency detection and sizing
 
@@ -75,6 +74,7 @@
 
 ---
 
+## Phase 93: Verification Intelligence
 
 **Goal:** Smarter verification with regression detection
 
@@ -92,6 +92,7 @@
 
 ---
 
+## Phase 94: Execution Intelligence
 
 **Goal:** Autonomous deviation handling and recovery
 
@@ -105,12 +106,11 @@
 3. Stuck/loop patterns detected and pivots suggested
 
 **Plans:**
-- ✅ 94-01: Execution Intelligence (deviation recovery, checkpoint decisions, loop detection)
-
-**Completed:** 2026-03-11
+- [ ] 94-01: Execution Intelligence (deviation recovery, checkpoint decisions, loop detection)
 
 ---
 
+## Phase 95: Interactive Workflows
 
 **Goal:** Guided prompts and wizards for complex tasks
 
@@ -124,13 +124,11 @@
 3. User can abort workflows gracefully
 4. Compaction preserves full context (decisions, blockers, intent)
 
-**Plans:**
-- ✅ 95-01: Interactive workflows with prompts, wizards, and enhanced compaction
-
-**Completed:** 2026-03-11
+**Plans:** TBD
 
 ---
 
+## Phase 96: Multi-Agent Collaboration
 
 **Goal:** Better handoffs between agents
 
@@ -147,6 +145,7 @@
 
 ---
 
+## Phase 97: UX Polish
 
 **Goal:** Command improvements and final UX enhancements
 
@@ -177,4 +176,3 @@
 | 97 | UX-07, UX-08, UX-09, PERF-03, PERF-04 | 5 |
 
 **Total: 30 requirements across 7 phases**
-
