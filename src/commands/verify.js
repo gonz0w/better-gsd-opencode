@@ -1253,8 +1253,14 @@ function cmdVerifyRequirements(cwd, options, raw) {
 // ─── Verify Regression (VRFY-03) ────────────────────────────────────────────
 
 function cmdVerifyRegression(cwd, options, raw) {
+  const { execSync } = require('child_process');
   const memoryDir = path.join(cwd, '.planning', 'memory');
   const baselinePath = path.join(memoryDir, 'test-baseline.json');
+
+  // Auto mode: detect patterns automatically using git diff
+  if (options && options.auto) {
+    return cmdVerifyRegressionAuto(cwd, raw);
+  }
 
   let beforeData = null;
   let afterData = null;
@@ -1345,6 +1351,117 @@ function cmdVerifyRegression(cwd, options, raw) {
     regression_count: regressions.length,
     verdict: regressions.length === 0 ? 'pass' : 'fail',
   }, raw, regressions.length === 0 ? 'pass' : 'fail');
+}
+
+// ─── Verify Regression Auto ─────────────────────────────────────────────────
+
+function cmdVerifyRegressionAuto(cwd, raw) {
+  const { execSync } = require('child_process');
+  const patterns = [];
+  
+  try {
+    // Get changed files from git
+    const diffStat = execSync('git diff --stat HEAD~10 --name-only', {
+      cwd,
+      encoding: 'utf-8',
+      timeout: 10000,
+    });
+    const changedFiles = diffStat.split('\n').filter(f => f.trim());
+    
+    // Detect file-level regressions: check if any test files were removed or modified significantly
+    const testFilesChanged = changedFiles.filter(f => f.includes('.test.') || f.includes('.spec.'));
+    if (testFilesChanged.length > 0) {
+      patterns.push({
+        type: 'test_files_changed',
+        severity: 'info',
+        files: testFilesChanged,
+        description: 'Test files modified in recent commits',
+      });
+    }
+    
+    // Check for test count regressions by scanning test file exports
+    let totalTestsBefore = 0;
+    let totalTestsAfter = 0;
+    
+    for (const file of changedFiles) {
+      if (file.endsWith('.test.js') || file.endsWith('.spec.js')) {
+        const content = safeReadFile(path.join(cwd, file)) || '';
+        // Count test cases (it, test, describe blocks)
+        const testMatches = content.match(/(?:it|test|describe)\s*\(/g);
+        if (testMatches) {
+          totalTestsAfter += testMatches.length;
+        }
+      }
+    }
+    
+    // Compare with baseline if exists
+    const baselinePath = path.join(cwd, '.planning', 'memory', 'test-baseline.json');
+    const baselineContent = safeReadFile(baselinePath);
+    if (baselineContent) {
+      try {
+        const baseline = JSON.parse(baselineContent);
+        if (baseline.tests_total !== undefined && totalTestsAfter !== baseline.tests_total) {
+          const diff = totalTestsAfter - baseline.tests_total;
+          patterns.push({
+            type: 'test_count_decreased',
+            severity: diff < 0 ? 'warning' : 'info',
+            baseline: baseline.tests_total,
+            current: totalTestsAfter,
+            difference: diff,
+            description: diff < 0 
+              ? `Test count decreased by ${Math.abs(diff)} from baseline`
+              : `Test count increased by ${diff} from baseline`,
+          });
+        }
+      } catch (e) {
+        debugLog('verify.regression.auto', 'baseline parse failed', e);
+      }
+    }
+    
+    // Detect coverage changes
+    const coverageFiles = changedFiles.filter(f => 
+      f.endsWith('.js') || f.endsWith('.ts') || f.endsWith('.jsx') || f.endsWith('.tsx')
+    );
+    if (coverageFiles.length > 0) {
+      patterns.push({
+        type: 'source_files_changed',
+        severity: 'info',
+        files: coverageFiles,
+        description: `${coverageFiles.length} source files changed - consider running coverage`,
+      });
+    }
+    
+    // Check for timing regressions by looking at test execution patterns
+    const slowTestPatterns = ['timeout', 'slow', 'skip'];
+    for (const file of changedFiles) {
+      if (file.endsWith('.test.js') || file.endsWith('.spec.js')) {
+        const content = safeReadFile(path.join(cwd, file)) || '';
+        for (const pattern of slowTestPatterns) {
+          if (content.includes(pattern)) {
+            patterns.push({
+              type: 'timing_pattern_detected',
+              severity: 'info',
+              file,
+              pattern,
+              description: `Potential timing-related pattern: ${pattern}`,
+            });
+            break;
+          }
+        }
+      }
+    }
+    
+  } catch (e) {
+    debugLog('verify.regression.auto', 'git diff failed', e);
+  }
+  
+  output({
+    auto: true,
+    regression_patterns: patterns,
+    pattern_count: patterns.length,
+    verdict: patterns.length === 0 ? 'pass' : 'warning',
+    note: 'Automatic pattern detection based on recent git changes',
+  }, raw, patterns.length === 0 ? 'pass' : 'warning');
 }
 
 // ─── Verify Plan Wave (PLAN-04) ─────────────────────────────────────────────
@@ -1626,6 +1743,12 @@ function cmdVerifyQuality(cwd, options, raw) {
 
   const phaseNum = options.phase || null;
   const planPath = options.plan || null;
+  const gapDetection = options.gap_detection || false;
+
+  // Gap detection mode: analyze changed files for untested paths
+  if (gapDetection) {
+    return cmdVerifyQualityGapDetection(cwd, raw);
+  }
 
   // ── 1. Tests dimension (weight 30%) ──────────────────────────────────────
   let testsScore = null;
@@ -1893,6 +2016,92 @@ function cmdVerifyQuality(cwd, options, raw) {
     plan: planId,
     phase: phaseNum || (planId ? planId.split('-')[0] : null),
   }, { formatter: formatVerifyQuality });
+}
+
+// ─── Verify Quality Gap Detection ──────────────────────────────────────────────
+
+function cmdVerifyQualityGapDetection(cwd, raw) {
+  const { execSync } = require('child_process');
+  const gaps = [];
+  
+  try {
+    // Get changed files from git
+    const diffStat = execSync('git diff --stat HEAD~10 --name-only', {
+      cwd,
+      encoding: 'utf-8',
+      timeout: 10000,
+    });
+    const changedFiles = diffStat.split('\n').filter(f => f.trim());
+    
+    // Filter source files
+    const sourceFiles = changedFiles.filter(f => 
+      f.endsWith('.js') || f.endsWith('.ts') || f.endsWith('.jsx') || f.endsWith('.tsx')
+    );
+    
+    for (const file of sourceFiles) {
+      const content = safeReadFile(path.join(cwd, file)) || '';
+      
+      // Check for untested functions
+      const functionMatches = content.match(/(?:function\s+|const\s+|let\s+|var\s+|async\s+)\s*(\w+)\s*[=\(]/g) || [];
+      const functions = functionMatches.map(m => m.replace(/^(?:function\s+|const\s+|let\s+|var\s+|async\s+)\s*/, '').replace(/\s*[=\(].*$/, '')).filter(f => f.length > 0);
+      
+      // Check if there's a corresponding test file
+      const testFilePatterns = [
+        file.replace(/\.(js|ts|jsx|tsx)$/, '.test.$1'),
+        file.replace(/\.(js|ts|jsx|tsx)$/, '.spec.$1'),
+        file.replace(/^src\//, 'src/__tests__/').replace(/\.(js|ts|jsx|tsx)$/, '.test.$1'),
+        file.replace(/^src\//, 'src/test/').replace(/\.(js|ts|jsx|tsx)$/, '.test.$1'),
+      ];
+      
+      const hasTest = testFilePatterns.some(p => fs.existsSync(path.join(cwd, p)));
+      
+      if (!hasTest && functions.length > 0) {
+        gaps.push({
+          file,
+          type: 'no_test_file',
+          functions: functions.slice(0, 5), // Limit to 5
+          description: `No test file found for ${file} (${functions.length} functions)`,
+        });
+      }
+      
+      // Check for uncovered branches (if-else without tests)
+      const ifElseMatches = content.match(/if\s*\([^)]+\)\s*\{[\s\S]*?else\s*\{/g) || [];
+      for (const match of ifElseMatches) {
+        if (!hasTest) {
+          gaps.push({
+            file,
+            type: 'branch_coverage',
+            pattern: 'if-else without test coverage',
+            description: 'Conditional branches may lack test coverage',
+          });
+          break;
+        }
+      }
+    }
+    
+    // Check for uncovered files (source files with no test)
+    const testFiles = changedFiles.filter(f => f.includes('.test.') || f.includes('.spec.'));
+    const untestedSource = sourceFiles.filter(sf => !testFiles.some(tf => tf.includes(sf.replace(/^src\//, ''))));
+    
+    if (untestedSource.length > 0) {
+      gaps.push({
+        type: 'untested_files',
+        files: untestedSource,
+        description: `${untestedSource.length} source files changed without corresponding test updates`,
+      });
+    }
+    
+  } catch (e) {
+    debugLog('verify.quality.gap', 'gap detection failed', e);
+  }
+  
+  output({
+    gap_detection: true,
+    gaps,
+    gap_count: gaps.length,
+    verdict: gaps.length === 0 ? 'pass' : 'gaps_found',
+    note: 'Analyzed recent git changes for test coverage gaps',
+  }, raw, gaps.length === 0 ? 'pass' : 'gaps_found');
 }
 
 // ─── Assertions Commands ────────────────────────────────────────────────────

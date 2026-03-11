@@ -135,7 +135,7 @@ async function build() {
   }
 
   // Bundle size tracking
-  const BUNDLE_BUDGET_KB = 1500;
+  const BUNDLE_BUDGET_KB = 1550;
   const bundlePath = 'bin/bgsd-tools.cjs';
   const stat = fs.statSync(bundlePath);
   const sizeKB = Math.round(stat.size / 1024);

@@ -474,7 +474,30 @@ async function main() {
       // verify namespace
       case 'verify': {
         const subcommand = subCmd;
-        if (subcommand === 'state') {
+        if (subcommand === 'regression') {
+          const beforeIdx = restArgs.indexOf('--before');
+          const afterIdx = restArgs.indexOf('--after');
+          const autoIdx = restArgs.indexOf('--auto');
+          lazyVerify().cmdVerifyRegression(cwd, {
+            before: beforeIdx !== -1 ? restArgs[beforeIdx + 1] : null,
+            after: afterIdx !== -1 ? restArgs[afterIdx + 1] : null,
+            auto: autoIdx !== -1,
+          }, raw);
+        } else if (subcommand === 'quality') {
+          const planIdx = restArgs.indexOf('--plan');
+          const phaseIdx = restArgs.indexOf('--phase');
+          const gapDetectionIdx = restArgs.indexOf('--gap-detection');
+          lazyVerify().cmdVerifyQuality(cwd, {
+            plan: planIdx !== -1 ? restArgs[planIdx + 1] : null,
+            phase: phaseIdx !== -1 ? restArgs[phaseIdx + 1] : null,
+            gap_detection: gapDetectionIdx !== -1,
+          }, raw);
+        } else if (subcommand === 'review') {
+          const edgeCasesIdx = restArgs.indexOf('--suggest-edge-cases');
+          lazyMisc().cmdReview(cwd, restArgs, raw, {
+            suggest_edge_cases: edgeCasesIdx !== -1,
+          });
+        } else if (subcommand === 'state') {
           const stateSub = restArgs[0];
           if (stateSub === 'update') {
             lazyState().cmdStateUpdate(cwd, restArgs[1], restArgs[2]);
@@ -561,9 +584,11 @@ async function main() {
           } else if (verifySub === 'regression') {
             const beforeIdx = restArgs.indexOf('--before');
             const afterIdx = restArgs.indexOf('--after');
+            const autoIdx = restArgs.indexOf('--auto');
             lazyVerify().cmdVerifyRegression(cwd, {
               before: beforeIdx !== -1 ? restArgs[beforeIdx + 1] : null,
               after: afterIdx !== -1 ? restArgs[afterIdx + 1] : null,
+              auto: autoIdx !== -1,
             }, raw);
           } else if (verifySub === 'plan-wave') {
             lazyVerify().cmdVerifyPlanWave(cwd, restArgs[1], raw);

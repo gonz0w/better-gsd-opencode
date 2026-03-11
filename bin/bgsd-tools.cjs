@@ -7650,8 +7650,12 @@ var require_verify = __commonJS({
       output2(result, { formatter: formatVerifyRequirements, rawValue });
     }
     function cmdVerifyRegression(cwd, options, raw) {
+      const { execSync } = require("child_process");
       const memoryDir = path.join(cwd, ".planning", "memory");
       const baselinePath = path.join(memoryDir, "test-baseline.json");
+      if (options && options.auto) {
+        return cmdVerifyRegressionAuto(cwd, raw);
+      }
       let beforeData = null;
       let afterData = null;
       if (options && options.before && options.after) {
@@ -7727,6 +7731,96 @@ var require_verify = __commonJS({
         regression_count: regressions.length,
         verdict: regressions.length === 0 ? "pass" : "fail"
       }, raw, regressions.length === 0 ? "pass" : "fail");
+    }
+    function cmdVerifyRegressionAuto(cwd, raw) {
+      const { execSync } = require("child_process");
+      const patterns = [];
+      try {
+        const diffStat = execSync("git diff --stat HEAD~10 --name-only", {
+          cwd,
+          encoding: "utf-8",
+          timeout: 1e4
+        });
+        const changedFiles = diffStat.split("\n").filter((f) => f.trim());
+        const testFilesChanged = changedFiles.filter((f) => f.includes(".test.") || f.includes(".spec."));
+        if (testFilesChanged.length > 0) {
+          patterns.push({
+            type: "test_files_changed",
+            severity: "info",
+            files: testFilesChanged,
+            description: "Test files modified in recent commits"
+          });
+        }
+        let totalTestsBefore = 0;
+        let totalTestsAfter = 0;
+        for (const file of changedFiles) {
+          if (file.endsWith(".test.js") || file.endsWith(".spec.js")) {
+            const content = safeReadFile(path.join(cwd, file)) || "";
+            const testMatches = content.match(/(?:it|test|describe)\s*\(/g);
+            if (testMatches) {
+              totalTestsAfter += testMatches.length;
+            }
+          }
+        }
+        const baselinePath = path.join(cwd, ".planning", "memory", "test-baseline.json");
+        const baselineContent = safeReadFile(baselinePath);
+        if (baselineContent) {
+          try {
+            const baseline = JSON.parse(baselineContent);
+            if (baseline.tests_total !== void 0 && totalTestsAfter !== baseline.tests_total) {
+              const diff = totalTestsAfter - baseline.tests_total;
+              patterns.push({
+                type: "test_count_decreased",
+                severity: diff < 0 ? "warning" : "info",
+                baseline: baseline.tests_total,
+                current: totalTestsAfter,
+                difference: diff,
+                description: diff < 0 ? `Test count decreased by ${Math.abs(diff)} from baseline` : `Test count increased by ${diff} from baseline`
+              });
+            }
+          } catch (e) {
+            debugLog("verify.regression.auto", "baseline parse failed", e);
+          }
+        }
+        const coverageFiles = changedFiles.filter(
+          (f) => f.endsWith(".js") || f.endsWith(".ts") || f.endsWith(".jsx") || f.endsWith(".tsx")
+        );
+        if (coverageFiles.length > 0) {
+          patterns.push({
+            type: "source_files_changed",
+            severity: "info",
+            files: coverageFiles,
+            description: `${coverageFiles.length} source files changed - consider running coverage`
+          });
+        }
+        const slowTestPatterns = ["timeout", "slow", "skip"];
+        for (const file of changedFiles) {
+          if (file.endsWith(".test.js") || file.endsWith(".spec.js")) {
+            const content = safeReadFile(path.join(cwd, file)) || "";
+            for (const pattern of slowTestPatterns) {
+              if (content.includes(pattern)) {
+                patterns.push({
+                  type: "timing_pattern_detected",
+                  severity: "info",
+                  file,
+                  pattern,
+                  description: `Potential timing-related pattern: ${pattern}`
+                });
+                break;
+              }
+            }
+          }
+        }
+      } catch (e) {
+        debugLog("verify.regression.auto", "git diff failed", e);
+      }
+      output2({
+        auto: true,
+        regression_patterns: patterns,
+        pattern_count: patterns.length,
+        verdict: patterns.length === 0 ? "pass" : "warning",
+        note: "Automatic pattern detection based on recent git changes"
+      }, raw, patterns.length === 0 ? "pass" : "warning");
     }
     function cmdVerifyPlanWave(cwd, phasePath, raw) {
       if (!phasePath) {
@@ -7947,6 +8041,10 @@ var require_verify = __commonJS({
       const { loadConfig } = require_config();
       const phaseNum = options.phase || null;
       const planPath = options.plan || null;
+      const gapDetection = options.gap_detection || false;
+      if (gapDetection) {
+        return cmdVerifyQualityGapDetection(cwd, raw);
+      }
       let testsScore = null;
       let testsDetail = "no test framework detected";
       const config = loadConfig(cwd);
@@ -8173,6 +8271,72 @@ var require_verify = __commonJS({
         plan: planId,
         phase: phaseNum || (planId ? planId.split("-")[0] : null)
       }, { formatter: formatVerifyQuality });
+    }
+    function cmdVerifyQualityGapDetection(cwd, raw) {
+      const { execSync } = require("child_process");
+      const gaps = [];
+      try {
+        const diffStat = execSync("git diff --stat HEAD~10 --name-only", {
+          cwd,
+          encoding: "utf-8",
+          timeout: 1e4
+        });
+        const changedFiles = diffStat.split("\n").filter((f) => f.trim());
+        const sourceFiles = changedFiles.filter(
+          (f) => f.endsWith(".js") || f.endsWith(".ts") || f.endsWith(".jsx") || f.endsWith(".tsx")
+        );
+        for (const file of sourceFiles) {
+          const content = safeReadFile(path.join(cwd, file)) || "";
+          const functionMatches = content.match(/(?:function\s+|const\s+|let\s+|var\s+|async\s+)\s*(\w+)\s*[=\(]/g) || [];
+          const functions = functionMatches.map((m) => m.replace(/^(?:function\s+|const\s+|let\s+|var\s+|async\s+)\s*/, "").replace(/\s*[=\(].*$/, "")).filter((f) => f.length > 0);
+          const testFilePatterns = [
+            file.replace(/\.(js|ts|jsx|tsx)$/, ".test.$1"),
+            file.replace(/\.(js|ts|jsx|tsx)$/, ".spec.$1"),
+            file.replace(/^src\//, "src/__tests__/").replace(/\.(js|ts|jsx|tsx)$/, ".test.$1"),
+            file.replace(/^src\//, "src/test/").replace(/\.(js|ts|jsx|tsx)$/, ".test.$1")
+          ];
+          const hasTest = testFilePatterns.some((p) => fs.existsSync(path.join(cwd, p)));
+          if (!hasTest && functions.length > 0) {
+            gaps.push({
+              file,
+              type: "no_test_file",
+              functions: functions.slice(0, 5),
+              // Limit to 5
+              description: `No test file found for ${file} (${functions.length} functions)`
+            });
+          }
+          const ifElseMatches = content.match(/if\s*\([^)]+\)\s*\{[\s\S]*?else\s*\{/g) || [];
+          for (const match of ifElseMatches) {
+            if (!hasTest) {
+              gaps.push({
+                file,
+                type: "branch_coverage",
+                pattern: "if-else without test coverage",
+                description: "Conditional branches may lack test coverage"
+              });
+              break;
+            }
+          }
+        }
+        const testFiles = changedFiles.filter((f) => f.includes(".test.") || f.includes(".spec."));
+        const untestedSource = sourceFiles.filter((sf) => !testFiles.some((tf) => tf.includes(sf.replace(/^src\//, ""))));
+        if (untestedSource.length > 0) {
+          gaps.push({
+            type: "untested_files",
+            files: untestedSource,
+            description: `${untestedSource.length} source files changed without corresponding test updates`
+          });
+        }
+      } catch (e) {
+        debugLog("verify.quality.gap", "gap detection failed", e);
+      }
+      output2({
+        gap_detection: true,
+        gaps,
+        gap_count: gaps.length,
+        verdict: gaps.length === 0 ? "pass" : "gaps_found",
+        note: "Analyzed recent git changes for test coverage gaps"
+      }, raw, gaps.length === 0 ? "pass" : "gaps_found");
     }
     function cmdAssertionsList(cwd, options, raw) {
       const assertionsPath = path.join(cwd, ".planning", "ASSERTIONS.md");
@@ -33209,7 +33373,7 @@ _Pending verification_
         error("Unknown tdd subcommand: " + subcommand + ". Available: validate-red, validate-green, validate-refactor, auto-test, detect-antipattern");
       }
     }
-    function cmdReview(cwd, args, raw) {
+    function cmdReview(cwd, args, raw, options = {}) {
       if (!args[0] || !args[1]) {
         error("Usage: review <phase> <plan-number>");
       }
@@ -33249,6 +33413,11 @@ _Pending verification_
         conventionsDoc = cachedReadFile(path.join(cwd, ".planning", "codebase", "CONVENTIONS.md"));
       } catch (e) {
       }
+      let edge_case_suggestions = null;
+      if (options.suggest_edge_cases) {
+        const changedFileList = diff.files ? diff.files.map((f) => f.path) : [];
+        edge_case_suggestions = generateEdgeCaseSuggestions(cwd, changedFileList);
+      }
       output2({
         phase: `${phaseInfo.phase_number}-${phaseInfo.phase_name}`,
         plan: padPlan,
@@ -33256,8 +33425,48 @@ _Pending verification_
         diff: { file_count: diff.file_count || 0, total_insertions: diff.total_insertions || 0, total_deletions: diff.total_deletions || 0 },
         conventions,
         conventions_doc: conventionsDoc,
-        files_changed: diff.files ? diff.files.map((f) => f.path) : []
+        files_changed: diff.files ? diff.files.map((f) => f.path) : [],
+        edge_case_suggestions
       }, raw);
+    }
+    function generateEdgeCaseSuggestions(cwd, changedFiles) {
+      const suggestions = [];
+      for (const file of changedFiles || []) {
+        const content = safeReadFile(path.join(cwd, file)) || "";
+        if (content.includes("== null") || content.includes("=== null") || content.includes("== undefined")) {
+          suggestions.push({
+            category: "null_undefined",
+            file,
+            description: "File contains null checks - verify all null paths are tested",
+            priority: "high"
+          });
+        }
+        if (content.includes("catch (") || content.includes("throw new")) {
+          suggestions.push({
+            category: "error_paths",
+            file,
+            description: "File contains error handling - verify error paths are tested",
+            priority: "high"
+          });
+        }
+        if (content.includes("async ") && content.includes("await ")) {
+          suggestions.push({
+            category: "async_edge_cases",
+            file,
+            description: "File contains async code - verify race conditions and timeouts are tested",
+            priority: "medium"
+          });
+        }
+        if (content.includes(".map(") || content.includes(".filter(") || content.includes(".reduce(")) {
+          suggestions.push({
+            category: "empty_collections",
+            file,
+            description: "File contains array operations - verify empty array edge cases are tested",
+            priority: "medium"
+          });
+        }
+      }
+      return suggestions.length > 0 ? suggestions : null;
     }
     async function cmdParityCheck(cwd, args, raw) {
       const { checkParity, checkAllParity } = require_parity_check();
@@ -37861,7 +38070,30 @@ Available: execute-phase, plan-phase, new-project, new-milestone, quick, resume,
           // verify namespace
           case "verify": {
             const subcommand = subCmd;
-            if (subcommand === "state") {
+            if (subcommand === "regression") {
+              const beforeIdx = restArgs.indexOf("--before");
+              const afterIdx = restArgs.indexOf("--after");
+              const autoIdx = restArgs.indexOf("--auto");
+              lazyVerify().cmdVerifyRegression(cwd, {
+                before: beforeIdx !== -1 ? restArgs[beforeIdx + 1] : null,
+                after: afterIdx !== -1 ? restArgs[afterIdx + 1] : null,
+                auto: autoIdx !== -1
+              }, raw);
+            } else if (subcommand === "quality") {
+              const planIdx = restArgs.indexOf("--plan");
+              const phaseIdx = restArgs.indexOf("--phase");
+              const gapDetectionIdx = restArgs.indexOf("--gap-detection");
+              lazyVerify().cmdVerifyQuality(cwd, {
+                plan: planIdx !== -1 ? restArgs[planIdx + 1] : null,
+                phase: phaseIdx !== -1 ? restArgs[phaseIdx + 1] : null,
+                gap_detection: gapDetectionIdx !== -1
+              }, raw);
+            } else if (subcommand === "review") {
+              const edgeCasesIdx = restArgs.indexOf("--suggest-edge-cases");
+              lazyMisc().cmdReview(cwd, restArgs, raw, {
+                suggest_edge_cases: edgeCasesIdx !== -1
+              });
+            } else if (subcommand === "state") {
               const stateSub = restArgs[0];
               if (stateSub === "update") {
                 lazyState().cmdStateUpdate(cwd, restArgs[1], restArgs[2]);
@@ -37948,9 +38180,11 @@ Available: execute-phase, plan-phase, new-project, new-milestone, quick, resume,
               } else if (verifySub === "regression") {
                 const beforeIdx = restArgs.indexOf("--before");
                 const afterIdx = restArgs.indexOf("--after");
+                const autoIdx = restArgs.indexOf("--auto");
                 lazyVerify().cmdVerifyRegression(cwd, {
                   before: beforeIdx !== -1 ? restArgs[beforeIdx + 1] : null,
-                  after: afterIdx !== -1 ? restArgs[afterIdx + 1] : null
+                  after: afterIdx !== -1 ? restArgs[afterIdx + 1] : null,
+                  auto: autoIdx !== -1
                 }, raw);
               } else if (verifySub === "plan-wave") {
                 lazyVerify().cmdVerifyPlanWave(cwd, restArgs[1], raw);
