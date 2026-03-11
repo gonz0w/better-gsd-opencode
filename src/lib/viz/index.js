@@ -6,5 +6,6 @@
 module.exports = {
   progress: require('./progress'),
   milestone: require('./milestone'),
-  quality: require('./quality')
+  quality: require('./quality'),
+  burndown: require('./burndown')
 };
