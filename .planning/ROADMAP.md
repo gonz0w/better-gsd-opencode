@@ -129,7 +129,9 @@
 1. User sees formatted milestone summary when milestone completes with key metrics
 2. User can view computed velocity metrics showing tasks completed per session
 
-**Plans:** TBD
+**Plans:** 
+  - ✅ 102-01: Milestone summary report module (VIS-07)
+  - ✅ 102-02: Velocity metrics and CLI commands (VIS-08)
 
 ---
 
@@ -278,7 +280,7 @@
 | 99 | NL-05, NL-06, NL-07 | 3 | Pending | - |
 | 100 | VIS-01, VIS-02, VIS-03 | 3 | Pending | - |
 | 101 | VIS-04, VIS-05, VIS-06 | 3 | Pending | - |
-| 102 | VIS-07, VIS-08 | 2 | Pending | - |
+| 102 | VIS-07, VIS-08 | 2 | In Progress | - |
 | 91 | UX-01, UX-02, UX-03, UX-10, UX-11, UX-12, PERF-01, PERF-02 | 8 | Complete | 2026-03-11 |
 | 92 | AGENT-01, AGENT-02, AGENT-03 | 3 | Complete | 2026-03-11 |
 | 93 | AGENT-04, AGENT-05, AGENT-06 | 3 | Complete | 2026-03-11 |
