@@ -1,7 +1,7 @@
 'use strict';
 
 const { COMMAND_HELP } = require('./lib/constants');
-const { error } = require('./lib/output');
+const { error, output } = require('./lib/output');
 const { diagnoseCompileCache } = require('./lib/runtime-capabilities');
 const { detectBun, getCachedBunVersion, configGet, configSet } = require('./lib/cli-tools/bun-runtime');
 const { loadConfig } = require('./lib/config');
@@ -105,6 +105,7 @@ function lazyResearch() { return _modules.research || (_modules.research = requi
 function lazyTools() { return _modules.tools || (_modules.tools = require('./commands/tools')); }
 function lazyRuntime() { return _modules.runtime || (_modules.runtime = require('./commands/runtime')); }
 function lazyMeasure() { return _modules.measure || (_modules.measure = require('./commands/measure')); }
+function lazyRecovery() { return _modules.recovery || (_modules.recovery = require('./lib/recovery')); }
 
 
 async function main() {
@@ -1022,8 +1023,77 @@ Examples:
             verbose: isVerbose,
             binPath: binPathIdx !== -1 ? restArgs[binPathIdx + 1] : 'bin/bgsd-tools.cjs'
           }, raw);
+        } else if (subcommand === 'recovery') {
+          const recoverySub = restArgs[0];
+          const recoveryMod = lazyRecovery();
+          if (recoverySub === 'analyze') {
+            // util:recovery analyze <deviation-text>
+            const deviation = restArgs.slice(1).join(' ');
+            const recovery = recoveryMod.createAutoRecovery();
+            const classification = recovery.classifyDeviation(deviation);
+            output({
+              deviation,
+              classification: {
+                type: classification.type,
+                rule: classification.rule,
+                description: classification.description,
+                canAutoFix: classification.strategy?.canAutoFix
+              }
+            }, raw);
+          } else if (recoverySub === 'checkpoint') {
+            // util:recovery checkpoint <task-json>
+            const taskJson = restArgs.slice(1).join(' ');
+            let task;
+            try {
+              task = taskJson ? JSON.parse(taskJson) : {};
+            } catch (e) {
+              // If not JSON, treat as simple task
+              task = { type: taskJson || 'auto' };
+            }
+            const advisor = recoveryMod.createCheckpointAdvisor();
+            const result = advisor.analyze(task);
+            output({
+              task,
+              complexityScore: result.analysis.totalScore,
+              breakdown: result.analysis.breakdown,
+              recommendation: {
+                type: result.recommendation.recommended,
+                description: result.recommendation.description,
+                rationale: result.recommendation.rationale
+              }
+            }, raw);
+          } else if (recoverySub === 'stuck') {
+            // util:recovery stuck <task-id>
+            const taskId = restArgs[1] || 'default';
+            const detector = recoveryMod.createLoopDetector();
+            const status = detector.getStatus(taskId);
+            output({
+              taskId,
+              isStuck: status.isStuck,
+              attempts: status.attempts,
+              retryCount: status.retryCount,
+              lastError: status.lastError
+            }, raw);
+          } else if (!recoverySub || recoverySub === '--help' || recoverySub === '-h') {
+            process.stderr.write(`Usage: bgsd-tools util:recovery <subcommand> [options]
+
+Execution intelligence - recovery and checkpoint management.
+
+Subcommands:
+  analyze <deviation>    Classify a deviation using the 4-rule framework
+  checkpoint <task-json> Analyze task complexity and recommend checkpoint type
+  stuck <task-id>       Check if a task is stuck in a loop
+
+Examples:
+  bgsd-tools util:recovery analyze "Cannot read property 'foo' of undefined"
+  bgsd-tools util:recovery checkpoint '{"files":["a.js","b.js"],"type":"auto","dependsOn":["t1"]}'
+  bgsd-tools util:recovery stuck task-123
+`);
+          } else {
+            error(`Unknown recovery subcommand: ${recoverySub}. Available: analyze, checkpoint, stuck`);
+          }
         } else {
-          error(`Unknown util subcommand: ${subcommand}. Available: config-get, config-set, env, current-timestamp, list-todos, todo, memory, mcp, classify, frontmatter, progress, websearch, history-digest, trace-requirement, codebase, cache, agent, resolve-model, template, generate-slug, verify-path-exists, config-ensure-section, config-migrate, scaffold, phase-plan-index, state-snapshot, summary-extract, quick-summary, extract-sections, git, profiler, tools, runtime, measure`);
+          error(`Unknown util subcommand: ${subcommand}. Available: config-get, config-set, env, current-timestamp, list-todos, todo, memory, mcp, classify, frontmatter, progress, websearch, history-digest, trace-requirement, codebase, cache, agent, resolve-model, template, generate-slug, verify-path-exists, config-ensure-section, config-migrate, scaffold, phase-plan-index, state-snapshot, summary-extract, quick-summary, extract-sections, git, profiler, tools, runtime, measure, recovery`);
         }
         break;
       }

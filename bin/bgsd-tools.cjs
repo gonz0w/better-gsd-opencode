@@ -1015,7 +1015,7 @@ var require_output = __commonJS({
         process.stdout.write(json);
       }
     }
-    function output2(result, options) {
+    function output(result, options) {
       if (typeof options === "boolean") {
         outputJSON(result, arguments[2]);
         process.exit(process.exitCode || 0);
@@ -1048,7 +1048,7 @@ var require_output = __commonJS({
       if (err) line += ` | ${err.message || err}`;
       process.stderr.write(line + "\n");
     }
-    module2.exports = { filterFields, output: output2, status, error, debugLog };
+    module2.exports = { filterFields, output, status, error, debugLog };
   }
 });
 
@@ -2188,8 +2188,8 @@ var require_format = __commonJS({
           const label = this._getTaskLabel(root);
           parts.push(`${label} (${combined}%)`);
         }
-        const output2 = progressBar(0) + " " + parts.join(" | ");
-        this._output("\r" + output2);
+        const output = progressBar(0) + " " + parts.join(" | ");
+        this._output("\r" + output);
       }
       _output(text) {
         process.stderr.write(text);
@@ -2438,11 +2438,11 @@ var require_debug = __commonJS({
       const colorFn = levelColors[level] || format.color.blue;
       const prefix = colorFn(`[${level.toUpperCase()}]`);
       const timeStr = format.color.dim((/* @__PURE__ */ new Date()).toISOString());
-      let output2 = `${timeStr} ${prefix} ${message}`;
+      let output = `${timeStr} ${prefix} ${message}`;
       if (data !== void 0) {
-        output2 += " " + format.color.dim(JSON.stringify(data, null, 2));
+        output += " " + format.color.dim(JSON.stringify(data, null, 2));
       }
-      process.stderr.write(output2 + "\n");
+      process.stderr.write(output + "\n");
     }
     function traceError(err) {
       const errObj = err instanceof error.BgsdError ? err : new error.BgsdError({
@@ -4637,7 +4637,7 @@ var require_state = __commonJS({
   "src/commands/state.js"(exports2, module2) {
     var fs = require("fs");
     var path = require("path");
-    var { output: output2, error, debugLog } = require_output();
+    var { output, error, debugLog } = require_output();
     var { loadConfig } = require_config();
     var { safeReadFile, cachedReadFile, invalidateFileCache, normalizePhaseName, findPhaseInternal, getPhaseTree } = require_helpers();
     var { execGit } = require_git();
@@ -4740,7 +4740,7 @@ var require_state = __commonJS({
         `roadmap_exists=${roadmapExists}`,
         `state_exists=${stateExists}`
       ].join("\n");
-      output2(result, { formatter: formatStateShow, rawValue: rawLines });
+      output(result, { formatter: formatStateShow, rawValue: rawLines });
     }
     function cmdStateGet(cwd, section, raw) {
       const statePath = path.join(cwd, ".planning", "STATE.md");
@@ -4749,13 +4749,13 @@ var require_state = __commonJS({
         error("STATE.md not found");
       }
       if (!section) {
-        output2({ content }, raw, content);
+        output({ content }, raw, content);
         return;
       }
       const fieldMatch = content.match(getFieldReplaceRegex(section));
       if (fieldMatch) {
         const val = fieldMatch[2].trim();
-        output2({ [section]: val }, raw, val);
+        output({ [section]: val }, raw, val);
         return;
       }
       const fieldEscaped = section.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -4763,10 +4763,10 @@ var require_state = __commonJS({
 ([\\s\\S]*?)(?=\\n##|$)`, "i");
       const sectionMatch = content.match(sectionPattern);
       if (sectionMatch) {
-        output2({ [section]: sectionMatch[1].trim() }, raw, sectionMatch[1].trim());
+        output({ [section]: sectionMatch[1].trim() }, raw, sectionMatch[1].trim());
         return;
       }
-      output2({ error: `Section or field "${section}" not found` }, raw, "");
+      output({ error: `Section or field "${section}" not found` }, raw, "");
     }
     function cmdStatePatch(cwd, patches, raw) {
       const statePath = path.join(cwd, ".planning", "STATE.md");
@@ -4788,7 +4788,7 @@ var require_state = __commonJS({
         fs.writeFileSync(statePath, content, "utf-8");
         invalidateFileCache(statePath);
       }
-      output2(results, raw, results.updated.length > 0 ? "true" : "false");
+      output(results, raw, results.updated.length > 0 ? "true" : "false");
     }
     function cmdStateUpdate(cwd, field, value) {
       if (!field || value === void 0) {
@@ -4797,7 +4797,7 @@ var require_state = __commonJS({
       const statePath = path.join(cwd, ".planning", "STATE.md");
       let content = cachedReadFile(statePath);
       if (!content) {
-        output2({ updated: false, reason: "STATE.md not found" });
+        output({ updated: false, reason: "STATE.md not found" });
         return;
       }
       const pattern = getFieldReplaceRegex(field);
@@ -4805,9 +4805,9 @@ var require_state = __commonJS({
         content = content.replace(pattern, `$1${value}`);
         fs.writeFileSync(statePath, content, "utf-8");
         invalidateFileCache(statePath);
-        output2({ updated: true });
+        output({ updated: true });
       } else {
-        output2({ updated: false, reason: `Field "${field}" not found in STATE.md` });
+        output({ updated: false, reason: `Field "${field}" not found in STATE.md` });
       }
     }
     function stateExtractField(content, fieldName) {
@@ -4826,14 +4826,14 @@ var require_state = __commonJS({
       const statePath = path.join(cwd, ".planning", "STATE.md");
       let content = cachedReadFile(statePath);
       if (!content) {
-        output2({ error: "STATE.md not found" }, raw);
+        output({ error: "STATE.md not found" }, raw);
         return;
       }
       const currentPlan = parseInt(stateExtractField(content, "Current Plan"), 10);
       const totalPlans = parseInt(stateExtractField(content, "Total Plans in Phase"), 10);
       const today = (/* @__PURE__ */ new Date()).toISOString().split("T")[0];
       if (isNaN(currentPlan) || isNaN(totalPlans)) {
-        output2({ error: "Cannot parse Current Plan or Total Plans in Phase from STATE.md" }, raw);
+        output({ error: "Cannot parse Current Plan or Total Plans in Phase from STATE.md" }, raw);
         return;
       }
       if (currentPlan >= totalPlans) {
@@ -4841,7 +4841,7 @@ var require_state = __commonJS({
         content = stateReplaceField(content, "Last Activity", today) || content;
         fs.writeFileSync(statePath, content, "utf-8");
         invalidateFileCache(statePath);
-        output2({ advanced: false, reason: "last_plan", current_plan: currentPlan, total_plans: totalPlans, status: "ready_for_verification" }, raw, "false");
+        output({ advanced: false, reason: "last_plan", current_plan: currentPlan, total_plans: totalPlans, status: "ready_for_verification" }, raw, "false");
       } else {
         const newPlan = currentPlan + 1;
         content = stateReplaceField(content, "Current Plan", String(newPlan)) || content;
@@ -4849,19 +4849,19 @@ var require_state = __commonJS({
         content = stateReplaceField(content, "Last Activity", today) || content;
         fs.writeFileSync(statePath, content, "utf-8");
         invalidateFileCache(statePath);
-        output2({ advanced: true, previous_plan: currentPlan, current_plan: newPlan, total_plans: totalPlans }, raw, "true");
+        output({ advanced: true, previous_plan: currentPlan, current_plan: newPlan, total_plans: totalPlans }, raw, "true");
       }
     }
     function cmdStateRecordMetric(cwd, options, raw) {
       const statePath = path.join(cwd, ".planning", "STATE.md");
       let content = cachedReadFile(statePath);
       if (!content) {
-        output2({ error: "STATE.md not found" }, raw);
+        output({ error: "STATE.md not found" }, raw);
         return;
       }
       const { phase, plan, duration, tasks, files } = options;
       if (!phase || !plan || !duration) {
-        output2({ error: "phase, plan, and duration required" }, raw);
+        output({ error: "phase, plan, and duration required" }, raw);
         return;
       }
       const metricsPattern = /(##\s*Performance Metrics[\s\S]*?\n\|[^\n]+\n\|[-|\s]+\n)([\s\S]*?)(?=\n##|\n$|$)/i;
@@ -4879,16 +4879,16 @@ var require_state = __commonJS({
 `);
         fs.writeFileSync(statePath, content, "utf-8");
         invalidateFileCache(statePath);
-        output2({ recorded: true, phase, plan, duration }, raw, "true");
+        output({ recorded: true, phase, plan, duration }, raw, "true");
       } else {
-        output2({ recorded: false, reason: "Performance Metrics section not found in STATE.md" }, raw, "false");
+        output({ recorded: false, reason: "Performance Metrics section not found in STATE.md" }, raw, "false");
       }
     }
     function cmdStateUpdateProgress(cwd, raw) {
       const statePath = path.join(cwd, ".planning", "STATE.md");
       let content = cachedReadFile(statePath);
       if (!content) {
-        output2({ error: "STATE.md not found" }, raw);
+        output({ error: "STATE.md not found" }, raw);
         return;
       }
       let totalPlans = 0;
@@ -4908,21 +4908,21 @@ var require_state = __commonJS({
         content = content.replace(progressPattern, `$1${progressStr}`);
         fs.writeFileSync(statePath, content, "utf-8");
         invalidateFileCache(statePath);
-        output2({ updated: true, percent, completed: totalSummaries, total: totalPlans, bar: progressStr }, { formatter: formatStateUpdateProgress, rawValue: progressStr });
+        output({ updated: true, percent, completed: totalSummaries, total: totalPlans, bar: progressStr }, { formatter: formatStateUpdateProgress, rawValue: progressStr });
       } else {
-        output2({ updated: false, reason: "Progress field not found in STATE.md" }, { formatter: formatStateUpdateProgress, rawValue: "false" });
+        output({ updated: false, reason: "Progress field not found in STATE.md" }, { formatter: formatStateUpdateProgress, rawValue: "false" });
       }
     }
     function cmdStateAddDecision(cwd, options, raw) {
       const statePath = path.join(cwd, ".planning", "STATE.md");
       let content = cachedReadFile(statePath);
       if (!content) {
-        output2({ error: "STATE.md not found" }, raw);
+        output({ error: "STATE.md not found" }, raw);
         return;
       }
       const { phase, summary, rationale } = options;
       if (!summary) {
-        output2({ error: "summary required" }, raw);
+        output({ error: "summary required" }, raw);
         return;
       }
       const entry = `- [Phase ${phase || "?"}]: ${summary}${rationale ? ` \u2014 ${rationale}` : ""}`;
@@ -4935,20 +4935,20 @@ var require_state = __commonJS({
         content = content.replace(sectionPattern, `${match[1]}${sectionBody}`);
         fs.writeFileSync(statePath, content, "utf-8");
         invalidateFileCache(statePath);
-        output2({ added: true, decision: entry }, raw, "true");
+        output({ added: true, decision: entry }, raw, "true");
       } else {
-        output2({ added: false, reason: "Decisions section not found in STATE.md" }, raw, "false");
+        output({ added: false, reason: "Decisions section not found in STATE.md" }, raw, "false");
       }
     }
     function cmdStateAddBlocker(cwd, text, raw) {
       const statePath = path.join(cwd, ".planning", "STATE.md");
       let content = cachedReadFile(statePath);
       if (!content) {
-        output2({ error: "STATE.md not found" }, raw);
+        output({ error: "STATE.md not found" }, raw);
         return;
       }
       if (!text) {
-        output2({ error: "text required" }, raw);
+        output({ error: "text required" }, raw);
         return;
       }
       const entry = `- ${text}`;
@@ -4961,20 +4961,20 @@ var require_state = __commonJS({
         content = content.replace(sectionPattern, `${match[1]}${sectionBody}`);
         fs.writeFileSync(statePath, content, "utf-8");
         invalidateFileCache(statePath);
-        output2({ added: true, blocker: text }, raw, "true");
+        output({ added: true, blocker: text }, raw, "true");
       } else {
-        output2({ added: false, reason: "Blockers section not found in STATE.md" }, raw, "false");
+        output({ added: false, reason: "Blockers section not found in STATE.md" }, raw, "false");
       }
     }
     function cmdStateResolveBlocker(cwd, text, raw) {
       const statePath = path.join(cwd, ".planning", "STATE.md");
       let content = cachedReadFile(statePath);
       if (!content) {
-        output2({ error: "STATE.md not found" }, raw);
+        output({ error: "STATE.md not found" }, raw);
         return;
       }
       if (!text) {
-        output2({ error: "text required" }, raw);
+        output({ error: "text required" }, raw);
         return;
       }
       const sectionPattern = /(###?\s*(?:Blockers|Blockers\/Concerns|Concerns)\s*\n)([\s\S]*?)(?=\n###?|\n##[^#]|$)/i;
@@ -4993,16 +4993,16 @@ var require_state = __commonJS({
         content = content.replace(sectionPattern, `${match[1]}${newBody}`);
         fs.writeFileSync(statePath, content, "utf-8");
         invalidateFileCache(statePath);
-        output2({ resolved: true, blocker: text }, raw, "true");
+        output({ resolved: true, blocker: text }, raw, "true");
       } else {
-        output2({ resolved: false, reason: "Blockers section not found in STATE.md" }, raw, "false");
+        output({ resolved: false, reason: "Blockers section not found in STATE.md" }, raw, "false");
       }
     }
     function cmdStateRecordSession(cwd, options, raw) {
       const statePath = path.join(cwd, ".planning", "STATE.md");
       let content = cachedReadFile(statePath);
       if (!content) {
-        output2({ error: "STATE.md not found" }, raw);
+        output({ error: "STATE.md not found" }, raw);
         return;
       }
       const now = (/* @__PURE__ */ new Date()).toISOString();
@@ -5035,9 +5035,9 @@ var require_state = __commonJS({
       if (updated.length > 0) {
         fs.writeFileSync(statePath, content, "utf-8");
         invalidateFileCache(statePath);
-        output2({ recorded: true, updated }, raw, "true");
+        output({ recorded: true, updated }, raw, "true");
       } else {
-        output2({ recorded: false, reason: "No session fields found in STATE.md" }, raw, "false");
+        output({ recorded: false, reason: "No session fields found in STATE.md" }, raw, "false");
       }
     }
     function cmdStateValidate(cwd, options, raw) {
@@ -5050,7 +5050,7 @@ var require_state = __commonJS({
       const roadmapContent = safeReadFile(roadmapPath);
       const stateContent = safeReadFile(statePath);
       if (!roadmapContent && !stateContent) {
-        output2({
+        output({
           status: "errors",
           issues: [{ type: "missing_files", location: ".planning/", expected: "ROADMAP.md and STATE.md", actual: "Neither found", severity: "error" }],
           fixes_applied: [],
@@ -5229,7 +5229,7 @@ var require_state = __commonJS({
       if (errorCount > 0) status = "errors";
       else if (warnCount > 0) status = "warnings";
       const summary = status === "clean" ? "State validation passed \u2014 no issues found" : `Found ${errorCount} error${errorCount !== 1 ? "s" : ""} and ${warnCount} warning${warnCount !== 1 ? "s" : ""}`;
-      output2({
+      output({
         status,
         issues,
         fixes_applied: fixesApplied,
@@ -5258,7 +5258,7 @@ var require_roadmap = __commonJS({
   "src/commands/roadmap.js"(exports2, module2) {
     var fs = require("fs");
     var path = require("path");
-    var { output: output2, error, debugLog } = require_output();
+    var { output, error, debugLog } = require_output();
     var { normalizePhaseName, cachedReadFile, findPhaseInternal, getPhaseTree, invalidateFileCache } = require_helpers();
     var { extractFrontmatter } = require_frontmatter();
     function cmdRoadmapGetPhase(cwd, phaseNum, raw) {
@@ -5266,7 +5266,7 @@ var require_roadmap = __commonJS({
       try {
         const content = cachedReadFile(roadmapPath);
         if (!content) {
-          output2({ found: false, error: "ROADMAP.md not found" }, raw, "");
+          output({ found: false, error: "ROADMAP.md not found" }, raw, "");
           return;
         }
         const escapedPhase = phaseNum.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -5282,7 +5282,7 @@ var require_roadmap = __commonJS({
           );
           const checklistMatch = content.match(checklistPattern);
           if (checklistMatch) {
-            output2({
+            output({
               found: false,
               phase_number: phaseNum,
               phase_name: checklistMatch[1].trim(),
@@ -5291,7 +5291,7 @@ var require_roadmap = __commonJS({
             }, raw, "");
             return;
           }
-          output2({ found: false, phase_number: phaseNum }, raw, "");
+          output({ found: false, phase_number: phaseNum }, raw, "");
           return;
         }
         const phaseName = headerMatch[1].trim();
@@ -5304,7 +5304,7 @@ var require_roadmap = __commonJS({
         const goal = goalMatch ? goalMatch[1].trim() : null;
         const criteriaMatch = section.match(/\*\*Success Criteria\*\*[^\n]*:\s*\n((?:\s*\d+\.\s*[^\n]+\n?)+)/i);
         const success_criteria = criteriaMatch ? criteriaMatch[1].trim().split("\n").map((line) => line.replace(/^\s*\d+\.\s*/, "").trim()).filter(Boolean) : [];
-        output2(
+        output(
           {
             found: true,
             phase_number: phaseNum,
@@ -5325,7 +5325,7 @@ var require_roadmap = __commonJS({
       const roadmapPath = path.join(cwd, ".planning", "ROADMAP.md");
       const content = cachedReadFile(roadmapPath);
       if (!content) {
-        output2({ error: "ROADMAP.md not found", milestones: [], phases: [], current_phase: null }, raw);
+        output({ error: "ROADMAP.md not found", milestones: [], phases: [], current_phase: null }, raw);
         return;
       }
       const phasesDir = path.join(cwd, ".planning", "phases");
@@ -5419,7 +5419,7 @@ var require_roadmap = __commonJS({
         missing_phase_details: missingDetails.length > 0 ? missingDetails : null,
         missing_checklist_entries: missingChecklist.length > 0 ? missingChecklist : null
       };
-      output2(result, raw);
+      output(result, raw);
     }
     function cmdRoadmapUpdatePlanProgress(cwd, phaseNum, raw) {
       if (!phaseNum) {
@@ -5433,14 +5433,14 @@ var require_roadmap = __commonJS({
       const planCount = phaseInfo.plans.length;
       const summaryCount = phaseInfo.summaries.length;
       if (planCount === 0) {
-        output2({ updated: false, reason: "No plans found", plan_count: 0, summary_count: 0 }, raw, "no plans");
+        output({ updated: false, reason: "No plans found", plan_count: 0, summary_count: 0 }, raw, "no plans");
         return;
       }
       const isComplete = summaryCount >= planCount;
       const status = isComplete ? "Complete" : summaryCount > 0 ? "In Progress" : "Planned";
       const today = (/* @__PURE__ */ new Date()).toISOString().split("T")[0];
       if (!fs.existsSync(roadmapPath)) {
-        output2({ updated: false, reason: "ROADMAP.md not found", plan_count: planCount, summary_count: summaryCount }, raw, "no roadmap");
+        output({ updated: false, reason: "ROADMAP.md not found", plan_count: planCount, summary_count: summaryCount }, raw, "no roadmap");
         return;
       }
       let roadmapContent = fs.readFileSync(roadmapPath, "utf-8");
@@ -5469,7 +5469,7 @@ var require_roadmap = __commonJS({
       }
       fs.writeFileSync(roadmapPath, roadmapContent, "utf-8");
       invalidateFileCache(roadmapPath);
-      output2({
+      output({
         updated: true,
         phase: phaseNum,
         plan_count: planCount,
@@ -5491,7 +5491,7 @@ var require_phase = __commonJS({
   "src/commands/phase.js"(exports2, module2) {
     var fs = require("fs");
     var path = require("path");
-    var { output: output2, error, debugLog } = require_output();
+    var { output, error, debugLog } = require_output();
     var { normalizePhaseName, getArchivedPhaseDirs, findPhaseInternal, generateSlugInternal, getMilestoneInfo, invalidateFileCache, cachedReadFile } = require_helpers();
     var { extractFrontmatter } = require_frontmatter();
     var { execGit } = require_git();
@@ -5510,9 +5510,9 @@ var require_phase = __commonJS({
       const { type, phase, includeArchived } = options;
       if (!fs.existsSync(phasesDir)) {
         if (type) {
-          output2({ files: [], count: 0 }, raw, "");
+          output({ files: [], count: 0 }, raw, "");
         } else {
-          output2({ directories: [], count: 0 }, raw, "");
+          output({ directories: [], count: 0 }, raw, "");
         }
         return;
       }
@@ -5534,7 +5534,7 @@ var require_phase = __commonJS({
           const normalized = normalizePhaseName(phase);
           const match = dirs.find((d) => d.startsWith(normalized));
           if (!match) {
-            output2({ files: [], count: 0, phase_dir: null, error: "Phase not found" }, raw, "");
+            output({ files: [], count: 0, phase_dir: null, error: "Phase not found" }, raw, "");
             return;
           }
           dirs = [match];
@@ -5559,10 +5559,10 @@ var require_phase = __commonJS({
             count: files.length,
             phase_dir: phase ? dirs[0].replace(/^\d+(?:\.\d+)?-?/, "") : null
           };
-          output2(result, raw, files.join("\n"));
+          output(result, raw, files.join("\n"));
           return;
         }
-        output2({ directories: dirs, count: dirs.length }, raw, dirs.join("\n"));
+        output({ directories: dirs, count: dirs.length }, raw, dirs.join("\n"));
       } catch (e) {
         debugLog("phase.list", "list phases failed", e);
         error("Failed to list phases: " + e.message);
@@ -5572,7 +5572,7 @@ var require_phase = __commonJS({
       const phasesDir = path.join(cwd, ".planning", "phases");
       const normalized = normalizePhaseName(basePhase);
       if (!fs.existsSync(phasesDir)) {
-        output2(
+        output(
           {
             found: false,
             base_phase: normalized,
@@ -5609,7 +5609,7 @@ var require_phase = __commonJS({
           const lastNum = parseInt(lastDecimal.split(".")[1], 10);
           nextDecimal = `${normalized}.${lastNum + 1}`;
         }
-        output2(
+        output(
           {
             found: baseExists,
             base_phase: normalized,
@@ -5674,7 +5674,7 @@ Plans:
         slug,
         directory: `.planning/phases/${dirName}`
       };
-      output2(result, raw, paddedNum);
+      output(result, raw, paddedNum);
     }
     function cmdPhaseInsert(cwd, afterPhase, description, raw) {
       if (!afterPhase || !description) {
@@ -5749,7 +5749,7 @@ Plans:
         slug,
         directory: `.planning/phases/${dirName}`
       };
-      output2(result, raw, decimalPhase);
+      output(result, raw, decimalPhase);
     }
     function cmdPhaseRemove(cwd, targetPhase, options, raw) {
       if (!targetPhase) {
@@ -5941,7 +5941,7 @@ Plans:
         roadmap_updated: true,
         state_updated: fs.existsSync(statePath)
       };
-      output2(result, raw);
+      output(result, raw);
     }
     function cmdRequirementsMarkComplete(cwd, reqIdsRaw, raw) {
       if (!reqIdsRaw || reqIdsRaw.length === 0) {
@@ -5953,7 +5953,7 @@ Plans:
       }
       const reqPath = path.join(cwd, ".planning", "REQUIREMENTS.md");
       if (!fs.existsSync(reqPath)) {
-        output2({ updated: false, reason: "REQUIREMENTS.md not found", ids: reqIds }, raw, "no requirements file");
+        output({ updated: false, reason: "REQUIREMENTS.md not found", ids: reqIds }, raw, "no requirements file");
         return;
       }
       let reqContent = cachedReadFile(reqPath);
@@ -5984,7 +5984,7 @@ Plans:
         fs.writeFileSync(reqPath, reqContent, "utf-8");
         invalidateFileCache(reqPath);
       }
-      output2({
+      output({
         updated: updated.length > 0,
         marked_complete: updated,
         not_found: notFound,
@@ -6174,7 +6174,7 @@ Plans:
       if (uncheckedRoadmapPhases.length > 0) {
         result.unchecked_roadmap_phases = uncheckedRoadmapPhases;
       }
-      output2(result, raw);
+      output(result, raw);
     }
     function cmdMilestoneComplete(cwd, version, options, raw) {
       if (!version) {
@@ -6553,7 +6553,7 @@ See \`.planning/milestones/${version}-ROADMAP.md\` and \`.planning/milestones/${
         milestones_updated: true,
         state_updated: fs.existsSync(statePath)
       };
-      output2(result, raw);
+      output(result, raw);
     }
     module2.exports = {
       cmdPhasesList,
@@ -6574,7 +6574,7 @@ var require_verify = __commonJS({
     "use strict";
     var fs = require("fs");
     var path = require("path");
-    var { output: output2, error, debugLog } = require_output();
+    var { output, error, debugLog } = require_output();
     var { safeReadFile, cachedReadFile, findPhaseInternal, normalizePhaseName, parseMustHavesBlock, getArchivedPhaseDirs, getMilestoneInfo, getPhaseTree } = require_helpers();
     var { extractFrontmatter } = require_frontmatter();
     var { execGit } = require_git();
@@ -6586,7 +6586,7 @@ var require_verify = __commonJS({
       const fullPath = path.isAbsolute(filePath) ? filePath : path.join(cwd, filePath);
       const content = safeReadFile(fullPath);
       if (!content) {
-        output2({ error: "File not found", path: filePath }, raw);
+        output({ error: "File not found", path: filePath }, raw);
         return;
       }
       const fm = extractFrontmatter(content);
@@ -6653,7 +6653,7 @@ var require_verify = __commonJS({
       if (templateCompliance.missing_fields.length > 0 || templateCompliance.type_issues.length > 0) {
         templateCompliance.valid = false;
       }
-      output2({
+      output({
         valid: errors.length === 0,
         errors,
         warnings,
@@ -6669,7 +6669,7 @@ var require_verify = __commonJS({
       }
       const phaseInfo = findPhaseInternal(cwd, phase);
       if (!phaseInfo || !phaseInfo.found) {
-        output2({ error: "Phase not found", phase }, raw);
+        output({ error: "Phase not found", phase }, raw);
         return;
       }
       const errors = [];
@@ -6680,7 +6680,7 @@ var require_verify = __commonJS({
         files = fs.readdirSync(phaseDir);
       } catch (e) {
         debugLog("verify.phaseComplete", "readdir phase failed", e);
-        output2({ error: "Cannot read phase directory" }, raw);
+        output({ error: "Cannot read phase directory" }, raw);
         return;
       }
       const plans = files.filter((f) => f.match(/-PLAN\.md$/i));
@@ -6695,7 +6695,7 @@ var require_verify = __commonJS({
       if (orphanSummaries.length > 0) {
         warnings.push(`Summaries without plans: ${orphanSummaries.join(", ")}`);
       }
-      output2({
+      output({
         complete: errors.length === 0,
         phase: phaseInfo.phase_number,
         plan_count: plans.length,
@@ -6713,7 +6713,7 @@ var require_verify = __commonJS({
       const fullPath = path.isAbsolute(filePath) ? filePath : path.join(cwd, filePath);
       const content = safeReadFile(fullPath);
       if (!content) {
-        output2({ error: "File not found", path: filePath }, raw);
+        output({ error: "File not found", path: filePath }, raw);
         return;
       }
       const found = [];
@@ -6740,7 +6740,7 @@ var require_verify = __commonJS({
           missing.push(cleanRef);
         }
       }
-      output2({
+      output({
         valid: missing.length === 0,
         found: found.length,
         missing,
@@ -6761,7 +6761,7 @@ var require_verify = __commonJS({
           invalid.push(hash);
         }
       }
-      output2({
+      output({
         all_valid: invalid.length === 0,
         valid,
         invalid,
@@ -6775,12 +6775,12 @@ var require_verify = __commonJS({
       const fullPath = path.isAbsolute(planFilePath) ? planFilePath : path.join(cwd, planFilePath);
       const content = safeReadFile(fullPath);
       if (!content) {
-        output2({ error: "File not found", path: planFilePath }, raw);
+        output({ error: "File not found", path: planFilePath }, raw);
         return;
       }
       const artifacts = parseMustHavesBlock(content, "artifacts");
       if (artifacts.length === 0) {
-        output2({ error: "No must_haves.artifacts found in frontmatter", path: planFilePath }, raw);
+        output({ error: "No must_haves.artifacts found in frontmatter", path: planFilePath }, raw);
         return;
       }
       const results = [];
@@ -6813,7 +6813,7 @@ var require_verify = __commonJS({
         results.push(check);
       }
       const passed = results.filter((r) => r.passed).length;
-      output2({
+      output({
         all_passed: passed === results.length,
         passed,
         total: results.length,
@@ -6827,12 +6827,12 @@ var require_verify = __commonJS({
       const fullPath = path.isAbsolute(planFilePath) ? planFilePath : path.join(cwd, planFilePath);
       const content = safeReadFile(fullPath);
       if (!content) {
-        output2({ error: "File not found", path: planFilePath }, raw);
+        output({ error: "File not found", path: planFilePath }, raw);
         return;
       }
       const keyLinks = parseMustHavesBlock(content, "key_links");
       if (keyLinks.length === 0) {
-        output2({ error: "No must_haves.key_links found in frontmatter", path: planFilePath }, raw);
+        output({ error: "No must_haves.key_links found in frontmatter", path: planFilePath }, raw);
         return;
       }
       const results = [];
@@ -6872,7 +6872,7 @@ var require_verify = __commonJS({
         results.push(check);
       }
       const verified = results.filter((r) => r.verified).length;
-      output2({
+      output({
         all_verified: verified === results.length,
         verified,
         total: results.length,
@@ -6886,7 +6886,7 @@ var require_verify = __commonJS({
       const roadmapContent = cachedReadFile(roadmapPath);
       if (!roadmapContent) {
         errors.push("ROADMAP.md not found");
-        output2({ passed: false, errors, warnings }, raw, "failed");
+        output({ passed: false, errors, warnings }, raw, "failed");
         return;
       }
       const roadmapPhases = /* @__PURE__ */ new Set();
@@ -6946,7 +6946,7 @@ var require_verify = __commonJS({
         }
       }
       const passed = errors.length === 0;
-      output2({ passed, errors, warnings, warning_count: warnings.length }, raw, passed ? "passed" : "failed");
+      output({ passed, errors, warnings, warning_count: warnings.length }, raw, passed ? "passed" : "failed");
     }
     function cmdValidateHealth(cwd, options, raw) {
       const planningDir = path.join(cwd, ".planning");
@@ -6967,7 +6967,7 @@ var require_verify = __commonJS({
       };
       if (!fs.existsSync(planningDir)) {
         addIssue("error", "E001", ".planning/ directory not found", "Run /gsd:new-project to initialize");
-        output2({
+        output({
           status: "broken",
           errors,
           warnings,
@@ -7154,7 +7154,7 @@ var require_verify = __commonJS({
         status = "healthy";
       }
       const repairableCount = errors.filter((e) => e.repairable).length + warnings.filter((w) => w.repairable).length;
-      output2({
+      output({
         status,
         errors,
         warnings,
@@ -7170,7 +7170,7 @@ var require_verify = __commonJS({
       const fullPath = path.isAbsolute(planPath) ? planPath : path.join(cwd, planPath);
       const content = safeReadFile(fullPath);
       if (!content) {
-        output2({ error: "File not found", path: planPath }, raw);
+        output({ error: "File not found", path: planPath }, raw);
         return;
       }
       const fm = extractFrontmatter(content);
@@ -7272,7 +7272,7 @@ var require_verify = __commonJS({
       if (taskCount === 0) flags.push("no_tasks_found");
       if (dirCount > 5) flags.push("high_directory_spread");
       if (concernCount > 3) flags.push("many_concerns");
-      output2({
+      output({
         plan: planId,
         sr_score: srScore,
         sr_label: srLabel,
@@ -7311,7 +7311,7 @@ var require_verify = __commonJS({
         }
       }
       if (!testCommand) {
-        output2({
+        output({
           test_result: "skip",
           tests_passed: 0,
           tests_failed: 0,
@@ -7380,7 +7380,7 @@ var require_verify = __commonJS({
         }
       }
       const verdict = testResult === "pass" && artifactsOk && keyLinksOk ? "pass" : "fail";
-      output2({
+      output({
         test_result: testResult,
         tests_passed: testsPassed,
         tests_failed: testsFailed,
@@ -7435,7 +7435,7 @@ var require_verify = __commonJS({
       const reqPath = path.join(cwd, ".planning", "REQUIREMENTS.md");
       const content = safeReadFile(reqPath);
       if (!content) {
-        output2({
+        output({
           total: 0,
           addressed: 0,
           unaddressed: 0,
@@ -7647,7 +7647,7 @@ var require_verify = __commonJS({
       } else {
         rawValue = unaddressedList.length === 0 ? "pass" : "fail";
       }
-      output2(result, { formatter: formatVerifyRequirements, rawValue });
+      output(result, { formatter: formatVerifyRequirements, rawValue });
     }
     function cmdVerifyRegression(cwd, options, raw) {
       const { execSync } = require("child_process");
@@ -7664,11 +7664,11 @@ var require_verify = __commonJS({
         const beforeContent = safeReadFile(beforePath);
         const afterContent = safeReadFile(afterPath);
         if (!beforeContent) {
-          output2({ error: "Before file not found", path: options.before }, raw, "error");
+          output({ error: "Before file not found", path: options.before }, raw, "error");
           return;
         }
         if (!afterContent) {
-          output2({ error: "After file not found", path: options.after }, raw, "error");
+          output({ error: "After file not found", path: options.after }, raw, "error");
           return;
         }
         try {
@@ -7676,13 +7676,13 @@ var require_verify = __commonJS({
           afterData = JSON.parse(afterContent);
         } catch (e) {
           debugLog("verify.regression", "JSON parse failed", e);
-          output2({ error: "Invalid JSON in before/after files" }, raw, "error");
+          output({ error: "Invalid JSON in before/after files" }, raw, "error");
           return;
         }
       } else {
         const baselineContent = safeReadFile(baselinePath);
         if (!baselineContent) {
-          output2({
+          output({
             regressions: [],
             regression_count: 0,
             verdict: "pass",
@@ -7694,11 +7694,11 @@ var require_verify = __commonJS({
           beforeData = JSON.parse(baselineContent);
         } catch (e) {
           debugLog("verify.regression", "baseline parse failed", e);
-          output2({ error: "Invalid JSON in test-baseline.json" }, raw, "error");
+          output({ error: "Invalid JSON in test-baseline.json" }, raw, "error");
           return;
         }
         if (!afterData) {
-          output2({
+          output({
             regressions: [],
             regression_count: 0,
             verdict: "pass",
@@ -7726,7 +7726,7 @@ var require_verify = __commonJS({
           }
         }
       }
-      output2({
+      output({
         regressions,
         regression_count: regressions.length,
         verdict: regressions.length === 0 ? "pass" : "fail"
@@ -7814,7 +7814,7 @@ var require_verify = __commonJS({
       } catch (e) {
         debugLog("verify.regression.auto", "git diff failed", e);
       }
-      output2({
+      output({
         auto: true,
         regression_patterns: patterns,
         pattern_count: patterns.length,
@@ -7832,7 +7832,7 @@ var require_verify = __commonJS({
         files = fs.readdirSync(fullPath);
       } catch (e) {
         debugLog("verify.planWave", "readdir failed", e);
-        output2({ error: "Cannot read phase directory", path: phasePath }, raw);
+        output({ error: "Cannot read phase directory", path: phasePath }, raw);
         return;
       }
       const planFiles = files.filter((f) => f.match(/-PLAN\.md$/i)).sort();
@@ -7887,7 +7887,7 @@ var require_verify = __commonJS({
       const conflictedPlanIds = new Set(conflicts.flatMap((c) => c.plans));
       const safeToParallelize = allPlanIds.filter((id) => !conflictedPlanIds.has(id));
       const verdict = conflicts.length > 0 ? "conflicts_found" : "clean";
-      output2({
+      output({
         phase: phaseNum,
         waves,
         conflicts,
@@ -7906,7 +7906,7 @@ var require_verify = __commonJS({
         files = fs.readdirSync(fullPath);
       } catch (e) {
         debugLog("verify.planDeps", "readdir failed", e);
-        output2({ error: "Cannot read phase directory", path: phasePath }, raw);
+        output({ error: "Cannot read phase directory", path: phasePath }, raw);
         return;
       }
       const planFiles = files.filter((f) => f.match(/-PLAN\.md$/i)).sort();
@@ -7989,7 +7989,7 @@ var require_verify = __commonJS({
         }
       }
       const verdict = issues.length > 0 ? "issues_found" : "clean";
-      output2({
+      output({
         phase: phaseNum,
         plan_count: planIds.size,
         dependency_graph: dependencyGraph,
@@ -8263,7 +8263,7 @@ var require_verify = __commonJS({
         if (s[0] < s[1] && s[1] < s[2]) trend = "improving";
         else if (s[0] > s[1] && s[1] > s[2]) trend = "declining";
       }
-      output2({
+      output({
         score,
         grade,
         dimensions,
@@ -8330,7 +8330,7 @@ var require_verify = __commonJS({
       } catch (e) {
         debugLog("verify.quality.gap", "gap detection failed", e);
       }
-      output2({
+      output({
         gap_detection: true,
         gaps,
         gap_count: gaps.length,
@@ -8342,7 +8342,7 @@ var require_verify = __commonJS({
       const assertionsPath = path.join(cwd, ".planning", "ASSERTIONS.md");
       const content = safeReadFile(assertionsPath);
       if (!content) {
-        output2({ error: "ASSERTIONS.md not found", path: ".planning/ASSERTIONS.md" }, raw, "ASSERTIONS.md not found");
+        output({ error: "ASSERTIONS.md not found", path: ".planning/ASSERTIONS.md" }, raw, "ASSERTIONS.md not found");
         return;
       }
       const parsed = parseAssertionsMd(content);
@@ -8367,7 +8367,7 @@ var require_verify = __commonJS({
       }
       const totalRequirements = Object.keys(requirements).length;
       const rawValue = `${totalRequirements} requirements, ${totalAssertions} assertions (${mustHaveCount} must-have, ${niceToHaveCount} nice-to-have)`;
-      output2({
+      output({
         total_requirements: totalRequirements,
         total_assertions: totalAssertions,
         must_have_count: mustHaveCount,
@@ -8379,7 +8379,7 @@ var require_verify = __commonJS({
       const assertionsPath = path.join(cwd, ".planning", "ASSERTIONS.md");
       const content = safeReadFile(assertionsPath);
       if (!content) {
-        output2({ error: "ASSERTIONS.md not found", path: ".planning/ASSERTIONS.md" }, raw, "ASSERTIONS.md not found");
+        output({ error: "ASSERTIONS.md not found", path: ".planning/ASSERTIONS.md" }, raw, "ASSERTIONS.md not found");
         return;
       }
       const parsed = parseAssertionsMd(content);
@@ -8426,7 +8426,7 @@ var require_verify = __commonJS({
       const coveragePercent = totalReqs > 0 ? Math.round(assertionReqCount / totalReqs * 100) : 0;
       const valid = issues.filter((i) => i.severity === "error").length === 0;
       const rawValue = valid ? "valid" : `${issues.length} issues found`;
-      output2({
+      output({
         valid,
         issues,
         stats: {
@@ -8486,7 +8486,7 @@ var require_verify = __commonJS({
       const roadmapPath = path.join(cwd, ".planning", "ROADMAP.md");
       const rc = cachedReadFile(roadmapPath);
       if (!rc) {
-        output2({ passed: false, errors: ["ROADMAP.md not found"], warnings: [] }, raw, "failed");
+        output({ passed: false, errors: ["ROADMAP.md not found"], warnings: [] }, raw, "failed");
         return;
       }
       const errs = [], warns = [], repairs = [];
@@ -8553,7 +8553,7 @@ var require_verify = __commonJS({
         result.repairs = repairs;
         result.repair_count = repairs.length;
       }
-      output2(result, raw, passed ? "passed" : errs.length > 0 ? "failed" : "warnings");
+      output(result, raw, passed ? "passed" : errs.length > 0 ? "failed" : "warnings");
     }
     module2.exports = {
       cmdVerifyPlanStructure,
@@ -8584,7 +8584,7 @@ var require_intent = __commonJS({
   "src/commands/intent.js"(exports2, module2) {
     var fs = require("fs");
     var path = require("path");
-    var { output: output2, error, debugLog } = require_output();
+    var { output, error, debugLog } = require_output();
     var { loadConfig } = require_config();
     var { execGit } = require_git();
     var { parseIntentMd, generateIntentMd, parsePlanIntent, getMilestoneInfo, normalizePhaseName } = require_helpers();
@@ -8672,7 +8672,7 @@ var require_intent = __commonJS({
         sections,
         commit: commitHash
       };
-      output2(result, raw, commitHash || "created");
+      output(result, raw, commitHash || "created");
     }
     var SECTION_ALIASES = ["objective", "users", "outcomes", "criteria", "constraints", "health", "history"];
     function makeFormatIntentShow(args, rawContent) {
@@ -8701,18 +8701,18 @@ var require_intent = __commonJS({
         if (sectionFilter) {
           const sectionData = {};
           sectionData[sectionFilter] = data[sectionFilter];
-          output2(sectionData, false);
+          output(sectionData, false);
         } else {
-          output2(data, false);
+          output(data, false);
         }
         return;
       }
       if (sectionFilter) {
         const sectionData = {};
         sectionData[sectionFilter] = data[sectionFilter];
-        output2(sectionData, { formatter: makeFormatIntentShow(args, content) });
+        output(sectionData, { formatter: makeFormatIntentShow(args, content) });
       } else {
-        output2(data, { formatter: makeFormatIntentShow(args, content) });
+        output(data, { formatter: makeFormatIntentShow(args, content) });
       }
     }
     function renderCompactSummary(data) {
@@ -9157,7 +9157,7 @@ var require_intent = __commonJS({
         revision: data.revision,
         commit: commitHash
       };
-      output2(result, raw);
+      output(result, raw);
     }
     function getNextId(items, prefix) {
       let maxNum = 0;
@@ -9444,7 +9444,7 @@ var require_intent = __commonJS({
         revision: revision || null
       };
       if (!valid) process.exitCode = 1;
-      output2(result, { formatter: formatIntentValidate });
+      output(result, { formatter: formatIntentValidate });
     }
     function cmdIntentTrace(cwd, args, raw) {
       const planningDir = path.join(cwd, ".planning");
@@ -9543,7 +9543,7 @@ var require_intent = __commonJS({
         }))
       };
       if (raw) {
-        output2(result, false);
+        output(result, false);
         return;
       }
       const lines = [];
@@ -9576,7 +9576,7 @@ var require_intent = __commonJS({
         const gapParts = Object.entries(gapCounts).sort(([a], [b]) => a.localeCompare(b)).map(([p, c]) => `${c}\xD7${p}`);
         lines.push(`Gaps: ${gaps.length} outcomes uncovered (${gapParts.join(", ")})`);
       }
-      output2(null, true, lines.join("\n") + "\n");
+      output(null, true, lines.join("\n") + "\n");
     }
     function calculateDriftScore(data) {
       const { outcomes, plans, signalData } = data;
@@ -9812,7 +9812,7 @@ var require_intent = __commonJS({
       if (!data) {
         error("INTENT.md has no desired outcomes defined.");
       }
-      output2(data, { formatter: formatIntentDrift });
+      output(data, { formatter: formatIntentDrift });
     }
     function getIntentSummary(cwd) {
       const intentPath = path.join(cwd, ".planning", "INTENT.md");
@@ -9848,7 +9848,7 @@ var require_env = __commonJS({
     var fs = require("fs");
     var path = require("path");
     var { execFileSync } = require("child_process");
-    var { output: output2, error, debugLog } = require_output();
+    var { output, error, debugLog } = require_output();
     var LANG_MANIFESTS = [
       { file: "package.json", language: "node", binary: "node", versionFlag: "--version" },
       { file: "go.mod", language: "go", binary: "go", versionFlag: "version" },
@@ -10567,7 +10567,7 @@ var require_env = __commonJS({
             process.stderr.write("Environment manifest is current\n");
           }
           if (raw) {
-            output2(existing, raw);
+            output(existing, raw);
           }
           process.exit(0);
         }
@@ -10588,7 +10588,7 @@ var require_env = __commonJS({
 `);
       }
       if (raw) {
-        output2(result, raw);
+        output(result, raw);
       }
       process.exit(0);
     }
@@ -10612,7 +10612,7 @@ var require_env = __commonJS({
         languages_count: manifest ? (manifest.languages || []).length : 0,
         changed_files: staleness.changed_files || []
       };
-      output2(result, raw);
+      output(result, raw);
     }
     function readEnvManifest(cwd) {
       const manifestPath = path.join(cwd, ".planning", "env-manifest.json");
@@ -11083,7 +11083,7 @@ var require_stringify = __commonJS({
       const stringify = (node, parent = {}) => {
         const invalidBlock = options.escapeInvalid && utils.isInvalidBrace(parent);
         const invalidNode = node.invalid === true && options.escapeInvalid === true;
-        let output2 = "";
+        let output = "";
         if (node.value) {
           if ((invalidBlock || invalidNode) && utils.isOpenOrClose(node)) {
             return "\\" + node.value;
@@ -11095,10 +11095,10 @@ var require_stringify = __commonJS({
         }
         if (node.nodes) {
           for (const child of node.nodes) {
-            output2 += stringify(child);
+            output += stringify(child);
           }
         }
-        return output2;
+        return output;
       };
       return stringify(ast);
     };
@@ -11538,7 +11538,7 @@ var require_compile = __commonJS({
         const invalidNode = node.invalid === true && options.escapeInvalid === true;
         const invalid = invalidBlock === true || invalidNode === true;
         const prefix = options.escapeInvalid === true ? "\\" : "";
-        let output2 = "";
+        let output = "";
         if (node.isOpen === true) {
           return prefix + node.value;
         }
@@ -11567,10 +11567,10 @@ var require_compile = __commonJS({
         }
         if (node.nodes) {
           for (const child of node.nodes) {
-            output2 += walk(child, node);
+            output += walk(child, node);
           }
         }
-        return output2;
+        return output;
       };
       return walk(ast);
     };
@@ -12020,23 +12020,23 @@ var require_braces = __commonJS({
     var expand = require_expand();
     var parse = require_parse();
     var braces = (input, options = {}) => {
-      let output2 = [];
+      let output = [];
       if (Array.isArray(input)) {
         for (const pattern of input) {
           const result = braces.create(pattern, options);
           if (Array.isArray(result)) {
-            output2.push(...result);
+            output.push(...result);
           } else {
-            output2.push(result);
+            output.push(result);
           }
         }
       } else {
-        output2 = [].concat(braces.create(input, options));
+        output = [].concat(braces.create(input, options));
       }
       if (options && options.expand === true && options.nodupes === true) {
-        output2 = [...new Set(output2)];
+        output = [...new Set(output)];
       }
-      return output2;
+      return output;
     };
     braces.parse = (input, options = {}) => parse(input, options);
     braces.stringify = (input, options = {}) => {
@@ -12313,21 +12313,21 @@ var require_utils2 = __commonJS({
       return `${input.slice(0, idx)}\\${input.slice(idx)}`;
     };
     exports2.removePrefix = (input, state = {}) => {
-      let output2 = input;
-      if (output2.startsWith("./")) {
-        output2 = output2.slice(2);
+      let output = input;
+      if (output.startsWith("./")) {
+        output = output.slice(2);
         state.prefix = "./";
       }
-      return output2;
+      return output;
     };
     exports2.wrapOutput = (input, state = {}, options = {}) => {
       const prepend = options.contains ? "" : "^";
       const append = options.contains ? "" : "$";
-      let output2 = `${prepend}(?:${input})${append}`;
+      let output = `${prepend}(?:${input})${append}`;
       if (state.negated === true) {
-        output2 = `(?:^(?!${output2}).*$)`;
+        output = `(?:^(?!${output}).*$)`;
       }
-      return output2;
+      return output;
     };
   }
 });
@@ -12822,14 +12822,14 @@ var require_parse2 = __commonJS({
         token.prev = prev;
         token.parens = state.parens;
         token.output = state.output;
-        const output2 = (opts.capture ? "(" : "") + token.open;
+        const output = (opts.capture ? "(" : "") + token.open;
         increment("parens");
         push({ type, value: value2, output: state.output ? "" : ONE_CHAR });
-        push({ type: "paren", extglob: true, value: advance(), output: output2 });
+        push({ type: "paren", extglob: true, value: advance(), output });
         extglobs.push(token);
       };
       const extglobClose = (token) => {
-        let output2 = token.close + (opts.capture ? ")" : "");
+        let output = token.close + (opts.capture ? ")" : "");
         let rest;
         if (token.type === "negate") {
           let extglobStar = star;
@@ -12837,22 +12837,22 @@ var require_parse2 = __commonJS({
             extglobStar = globstar(opts);
           }
           if (extglobStar !== star || eos() || /^\)+$/.test(remaining())) {
-            output2 = token.close = `)$))${extglobStar}`;
+            output = token.close = `)$))${extglobStar}`;
           }
           if (token.inner.includes("*") && (rest = remaining()) && /^\.[^\\/.]+$/.test(rest)) {
             const expression = parse(rest, { ...options, fastpaths: false }).output;
-            output2 = token.close = `)${expression})${extglobStar})`;
+            output = token.close = `)${expression})${extglobStar})`;
           }
           if (token.prev.type === "bos") {
             state.negatedExtglob = true;
           }
         }
-        push({ type: "paren", extglob: true, value, output: output2 });
+        push({ type: "paren", extglob: true, value, output });
         decrement("parens");
       };
       if (opts.fastpaths !== false && !/(^[*!]|[/()[\]{}"])/.test(input)) {
         let backslashes = false;
-        let output2 = input.replace(REGEX_SPECIAL_CHARS_BACKREF, (m, esc, chars, first, rest, index) => {
+        let output = input.replace(REGEX_SPECIAL_CHARS_BACKREF, (m, esc, chars, first, rest, index) => {
           if (first === "\\") {
             backslashes = true;
             return m;
@@ -12879,18 +12879,18 @@ var require_parse2 = __commonJS({
         });
         if (backslashes === true) {
           if (opts.unescape === true) {
-            output2 = output2.replace(/\\/g, "");
+            output = output.replace(/\\/g, "");
           } else {
-            output2 = output2.replace(/\\+/g, (m) => {
+            output = output.replace(/\\+/g, (m) => {
               return m.length % 2 === 0 ? "\\\\" : m ? "\\" : "";
             });
           }
         }
-        if (output2 === input && opts.contains === true) {
+        if (output === input && opts.contains === true) {
           state.output = input;
           return state;
         }
-        state.output = utils.wrapOutput(output2, state, options);
+        state.output = utils.wrapOutput(output, state, options);
         return state;
       }
       while (!eos()) {
@@ -13060,7 +13060,7 @@ var require_parse2 = __commonJS({
             push({ type: "text", value, output: value });
             continue;
           }
-          let output2 = ")";
+          let output = ")";
           if (brace.dots === true) {
             const arr = tokens.slice();
             const range = [];
@@ -13073,20 +13073,20 @@ var require_parse2 = __commonJS({
                 range.unshift(arr[i].value);
               }
             }
-            output2 = expandRange(range, opts);
+            output = expandRange(range, opts);
             state.backtrack = true;
           }
           if (brace.comma !== true && brace.dots !== true) {
             const out = state.output.slice(0, brace.outputIndex);
             const toks = state.tokens.slice(brace.tokensIndex);
             brace.value = brace.output = "\\{";
-            value = output2 = "\\}";
+            value = output = "\\}";
             state.output = out;
             for (const t of toks) {
               state.output += t.output || t.value;
             }
           }
-          push({ type: "brace", value, output: output2 });
+          push({ type: "brace", value, output });
           decrement("braces");
           braces.pop();
           continue;
@@ -13099,13 +13099,13 @@ var require_parse2 = __commonJS({
           continue;
         }
         if (value === ",") {
-          let output2 = value;
+          let output = value;
           const brace = braces[braces.length - 1];
           if (brace && stack[stack.length - 1] === "braces") {
             brace.comma = true;
-            output2 = "|";
+            output = "|";
           }
-          push({ type: "comma", value, output: output2 });
+          push({ type: "comma", value, output });
           continue;
         }
         if (value === "/") {
@@ -13145,14 +13145,14 @@ var require_parse2 = __commonJS({
           }
           if (prev && prev.type === "paren") {
             const next = peek();
-            let output2 = value;
+            let output = value;
             if (next === "<" && !utils.supportsLookbehinds()) {
               throw new Error("Node.js v10 or higher is required for regex lookbehinds");
             }
             if (prev.value === "(" && !/[!=<:]/.test(next) || next === "<" && !/<([!=]|\w+>)/.test(remaining())) {
-              output2 = `\\${value}`;
+              output = `\\${value}`;
             }
-            push({ type: "text", value, output: output2 });
+            push({ type: "text", value, output });
             continue;
           }
           if (opts.dot !== true && (prev.type === "slash" || prev.type === "bos")) {
@@ -13424,8 +13424,8 @@ var require_parse2 = __commonJS({
           }
         }
       };
-      const output2 = utils.removePrefix(input, state);
-      let source = create(output2);
+      const output = utils.removePrefix(input, state);
+      let source = create(output);
       if (source && opts.strictSlashes !== true) {
         source += `${SLASH_LITERAL}?`;
       }
@@ -13472,8 +13472,8 @@ var require_picomatch = __commonJS({
         isIgnored = picomatch(opts.ignore, ignoreOpts, returnState);
       }
       const matcher = (input, returnObject = false) => {
-        const { isMatch, match, output: output2 } = picomatch.test(input, regex, options, { glob, posix });
-        const result = { glob, state, regex, posix, input, output: output2, match, isMatch };
+        const { isMatch, match, output } = picomatch.test(input, regex, options, { glob, posix });
+        const result = { glob, state, regex, posix, input, output, match, isMatch };
         if (typeof opts.onResult === "function") {
           opts.onResult(result);
         }
@@ -13508,19 +13508,19 @@ var require_picomatch = __commonJS({
       const opts = options || {};
       const format = opts.format || (posix ? utils.toPosixSlashes : null);
       let match = input === glob;
-      let output2 = match && format ? format(input) : input;
+      let output = match && format ? format(input) : input;
       if (match === false) {
-        output2 = format ? format(input) : input;
-        match = output2 === glob;
+        output = format ? format(input) : input;
+        match = output === glob;
       }
       if (match === false || opts.capture === true) {
         if (opts.matchBase === true || opts.basename === true) {
           match = picomatch.matchBase(input, regex, options, posix);
         } else {
-          match = regex.exec(output2);
+          match = regex.exec(output);
         }
       }
-      return { isMatch: Boolean(match), match, output: output2 };
+      return { isMatch: Boolean(match), match, output };
     };
     picomatch.matchBase = (input, glob, options, posix = utils.isWindows(options)) => {
       const regex = glob instanceof RegExp ? glob : picomatch.makeRe(glob, options);
@@ -26140,7 +26140,7 @@ var require_codebase = __commonJS({
     "use strict";
     var fs = require("fs");
     var path = require("path");
-    var { output: output2, error, debugLog } = require_output();
+    var { output, error, debugLog } = require_output();
     var {
       checkStaleness,
       performAnalysis,
@@ -26190,7 +26190,7 @@ var require_codebase = __commonJS({
             debugLog("codebase.analyze", `incremental mode: ${changedFiles.length} changed files`);
           } else if (!staleness.stale) {
             const durationMs2 = Date.now() - startMs;
-            output2({
+            output({
               success: true,
               mode: "cached",
               files_analyzed: 0,
@@ -26221,7 +26221,7 @@ var require_codebase = __commonJS({
         fs.unlinkSync(path.join(cwd, ".planning", ".cache", ".analyzing"));
       } catch {
       }
-      output2({
+      output({
         success: true,
         mode,
         files_analyzed: filesAnalyzed,
@@ -26273,7 +26273,7 @@ var require_codebase = __commonJS({
     function cmdCodebaseStatus(cwd, args, raw) {
       const intel = readIntel(cwd);
       if (!intel) {
-        output2({
+        output({
           exists: false,
           message: "No codebase intel. Run: codebase analyze"
         }, { formatter: formatCodebaseStatus });
@@ -26286,7 +26286,7 @@ var require_codebase = __commonJS({
         if (staleness.changed_files && staleness.changed_files.length > 0 && intel.git_commit_hash) {
           changedGroups = groupChangedFiles(cwd, intel.git_commit_hash, staleness.changed_files);
         }
-        output2({
+        output({
           exists: true,
           stale: true,
           reason: staleness.reason,
@@ -26297,7 +26297,7 @@ var require_codebase = __commonJS({
           generated_at: intel.generated_at
         }, { formatter: formatCodebaseStatus });
       } else {
-        output2({
+        output({
           exists: true,
           stale: false,
           generated_at: intel.generated_at,
@@ -26459,7 +26459,7 @@ var require_codebase = __commonJS({
         });
       }
       const frameworkPatterns = conventions.frameworks || [];
-      output2({
+      output({
         success: true,
         naming_patterns: namingPatterns,
         file_organization: conventions.file_organization,
@@ -26489,7 +26489,7 @@ var require_codebase = __commonJS({
       const maxIdx = args.indexOf("--max");
       const maxRules = maxIdx !== -1 ? parseInt(args[maxIdx + 1], 10) : 15;
       const result = generateRules(conventions, { threshold, maxRules });
-      output2({
+      output({
         success: true,
         rules: result.rules,
         rules_text: result.rules_text,
@@ -26519,7 +26519,7 @@ var require_codebase = __commonJS({
       if (wantCycles) {
         result.cycles = findCycles(graph);
       }
-      output2(result, raw);
+      output(result, raw);
     }
     function cmdCodebaseImpact(cwd, args, raw) {
       const filePaths = args.filter((a) => !a.startsWith("-"));
@@ -26562,7 +26562,7 @@ var require_codebase = __commonJS({
         });
       }
       const totalDependents = files.reduce((sum, r) => sum + r.dependent_count, 0);
-      output2({
+      output({
         files_analyzed: files.length,
         total_dependents: totalDependents,
         overall_risk: totalDependents > 20 ? "high" : totalDependents > 10 ? "medium" : "low",
@@ -26619,7 +26619,7 @@ var require_codebase = __commonJS({
         }
         process.stderr.write(lines.join("\n") + "\n");
       }
-      output2({
+      output({
         success: true,
         nodes: lifecycle.nodes.length,
         edges: lifecycle.stats.edge_count,
@@ -26811,7 +26811,7 @@ var require_codebase = __commonJS({
         const planFiles2 = getPlanFiles(cwd, planPath2);
         const { buildTaskContext } = require_context();
         const result2 = buildTaskContext(cwd, taskFiles, { planFiles: planFiles2, tokenBudget });
-        output2({ success: true, ...result2 }, raw);
+        output({ success: true, ...result2 }, raw);
         return;
       }
       const filesIdx = args.indexOf("--files");
@@ -26907,7 +26907,7 @@ var require_codebase = __commonJS({
         omitted_files: budgetResult.omitted_files
       };
       if (raw) {
-        output2(result, raw);
+        output(result, raw);
       } else {
         const lines = [];
         lines.push("");
@@ -26941,7 +26941,7 @@ var require_codebase = __commonJS({
           lines.push("");
         }
         process.stderr.write(lines.join("\n") + "\n");
-        output2(result, false);
+        output(result, false);
       }
     }
     function formatCodebaseAst(result) {
@@ -26980,7 +26980,7 @@ var require_codebase = __commonJS({
       const { extractSignatures } = require_ast();
       const resolved = path.resolve(cwd, filePath);
       const result = extractSignatures(resolved);
-      output2({
+      output({
         file: filePath,
         language: result.language,
         signatures: result.signatures,
@@ -27038,7 +27038,7 @@ var require_codebase = __commonJS({
       const { extractExports } = require_ast();
       const resolved = path.resolve(cwd, filePath);
       const result = extractExports(resolved);
-      output2({
+      output({
         file: filePath,
         type: result.type,
         named: result.named,
@@ -27090,7 +27090,7 @@ var require_codebase = __commonJS({
       const { computeComplexity } = require_ast();
       const resolved = path.resolve(cwd, filePath);
       const result = computeComplexity(resolved);
-      output2({
+      output({
         file: filePath,
         module_complexity: result.module_complexity,
         functions: result.functions,
@@ -27102,7 +27102,7 @@ var require_codebase = __commonJS({
       const tokenBudget = budgetIdx !== -1 ? parseInt(args[budgetIdx + 1], 10) : 1e3;
       const { generateRepoMap } = require_ast();
       const result = generateRepoMap(cwd, { tokenBudget });
-      output2({
+      output({
         summary: result.summary,
         files_included: result.files_included,
         total_signatures: result.total_signatures,
@@ -27139,7 +27139,7 @@ var require_worktree = __commonJS({
     var path = require("path");
     var os = require("os");
     var { execSync, execFileSync } = require("child_process");
-    var { output: output2, error, debugLog } = require_output();
+    var { output, error, debugLog } = require_output();
     var { execGit } = require_git();
     var { loadConfig } = require_config();
     var { extractFrontmatter } = require_frontmatter();
@@ -27349,7 +27349,7 @@ var require_worktree = __commonJS({
       };
       if (setupError) result.setup_error = setupError;
       if (resourceWarnings.length > 0) result.resource_warnings = resourceWarnings;
-      output2(result, raw);
+      output(result, raw);
     }
     function cmdWorktreeList(cwd, raw) {
       const config = getWorktreeConfig(cwd);
@@ -27376,7 +27376,7 @@ var require_worktree = __commonJS({
       });
       const result = { worktrees };
       if (worktrees.length === 0) {
-        output2(result, raw, "No active worktrees for this project.\n");
+        output(result, raw, "No active worktrees for this project.\n");
       } else {
         const lines = [
           "Plan ID   | Branch                     | Path                                    | Disk Usage",
@@ -27385,7 +27385,7 @@ var require_worktree = __commonJS({
         for (const wt of worktrees) {
           lines.push(`${(wt.plan_id || "").padEnd(9)} | ${(wt.branch || "").padEnd(26)} | ${(wt.path || "").padEnd(39)} | ${wt.disk_usage}`);
         }
-        output2(result, raw, lines.join("\n") + "\n");
+        output(result, raw, lines.join("\n") + "\n");
       }
     }
     function cmdWorktreeRemove(cwd, planId, raw) {
@@ -27415,7 +27415,7 @@ var require_worktree = __commonJS({
           debugLog("worktree.remove", `Failed to delete branch ${branchName}: ${branchResult.stderr}`);
         }
       }
-      output2({ removed: true, plan_id: planId, path: worktreePath }, raw);
+      output({ removed: true, plan_id: planId, path: worktreePath }, raw);
     }
     function cmdWorktreeCleanup(cwd, raw) {
       const config = getWorktreeConfig(cwd);
@@ -27454,7 +27454,7 @@ var require_worktree = __commonJS({
       } catch {
         debugLog("worktree.cleanup", "Failed to remove empty project directory");
       }
-      output2({ cleaned: removed.length, worktrees: removed }, raw);
+      output({ cleaned: removed.length, worktrees: removed }, raw);
     }
     var AUTO_RESOLVE_PATTERNS = [
       "package-lock.json",
@@ -27471,9 +27471,9 @@ var require_worktree = __commonJS({
         return filePath === pattern || filePath.endsWith("/" + pattern);
       });
     }
-    function parseMergeTreeConflicts(output3) {
+    function parseMergeTreeConflicts(output2) {
       const conflicts = [];
-      const lines = output3.split("\n");
+      const lines = output2.split("\n");
       for (const line of lines) {
         const match = line.match(/^CONFLICT\s+\(([^)]+)\):\s+.*?(?:in\s+)?(\S+)\s*$/);
         if (match) {
@@ -27581,7 +27581,7 @@ var require_worktree = __commonJS({
       const autoResolvable = conflicts.filter((c) => isAutoResolvable(c.file));
       const realConflicts = conflicts.filter((c) => !isAutoResolvable(c.file));
       if (realConflicts.length > 0) {
-        output2({
+        output({
           merged: false,
           plan_id: planId,
           branch: worktreeBranch,
@@ -27616,7 +27616,7 @@ var require_worktree = __commonJS({
       } else if (mergeResult.exitCode !== 0) {
         error(`Merge execution failed: ${mergeResult.stderr}`);
       }
-      output2({
+      output({
         merged: true,
         plan_id: planId,
         branch: worktreeBranch,
@@ -27651,7 +27651,7 @@ var require_worktree = __commonJS({
           }
         }
       }
-      output2({
+      output({
         phase: phaseNumber,
         plans_analyzed: phasePlans.length,
         overlaps,
@@ -27684,7 +27684,7 @@ var require_research = __commonJS({
     var { execFileSync } = require("child_process");
     var { checkBinary } = require_env();
     var { loadConfig } = require_config();
-    var { output: output2, status, debugLog } = require_output();
+    var { output, status, debugLog } = require_output();
     var { banner, sectionHeader, formatTable, color, SYMBOLS, truncate } = require_format();
     var _researchCache = null;
     function getResearchCache() {
@@ -27951,7 +27951,7 @@ var require_research = __commonJS({
         recommendations,
         warning: mcpServers.warning || null
       };
-      output2(result, { formatter: formatCapabilities, raw });
+      output(result, { formatter: formatCapabilities, raw });
     }
     function parseFlag(args, flag, defaultValue) {
       const idx = args.indexOf(flag);
@@ -28041,7 +28041,7 @@ var require_research = __commonJS({
       const cliTools = detectCliTools(cwd);
       if (!cliTools["yt-dlp"].available) {
         const result2 = { error: "yt-dlp not installed", install_hint: "pip install yt-dlp", available: false };
-        output2(result2, { formatter: formatYtSearch, raw });
+        output(result2, { formatter: formatYtSearch, raw });
         return;
       }
       const count = parseInt(parseFlag(args, "--count", "10"), 10);
@@ -28059,7 +28059,7 @@ var require_research = __commonJS({
       const query = positional.filter((a) => !flagValues.has(a)).join(" ").trim();
       if (!query) {
         const result2 = { error: "Missing search query", usage: 'research:yt-search "topic" [--count N] [--max-age DAYS] [--min-duration SEC] [--max-duration SEC] [--min-views N]' };
-        output2(result2, { formatter: formatYtSearch, raw });
+        output(result2, { formatter: formatYtSearch, raw });
         return;
       }
       let rawResults;
@@ -28081,7 +28081,7 @@ var require_research = __commonJS({
         }).filter(Boolean);
       } catch (err) {
         const result2 = { error: "yt-dlp search failed", details: err.message };
-        output2(result2, { formatter: formatYtSearch, raw });
+        output(result2, { formatter: formatYtSearch, raw });
         return;
       }
       const extracted = rawResults.map((r) => {
@@ -28130,7 +28130,7 @@ var require_research = __commonJS({
         post_filter_count: scored.length,
         results: scored
       };
-      output2(result, { formatter: formatYtSearch, raw });
+      output(result, { formatter: formatYtSearch, raw });
     }
     function parseVtt(vttContent, keepTimestamps) {
       const lines = vttContent.split("\n");
@@ -28247,7 +28247,7 @@ var require_research = __commonJS({
       const cliTools = detectCliTools(cwd);
       if (!cliTools["yt-dlp"].available) {
         const result = { error: "yt-dlp not installed", install_hint: "pip install yt-dlp", available: false };
-        output2(result, { formatter: formatYtTranscript, raw });
+        output(result, { formatter: formatYtTranscript, raw });
         return;
       }
       const keepTimestamps = args.includes("--timestamps");
@@ -28262,13 +28262,13 @@ var require_research = __commonJS({
       const videoInput = positional.filter((a) => !flagValues.has(a))[0];
       if (!videoInput) {
         const result = { error: "Missing video ID or URL", usage: "research:yt-transcript <video-id|url> [--timestamps] [--lang LANG]" };
-        output2(result, { formatter: formatYtTranscript, raw });
+        output(result, { formatter: formatYtTranscript, raw });
         return;
       }
       const videoId = extractVideoId(videoInput);
       if (!videoId) {
         const result = { error: "Could not parse video ID from input", input: videoInput };
-        output2(result, { formatter: formatYtTranscript, raw });
+        output(result, { formatter: formatYtTranscript, raw });
         return;
       }
       const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
@@ -28278,7 +28278,7 @@ var require_research = __commonJS({
         tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "gsd-yt-"));
       } catch (e) {
         const result = { error: "Failed to create temp directory", details: e.message };
-        output2(result, { formatter: formatYtTranscript, raw });
+        output(result, { formatter: formatYtTranscript, raw });
         return;
       }
       try {
@@ -28313,7 +28313,7 @@ var require_research = __commonJS({
             message: "No subtitles available for this video",
             has_subtitles: false
           };
-          output2(result2, { formatter: formatYtTranscript, raw });
+          output(result2, { formatter: formatYtTranscript, raw });
           return;
         }
         let selectedFile = vttFiles[0];
@@ -28350,7 +28350,7 @@ var require_research = __commonJS({
           word_count: wordCount,
           char_count: charCount
         };
-        output2(result, { formatter: formatYtTranscript, raw });
+        output(result, { formatter: formatYtTranscript, raw });
       } finally {
         try {
           fs.rmSync(tmpDir, { recursive: true, force: true });
@@ -28546,7 +28546,7 @@ var require_research = __commonJS({
           timing: { web_ms: 0, youtube_ms: 0, total_ms: 0 },
           agent_context: ""
         };
-        output2(result2, { formatter: formatCollect, raw });
+        output(result2, { formatter: formatCollect, raw });
         return;
       }
       const cliTools = detectCliTools(cwd);
@@ -28561,7 +28561,7 @@ var require_research = __commonJS({
       const query = args.filter((a) => !a.startsWith("--")).filter((a) => !flagValues.has(a)).join(" ").trim();
       if (!query) {
         const result2 = { error: "Missing search query", usage: 'research:collect "topic" [--quick]' };
-        output2(result2, { formatter: formatCollect, raw });
+        output(result2, { formatter: formatCollect, raw });
         return;
       }
       if (!noCache) {
@@ -28569,7 +28569,7 @@ var require_research = __commonJS({
         if (cache) {
           const cached = cache.getResearch(query);
           if (cached) {
-            output2({ ...cached, cache_hit: true }, { formatter: formatCollect, raw });
+            output({ ...cached, cache_hit: true }, { formatter: formatCollect, raw });
             return;
           }
         }
@@ -28664,7 +28664,7 @@ var require_research = __commonJS({
         }
       }
       deleteSession(cwd);
-      output2(result, { formatter: formatCollect, raw });
+      output(result, { formatter: formatCollect, raw });
     }
     function getNlmBinary(cwd) {
       const cliTools = detectCliTools(cwd);
@@ -28742,19 +28742,19 @@ var require_research = __commonJS({
     function cmdResearchNlmCreate(cwd, args, raw) {
       const nlmBinary = getNlmBinary(cwd);
       if (!nlmBinary.available) {
-        output2({ error: nlmBinary.error, install_hint: nlmBinary.install_hint }, { formatter: formatNlmCreate, raw });
+        output({ error: nlmBinary.error, install_hint: nlmBinary.install_hint }, { formatter: formatNlmCreate, raw });
         return;
       }
       const config = loadConfig(cwd);
       const authTimeout = Math.min(1e4, Math.floor((config.rag_timeout || 30) * 1e3 / 3));
       const auth = checkNlmAuth(nlmBinary.path, authTimeout);
       if (!auth.authenticated) {
-        output2({ error: auth.message, reauth_command: auth.reauth_command }, { formatter: formatNlmCreate, raw });
+        output({ error: auth.message, reauth_command: auth.reauth_command }, { formatter: formatNlmCreate, raw });
         return;
       }
       const title = args.filter((a) => !a.startsWith("--")).join(" ").trim();
       if (!title) {
-        output2({ error: "Missing notebook title", usage: 'research:nlm-create "My Notebook Title"' }, { formatter: formatNlmCreate, raw });
+        output({ error: "Missing notebook title", usage: 'research:nlm-create "My Notebook Title"' }, { formatter: formatNlmCreate, raw });
         return;
       }
       try {
@@ -28769,9 +28769,9 @@ var require_research = __commonJS({
           title: parsed.title || title,
           raw_output: parsed
         };
-        output2(result, { formatter: formatNlmCreate, raw });
+        output(result, { formatter: formatNlmCreate, raw });
       } catch (err) {
-        output2({ error: "Failed to create notebook", details: (err.message || "").slice(0, 300) }, { formatter: formatNlmCreate, raw });
+        output({ error: "Failed to create notebook", details: (err.message || "").slice(0, 300) }, { formatter: formatNlmCreate, raw });
       }
     }
     function formatNlmAsk(data) {
@@ -28797,14 +28797,14 @@ var require_research = __commonJS({
     function cmdResearchNlmAsk(cwd, args, raw) {
       const nlmBinary = getNlmBinary(cwd);
       if (!nlmBinary.available) {
-        output2({ error: nlmBinary.error, install_hint: nlmBinary.install_hint }, { formatter: formatNlmAsk, raw });
+        output({ error: nlmBinary.error, install_hint: nlmBinary.install_hint }, { formatter: formatNlmAsk, raw });
         return;
       }
       const config = loadConfig(cwd);
       const authTimeout = Math.min(1e4, Math.floor((config.rag_timeout || 30) * 1e3 / 3));
       const auth = checkNlmAuth(nlmBinary.path, authTimeout);
       if (!auth.authenticated) {
-        output2({ error: auth.message, reauth_command: auth.reauth_command }, { formatter: formatNlmAsk, raw });
+        output({ error: auth.message, reauth_command: auth.reauth_command }, { formatter: formatNlmAsk, raw });
         return;
       }
       const positional = args.filter((a) => !a.startsWith("--"));
@@ -28819,11 +28819,11 @@ var require_research = __commonJS({
       const question = cleanPositional.slice(1).join(" ").trim();
       const newFlag = args.includes("--new");
       if (!notebookId) {
-        output2({ error: "Missing notebook ID", usage: 'research:nlm-ask <notebook-id> "question" [--new]' }, { formatter: formatNlmAsk, raw });
+        output({ error: "Missing notebook ID", usage: 'research:nlm-ask <notebook-id> "question" [--new]' }, { formatter: formatNlmAsk, raw });
         return;
       }
       if (!question) {
-        output2({ error: "Missing question", usage: 'research:nlm-ask <notebook-id> "question" [--new]' }, { formatter: formatNlmAsk, raw });
+        output({ error: "Missing question", usage: 'research:nlm-ask <notebook-id> "question" [--new]' }, { formatter: formatNlmAsk, raw });
         return;
       }
       try {
@@ -28833,7 +28833,7 @@ var require_research = __commonJS({
           stdio: "pipe"
         });
       } catch (err) {
-        output2({ error: "Failed to set active notebook", notebook_id: notebookId, details: (err.message || "").slice(0, 300) }, { formatter: formatNlmAsk, raw });
+        output({ error: "Failed to set active notebook", notebook_id: notebookId, details: (err.message || "").slice(0, 300) }, { formatter: formatNlmAsk, raw });
         return;
       }
       try {
@@ -28852,9 +28852,9 @@ var require_research = __commonJS({
           references: parsed.references || [],
           raw_output: parsed
         };
-        output2(result, { formatter: formatNlmAsk, raw });
+        output(result, { formatter: formatNlmAsk, raw });
       } catch (err) {
-        output2({ error: "Failed to ask question", details: (err.message || "").slice(0, 300) }, { formatter: formatNlmAsk, raw });
+        output({ error: "Failed to ask question", details: (err.message || "").slice(0, 300) }, { formatter: formatNlmAsk, raw });
       }
     }
     function formatNlmReport(data) {
@@ -28874,14 +28874,14 @@ var require_research = __commonJS({
     function cmdResearchNlmReport(cwd, args, raw) {
       const nlmBinary = getNlmBinary(cwd);
       if (!nlmBinary.available) {
-        output2({ error: nlmBinary.error, install_hint: nlmBinary.install_hint }, { formatter: formatNlmReport, raw });
+        output({ error: nlmBinary.error, install_hint: nlmBinary.install_hint }, { formatter: formatNlmReport, raw });
         return;
       }
       const config = loadConfig(cwd);
       const authTimeout = Math.min(1e4, Math.floor((config.rag_timeout || 30) * 1e3 / 3));
       const auth = checkNlmAuth(nlmBinary.path, authTimeout);
       if (!auth.authenticated) {
-        output2({ error: auth.message, reauth_command: auth.reauth_command }, { formatter: formatNlmReport, raw });
+        output({ error: auth.message, reauth_command: auth.reauth_command }, { formatter: formatNlmReport, raw });
         return;
       }
       const positional = args.filter((a) => !a.startsWith("--"));
@@ -28897,7 +28897,7 @@ var require_research = __commonJS({
       const customPrompt = parseFlag(args, "--prompt", null);
       const validTypes = ["briefing-doc", "study-guide", "blog-post"];
       if (!notebookId) {
-        output2({ error: "Missing notebook ID", usage: 'research:nlm-report <notebook-id> [--type briefing-doc|study-guide|blog-post] [--prompt "custom"]' }, { formatter: formatNlmReport, raw });
+        output({ error: "Missing notebook ID", usage: 'research:nlm-report <notebook-id> [--type briefing-doc|study-guide|blog-post] [--prompt "custom"]' }, { formatter: formatNlmReport, raw });
         return;
       }
       try {
@@ -28907,7 +28907,7 @@ var require_research = __commonJS({
           stdio: "pipe"
         });
       } catch (err) {
-        output2({ error: "Failed to set active notebook", notebook_id: notebookId, details: (err.message || "").slice(0, 300) }, { formatter: formatNlmReport, raw });
+        output({ error: "Failed to set active notebook", notebook_id: notebookId, details: (err.message || "").slice(0, 300) }, { formatter: formatNlmReport, raw });
         return;
       }
       try {
@@ -28927,9 +28927,9 @@ var require_research = __commonJS({
           content: parsed.content || parsed.report || null,
           raw_output: parsed
         };
-        output2(result, { formatter: formatNlmReport, raw });
+        output(result, { formatter: formatNlmReport, raw });
       } catch (err) {
-        output2({ error: "Failed to generate report", details: (err.message || "").slice(0, 300) }, { formatter: formatNlmReport, raw });
+        output({ error: "Failed to generate report", details: (err.message || "").slice(0, 300) }, { formatter: formatNlmReport, raw });
       }
     }
     function collectNlmSynthesis(cwd, query, sources, timeout) {
@@ -28997,25 +28997,25 @@ var require_research = __commonJS({
     function cmdResearchNlmAddSource(cwd, args, raw) {
       const nlmBinary = getNlmBinary(cwd);
       if (!nlmBinary.available) {
-        output2({ error: nlmBinary.error, install_hint: nlmBinary.install_hint }, { formatter: formatNlmAddSource, raw });
+        output({ error: nlmBinary.error, install_hint: nlmBinary.install_hint }, { formatter: formatNlmAddSource, raw });
         return;
       }
       const config = loadConfig(cwd);
       const authTimeout = Math.min(1e4, Math.floor((config.rag_timeout || 30) * 1e3 / 3));
       const auth = checkNlmAuth(nlmBinary.path, authTimeout);
       if (!auth.authenticated) {
-        output2({ error: auth.message, reauth_command: auth.reauth_command }, { formatter: formatNlmAddSource, raw });
+        output({ error: auth.message, reauth_command: auth.reauth_command }, { formatter: formatNlmAddSource, raw });
         return;
       }
       const positional = args.filter((a) => !a.startsWith("--"));
       const notebookId = positional[0];
       const sourceUrl = positional.slice(1).join(" ").trim();
       if (!notebookId) {
-        output2({ error: "Missing notebook ID", usage: 'research:nlm-add-source <notebook-id> "source-url-or-path"' }, { formatter: formatNlmAddSource, raw });
+        output({ error: "Missing notebook ID", usage: 'research:nlm-add-source <notebook-id> "source-url-or-path"' }, { formatter: formatNlmAddSource, raw });
         return;
       }
       if (!sourceUrl) {
-        output2({ error: "Missing source URL or path", usage: 'research:nlm-add-source <notebook-id> "source-url-or-path"' }, { formatter: formatNlmAddSource, raw });
+        output({ error: "Missing source URL or path", usage: 'research:nlm-add-source <notebook-id> "source-url-or-path"' }, { formatter: formatNlmAddSource, raw });
         return;
       }
       try {
@@ -29025,7 +29025,7 @@ var require_research = __commonJS({
           stdio: "pipe"
         });
       } catch (err) {
-        output2({ error: "Failed to set active notebook", notebook_id: notebookId, details: (err.message || "").slice(0, 300) }, { formatter: formatNlmAddSource, raw });
+        output({ error: "Failed to set active notebook", notebook_id: notebookId, details: (err.message || "").slice(0, 300) }, { formatter: formatNlmAddSource, raw });
         return;
       }
       try {
@@ -29040,9 +29040,9 @@ var require_research = __commonJS({
           source_url: sourceUrl,
           raw_output: parsed
         };
-        output2(result, { formatter: formatNlmAddSource, raw });
+        output(result, { formatter: formatNlmAddSource, raw });
       } catch (err) {
-        output2({ error: "Failed to add source", notebook_id: notebookId, source_url: sourceUrl, details: (err.message || "").slice(0, 300) }, { formatter: formatNlmAddSource, raw });
+        output({ error: "Failed to add source", notebook_id: notebookId, source_url: sourceUrl, details: (err.message || "").slice(0, 300) }, { formatter: formatNlmAddSource, raw });
       }
     }
     module2.exports = { detectCliTools, detectMcpServers, calculateTier, cmdResearchCapabilities, cmdResearchYtSearch, cmdResearchYtTranscript, cmdResearchCollect, cmdResearchNlmCreate, cmdResearchNlmAddSource, cmdResearchNlmAsk, cmdResearchNlmReport };
@@ -29056,7 +29056,7 @@ var require_trajectory = __commonJS({
     var path = require("path");
     var crypto = require("crypto");
     var { execFileSync } = require("child_process");
-    var { output: output2, error, debugLog } = require_output();
+    var { output, error, debugLog } = require_output();
     var { execGit, diffSummary } = require_git();
     var { banner, formatTable, summaryLine, actionHint, color, SYMBOLS, relativeTime } = require_format();
     var { VALID_TRAJECTORY_SCOPES } = require_constants();
@@ -29194,7 +29194,7 @@ var require_trajectory = __commonJS({
       entries.push(entry);
       fs.mkdirSync(memDir, { recursive: true });
       fs.writeFileSync(trajPath, JSON.stringify(entries, null, 2), "utf-8");
-      output2({
+      output({
         created: true,
         checkpoint: name,
         branch: branchName,
@@ -29265,7 +29265,7 @@ var require_trajectory = __commonJS({
         count: checkpoints.length,
         scopes: scopes.size
       };
-      output2(result, { formatter: formatTrajectoryList });
+      output(result, { formatter: formatTrajectoryList });
     }
     function formatTrajectoryList(result) {
       const lines = [];
@@ -29437,7 +29437,7 @@ var require_trajectory = __commonJS({
       }
       fs.mkdirSync(memDir, { recursive: true });
       fs.writeFileSync(trajPath, JSON.stringify(entries, null, 2), "utf-8");
-      output2({
+      output({
         pivoted: true,
         checkpoint: name,
         target_ref: targetEntry.git_ref,
@@ -29547,7 +29547,7 @@ var require_trajectory = __commonJS({
         best_per_metric: bestPerMetric,
         worst_per_metric: worstPerMetric
       };
-      output2(result, { formatter: formatCompareResult });
+      output(result, { formatter: formatCompareResult });
     }
     function formatCompareResult(result) {
       const lines = [];
@@ -29682,7 +29682,7 @@ var require_trajectory = __commonJS({
       entries.push(journalEntry);
       fs.mkdirSync(memDir, { recursive: true });
       fs.writeFileSync(trajPath, JSON.stringify(entries, null, 2), "utf-8");
-      output2({
+      output({
         chosen: true,
         checkpoint: name,
         scope,
@@ -29808,7 +29808,7 @@ var require_trajectory = __commonJS({
         name_filter: name || null,
         context
       };
-      output2(result, { formatter: formatDeadEndResult });
+      output(result, { formatter: formatDeadEndResult });
     }
     function formatDeadEndResult(result) {
       const lines = [];
@@ -29843,7 +29843,7 @@ var require_orchestration = __commonJS({
     "use strict";
     var fs = require("fs");
     var path = require("path");
-    var { debugLog, output: output2, error } = require_output();
+    var { debugLog, output, error } = require_output();
     var { extractFrontmatter } = require_frontmatter();
     var { banner, sectionHeader, formatTable, summaryLine, color, SYMBOLS } = require_format();
     function parseTasksFromPlan(content) {
@@ -30097,7 +30097,7 @@ var require_orchestration = __commonJS({
       if (!classification) {
         error("Failed to classify plan: " + planPath);
       }
-      output2(classification, {
+      output(classification, {
         formatter: (result) => {
           const lines = [];
           lines.push(banner("Classify Plan"));
@@ -30146,7 +30146,7 @@ var require_orchestration = __commonJS({
         plans: classifications,
         execution_mode: executionMode
       };
-      output2(result, {
+      output(result, {
         formatter: (res) => {
           const lines = [];
           lines.push(banner(`Classify Phase ${res.phase}`));
@@ -30196,7 +30196,7 @@ var require_init = __commonJS({
     "use strict";
     var fs = require("fs");
     var path = require("path");
-    var { output: output2, error, debugLog } = require_output();
+    var { output, error, debugLog } = require_output();
     var { banner, sectionHeader, progressBar, formatTable, summaryLine, actionHint, color, SYMBOLS, colorByPercent } = require_format();
     var { loadConfig } = require_config();
     var { safeReadFile, cachedReadFile, findPhaseInternal, resolveModelInternal, getRoadmapPhaseInternal, getMilestoneInfo, getArchivedPhaseDirs, normalizePhaseName, isValidDateString, sanitizeShellArg, pathExistsInternal, generateSlugInternal, getPhaseTree } = require_helpers();
@@ -30529,7 +30529,7 @@ var require_init = __commonJS({
         const agentType = agentArg.split("=")[1];
         if (agentType) {
           const { scopeContextForAgent } = require_context();
-          return output2(scopeContextForAgent(result, agentType), raw);
+          return output(scopeContextForAgent(result, agentType), raw);
         }
       }
       if (global._gsdCompactMode) {
@@ -30574,7 +30574,7 @@ var require_init = __commonJS({
             ]
           };
         }
-        return output2(compactResult, raw);
+        return output(compactResult, raw);
       }
       if (!result.worktree_enabled) {
         delete result.worktree_config;
@@ -30594,7 +30594,7 @@ var require_init = __commonJS({
       if (result.codebase_freshness === null) delete result.codebase_freshness;
       if (result.previous_attempts === null) delete result.previous_attempts;
       if (result.rag_capabilities === null) delete result.rag_capabilities;
-      output2(result, raw);
+      output(result, raw);
     }
     function cmdInitPlanPhase(cwd, phase, raw) {
       if (!phase) {
@@ -30714,7 +30714,7 @@ var require_init = __commonJS({
         const agentType = agentArg.split("=")[1];
         if (agentType) {
           const { scopeContextForAgent } = require_context();
-          return output2(scopeContextForAgent(result, agentType), raw);
+          return output(scopeContextForAgent(result, agentType), raw);
         }
       }
       if (global._gsdCompactMode) {
@@ -30754,7 +30754,7 @@ var require_init = __commonJS({
           if (result.verification_path) manifestFiles.push({ path: result.verification_path, required: false });
           compactResult._manifest = { files: manifestFiles };
         }
-        return output2(compactResult, raw);
+        return output(compactResult, raw);
       }
       if (result.intent_summary === null) delete result.intent_summary;
       if (result.intent_path === null) delete result.intent_path;
@@ -30763,7 +30763,7 @@ var require_init = __commonJS({
       if (result.codebase_conventions === null) delete result.codebase_conventions;
       if (result.codebase_dependencies === null) delete result.codebase_dependencies;
       if (result.codebase_freshness === null) delete result.codebase_freshness;
-      output2(result, raw);
+      output(result, raw);
     }
     function cmdInitNewProject(cwd, raw) {
       const config = loadConfig(cwd);
@@ -30834,9 +30834,9 @@ var require_init = __commonJS({
         if (global._gsdManifestMode) {
           compactResult._manifest = { files: manifestFiles };
         }
-        return output2(compactResult, raw);
+        return output(compactResult, raw);
       }
-      output2(result, raw);
+      output(result, raw);
     }
     function cmdInitNewMilestone(cwd, raw) {
       const config = loadConfig(cwd);
@@ -30878,9 +30878,9 @@ var require_init = __commonJS({
         if (global._gsdManifestMode) {
           compactResult._manifest = { files: manifestFiles };
         }
-        return output2(compactResult, raw);
+        return output(compactResult, raw);
       }
-      output2(result, raw);
+      output(result, raw);
     }
     function cmdInitQuick(cwd, description, raw) {
       const config = loadConfig(cwd);
@@ -30940,9 +30940,9 @@ var require_init = __commonJS({
         if (global._gsdManifestMode) {
           compactResult._manifest = { files: manifestFiles };
         }
-        return output2(compactResult, raw);
+        return output(compactResult, raw);
       }
-      output2(result, raw);
+      output(result, raw);
     }
     function cmdInitResume(cwd, raw) {
       const config = loadConfig(cwd);
@@ -30989,9 +30989,9 @@ var require_init = __commonJS({
         if (global._gsdManifestMode) {
           compactResult._manifest = { files: manifestFiles };
         }
-        return output2(compactResult, raw);
+        return output(compactResult, raw);
       }
-      output2(result, raw);
+      output(result, raw);
     }
     function cmdInitVerifyWork(cwd, phase, raw) {
       if (!phase) {
@@ -31041,9 +31041,9 @@ var require_init = __commonJS({
         if (global._gsdManifestMode) {
           compactResult._manifest = { files: manifestFiles };
         }
-        return output2(compactResult, raw);
+        return output(compactResult, raw);
       }
-      output2(result, raw);
+      output(result, raw);
     }
     function cmdInitPhaseOp(cwd, phase, raw) {
       const config = loadConfig(cwd);
@@ -31172,9 +31172,9 @@ var require_init = __commonJS({
           if (result.research_path) manifestFiles.push({ path: result.research_path, required: false });
           compactResult._manifest = { files: manifestFiles };
         }
-        return output2(compactResult, raw);
+        return output(compactResult, raw);
       }
-      output2(result, raw);
+      output(result, raw);
     }
     function cmdInitTodos(cwd, area, raw) {
       const config = loadConfig(cwd);
@@ -31237,9 +31237,9 @@ var require_init = __commonJS({
         if (global._gsdManifestMode) {
           compactResult._manifest = { files: manifestFiles };
         }
-        return output2(compactResult, raw);
+        return output(compactResult, raw);
       }
-      output2(result, raw);
+      output(result, raw);
     }
     function cmdInitMilestoneOp(cwd, raw) {
       const config = loadConfig(cwd);
@@ -31295,9 +31295,9 @@ var require_init = __commonJS({
         if (global._gsdManifestMode) {
           compactResult._manifest = { files: manifestFiles };
         }
-        return output2(compactResult, raw);
+        return output(compactResult, raw);
       }
-      output2(result, raw);
+      output(result, raw);
     }
     function cmdInitMapCodebase(cwd, raw) {
       const config = loadConfig(cwd);
@@ -31337,9 +31337,9 @@ var require_init = __commonJS({
         if (global._gsdManifestMode) {
           compactResult._manifest = { files: manifestFiles };
         }
-        return output2(compactResult, raw);
+        return output(compactResult, raw);
       }
-      output2(result, raw);
+      output(result, raw);
     }
     function formatInitProgress(result) {
       const lines = [];
@@ -31533,7 +31533,7 @@ var require_init = __commonJS({
         if (global._gsdManifestMode) {
           compactResult._manifest = { files: manifestFiles };
         }
-        return output2(compactResult, { formatter: formatInitProgress });
+        return output(compactResult, { formatter: formatInitProgress });
       }
       if (result.intent_summary === null) delete result.intent_summary;
       if (result.env_summary === null) {
@@ -31550,7 +31550,7 @@ var require_init = __commonJS({
       if (result.codebase_freshness === null) delete result.codebase_freshness;
       if (result.paused_at === null) delete result.paused_at;
       if (result.session_diff === null) delete result.session_diff;
-      output2(result, { formatter: formatInitProgress });
+      output(result, { formatter: formatInitProgress });
     }
     function cmdInitMemory(cwd, args, raw) {
       const workflowIdx = args.indexOf("--workflow");
@@ -31734,7 +31734,7 @@ var require_init = __commonJS({
         jsonStr = JSON.stringify(result);
       }
       result.digest_lines = result.decisions.length + result.blockers.length + result.todos.length + result.lessons.length;
-      output2(result, raw);
+      output(result, raw);
     }
     function getSessionDiffSummary(cwd) {
       try {
@@ -31969,7 +31969,7 @@ var require_misc = __commonJS({
     var fs = require("fs");
     var path = require("path");
     var { execSync } = require("child_process");
-    var { output: output2, error, debugLog } = require_output();
+    var { output, error, debugLog } = require_output();
     var { loadConfig, isGitIgnored } = require_config();
     var { MODEL_PROFILES, CONFIG_SCHEMA } = require_constants();
     var { safeReadFile, cachedReadFile, normalizePhaseName, findPhaseInternal, generateSlugInternal, getArchivedPhaseDirs, getMilestoneInfo, getPhaseTree, cachedReaddirSync } = require_helpers();
@@ -31981,7 +31981,7 @@ var require_misc = __commonJS({
       }
       const slug = text.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
       const result = { slug };
-      output2(result, raw, slug);
+      output(result, raw, slug);
     }
     function cmdCurrentTimestamp(format, raw) {
       const now = /* @__PURE__ */ new Date();
@@ -31998,7 +31998,7 @@ var require_misc = __commonJS({
           result = now.toISOString();
           break;
       }
-      output2({ timestamp: result }, raw, result);
+      output({ timestamp: result }, raw, result);
     }
     function cmdListTodos(cwd, area, raw) {
       const pendingDir = path.join(cwd, ".planning", "todos", "pending");
@@ -32030,7 +32030,7 @@ var require_misc = __commonJS({
         debugLog("feature.listTodos", "read pending dir failed", e);
       }
       const result = { count, todos };
-      output2(result, raw, count.toString());
+      output(result, raw, count.toString());
     }
     function cmdVerifyPathExists(cwd, targetPath, raw) {
       if (!targetPath) {
@@ -32041,11 +32041,11 @@ var require_misc = __commonJS({
         const stats = fs.statSync(fullPath);
         const type = stats.isDirectory() ? "directory" : stats.isFile() ? "file" : "other";
         const result = { exists: true, type };
-        output2(result, raw, "true");
+        output(result, raw, "true");
       } catch (e) {
         debugLog("file.stat", "stat failed", e);
         const result = { exists: false, type: null };
-        output2(result, raw, "false");
+        output(result, raw, "false");
       }
     }
     function cmdConfigEnsureSection(cwd, raw) {
@@ -32061,7 +32061,7 @@ var require_misc = __commonJS({
       }
       if (fs.existsSync(configPath)) {
         const result = { created: false, reason: "already_exists" };
-        output2(result, raw, "exists");
+        output(result, raw, "exists");
         return;
       }
       const homedir = require("os").homedir();
@@ -32094,7 +32094,7 @@ var require_misc = __commonJS({
       try {
         fs.writeFileSync(configPath, JSON.stringify(defaults, null, 2), "utf-8");
         const result = { created: true, path: ".planning/config.json" };
-        output2(result, raw, "created");
+        output(result, raw, "created");
       } catch (err) {
         debugLog("config.ensure", "write failed", err);
         error("Failed to create config.json: " + err.message);
@@ -32135,7 +32135,7 @@ var require_misc = __commonJS({
       try {
         fs.writeFileSync(configPath, JSON.stringify(config, null, 2), "utf-8");
         const result = { updated: true, key: keyPath, value: parsedValue };
-        output2(result, raw, `${keyPath}=${parsedValue}`);
+        output(result, raw, `${keyPath}=${parsedValue}`);
       } catch (err) {
         debugLog("config.set", "write failed", err);
         error("Failed to write config.json: " + err.message);
@@ -32169,7 +32169,7 @@ var require_misc = __commonJS({
       if (current === void 0) {
         error(`Key not found: ${keyPath}`);
       }
-      output2(current, raw, String(current));
+      output(current, raw, String(current));
     }
     function cmdConfigMigrate(cwd, raw) {
       const configPath = path.join(cwd, ".planning", "config.json");
@@ -32230,7 +32230,7 @@ var require_misc = __commonJS({
         config_path: ".planning/config.json",
         backup_path: migratedKeys.length > 0 ? ".planning/config.json.bak" : null
       };
-      output2(result, raw);
+      output(result, raw);
     }
     function cmdHistoryDigest(cwd, options, raw) {
       const limit = options.limit || null;
@@ -32255,7 +32255,7 @@ var require_misc = __commonJS({
       }
       if (allPhaseDirs.length === 0) {
         digest.tech_stack = [];
-        output2(digest, raw);
+        output(digest, raw);
         return;
       }
       try {
@@ -32319,7 +32319,7 @@ var require_misc = __commonJS({
           delete digest.decisions;
           delete digest.tech_stack;
         }
-        output2(digest, raw);
+        output(digest, raw);
       } catch (e) {
         debugLog("feature.historyDigest", "digest generation failed", e);
         error("Failed to generate history digest: " + e.message);
@@ -32334,13 +32334,13 @@ var require_misc = __commonJS({
       const agentModels = MODEL_PROFILES[agentType];
       if (!agentModels) {
         const result2 = { model: "sonnet", profile, unknown_agent: true };
-        output2(result2, raw, "sonnet");
+        output(result2, raw, "sonnet");
         return;
       }
       const resolved = agentModels[profile] || agentModels["balanced"] || "sonnet";
       const model = resolved === "opus" ? "inherit" : resolved;
       const result = { model, profile };
-      output2(result, raw, model);
+      output(result, raw, model);
     }
     function cmdFindPhase(cwd, phase, raw) {
       if (!phase) {
@@ -32354,7 +32354,7 @@ var require_misc = __commonJS({
         const dirs = entries.filter((e) => e.isDirectory()).map((e) => e.name).sort();
         const match = dirs.find((d) => d.startsWith(normalized));
         if (!match) {
-          output2(notFound, raw, "");
+          output(notFound, raw, "");
           return;
         }
         const dirMatch = match.match(/^(\d+(?:\.\d+)?)-?(.*)/);
@@ -32372,10 +32372,10 @@ var require_misc = __commonJS({
           plans,
           summaries
         };
-        output2(result, raw, result.directory);
+        output(result, raw, result.directory);
       } catch (e) {
         debugLog("phase.find", "readdir failed", e);
-        output2(notFound, raw, "");
+        output(notFound, raw, "");
       }
     }
     function preCommitChecks(cwd, force) {
@@ -32438,19 +32438,19 @@ var require_misc = __commonJS({
       const config = loadConfig(cwd);
       if (!config.commit_docs) {
         const result2 = { committed: false, hash: null, reason: "skipped_commit_docs_false" };
-        output2(result2, raw, "skipped");
+        output(result2, raw, "skipped");
         return;
       }
       if (isGitIgnored(cwd, ".planning")) {
         const result2 = { committed: false, hash: null, reason: "skipped_gitignored" };
-        output2(result2, raw, "skipped");
+        output(result2, raw, "skipped");
         return;
       }
       const checks = preCommitChecks(cwd, force);
       if (!checks.passed) {
         process.exitCode = 2;
         const result2 = { committed: false, hash: null, reason: "pre_commit_blocked", failures: checks.failures };
-        output2(result2, raw, "blocked");
+        output(result2, raw, "blocked");
         return;
       }
       const filesToStage = files && files.length > 0 ? files : [".planning/"];
@@ -32468,17 +32468,17 @@ var require_misc = __commonJS({
       if (commitResult.exitCode !== 0) {
         if (commitResult.stdout.includes("nothing to commit") || commitResult.stderr.includes("nothing to commit")) {
           const result3 = { committed: false, hash: null, reason: "nothing_to_commit" };
-          output2(result3, raw, "nothing");
+          output(result3, raw, "nothing");
           return;
         }
         const result2 = { committed: false, hash: null, reason: "nothing_to_commit", error: commitResult.stderr };
-        output2(result2, raw, "nothing");
+        output(result2, raw, "nothing");
         return;
       }
       const hashResult = execGit(cwd, ["rev-parse", "--short", "HEAD"]);
       const hash = hashResult.exitCode === 0 ? hashResult.stdout : null;
       const result = { committed: true, hash, reason: "committed", agent_type: agentType || null, tdd_phase: tddPhase || null };
-      output2(result, raw, hash || "committed");
+      output(result, raw, hash || "committed");
     }
     function cmdVerifySummary(cwd, summaryPath, checkFileCount, raw) {
       if (!summaryPath) {
@@ -32497,7 +32497,7 @@ var require_misc = __commonJS({
           },
           errors: ["SUMMARY.md not found"]
         };
-        output2(result2, raw, "failed");
+        output(result2, raw, "failed");
         return;
       }
       const content = cachedReadFile(fullPath);
@@ -32558,7 +32558,7 @@ var require_misc = __commonJS({
       };
       const passed = missing.length === 0 && selfCheck !== "failed";
       const result = { passed, checks, errors };
-      output2(result, raw, passed ? "passed" : "failed");
+      output(result, raw, passed ? "passed" : "failed");
     }
     function cmdTemplateSelect(cwd, planPath, raw) {
       if (!planPath) {
@@ -32590,10 +32590,10 @@ var require_misc = __commonJS({
           type = "complex";
         }
         const result = { template, type, taskCount, fileCount, hasDecisions };
-        output2(result, raw, template);
+        output(result, raw, template);
       } catch (e) {
         debugLog("template.pick", "template selection failed", e);
-        output2({ template: "templates/summary-standard.md", type: "standard", error: e.message }, raw, "templates/summary-standard.md");
+        output({ template: "templates/summary-standard.md", type: "standard", error: e.message }, raw, "templates/summary-standard.md");
       }
     }
     function cmdTemplateFill(cwd, templateType, options, raw) {
@@ -32605,7 +32605,7 @@ var require_misc = __commonJS({
       }
       const phaseInfo = findPhaseInternal(cwd, options.phase);
       if (!phaseInfo || !phaseInfo.found) {
-        output2({ error: "Phase not found", phase: options.phase }, raw);
+        output({ error: "Phase not found", phase: options.phase }, raw);
         return;
       }
       const padded = normalizePhaseName(options.phase);
@@ -32759,12 +32759,12 @@ ${body}
 `;
       const outPath = path.join(cwd, phaseInfo.directory, fileName);
       if (fs.existsSync(outPath)) {
-        output2({ error: "File already exists", path: path.relative(cwd, outPath) }, raw);
+        output({ error: "File already exists", path: path.relative(cwd, outPath) }, raw);
         return;
       }
       fs.writeFileSync(outPath, fullContent, "utf-8");
       const relPath = path.relative(cwd, outPath);
-      output2({ created: true, path: relPath, template: templateType }, raw, relPath);
+      output({ created: true, path: relPath, template: templateType }, raw, relPath);
     }
     function cmdPhasePlanIndex(cwd, phase, raw) {
       if (!phase) {
@@ -32786,7 +32786,7 @@ ${body}
         debugLog("phase.planIndex", "readdir failed", e);
       }
       if (!phaseDir) {
-        output2({ phase: normalized, error: "Phase not found", plans: [], waves: {}, incomplete: [], has_checkpoints: false }, raw);
+        output({ phase: normalized, error: "Phase not found", plans: [], waves: {}, incomplete: [], has_checkpoints: false }, raw);
         return;
       }
       const phaseFiles = fs.readdirSync(phaseDir);
@@ -32845,12 +32845,12 @@ ${body}
         incomplete,
         has_checkpoints: hasCheckpoints
       };
-      output2(result, raw);
+      output(result, raw);
     }
     function cmdStateSnapshot(cwd, raw) {
       const statePath = path.join(cwd, ".planning", "STATE.md");
       if (!fs.existsSync(statePath)) {
-        output2({ error: "STATE.md not found" }, raw);
+        output({ error: "STATE.md not found" }, raw);
         return;
       }
       const content = cachedReadFile(statePath);
@@ -32927,7 +32927,7 @@ ${body}
         paused_at: pausedAt,
         session
       };
-      output2(result, raw);
+      output(result, raw);
     }
     function cmdSummaryExtract(cwd, summaryPath, fields, raw) {
       if (!summaryPath) {
@@ -32935,7 +32935,7 @@ ${body}
       }
       const fullPath = path.join(cwd, summaryPath);
       if (!fs.existsSync(fullPath)) {
-        output2({ error: "File not found", path: summaryPath }, raw);
+        output({ error: "File not found", path: summaryPath }, raw);
         return;
       }
       const content = cachedReadFile(fullPath);
@@ -32975,19 +32975,19 @@ ${body}
             filtered[field] = fullResult[field];
           }
         }
-        output2(filtered, raw);
+        output(filtered, raw);
         return;
       }
-      output2(fullResult, raw);
+      output(fullResult, raw);
     }
     async function cmdWebsearch(query, options, raw) {
       const apiKey = process.env.BRAVE_API_KEY;
       if (!apiKey) {
-        output2({ available: false, reason: "BRAVE_API_KEY not set" }, raw, "");
+        output({ available: false, reason: "BRAVE_API_KEY not set" }, raw, "");
         return;
       }
       if (!query) {
-        output2({ available: false, error: "Query required" }, raw, "");
+        output({ available: false, error: "Query required" }, raw, "");
         return;
       }
       const params = new URLSearchParams({
@@ -33011,7 +33011,7 @@ ${body}
           }
         );
         if (!response.ok) {
-          output2({ available: false, error: `API error: ${response.status}` }, raw, "");
+          output({ available: false, error: `API error: ${response.status}` }, raw, "");
           return;
         }
         const data = await response.json();
@@ -33021,7 +33021,7 @@ ${body}
           description: r.description,
           age: r.age || null
         }));
-        output2({
+        output({
           available: true,
           query,
           count: results.length,
@@ -33031,7 +33031,7 @@ ${r.url}
 ${r.description}`).join("\n\n"));
       } catch (err) {
         debugLog("feature.webSearch", "search request failed", err);
-        output2({ available: false, error: err.message }, raw, "");
+        output({ available: false, error: err.message }, raw, "");
       }
     }
     function cmdFrontmatterGet(cwd, filePath, field, raw) {
@@ -33041,19 +33041,19 @@ ${r.description}`).join("\n\n"));
       const fullPath = path.isAbsolute(filePath) ? filePath : path.join(cwd, filePath);
       const content = safeReadFile(fullPath);
       if (!content) {
-        output2({ error: "File not found", path: filePath }, raw);
+        output({ error: "File not found", path: filePath }, raw);
         return;
       }
       const fm = extractFrontmatter(content);
       if (field) {
         const value = fm[field];
         if (value === void 0) {
-          output2({ error: "Field not found", field }, raw);
+          output({ error: "Field not found", field }, raw);
           return;
         }
-        output2({ [field]: value }, raw, JSON.stringify(value));
+        output({ [field]: value }, raw, JSON.stringify(value));
       } else {
-        output2(fm, raw);
+        output(fm, raw);
       }
     }
     function cmdFrontmatterSet(cwd, filePath, field, value, raw) {
@@ -33062,7 +33062,7 @@ ${r.description}`).join("\n\n"));
       }
       const fullPath = path.isAbsolute(filePath) ? filePath : path.join(cwd, filePath);
       if (!fs.existsSync(fullPath)) {
-        output2({ error: "File not found", path: filePath }, raw);
+        output({ error: "File not found", path: filePath }, raw);
         return;
       }
       const content = cachedReadFile(fullPath);
@@ -33077,7 +33077,7 @@ ${r.description}`).join("\n\n"));
       fm[field] = parsedValue;
       const newContent = spliceFrontmatter(content, fm);
       fs.writeFileSync(fullPath, newContent, "utf-8");
-      output2({ updated: true, field, value: parsedValue }, raw, "true");
+      output({ updated: true, field, value: parsedValue }, raw, "true");
     }
     function cmdFrontmatterMerge(cwd, filePath, data, raw) {
       if (!filePath || !data) {
@@ -33085,7 +33085,7 @@ ${r.description}`).join("\n\n"));
       }
       const fullPath = path.isAbsolute(filePath) ? filePath : path.join(cwd, filePath);
       if (!fs.existsSync(fullPath)) {
-        output2({ error: "File not found", path: filePath }, raw);
+        output({ error: "File not found", path: filePath }, raw);
         return;
       }
       const content = cachedReadFile(fullPath);
@@ -33101,7 +33101,7 @@ ${r.description}`).join("\n\n"));
       Object.assign(fm, mergeData);
       const newContent = spliceFrontmatter(content, fm);
       fs.writeFileSync(fullPath, newContent, "utf-8");
-      output2({ merged: true, fields: Object.keys(mergeData) }, raw, "true");
+      output({ merged: true, fields: Object.keys(mergeData) }, raw, "true");
     }
     var FRONTMATTER_SCHEMAS = {
       plan: { required: ["phase", "plan", "type", "wave", "depends_on", "files_modified", "autonomous", "must_haves"] },
@@ -33119,13 +33119,13 @@ ${r.description}`).join("\n\n"));
       const fullPath = path.isAbsolute(filePath) ? filePath : path.join(cwd, filePath);
       const content = safeReadFile(fullPath);
       if (!content) {
-        output2({ error: "File not found", path: filePath }, raw);
+        output({ error: "File not found", path: filePath }, raw);
         return;
       }
       const fm = extractFrontmatter(content);
       const missing = schema.required.filter((f) => fm[f] === void 0);
       const present = schema.required.filter((f) => fm[f] !== void 0);
-      output2({ valid: missing.length === 0, missing, present, schema: schemaName }, raw, missing.length === 0 ? "valid" : "invalid");
+      output({ valid: missing.length === 0, missing, present, schema: schemaName }, raw, missing.length === 0 ? "valid" : "invalid");
     }
     function cmdProgressRender(cwd, format, raw) {
       const milestone = getMilestoneInfo(cwd);
@@ -33165,15 +33165,15 @@ ${r.description}`).join("\n\n"));
           out += `| ${p.number} | ${p.name} | ${p.summaries}/${p.plans} | ${p.status} |
 `;
         }
-        output2({ rendered: out }, raw, out);
+        output({ rendered: out }, raw, out);
       } else if (format === "bar") {
         const barWidth = 20;
         const filled = Math.round(percent / 100 * barWidth);
         const bar = "\u2588".repeat(filled) + "\u2591".repeat(barWidth - filled);
         const text = `[${bar}] ${totalSummaries}/${totalPlans} plans (${percent}%)`;
-        output2({ bar: text, percent, completed: totalSummaries, total: totalPlans }, raw, text);
+        output({ bar: text, percent, completed: totalSummaries, total: totalPlans }, raw, text);
       } else {
-        output2({
+        output({
           milestone_version: milestone.version,
           milestone_name: milestone.name,
           phases,
@@ -33200,7 +33200,7 @@ ${r.description}`).join("\n\n"));
 ` + content;
       fs.writeFileSync(path.join(completedDir, filename), content, "utf-8");
       fs.unlinkSync(sourcePath);
-      output2({ completed: true, file: filename, date: today }, raw, "completed");
+      output({ completed: true, file: filename, date: today }, raw, "completed");
     }
     function cmdScaffold(cwd, type, options, raw) {
       const { phase, name } = options;
@@ -33295,19 +33295,19 @@ _Pending verification_
           fs.mkdirSync(phasesParent, { recursive: true });
           const dirPath = path.join(phasesParent, dirName);
           fs.mkdirSync(dirPath, { recursive: true });
-          output2({ created: true, directory: `.planning/phases/${dirName}`, path: dirPath }, raw, dirPath);
+          output({ created: true, directory: `.planning/phases/${dirName}`, path: dirPath }, raw, dirPath);
           return;
         }
         default:
           error(`Unknown scaffold type: ${type}. Available: context, uat, verification, phase-dir`);
       }
       if (fs.existsSync(filePath)) {
-        output2({ created: false, reason: "already_exists", path: filePath }, raw, "exists");
+        output({ created: false, reason: "already_exists", path: filePath }, raw, "exists");
         return;
       }
       fs.writeFileSync(filePath, content, "utf-8");
       const relPath = path.relative(cwd, filePath);
-      output2({ created: true, path: relPath }, raw, relPath);
+      output({ created: true, path: relPath }, raw, relPath);
     }
     function cmdTdd(cwd, subcommand, parsedArgs, raw) {
       const testCmd = parsedArgs["test-cmd"];
@@ -33327,7 +33327,7 @@ _Pending verification_
         }
         const valid = expectFail ? exitCode !== 0 : exitCode === 0;
         if (!valid) process.exitCode = 1;
-        output2({ phase, valid, test_exit_code: exitCode, output_snippet: snip(out) }, raw);
+        output({ phase, valid, test_exit_code: exitCode, output_snippet: snip(out) }, raw);
       } else if (subcommand === "auto-test") {
         if (!testCmd) {
           error("--test-cmd required");
@@ -33339,7 +33339,7 @@ _Pending verification_
           exitCode = e.status || 1;
           out = (e.stdout || "") + (e.stderr || "");
         }
-        output2({ passed: exitCode === 0, exit_code: exitCode, output_snippet: snip(out) }, raw);
+        output({ passed: exitCode === 0, exit_code: exitCode, output_snippet: snip(out) }, raw);
       } else if (subcommand === "detect-antipattern") {
         const phase = parsedArgs.phase;
         const files = (parsedArgs.files || "").split(",").map((f) => f.trim()).filter(Boolean);
@@ -33368,7 +33368,7 @@ _Pending verification_
             }
           }
         }
-        output2({ phase, warnings }, raw);
+        output({ phase, warnings }, raw);
       } else {
         error("Unknown tdd subcommand: " + subcommand + ". Available: validate-red, validate-green, validate-refactor, auto-test, detect-antipattern");
       }
@@ -33418,7 +33418,7 @@ _Pending verification_
         const changedFileList = diff.files ? diff.files.map((f) => f.path) : [];
         edge_case_suggestions = generateEdgeCaseSuggestions(cwd, changedFileList);
       }
-      output2({
+      output({
         phase: `${phaseInfo.phase_number}-${phaseInfo.phase_name}`,
         plan: padPlan,
         commits: commits.map((c) => ({ hash: c.hash, message: c.message, files: c.files.map((f) => f.path) })),
@@ -33476,7 +33476,7 @@ _Pending verification_
       const showHelp = helpIdx !== -1;
       const outputJson = jsonIdx !== -1;
       if (showHelp) {
-        output2({
+        output({
           commands: ["parity-check"],
           help: `Usage: bgsd-tools util:parity-check [--optimization <name>] [--json]
 
@@ -33511,7 +33511,7 @@ Examples:
       const allMatch = results.every((r) => r.match === true);
       const exitCode = allMatch ? 0 : 1;
       if (outputJson) {
-        output2({
+        output({
           optimizations: results.map((r) => ({
             name: r.optimization,
             match: r.match,
@@ -33545,7 +33545,7 @@ Examples:
         }
         lines.push(`Overall: ${allMatch ? "ALL IN PARITY" : "SOME MISMATCHES"}`);
         lines.push(`Exit code: ${exitCode}`);
-        output2(lines.join("\n"), raw);
+        output(lines.join("\n"), raw);
       }
       if (!raw && exitCode !== 0) {
         process.exit(exitCode);
@@ -33594,7 +33594,7 @@ Examples:
           }
         }
       }
-      output2(structured, raw, outputText);
+      output(structured, raw, outputText);
     }
     module2.exports = {
       cmdGenerateSlug,
@@ -33638,7 +33638,7 @@ var require_features = __commonJS({
     var fs = require("fs");
     var path = require("path");
     var { execSync, execFileSync } = require("child_process");
-    var { output: output2, error, debugLog } = require_output();
+    var { output, error, debugLog } = require_output();
     var { loadConfig } = require_config();
     var { CONFIG_SCHEMA } = require_constants();
     var { parseAssertionsMd } = require_verify();
@@ -33662,11 +33662,11 @@ var require_features = __commonJS({
         debugLog("feature.sessionDiff", "read failed", e);
       }
       if (!since) {
-        output2({ error: "No last activity found in STATE.md", changes: [] }, raw);
+        output({ error: "No last activity found in STATE.md", changes: [] }, raw);
         return;
       }
       if (!isValidDateString(since)) {
-        output2({ error: "Invalid date format in STATE.md", changes: [] }, raw);
+        output({ error: "Invalid date format in STATE.md", changes: [] }, raw);
         return;
       }
       const sanitizedSince = sanitizeShellArg(since);
@@ -33688,7 +33688,7 @@ var require_features = __commonJS({
       const plans = filesChanged.filter((f) => f.includes("PLAN"));
       const state = filesChanged.filter((f) => f.includes("STATE"));
       const roadmap = filesChanged.filter((f) => f.includes("ROADMAP"));
-      output2({
+      output({
         since,
         commit_count: changes.length,
         commits: changes.slice(0, 20),
@@ -33763,7 +33763,7 @@ var require_features = __commonJS({
       if (totalLines > 1e3) {
         recommendations.push(`${totalLines} existing lines to read \u2014 large codebase context`);
       }
-      output2({
+      output({
         plan: planPath,
         files: {
           total: filesModified.length,
@@ -33793,7 +33793,7 @@ var require_features = __commonJS({
       const testCommands = config.test_commands || {};
       const testGate = config.test_gate !== false;
       if (Object.keys(testCommands).length === 0) {
-        output2({
+        output({
           configured: false,
           message: "No test_commands configured in .planning/config.json",
           example: {
@@ -33844,7 +33844,7 @@ var require_features = __commonJS({
           };
         }
       }
-      output2({
+      output({
         configured: true,
         test_gate: testGate,
         all_passed: allPassed,
@@ -33907,7 +33907,7 @@ var require_features = __commonJS({
         debugLog("feature.searchDecisions", "read failed", e);
       }
       results.sort((a, b) => b.score - a.score);
-      output2({
+      output({
         query,
         match_count: results.length,
         decisions: results.slice(0, 20)
@@ -33993,7 +33993,7 @@ var require_features = __commonJS({
         } catch (e) {
           debugLog("validate.dependencies", "read roadmap deps failed", e);
         }
-        output2({ phase, valid: issues.length === 0, issue_count: issues.length, issues, checked, note: "Phase has no plans yet \u2014 checked ROADMAP-level dependencies only" }, raw);
+        output({ phase, valid: issues.length === 0, issue_count: issues.length, issues, checked, note: "Phase has no plans yet \u2014 checked ROADMAP-level dependencies only" }, raw);
         return;
       }
       for (const planFile of planFiles) {
@@ -34054,7 +34054,7 @@ var require_features = __commonJS({
       } catch (e) {
         debugLog("validate.dependencies", "read failed", e);
       }
-      output2({
+      output({
         phase,
         valid: issues.length === 0,
         issue_count: issues.length,
@@ -34082,7 +34082,7 @@ var require_features = __commonJS({
         }
       });
       if (searchPaths.length === 0) {
-        output2({ query, match_count: 0, lessons: [], message: "No lessons file found (checked tasks/lessons.md and .planning/lessons.md)" }, raw);
+        output({ query, match_count: 0, lessons: [], message: "No lessons file found (checked tasks/lessons.md and .planning/lessons.md)" }, raw);
         return;
       }
       for (const searchPath of searchPaths) {
@@ -34110,7 +34110,7 @@ var require_features = __commonJS({
         }
       }
       results.sort((a, b) => b.score - a.score);
-      output2({
+      output({
         query,
         match_count: results.length,
         lessons: results.slice(0, 15)
@@ -34145,7 +34145,7 @@ var require_features = __commonJS({
             });
           }
           const totalDependents2 = graphResults.reduce((sum, r) => sum + r.dependent_count, 0);
-          output2({
+          output({
             files_analyzed: graphResults.length,
             total_dependents: totalDependents2,
             overall_risk: totalDependents2 > 20 ? "high" : totalDependents2 > 10 ? "medium" : "low",
@@ -34237,7 +34237,7 @@ var require_features = __commonJS({
         });
       }
       const totalDependents = results.reduce((sum, r) => sum + r.dependent_count, 0);
-      output2({
+      output({
         files_analyzed: results.length,
         total_dependents: totalDependents,
         overall_risk: totalDependents > 20 ? "high" : totalDependents > 10 ? "medium" : "low",
@@ -34271,7 +34271,7 @@ var require_features = __commonJS({
         debugLog("feature.rollbackInfo", "read failed", e);
       }
       if (!summaryContent) {
-        output2({ found: false, plan_id: planId, message: "No SUMMARY found for this plan" }, raw);
+        output({ found: false, plan_id: planId, message: "No SUMMARY found for this plan" }, raw);
         return;
       }
       const commitPattern = /\b([a-f0-9]{7,40})\b/g;
@@ -34315,7 +34315,7 @@ var require_features = __commonJS({
           }
         }
       }
-      output2({
+      output({
         found: true,
         plan_id: planId,
         summary_path: summaryPath,
@@ -34405,7 +34405,7 @@ var require_features = __commonJS({
       const avgPlansPerPhase = metrics.length > 0 ? Math.ceil(metrics.length / Math.max(1, metrics.length / 4)) : 4;
       const estimatedRemainingPlans = remainingPhases * avgPlansPerPhase;
       const estimatedDaysRemaining = totalCompletedPlans > 0 ? Math.ceil(estimatedRemainingPlans / (totalCompletedPlans / totalDays)) : null;
-      output2({
+      output({
         milestone: milestone.version,
         metrics: {
           plans_completed: totalCompletedPlans,
@@ -34442,7 +34442,7 @@ var require_features = __commonJS({
         debugLog("feature.traceRequirement", "read failed", e);
       }
       if (!trace.phase) {
-        output2({ ...trace, status: "unmapped", message: `${reqUpper} not found in ROADMAP.md coverage map` }, raw);
+        output({ ...trace, status: "unmapped", message: `${reqUpper} not found in ROADMAP.md coverage map` }, raw);
         return;
       }
       const phaseTree = getPhaseTree(cwd);
@@ -34524,7 +34524,7 @@ var require_features = __commonJS({
           trace.chain = `${reqUpper} \u2192 ${assertionEntries.length} assertions (${trace.must_have_count} must-have) \u2192 ${planRef} \u2192 VERIFICATION: ${verificationStatus}`;
         }
       }
-      output2(trace, raw);
+      output(trace, raw);
     }
     function cmdAnalyzeDeps(cwd, phasePath, raw) {
       if (!phasePath) {
@@ -34536,7 +34536,7 @@ var require_features = __commonJS({
         files = fs.readdirSync(fullPath);
       } catch (e) {
         debugLog("util.analyzeDeps", "readdir failed", e);
-        output2({ error: "Cannot read phase directory", path: phasePath }, raw);
+        output({ error: "Cannot read phase directory", path: phasePath }, raw);
         return;
       }
       const planFiles = files.filter((f) => f.match(/-PLAN\.md$/i)).sort();
@@ -34574,7 +34574,7 @@ var require_features = __commonJS({
           }
         }
       }
-      output2({ phase: phaseNum, suggestions }, raw);
+      output({ phase: phaseNum, suggestions }, raw);
     }
     function cmdEstimateScope(cwd, planPath, raw) {
       if (!planPath) {
@@ -34583,7 +34583,7 @@ var require_features = __commonJS({
       const fullPath = path.isAbsolute(planPath) ? planPath : path.join(cwd, planPath);
       const content = safeReadFile(fullPath);
       if (!content) {
-        output2({ error: "Cannot read plan file", path: planPath }, raw);
+        output({ error: "Cannot read plan file", path: planPath }, raw);
         return;
       }
       const fm = extractFrontmatter(content);
@@ -34614,7 +34614,7 @@ var require_features = __commonJS({
       } else if (contextEstimate > 40 && complexity === "high") {
         recommendations.push("Consider splitting if complexity increases");
       }
-      output2({
+      output({
         plan: planId,
         tasks: taskCount,
         files: fileCount,
@@ -34627,7 +34627,7 @@ var require_features = __commonJS({
     function cmdValidateConfig(cwd, raw) {
       const configPath = path.join(cwd, ".planning", "config.json");
       if (!fs.existsSync(configPath)) {
-        output2({ exists: false, message: "No config.json found" }, raw);
+        output({ exists: false, message: "No config.json found" }, raw);
         return;
       }
       let config;
@@ -34635,7 +34635,7 @@ var require_features = __commonJS({
         config = JSON.parse(fs.readFileSync(configPath, "utf-8"));
       } catch (e) {
         debugLog("feature.validateConfig", "read failed", e);
-        output2({ exists: true, valid_json: false, error: e.message }, raw);
+        output({ exists: true, valid_json: false, error: e.message }, raw);
         return;
       }
       const knownKeys = {};
@@ -34676,7 +34676,7 @@ var require_features = __commonJS({
         }
         effective[key] = { value, source: hasExplicit ? "explicit" : "default", description: schema.description };
       }
-      output2({
+      output({
         exists: true,
         valid_json: true,
         warning_count: warnings.length,
@@ -34727,7 +34727,7 @@ var require_features = __commonJS({
       } catch (e) {
         debugLog("feature.quickSummary", "parse STATE.md quick tasks failed", e);
       }
-      output2({
+      output({
         milestone: milestone.version,
         total_quick_tasks: quickTasks.length,
         tasks: quickTasks
@@ -34823,7 +34823,7 @@ var require_features = __commonJS({
       if (result.error) {
         error(`File not found: ${filePath}`);
       }
-      output2(result, raw);
+      output(result, raw);
     }
     var { extractAtReferences } = require_helpers();
     function measureAllWorkflows(cwd) {
@@ -34927,7 +34927,7 @@ Baseline saved: ${path.relative(cwd, baselinePath)}
 
 `);
       measurement.baseline_file = path.relative(cwd, baselinePath);
-      output2(measurement, raw);
+      output(measurement, raw);
     }
     function cmdContextBudgetCompare(cwd, baselinePath, raw) {
       let baseline;
@@ -35044,7 +35044,7 @@ Baseline saved: ${path.relative(cwd, baselinePath)}
 Improved: ${improved} | Unchanged: ${unchanged} | Worsened: ${worsened}
 
 `);
-      output2(result, raw);
+      output(result, raw);
     }
     function cmdContextBudgetMeasure(cwd, raw) {
       const measurements = [];
@@ -35171,7 +35171,7 @@ Improved: ${improved} | Unchanged: ${unchanged} | Worsened: ${worsened}
       const totalSlimTokens = measurements.reduce((sum, m) => sum + m.slim_tokens, 0);
       const totalSavedTokens = totalFullTokens - totalSlimTokens;
       const totalSavedPercent = totalFullTokens > 0 ? Math.round(totalSavedTokens / totalFullTokens * 100) : 0;
-      output2({
+      output({
         measurements,
         total_full_tokens: totalFullTokens,
         total_slim_tokens: totalSlimTokens,
@@ -35235,7 +35235,7 @@ Improved: ${improved} | Unchanged: ${unchanged} | Worsened: ${worsened}
         if (overBudget) overBudgetCount++;
         workflows.push({ name, actual_tokens: actualTokens, budget_tokens: budgetTokens, over_budget: overBudget, percent_of_budget: percentOfBudget });
       }
-      output2({ workflows, over_budget_count: overBudgetCount, total_workflows: workflows.length }, raw);
+      output({ workflows, over_budget_count: overBudgetCount, total_workflows: workflows.length }, raw);
     }
     function cmdTestCoverage(cwd, raw) {
       const config = loadConfig(cwd);
@@ -35350,7 +35350,7 @@ Improved: ${improved} | Unchanged: ${unchanged} | Worsened: ${worsened}
       const totalCommands = allCommands.length;
       const commandsWithTests = covered.length;
       const coveragePercent = totalCommands > 0 ? Math.round(commandsWithTests / totalCommands * 100) : 0;
-      output2({
+      output({
         total_commands: totalCommands,
         commands_with_tests: commandsWithTests,
         coverage_percent: coveragePercent,
@@ -35370,7 +35370,7 @@ Improved: ${improved} | Unchanged: ${unchanged} | Worsened: ${worsened}
       const orphanedWorkflows = findOrphanedWorkflows(intel);
       const orphanedTemplates = findOrphanedTemplates(intel);
       const orphanedConfigs = findOrphanedConfigs(intel);
-      output2({
+      output({
         orphaned_exports: orphanedExports,
         orphaned_files: orphanedFiles,
         orphaned_workflows: orphanedWorkflows,
@@ -35390,7 +35390,7 @@ Improved: ${improved} | Unchanged: ${unchanged} | Worsened: ${worsened}
       const pd = path.join(cwd, ".planning");
       const sc = safeReadFile(path.join(pd, "STATE.md"));
       if (!sc) {
-        output2({ error: "STATE.md not found" }, raw);
+        output({ error: "STATE.md not found" }, raw);
         return;
       }
       const xf = (f) => {
@@ -35455,7 +35455,7 @@ Improved: ${improved} | Unchanged: ${unchanged} | Worsened: ${worsened}
       }
       const sa = sc.match(/Stopped at:\s*(.+)/);
       const rf = sc.match(/Resume file:\s*(.+)/);
-      output2({
+      output({
         current_position: { phase: pm ? `${pm[1]} of ${pm[2]}` : phaseNum || "Unknown", phase_name: phaseName || "Unknown", plan, status },
         session_activity: { plans_completed: completed, decisions_made: decisions.slice(-5), blockers_resolved: [], last_activity: lastAct || "Unknown" },
         next_action: next,
@@ -35495,7 +35495,7 @@ var require_memory = __commonJS({
     var fs = require("fs");
     var path = require("path");
     var crypto = require("crypto");
-    var { output: output2, error, debugLog } = require_output();
+    var { output, error, debugLog } = require_output();
     var VALID_STORES = ["decisions", "bookmarks", "lessons", "todos", "trajectories"];
     var SACRED_STORES = ["decisions", "lessons", "trajectories"];
     var BOOKMARKS_MAX = 20;
@@ -35510,7 +35510,7 @@ var require_memory = __commonJS({
     function cmdMemoryEnsureDir(cwd) {
       const dir = path.join(cwd, ".planning", "memory");
       fs.mkdirSync(dir, { recursive: true });
-      output2({ ensured: true, memory_dir: dir });
+      output({ ensured: true, memory_dir: dir });
     }
     function cmdMemoryWrite(cwd, options, raw) {
       const { store, entry: entryJson } = options;
@@ -35585,7 +35585,7 @@ var require_memory = __commonJS({
         result.compact_needed = true;
         result.threshold = COMPACT_THRESHOLD;
       }
-      output2(result);
+      output(result);
     }
     function cmdMemoryRead(cwd, options, raw) {
       const { store, limit, query, phase, category, tags, from, to, asc } = options;
@@ -35639,7 +35639,7 @@ var require_memory = __commonJS({
       if (limit && parseInt(limit, 10) > 0) {
         entries = entries.slice(0, parseInt(limit, 10));
       }
-      output2({ entries, count: entries.length, store, total });
+      output({ entries, count: entries.length, store, total });
     }
     function cmdMemoryList(cwd, options, raw) {
       const memDir = path.join(cwd, ".planning", "memory");
@@ -35667,7 +35667,7 @@ var require_memory = __commonJS({
       } catch (e) {
         debugLog("memory.list", "readdir failed", e);
       }
-      output2({ stores, memory_dir: memDir });
+      output({ stores, memory_dir: memDir });
     }
     function cmdMemoryCompact(cwd, options, raw) {
       const { store, threshold: thresholdStr, dryRun } = options;
@@ -35763,13 +35763,13 @@ var require_memory = __commonJS({
         }
       }
       if (store && SACRED_STORES.includes(store)) {
-        output2({ compacted: false, reason: "sacred_data" });
+        output({ compacted: false, reason: "sacred_data" });
         return;
       }
       if (dryRun) {
         result.dry_run = true;
       }
-      output2(result);
+      output(result);
     }
     module2.exports = { cmdMemoryWrite, cmdMemoryRead, cmdMemoryList, cmdMemoryEnsureDir, cmdMemoryCompact };
   }
@@ -35781,7 +35781,7 @@ var require_mcp = __commonJS({
     "use strict";
     var fs = require("fs");
     var path = require("path");
-    var { output: output2, error, debugLog } = require_output();
+    var { output, error, debugLog } = require_output();
     var MCP_KNOWN_SERVERS = [
       { name: "postgres", patterns: [/postgres/i, /toolbox.*postgres/i], tool_count: 12, base_tokens: 700, total_estimate: 4500 },
       { name: "github", patterns: [/github/i], tool_count: 30, base_tokens: 1500, total_estimate: 46e3 },
@@ -36060,7 +36060,7 @@ var require_mcp = __commonJS({
       const hasDryRun = args.includes("--dry-run");
       if (hasRestore) {
         const result2 = restoreBackup(cwd);
-        output2(result2, raw);
+        output(result2, raw);
         return;
       }
       let contextWindow = DEFAULT_CONTEXT_WINDOW;
@@ -36115,7 +36115,7 @@ var require_mcp = __commonJS({
         const wd = recommendations.servers.filter((s) => s.recommendation === "disable" && s.source === "opencode.json");
         result.dry_run = { would_disable: wd.map((s) => s.name), would_disable_count: wd.length, tokens_would_save: wd.reduce((sum, s) => sum + (s.token_estimate || 0), 0), skipped_mcp_json: recommendations.servers.filter((s) => s.recommendation === "disable" && s.source === ".mcp.json").map((s) => s.name) };
       }
-      output2(result, raw);
+      output(result, raw);
     }
     module2.exports = {
       cmdMcpProfile
@@ -36129,7 +36129,7 @@ var require_cache2 = __commonJS({
     "use strict";
     var fs = require("fs");
     var path = require("path");
-    var { output: output2, debugLog } = require_output();
+    var { output, debugLog } = require_output();
     var _cacheEngine = null;
     function getCacheEngine() {
       if (!_cacheEngine) {
@@ -36170,7 +36170,7 @@ var require_cache2 = __commonJS({
     function cmdCacheStatus(cwd, args, raw) {
       const cacheEngine = getCacheEngine();
       if (!cacheEngine) {
-        output2({
+        output({
           backend: "unavailable",
           count: 0,
           hits: 0,
@@ -36180,21 +36180,21 @@ var require_cache2 = __commonJS({
         return;
       }
       const status = cacheEngine.status();
-      output2(status, raw, `${status.backend}: ${status.count} entries`);
+      output(status, raw, `${status.backend}: ${status.count} entries`);
     }
     function cmdCacheClear(cwd, args, raw) {
       const cacheEngine = getCacheEngine();
       if (!cacheEngine) {
-        output2({ cleared: false, error: "CacheEngine failed to load" }, raw, "Failed to clear cache");
+        output({ cleared: false, error: "CacheEngine failed to load" }, raw, "Failed to clear cache");
         return;
       }
       cacheEngine.clear();
-      output2({ cleared: true }, raw, "Cache cleared");
+      output({ cleared: true }, raw, "Cache cleared");
     }
     function cmdCacheWarm(cwd, args, raw) {
       const cacheEngine = getCacheEngine();
       if (!cacheEngine) {
-        output2({ warmed: 0, error: "CacheEngine failed to load" }, raw, "Failed to warm cache");
+        output({ warmed: 0, error: "CacheEngine failed to load" }, raw, "Failed to warm cache");
         return;
       }
       const filePaths = args.slice(2);
@@ -36202,7 +36202,7 @@ var require_cache2 = __commonJS({
       if (filePaths.length === 0) {
         resolvedPaths = discoverPlanningFiles(cwd);
         if (resolvedPaths.length === 0) {
-          output2({ warmed: 0, error: "No .planning/ files found" }, raw, "No files to warm");
+          output({ warmed: 0, error: "No .planning/ files found" }, raw, "No files to warm");
           return;
         }
       } else {
@@ -36214,12 +36214,12 @@ var require_cache2 = __commonJS({
       const start = Date.now();
       const warmed = cacheEngine.warm(resolvedPaths);
       const elapsed = Date.now() - start;
-      output2({ warmed, elapsed_ms: elapsed }, raw, `Warmed ${warmed} files in ${elapsed}ms`);
+      output({ warmed, elapsed_ms: elapsed }, raw, `Warmed ${warmed} files in ${elapsed}ms`);
     }
     function cmdCacheResearchStats(cwd, args, raw) {
       const cacheEngine = getCacheEngine();
       if (!cacheEngine) {
-        output2({
+        output({
           count: 0,
           hits: 0,
           misses: 0,
@@ -36228,16 +36228,16 @@ var require_cache2 = __commonJS({
         return;
       }
       const researchStatus = cacheEngine.statusResearch();
-      output2(researchStatus, raw, `research cache: ${researchStatus.count} entries, ${researchStatus.hits} hits, ${researchStatus.misses} misses`);
+      output(researchStatus, raw, `research cache: ${researchStatus.count} entries, ${researchStatus.hits} hits, ${researchStatus.misses} misses`);
     }
     function cmdCacheResearchClear(cwd, args, raw) {
       const cacheEngine = getCacheEngine();
       if (!cacheEngine) {
-        output2({ cleared: false, error: "CacheEngine failed to load" }, raw, "Failed to clear research cache");
+        output({ cleared: false, error: "CacheEngine failed to load" }, raw, "Failed to clear research cache");
         return;
       }
       cacheEngine.clearResearch();
-      output2({ cleared: true }, raw, "Research cache cleared");
+      output({ cleared: true }, raw, "Research cache cleared");
     }
     module2.exports = {
       cmdCacheStatus,
@@ -36255,7 +36255,7 @@ var require_agent = __commonJS({
     "use strict";
     var fs = require("fs");
     var path = require("path");
-    var { output: output2, error, debugLog } = require_output();
+    var { output, error, debugLog } = require_output();
     var { loadConfig } = require_config();
     var { safeReadFile } = require_helpers();
     var { extractFrontmatter } = require_frontmatter();
@@ -36438,7 +36438,7 @@ var require_agent = __commonJS({
         raci_source: raciPath,
         status: gaps.length === 0 && overlaps.length === 0 && invalidRefs.length === 0 ? "pass" : "fail"
       };
-      output2(result, raw, null, {
+      output(result, raw, null, {
         pass: `All ${lifecycleSteps.length} lifecycle steps have exactly one responsible agent`,
         fail: `Found ${gaps.length} gap(s), ${overlaps.length} overlap(s), ${invalidRefs.length} invalid reference(s)`
       });
@@ -36552,7 +36552,7 @@ var require_agent = __commonJS({
         warnings,
         status: errors.length === 0 ? "pass" : "fail"
       };
-      output2(result, raw, null, {
+      output(result, raw, null, {
         pass: `All ${agents.length} agent contracts valid`,
         fail: `${contractsInvalid} agent(s) with contract errors: ${errors.length} error(s), ${warnings.length} warning(s)`
       });
@@ -36611,7 +36611,7 @@ var require_agent = __commonJS({
     function cmdAgentList(cwd, raw) {
       const { agentsDir } = resolveBgsdPaths();
       const agents = scanAgents(agentsDir);
-      output2({ agents }, raw);
+      output({ agents }, raw);
     }
     module2.exports = {
       cmdAgentAudit,
@@ -37208,7 +37208,7 @@ var require_tools = __commonJS({
     "use strict";
     var { getToolStatus } = require_detector();
     var { getInstallGuidance } = require_install_guidance();
-    var { output: output2 } = require_output();
+    var { output } = require_output();
     function cmdToolsStatus(cwd, raw) {
       const status = getToolStatus();
       const available = [];
@@ -37250,7 +37250,7 @@ var require_tools = __commonJS({
         }
       };
       if (raw) {
-        output2(result, raw);
+        output(result, raw);
       } else {
         console.log(lines.join("\n"));
       }
@@ -37269,7 +37269,7 @@ var require_runtime = __commonJS({
     var fs = require("fs");
     var { detectBun, isRunningUnderBun, benchmarkStartup, benchmarkFileIO, benchmarkNested, benchmarkHTTPServer } = require_bun_runtime();
     var { getInstallGuidance } = require_install_guidance();
-    var { output: output2 } = require_output();
+    var { output } = require_output();
     function cmdRuntimeStatus(cwd, raw) {
       const bunStatus = detectBun();
       const runningUnder = isRunningUnderBun();
@@ -37305,7 +37305,7 @@ var require_runtime = __commonJS({
         installCommand: bunStatus.available ? null : getInstallGuidance("bun")?.installCommand
       };
       if (raw) {
-        output2(result, raw);
+        output(result, raw);
       } else {
         console.log(lines.join("\n"));
       }
@@ -37325,7 +37325,7 @@ var require_runtime = __commonJS({
           lines.push(`Install: ${guidance.installCommand}`);
         }
         if (raw) {
-          output2({ runs, bunAvailable: false, error: "Bun not available" }, raw);
+          output({ runs, bunAvailable: false, error: "Bun not available" }, raw);
         } else {
           console.log(lines.join("\n"));
         }
@@ -37405,7 +37405,7 @@ console.log('Processed', count, 'files');
         results
       };
       if (raw) {
-        output2(result, raw);
+        output(result, raw);
       } else {
         console.log(lines.join("\n"));
       }
@@ -37528,50 +37528,50 @@ var require_plugin_benchmark = __commonJS({
       };
     }
     function formatTable(results, verbose = false) {
-      let output2 = "\n";
-      output2 += "\u250C\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252C\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252C\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510\n";
-      output2 += "\u2502 Metric                     \u2502 Cold (ms)    \u2502 Warm (ms)    \u2502\n";
-      output2 += "\u251C\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u253C\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u253C\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2524\n";
+      let output = "\n";
+      output += "\u250C\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252C\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252C\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510\n";
+      output += "\u2502 Metric                     \u2502 Cold (ms)    \u2502 Warm (ms)    \u2502\n";
+      output += "\u251C\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u253C\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u253C\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2524\n";
       if (results.startup) {
-        output2 += `\u2502 Startup Time               \u2502 ${String(results.startup.cold).padStart(11)} \u2502 ${String(results.startup.warm).padStart(11)} \u2502
+        output += `\u2502 Startup Time               \u2502 ${String(results.startup.cold).padStart(11)} \u2502 ${String(results.startup.warm).padStart(11)} \u2502
 `;
       }
       if (results.commands) {
         for (const [cmd, time] of Object.entries(results.commands)) {
-          output2 += `\u2502 ${cmd.padEnd(26)} \u2502              \u2502 ${String(time).padStart(11)} \u2502
+          output += `\u2502 ${cmd.padEnd(26)} \u2502              \u2502 ${String(time).padStart(11)} \u2502
 `;
         }
       }
-      output2 += "\u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2534\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2534\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518\n";
+      output += "\u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2534\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2534\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518\n";
       if (verbose) {
         if (results.memory) {
-          output2 += "\n";
-          output2 += "\u250C\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252C\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510\n";
-          output2 += "\u2502 Memory Usage                \u2502 Value (MB)                   \u2502\n";
-          output2 += "\u251C\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u253C\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2524\n";
-          output2 += `\u2502 Heap Used                  \u2502 ${String(results.memory.heapUsed).padStart(25)} \u2502
+          output += "\n";
+          output += "\u250C\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252C\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510\n";
+          output += "\u2502 Memory Usage                \u2502 Value (MB)                   \u2502\n";
+          output += "\u251C\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u253C\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2524\n";
+          output += `\u2502 Heap Used                  \u2502 ${String(results.memory.heapUsed).padStart(25)} \u2502
 `;
-          output2 += `\u2502 Heap Total                 \u2502 ${String(results.memory.heapTotal).padStart(25)} \u2502
+          output += `\u2502 Heap Total                 \u2502 ${String(results.memory.heapTotal).padStart(25)} \u2502
 `;
-          output2 += `\u2502 RSS (Resident Set Size)    \u2502 ${String(results.memory.rss).padStart(25)} \u2502
+          output += `\u2502 RSS (Resident Set Size)    \u2502 ${String(results.memory.rss).padStart(25)} \u2502
 `;
-          output2 += `\u2502 External                   \u2502 ${String(results.memory.external).padStart(25)} \u2502
+          output += `\u2502 External                   \u2502 ${String(results.memory.external).padStart(25)} \u2502
 `;
-          output2 += "\u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2534\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518\n";
+          output += "\u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2534\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518\n";
         }
         if (results.context) {
-          output2 += "\n";
-          output2 += "\u250C\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252C\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510\n";
-          output2 += "\u2502 Context Load                \u2502 Time (ms)                    \u2502\n";
-          output2 += "\u251C\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u253C\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2524\n";
+          output += "\n";
+          output += "\u250C\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252C\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510\n";
+          output += "\u2502 Context Load                \u2502 Time (ms)                    \u2502\n";
+          output += "\u251C\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u253C\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2524\n";
           for (const [file, time] of Object.entries(results.context)) {
-            output2 += `\u2502 ${file.padEnd(26)} \u2502 ${String(time).padStart(25)} \u2502
+            output += `\u2502 ${file.padEnd(26)} \u2502 ${String(time).padStart(25)} \u2502
 `;
           }
-          output2 += "\u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2534\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518\n";
+          output += "\u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2534\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518\n";
         }
       }
-      return output2;
+      return output;
     }
     function runBenchmark(options = {}) {
       const verbose = options.verbose || false;
@@ -37620,12 +37620,799 @@ var require_measure = __commonJS({
   }
 });
 
+// src/lib/review/severity.js
+var require_severity = __commonJS({
+  "src/lib/review/severity.js"(exports2, module2) {
+    var SEVERITY = {
+      BLOCKER: "BLOCKER",
+      WARNING: "WARNING",
+      INFO: "INFO"
+    };
+    var CLASSIFICATION_RULES = [
+      {
+        pattern: /syntax error|parse error|cannot import|cannot require/i,
+        severity: SEVERITY.BLOCKER,
+        reason: "Code cannot run"
+      },
+      {
+        pattern: /missing|undefined|null reference|cannot read property/i,
+        severity: SEVERITY.BLOCKER,
+        reason: "Runtime error will occur"
+      },
+      {
+        pattern: /security|vulnerability|injection|expose|credential/i,
+        severity: SEVERITY.BLOCKER,
+        reason: "Security risk"
+      },
+      {
+        pattern: /deprecated|obsolete|outdated/i,
+        severity: SEVERITY.WARNING,
+        reason: "Will need updating soon"
+      },
+      {
+        pattern: /unused|unreachable|dead code/i,
+        severity: SEVERITY.WARNING,
+        reason: "Code smell"
+      },
+      {
+        pattern: /complexity|nesting|cognitive/i,
+        severity: SEVERITY.WARNING,
+        reason: "Maintainability concern"
+      },
+      {
+        pattern: /note|tip|consider|suggestion/i,
+        severity: SEVERITY.INFO,
+        reason: "Optional improvement"
+      }
+    ];
+    module2.exports = {
+      SEVERITY
+    };
+  }
+});
+
+// src/lib/recovery/autoRecovery.js
+var require_autoRecovery = __commonJS({
+  "src/lib/recovery/autoRecovery.js"(exports2, module2) {
+    var SEVERITY = require_severity().SEVERITY;
+    var RECOVERY_STRATEGIES = {
+      // Rule 1: Auto-fix bugs
+      bug: {
+        rule: 1,
+        type: "Bug",
+        canAutoFix: true,
+        maxAttempts: 3,
+        description: "Code doesn't work as intended",
+        recoveryActions: [
+          "Analyze error message and stack trace",
+          "Fix the root cause",
+          "Verify the fix works",
+          "Log the fix for SUMMARY"
+        ]
+      },
+      // Rule 2: Auto-add missing critical functionality
+      missing_critical: {
+        rule: 2,
+        type: "Missing Critical",
+        canAutoFix: true,
+        maxAttempts: 3,
+        description: "Missing essential features for correctness/security",
+        recoveryActions: [
+          "Identify missing functionality",
+          "Implement the missing piece",
+          "Verify it integrates correctly",
+          "Log for SUMMARY"
+        ]
+      },
+      // Rule 3: Auto-fix blocking issues
+      blocking: {
+        rule: 3,
+        type: "Blocking",
+        canAutoFix: true,
+        maxAttempts: 3,
+        description: "Something prevents completing the task",
+        recoveryActions: [
+          "Identify the blocker",
+          "Resolve or find workaround",
+          "Verify task can proceed",
+          "Log for SUMMARY"
+        ]
+      },
+      // Rule 4: Escalate architectural changes
+      architectural: {
+        rule: 4,
+        type: "Architectural",
+        canAutoFix: false,
+        maxAttempts: 1,
+        description: "Requires significant structural modification",
+        recoveryActions: [
+          "STOP - present decision to user",
+          "Describe the change needed",
+          "Explain why and impact",
+          "Wait for user decision"
+        ]
+      }
+    };
+    var DEVIATION_PATTERNS = [
+      // Bugs (Rule 1)
+      { pattern: /undefined is not an object|undefined.*property|Cannot read property/, type: "bug", rule: 1 },
+      { pattern: /is not a function|TypeError/, type: "bug", rule: 1 },
+      { pattern: /expected.*got|assertion failed/, type: "bug", rule: 1 },
+      { pattern: /logic error|incorrect|mistake/, type: "bug", rule: 1 },
+      // Missing Critical (Rule 2)
+      { pattern: /missing|not found|not defined/, type: "missing_critical", rule: 2 },
+      { pattern: /no error handling|unhandled/, type: "missing_critical", rule: 2 },
+      { pattern: /no validation|invalid input/, type: "missing_critical", rule: 2 },
+      { pattern: /no auth|no authorization/, type: "missing_critical", rule: 2 },
+      // Blocking (Rule 3)
+      { pattern: /cannot find module|module not found/, type: "blocking", rule: 3 },
+      { pattern: /dependency|package.*missing/, type: "blocking", rule: 3 },
+      { pattern: /import.*failed|require.*failed/, type: "blocking", rule: 3 },
+      { pattern: /circular dependency/, type: "blocking", rule: 3 },
+      // Architectural (Rule 4)
+      { pattern: /new table|new schema|new database/, type: "architectural", rule: 4 },
+      { pattern: /refactor.*architecture|redesign/, type: "architectural", rule: 4 },
+      { pattern: /switch.*library|replace.*framework/, type: "architectural", rule: 4 }
+    ];
+    var AutoRecovery = class {
+      constructor(config = {}) {
+        this.maxRetries = config.maxRetries || 3;
+        this.taskAttempts = /* @__PURE__ */ new Map();
+        this.recoveryLog = [];
+        this.metrics = {
+          deviationsHandled: 0,
+          autonomousRecoveries: 0,
+          escalatedToUser: 0,
+          ruleBreakdown: { 1: 0, 2: 0, 3: 0, 4: 0 }
+        };
+      }
+      /**
+       * Classify a deviation using the 4-rule framework
+       * @param {string} deviation - Deviation description or error message
+       * @param {Object} context - Additional context
+       * @returns {Object} Classification result
+       */
+      classifyDeviation(deviation, context = {}) {
+        const deviationLower = deviation.toLowerCase();
+        for (const { pattern, type, rule } of DEVIATION_PATTERNS) {
+          if (pattern.test(deviationLower)) {
+            return {
+              type,
+              rule,
+              strategy: RECOVERY_STRATEGIES[type],
+              description: deviation,
+              context
+            };
+          }
+        }
+        return {
+          type: "bug",
+          rule: 1,
+          strategy: RECOVERY_STRATEGIES.bug,
+          description: deviation,
+          context,
+          uncertain: true
+        };
+      }
+      /**
+       * Attempt to recover from a deviation
+       * @param {Object} classification - Deviation classification
+       * @param {Object} context - Recovery context (task info, etc.)
+       * @returns {Object} Recovery result
+       */
+      attemptRecovery(classification, context = {}) {
+        const { type, rule, strategy, description } = classification;
+        const taskId = context.taskId || "unknown";
+        const attempts = (this.taskAttempts.get(taskId) || 0) + 1;
+        this.taskAttempts.set(taskId, attempts);
+        const logEntry = {
+          taskId,
+          type,
+          rule,
+          description,
+          attempt: attempts,
+          timestamp: (/* @__PURE__ */ new Date()).toISOString(),
+          context
+        };
+        this.recoveryLog.push(logEntry);
+        this.metrics.deviationsHandled++;
+        this.metrics.ruleBreakdown[rule]++;
+        if (strategy.canAutoFix) {
+          if (attempts <= strategy.maxAttempts) {
+            this.metrics.autonomousRecoverles++;
+            return {
+              success: true,
+              action: "auto_fix",
+              rule,
+              type,
+              description: `Applying ${type} fix (attempt ${attempts}/${strategy.maxAttempts})`,
+              recoveryActions: strategy.recoveryActions,
+              canContinue: true,
+              logEntry
+            };
+          } else {
+            this.metrics.escalatedToUser++;
+            return {
+              success: false,
+              action: "escalate",
+              rule,
+              type,
+              description: `Max recovery attempts (${strategy.maxAttempts}) reached for ${type}`,
+              reason: "max_attempts_exceeded",
+              canContinue: false,
+              requiresCheckpoint: true,
+              logEntry
+            };
+          }
+        } else {
+          this.metrics.escalatedToUser++;
+          return {
+            success: false,
+            action: "escalate",
+            rule: 4,
+            type: "architectural",
+            description: "Architectural change required - user decision needed",
+            reason: "architectural_change",
+            canContinue: false,
+            requiresCheckpoint: true,
+            checkpointType: "decision",
+            checkpointDetails: {
+              title: "Architectural Change Required",
+              description,
+              context,
+              options: [
+                { id: "approve", label: "Approve Change", description: "Proceed with the proposed architectural change" },
+                { id: "decline", label: "Decline", description: "Abandon this approach" },
+                { id: "alternative", label: "Suggest Alternative", description: "Propose a different approach" }
+              ]
+            },
+            logEntry
+          };
+        }
+      }
+      /**
+       * Get recovery strategy for a specific rule
+       * @param {number} rule - Rule number (1-4)
+       * @returns {Object} Strategy object
+       */
+      getStrategyForRule(rule) {
+        const strategies = {
+          1: "bug",
+          2: "missing_critical",
+          3: "blocking",
+          4: "architectural"
+        };
+        return RECOVERY_STRATEGIES[strategies[rule]];
+      }
+      /**
+       * Get current recovery metrics
+       * @returns {Object} Metrics object
+       */
+      getMetrics() {
+        return { ...this.metrics };
+      }
+      /**
+       * Get recovery log
+       * @returns {Array} Recovery log entries
+       */
+      getRecoveryLog() {
+        return [...this.recoveryLog];
+      }
+      /**
+       * Reset recovery state for a task
+       * @param {string} taskId - Task identifier
+       */
+      resetTask(taskId) {
+        this.taskAttempts.delete(taskId);
+      }
+      /**
+       * Check if task has exceeded max retries
+       * @param {string} taskId - Task identifier
+       * @returns {boolean} True if exceeded
+       */
+      hasExceededMaxRetries(taskId) {
+        const attempts = this.taskAttempts.get(taskId) || 0;
+        return attempts >= this.maxRetries;
+      }
+      /**
+       * Get status for a specific task
+       * @param {string} taskId - Task identifier
+       * @returns {Object} Status object
+       */
+      getTaskStatus(taskId) {
+        const attempts = this.taskAttempts.get(taskId) || 0;
+        const taskLog = this.recoveryLog.filter((e) => e.taskId === taskId);
+        const lastEntry = taskLog[taskLog.length - 1];
+        return {
+          taskId,
+          attempts,
+          maxRetries: this.maxRetries,
+          canRetry: attempts < this.maxRetries,
+          lastDeviation: lastEntry ? lastEntry.description : null,
+          recoveryLogCount: taskLog.length
+        };
+      }
+    };
+    function createAutoRecovery(config) {
+      return new AutoRecovery(config);
+    }
+    module2.exports = {
+      createAutoRecovery,
+      RECOVERY_STRATEGIES,
+      DEVIATION_PATTERNS,
+      AutoRecovery
+    };
+  }
+});
+
+// src/lib/recovery/checkpointAdvisor.js
+var require_checkpointAdvisor = __commonJS({
+  "src/lib/recovery/checkpointAdvisor.js"(exports2, module2) {
+    var COMPLEXITY_FACTORS = {
+      fileCount: {
+        weight: 2,
+        thresholds: [
+          { max: 1, score: 0 },
+          { max: 3, score: 1 },
+          { max: 5, score: 2 },
+          { max: Infinity, score: 3 }
+        ]
+      },
+      taskType: {
+        weight: 3,
+        types: {
+          "auto": 0,
+          "checkpoint:human-verify": 2,
+          "checkpoint:decision": 4,
+          "checkpoint:human-action": 5
+        }
+      },
+      dependencies: {
+        weight: 2,
+        thresholds: [
+          { max: 0, score: 0 },
+          { max: 1, score: 1 },
+          { max: 2, score: 2 },
+          { max: Infinity, score: 3 }
+        ]
+      },
+      estimatedDuration: {
+        weight: 2,
+        thresholds: [
+          { max: 15, score: 0 },
+          // < 15 min
+          { max: 30, score: 1 },
+          // 15-30 min
+          { max: 45, score: 2 },
+          // 30-45 min
+          { max: 60, score: 3 },
+          // 45-60 min
+          { max: Infinity, score: 4 }
+          // > 60 min
+        ]
+      },
+      externalServices: {
+        weight: 4,
+        thresholds: [
+          { max: 0, score: 0 },
+          { max: 1, score: 2 },
+          { max: Infinity, score: 5 }
+        ]
+      },
+      userSetup: {
+        weight: 3,
+        thresholds: [
+          { max: 0, score: 0 },
+          { max: 1, score: 3 },
+          { max: Infinity, score: 5 }
+        ]
+      },
+      hasTests: {
+        weight: 1,
+        thresholds: [
+          { max: 0, score: 0 },
+          { max: Infinity, score: -1 }
+          // Having tests reduces complexity slightly
+        ]
+      }
+    };
+    var CHECKPOINT_RECOMMENDATIONS = [
+      { maxScore: 3, checkpointType: null, description: "Autonomous execution" },
+      { maxScore: 6, checkpointType: "human-verify", description: "Human verification recommended" },
+      { maxScore: 9, checkpointType: "decision", description: "Decision checkpoint recommended" },
+      { maxScore: Infinity, checkpointType: "human-action", description: "Human action required" }
+    ];
+    var CheckpointAdvisor = class {
+      constructor(config = {}) {
+        this.config = {
+          ...config,
+          weights: { ...COMPLEXITY_FACTORS, ...config.weights }
+        };
+      }
+      /**
+       * Analyze task complexity
+       * @param {Object} task - Task object
+       * @returns {Object} Analysis result
+       */
+      analyzeComplexity(task) {
+        const scores = {};
+        let totalScore = 0;
+        const fileCount = task.files?.length || task.filesModified?.length || 0;
+        scores.fileCount = this._scoreFromThresholds(fileCount, COMPLEXITY_FACTORS.fileCount);
+        totalScore += scores.fileCount * COMPLEXITY_FACTORS.fileCount.weight;
+        const taskType = task.type || "auto";
+        scores.taskType = COMPLEXITY_FACTORS.taskType.types[taskType] || 0;
+        totalScore += scores.taskType * COMPLEXITY_FACTORS.taskType.weight;
+        const dependencyCount = task.dependsOn?.length || task.dependencies?.length || 0;
+        scores.dependencies = this._scoreFromThresholds(dependencyCount, COMPLEXITY_FACTORS.dependencies);
+        totalScore += scores.dependencies * COMPLEXITY_FACTORS.dependencies.weight;
+        const duration = task.estimatedDuration || task.duration || 15;
+        scores.estimatedDuration = this._scoreFromThresholds(duration, COMPLEXITY_FACTORS.estimatedDuration);
+        totalScore += scores.estimatedDuration * COMPLEXITY_FACTORS.estimatedDuration.weight;
+        const externalCount = task.externalServices?.length || 0;
+        scores.externalServices = this._scoreFromThresholds(externalCount, COMPLEXITY_FACTORS.externalServices);
+        totalScore += scores.externalServices * COMPLEXITY_FACTORS.externalServices.weight;
+        const userSetupCount = task.userSetup?.length || (task.requiresUserSetup ? 1 : 0);
+        scores.userSetup = this._scoreFromThresholds(userSetupCount, COMPLEXITY_FACTORS.userSetup);
+        totalScore += scores.userSetup * COMPLEXITY_FACTORS.userSetup.weight;
+        const hasTests = task.hasTests || task.tests?.length > 0 ? 1 : 0;
+        scores.hasTests = this._scoreFromThresholds(hasTests, COMPLEXITY_FACTORS.hasTests);
+        totalScore += scores.hasTests * COMPLEXITY_FACTORS.hasTests.weight;
+        if (task.complexityScore !== void 0) {
+          totalScore = task.complexityScore;
+          scores.override = task.complexityScore;
+        }
+        if (task.autonomous === false && totalScore < 4) {
+          scores.autonomousOverride = -totalScore + 4;
+          totalScore += scores.autonomousOverride;
+        }
+        return {
+          totalScore: Math.max(0, Math.round(totalScore * 10) / 10),
+          // Round to 1 decimal
+          breakdown: scores,
+          factors: {
+            fileCount,
+            taskType,
+            dependencyCount,
+            duration,
+            externalCount,
+            userSetupCount,
+            hasTests: hasTests > 0
+          }
+        };
+      }
+      /**
+       * Recommend checkpoint based on complexity analysis
+       * @param {Object} task - Task object
+       * @param {Object} analysis - Complexity analysis result
+       * @returns {Object} Recommendation
+       */
+      recommendCheckpoint(task, analysis) {
+        const { totalScore } = analysis;
+        let recommendation = CHECKPOINT_RECOMMENDATIONS[0];
+        for (const rec of CHECKPOINT_RECOMMENDATIONS) {
+          if (totalScore <= rec.maxScore) {
+            recommendation = rec;
+            break;
+          }
+        }
+        const hasExplicitCheckpoint = task.type?.startsWith("checkpoint:");
+        const taskAutonomy = task.autonomous;
+        let finalRecommendation = recommendation.checkpointType;
+        if (hasExplicitCheckpoint) {
+          finalRecommendation = task.type.replace("checkpoint:", "");
+          recommendation.description = `Explicit checkpoint: ${finalRecommendation}`;
+        } else if (taskAutonomy === false && totalScore < 4) {
+          finalRecommendation = "human-verify";
+          recommendation.description = "Task marked non-autonomous, adding verification checkpoint";
+        } else if (taskAutonomy === true && totalScore >= 7) {
+          finalRecommendation = recommendation.checkpointType;
+          recommendation.description += " (complexity overrides autonomous flag)";
+        }
+        return {
+          recommended: finalRecommendation,
+          complexityScore: totalScore,
+          description: recommendation.description,
+          analysis,
+          shouldOverrideAutonomy: taskAutonomy === true && totalScore >= 7,
+          rationale: this._generateRationale(analysis, recommendation)
+        };
+      }
+      /**
+       * Analyze and recommend in one call
+       * @param {Object} task - Task object
+       * @returns {Object} Full recommendation with analysis
+       */
+      analyze(task) {
+        const analysis = this.analyzeComplexity(task);
+        const recommendation = this.recommendCheckpoint(task, analysis);
+        return { analysis, recommendation };
+      }
+      /**
+       * Score from thresholds
+       * @private
+       */
+      _scoreFromThresholds(value, factor) {
+        for (const threshold of factor.thresholds) {
+          if (value <= threshold.max) {
+            return threshold.score;
+          }
+        }
+        return 0;
+      }
+      /**
+       * Generate rationale for recommendation
+       * @private
+       */
+      _generateRationale(analysis, recommendation) {
+        const reasons = [];
+        const { breakdown, factors } = analysis;
+        if (factors.fileCount > 3) {
+          reasons.push(`${factors.fileCount} files touched (high complexity)`);
+        }
+        if (factors.dependencyCount > 2) {
+          reasons.push(`${factors.dependencyCount} dependencies`);
+        }
+        if (factors.duration > 45) {
+          reasons.push(`estimated ${factors.duration}min (long task)`);
+        }
+        if (factors.externalCount > 0) {
+          reasons.push(`${factors.externalCount} external service(s)`);
+        }
+        if (factors.userSetupCount > 0) {
+          reasons.push("requires user setup");
+        }
+        if (factors.taskType !== "auto") {
+          reasons.push(`task type: ${factors.taskType}`);
+        }
+        if (reasons.length === 0) {
+          reasons.push("low complexity - can execute autonomously");
+        }
+        return reasons;
+      }
+      /**
+       * Get checkpoint type from recommendation
+       * @param {string} recommendation - Recommendation string
+       * @returns {string} Checkpoint type
+       */
+      static getCheckpointType(recommendation) {
+        if (!recommendation) return null;
+        return `checkpoint:${recommendation}`;
+      }
+    };
+    function createCheckpointAdvisor(config) {
+      return new CheckpointAdvisor(config);
+    }
+    module2.exports = {
+      createCheckpointAdvisor,
+      CheckpointAdvisor,
+      COMPLEXITY_FACTORS,
+      CHECKPOINT_RECOMMENDATIONS
+    };
+  }
+});
+
+// src/lib/recovery/stuck-detector.js
+var require_stuck_detector = __commonJS({
+  "src/lib/recovery/stuck-detector.js"(exports2, module2) {
+    var SEVERITY = require_severity().SEVERITY;
+    var DEFAULT_CONFIG = {
+      maxRetries: 2,
+      detectionWindow: 10,
+      // Consider last N attempts
+      similarityThreshold: 0.8
+      // Error message similarity threshold
+    };
+    var StuckDetector = class {
+      constructor(config = {}) {
+        this.config = { ...DEFAULT_CONFIG, ...config };
+        this.taskHistory = /* @__PURE__ */ new Map();
+        this.recoveryCallbacks = [];
+      }
+      /**
+       * Record a task attempt
+       * @param {string} taskId - Unique task identifier
+       * @param {Object} attempt - Attempt details
+       */
+      recordAttempt(taskId, { error, timestamp = Date.now() }) {
+        if (!this.taskHistory.has(taskId)) {
+          this.taskHistory.set(taskId, []);
+        }
+        const history = this.taskHistory.get(taskId);
+        const attempt = {
+          error: this._normalizeError(error),
+          timestamp,
+          attemptNumber: history.length + 1
+        };
+        history.push(attempt);
+        if (history.length > this.config.detectionWindow) {
+          history.shift();
+        }
+        if (this.isStuck(taskId)) {
+          this._triggerRecovery(taskId);
+        }
+      }
+      /**
+       * Check if a task is stuck (repeated same error > maxRetries)
+       * @param {string} taskId - Task identifier
+       * @returns {boolean} True if stuck
+       */
+      isStuck(taskId) {
+        const history = this.taskHistory.get(taskId);
+        if (!history || history.length <= this.config.maxRetries) {
+          return false;
+        }
+        const recentAttempts = history.slice(-this.config.maxRetries - 1);
+        const firstError = recentAttempts[0].error;
+        return recentAttempts.every(
+          (attempt) => this._errorsSimilar(attempt.error, firstError)
+        );
+      }
+      /**
+       * Get stuck status for a task
+       * @param {string} taskId - Task identifier
+       * @returns {Object} Status object
+       */
+      getStatus(taskId) {
+        const history = this.taskHistory.get(taskId);
+        if (!history) {
+          return { isStuck: false, attempts: 0, retryCount: 0 };
+        }
+        const isStuck = this.isStuck(taskId);
+        const recentAttempts = history.slice(-this.config.maxRetries - 1);
+        return {
+          isStuck,
+          attempts: history.length,
+          retryCount: recentAttempts.length - 1,
+          lastError: history[history.length - 1]?.error,
+          recoveryTriggered: isStuck
+        };
+      }
+      /**
+       * Reset tracking for a task (e.g., after successful completion)
+       * @param {string} taskId - Task identifier
+       */
+      reset(taskId) {
+        this.taskHistory.delete(taskId);
+      }
+      /**
+       * Register a recovery callback
+       * @param {Function} callback - Recovery function(taskId, recoveryInfo)
+       */
+      onRecovery(callback) {
+        this.recoveryCallbacks.push(callback);
+      }
+      /**
+       * Normalize error message for comparison
+       */
+      _normalizeError(error) {
+        if (typeof error === "string") {
+          return error.toLowerCase().replace(/\s+/g, " ").trim();
+        }
+        if (error?.message) {
+          return this._normalizeError(error.message);
+        }
+        return "unknown error";
+      }
+      /**
+       * Check if two errors are similar
+       */
+      _errorsSimilar(error1, error2) {
+        if (error1 === error2) return true;
+        const longer = error1.length > error2.length ? error1 : error2;
+        const shorter = error1.length > error2.length ? error2 : error1;
+        return longer.includes(shorter) && longer.length / shorter.length < 2;
+      }
+      /**
+       * Trigger recovery workflow
+       */
+      _triggerRecovery(taskId) {
+        const history = this.taskHistory.get(taskId);
+        const recoveryInfo = {
+          taskId,
+          attempts: history.length,
+          errorPattern: history[history.length - 1]?.error,
+          lastGoodState: this._findLastGoodState(taskId),
+          suggestedApproaches: this._generateAlternatives(history)
+        };
+        for (const callback of this.recoveryCallbacks) {
+          try {
+            callback(taskId, recoveryInfo);
+          } catch (err) {
+            console.error(`Recovery callback error: ${err.message}`);
+          }
+        }
+      }
+      /**
+       * Find last known good state (simplified)
+       */
+      _findLastGoodState(taskId) {
+        return { message: "Last good state tracking not implemented" };
+      }
+      /**
+       * Generate alternative approaches
+       */
+      _generateAlternatives(history) {
+        const lastError = history[history.length - 1]?.error || "";
+        const alternatives = [
+          {
+            approach: "Pivot to checkpoint",
+            description: 'Consider pivoting to a prior checkpoint: trajectory pivot <checkpoint-name> --reason "..."'
+          },
+          {
+            approach: "Take a break",
+            description: "Step away from this task, clear context, return with fresh perspective"
+          },
+          {
+            approach: "Simplify",
+            description: "Reduce scope, implement minimal viable version first"
+          },
+          {
+            approach: "Research",
+            description: "Look up documentation, examples, or similar implementations"
+          }
+        ];
+        if (lastError.includes("import") || lastError.includes("require")) {
+          alternatives.push({
+            approach: "Check dependencies",
+            description: "Verify all imports are correct and packages are installed"
+          });
+        }
+        if (lastError.includes("syntax")) {
+          alternatives.push({
+            approach: "Validate syntax",
+            description: "Run linting or syntax checker to identify issues"
+          });
+        }
+        return alternatives;
+      }
+    };
+    function createStuckDetector(config) {
+      return new StuckDetector(config);
+    }
+    module2.exports = {
+      createStuckDetector
+    };
+  }
+});
+
+// src/lib/recovery/index.js
+var require_recovery = __commonJS({
+  "src/lib/recovery/index.js"(exports2, module2) {
+    var autoRecovery = require_autoRecovery();
+    var checkpointAdvisor = require_checkpointAdvisor();
+    var stuckDetector = require_stuck_detector();
+    var LoopDetector = stuckDetector.StuckDetector;
+    function createLoopDetector(config) {
+      return stuckDetector.createStuckDetector(config);
+    }
+    module2.exports = {
+      // Auto recovery for deviations
+      createAutoRecovery: autoRecovery.createAutoRecovery,
+      AutoRecovery: autoRecovery.AutoRecovery,
+      RECOVERY_STRATEGIES: autoRecovery.RECOVERY_STRATEGIES,
+      DEVIATION_PATTERNS: autoRecovery.DEVIATION_PATTERNS,
+      // Checkpoint advisor
+      createCheckpointAdvisor: checkpointAdvisor.createCheckpointAdvisor,
+      CheckpointAdvisor: checkpointAdvisor.CheckpointAdvisor,
+      COMPLEXITY_FACTORS: checkpointAdvisor.COMPLEXITY_FACTORS,
+      CHECKPOINT_RECOMMENDATIONS: checkpointAdvisor.CHECKPOINT_RECOMMENDATIONS,
+      // Stuck/loop detection
+      createStuckDetector: stuckDetector.createStuckDetector,
+      StuckDetector: stuckDetector.StuckDetector,
+      // Loop detector (alias)
+      createLoopDetector,
+      LoopDetector
+    };
+  }
+});
+
 // src/router.js
 var require_router = __commonJS({
   "src/router.js"(exports2, module2) {
     "use strict";
     var { COMMAND_HELP } = require_constants();
-    var { error } = require_output();
+    var { error, output } = require_output();
     var { diagnoseCompileCache } = require_runtime_capabilities();
     var { detectBun, getCachedBunVersion, configGet, configSet } = require_bun_runtime();
     var { loadConfig } = require_config();
@@ -37740,6 +38527,9 @@ var require_router = __commonJS({
     }
     function lazyMeasure() {
       return _modules.measure || (_modules.measure = require_measure());
+    }
+    function lazyRecovery() {
+      return _modules.recovery || (_modules.recovery = require_recovery());
     }
     async function main2() {
       const args = process.argv.slice(2);
@@ -38615,8 +39405,73 @@ Examples:
                 verbose: isVerbose2,
                 binPath: binPathIdx !== -1 ? restArgs[binPathIdx + 1] : "bin/bgsd-tools.cjs"
               }, raw);
+            } else if (subcommand === "recovery") {
+              const recoverySub = restArgs[0];
+              const recoveryMod = lazyRecovery();
+              if (recoverySub === "analyze") {
+                const deviation = restArgs.slice(1).join(" ");
+                const recovery = recoveryMod.createAutoRecovery();
+                const classification = recovery.classifyDeviation(deviation);
+                output({
+                  deviation,
+                  classification: {
+                    type: classification.type,
+                    rule: classification.rule,
+                    description: classification.description,
+                    canAutoFix: classification.strategy?.canAutoFix
+                  }
+                }, raw);
+              } else if (recoverySub === "checkpoint") {
+                const taskJson = restArgs.slice(1).join(" ");
+                let task;
+                try {
+                  task = taskJson ? JSON.parse(taskJson) : {};
+                } catch (e) {
+                  task = { type: taskJson || "auto" };
+                }
+                const advisor = recoveryMod.createCheckpointAdvisor();
+                const result = advisor.analyze(task);
+                output({
+                  task,
+                  complexityScore: result.analysis.totalScore,
+                  breakdown: result.analysis.breakdown,
+                  recommendation: {
+                    type: result.recommendation.recommended,
+                    description: result.recommendation.description,
+                    rationale: result.recommendation.rationale
+                  }
+                }, raw);
+              } else if (recoverySub === "stuck") {
+                const taskId = restArgs[1] || "default";
+                const detector = recoveryMod.createLoopDetector();
+                const status = detector.getStatus(taskId);
+                output({
+                  taskId,
+                  isStuck: status.isStuck,
+                  attempts: status.attempts,
+                  retryCount: status.retryCount,
+                  lastError: status.lastError
+                }, raw);
+              } else if (!recoverySub || recoverySub === "--help" || recoverySub === "-h") {
+                process.stderr.write(`Usage: bgsd-tools util:recovery <subcommand> [options]
+
+Execution intelligence - recovery and checkpoint management.
+
+Subcommands:
+  analyze <deviation>    Classify a deviation using the 4-rule framework
+  checkpoint <task-json> Analyze task complexity and recommend checkpoint type
+  stuck <task-id>       Check if a task is stuck in a loop
+
+Examples:
+  bgsd-tools util:recovery analyze "Cannot read property 'foo' of undefined"
+  bgsd-tools util:recovery checkpoint '{"files":["a.js","b.js"],"type":"auto","dependsOn":["t1"]}'
+  bgsd-tools util:recovery stuck task-123
+`);
+              } else {
+                error(`Unknown recovery subcommand: ${recoverySub}. Available: analyze, checkpoint, stuck`);
+              }
             } else {
-              error(`Unknown util subcommand: ${subcommand}. Available: config-get, config-set, env, current-timestamp, list-todos, todo, memory, mcp, classify, frontmatter, progress, websearch, history-digest, trace-requirement, codebase, cache, agent, resolve-model, template, generate-slug, verify-path-exists, config-ensure-section, config-migrate, scaffold, phase-plan-index, state-snapshot, summary-extract, quick-summary, extract-sections, git, profiler, tools, runtime, measure`);
+              error(`Unknown util subcommand: ${subcommand}. Available: config-get, config-set, env, current-timestamp, list-todos, todo, memory, mcp, classify, frontmatter, progress, websearch, history-digest, trace-requirement, codebase, cache, agent, resolve-model, template, generate-slug, verify-path-exists, config-ensure-section, config-migrate, scaffold, phase-plan-index, state-snapshot, summary-extract, quick-summary, extract-sections, git, profiler, tools, runtime, measure, recovery`);
             }
             break;
           }
