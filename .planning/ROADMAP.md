@@ -105,7 +105,8 @@
 2. Checkpoint decisions made based on task complexity
 3. Stuck/loop patterns detected and pivots suggested
 
-**Plans:** TBD
+**Plans:**
+- [ ] 94-01: Execution Intelligence (deviation recovery, checkpoint decisions, loop detection)
 
 ---
 
