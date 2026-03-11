@@ -2,6 +2,10 @@
 
 ## Milestones
 
+- 🆕 **v11.1 Command Execution & Polish** - Phases 103-105 (2026-03-11)
+  - Phase 103: Direct Command Routing — Simplify wrapper → workflow → CLI chain
+  - Phase 104: Zero Friction — Remove clarification loops, smart defaults
+  - Phase 105: Polish & Fixes — Fix edge cases, streamline execution
 - 🆕 **v11.0 Natural Interface & Insights** - Phases 98-102 (2026-03-11) — see `.planning/milestones/v11.0-ROADMAP.md`
   - Phase 98: NL Foundation — Intent classification, parameter extraction, smart aliases, fallback help
   - Phase 99: Conversational Planning — Multi-intent detection, contextual suggestions
@@ -21,6 +25,9 @@
 
 ## Phases
 
+- [ ] **Phase 103: Direct Command Routing** — Simplify wrapper → workflow → CLI chain
+- [ ] **Phase 104: Zero Friction** — Remove clarification loops, smart defaults
+- [ ] **Phase 105: Polish & Fixes** — Fix edge cases, streamline execution
 - [ ] **Phase 98: NL Foundation** — Intent classification, parameter extraction, smart aliases, fallback help
 - [ ] **Phase 99: Conversational Planning** — Multi-intent detection, contextual suggestions
 - [ ] **Phase 100: Visualization Core** — Progress bars, milestone progress, quality scores
@@ -37,11 +44,62 @@
 ---
 
 *Roadmap updated: 2026-03-11*
-*Ready for: /bgsd plan phase 98*
+*Ready for: /bgsd plan phase 103*
 
 ---
 
 # Phase Details
+
+### Phase 103: Direct Command Routing
+
+**Goal:** Simplify the wrapper → workflow → CLI chain so `/bgsd {cmd} {sub}` executes immediately
+
+**Depends on:** Nothing (first phase of v11.1)
+
+**Requirements:** ROUTE-01, ROUTE-02, ROUTE-03
+
+**Success Criteria** (what must be TRUE):
+1. `/bgsd milestone new` executes new-milestone workflow without clarification prompts
+2. All 41 slash commands route correctly on first attempt
+3. Command routing is deterministic — same command always routes to same workflow
+
+**Plans:** TBD
+
+---
+
+### Phase 104: Zero Friction
+
+**Goal:** Remove clarification loops and add smart defaults for ambiguous commands
+
+**Depends on:** Phase 103
+
+**Requirements:** FRIC-01, FRIC-02, FRIC-03
+
+**Success Criteria** (what must be TRUE):
+1. Commands execute without asking "did you mean X?" questions
+2. When ambiguity exists, system uses context to pick most likely option
+3. Users can always override with explicit intent specification
+
+**Plans:** TBD
+
+---
+
+### Phase 105: Polish & Fixes
+
+**Goal:** Fix edge cases and streamline workflow execution
+
+**Depends on:** Phase 104
+
+**Requirements:** POLY-01, POLY-02, POLY-03
+
+**Success Criteria** (what must be TRUE):
+1. Command confusion scenarios are handled gracefully
+2. Unnecessary steps in command chain are removed
+3. Error messages include actionable suggestions for correction
+
+**Plans:** TBD
+
+---
 
 ### Phase 98: NL Foundation
 
@@ -288,6 +346,9 @@
 | 95 | UX-04, UX-05, UX-06, PERF-05, PERF-06 | 5 | Complete | 2026-03-11 |
 | 96 | AGENT-10, AGENT-11, AGENT-12 | 3 | Complete | 2026-03-11 |
 | 97 | UX-07, UX-08, UX-09, PERF-03, PERF-04 | 5 | Complete | 2026-03-11 |
+| 103 | ROUTE-01, ROUTE-02, ROUTE-03 | 3 | Not Started | - |
+| 104 | FRIC-01, FRIC-02, FRIC-03 | 3 | Not Started | - |
+| 105 | POLY-01, POLY-02, POLY-03 | 3 | Not Started | - |
 
-**Total: 15 requirements across 5 v11.0 phases | 30 requirements across 12 phases total**
+**Total: 9 requirements across 3 v11.1 phases | 39 requirements across 18 phases total**
 
