@@ -904,6 +904,76 @@ function countTokens(text) {
 }
 
 // src/plugin/context-builder.js
+function buildTrajectoryBlock(state, plans) {
+  try {
+    const parts = [];
+    if (state && state.phase) {
+      const phaseMatch = state.phase.match(/^(\d+)/);
+      if (phaseMatch) {
+        parts.push(`Current: Phase ${phaseMatch[1]}`);
+      }
+    }
+    if (plans && plans.length > 0) {
+      const completedPlans = [];
+      const executedPlans = [];
+      for (const plan of plans) {
+        if (plan.executed || plan.completed) {
+          completedPlans.push(plan.frontmatter?.plan || "?");
+        }
+        if (plan.executed) {
+          executedPlans.push(plan.frontmatter?.plan || "?");
+        }
+      }
+      if (completedPlans.length > 0) {
+        parts.push(`Completed: ${completedPlans.join(", ")}`);
+      }
+      if (executedPlans.length > 0) {
+        parts.push(`Executed: ${executedPlans.join(", ")}`);
+      }
+    }
+    if (parts.length === 0) return null;
+    return `<trajectory>
+${parts.join("\n")}
+</trajectory>`;
+  } catch {
+    return null;
+  }
+}
+function buildSacredBlock(intent, roadmap) {
+  try {
+    const parts = [];
+    if (intent && intent.objective) {
+      parts.push(`Objective: ${intent.objective}`);
+    }
+    if (intent && intent.items && intent.items.length > 0) {
+      const keyItems = intent.items.slice(0, 3);
+      for (const item of keyItems) {
+        if (item.id && item.id.startsWith("DO-")) {
+          parts.push(`${item.id}: ${item.text || item.description || ""}`);
+        }
+      }
+    }
+    if (roadmap && roadmap.currentMilestone) {
+      const ms = roadmap.currentMilestone;
+      parts.push(`Milestone: ${ms.version || ms.name || "Current"}`);
+      if (ms.status) {
+        parts.push(`Status: ${ms.status}`);
+      }
+    }
+    if (roadmap && roadmap.phases) {
+      const currentPhase = roadmap.phases.find((p) => p.status === "current");
+      if (currentPhase) {
+        parts.push(`Phase: ${currentPhase.num}: ${currentPhase.name}`);
+      }
+    }
+    if (parts.length === 0) return null;
+    return `<sacred>
+${parts.join("\n")}
+</sacred>`;
+  } catch {
+    return null;
+  }
+}
 function buildSystemPrompt(cwd) {
   let projectState;
   try {
@@ -988,8 +1058,15 @@ function buildCompactionContext(cwd) {
   if (!projectState) {
     return null;
   }
-  const { state, project, intent, plans, currentPhase } = projectState;
+  const { state, project, intent, plans, currentPhase, roadmap } = projectState;
   const blocks = [];
+  try {
+    const sacredBlock = buildSacredBlock(intent, roadmap);
+    if (sacredBlock) {
+      blocks.push(sacredBlock);
+    }
+  } catch {
+  }
   try {
     if (project) {
       const parts = [];
@@ -1075,6 +1152,13 @@ ${parts.join("\n")}
 </session>`);
         }
       }
+    }
+  } catch {
+  }
+  try {
+    const trajectoryBlock = buildTrajectoryBlock(state, plans);
+    if (trajectoryBlock) {
+      blocks.push(trajectoryBlock);
     }
   } catch {
   }
