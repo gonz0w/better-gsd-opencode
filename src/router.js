@@ -5,6 +5,8 @@ const { error } = require('./lib/output');
 const { diagnoseCompileCache } = require('./lib/runtime-capabilities');
 const { detectBun, getCachedBunVersion, configGet, configSet } = require('./lib/cli-tools/bun-runtime');
 const { loadConfig } = require('./lib/config');
+const format = require('./lib/format');
+const debug = require('./lib/debug');
 
 // ─── Runtime Detection (Phase 89: Bun runtime detection with config persistence) ────────
 // Detect Bun at startup and show runtime banner.
@@ -154,6 +156,14 @@ async function main() {
     global._gsdCompactMode = true;
     args.splice(compactIdx, 1);
   }
+
+  // ─── Debug/Trace Flags (Phase 91: Rich TTY Output & Error Handling) ───────────
+  // Parse --debug and --trace flags (pass args to allow flag removal)
+  debug.parseDebugFlags(args);
+
+  // Parse color flags (--color, --no-color, --force-color)
+  // Pass args array so flags can be removed before command extraction
+  format.parseColorFlags(args);
 
   // ─── Runtime Banner ─────────────────────────────────────────────────────────
   // Show runtime info at startup (only in verbose mode or when running with Bun)

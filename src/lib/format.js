@@ -41,15 +41,24 @@ function getColorMode() {
  * Parse CLI arguments for color flags.
  * Call at CLI startup with process.argv.
  */
-function parseColorFlags(argv = process.argv) {
-  const args = argv.slice(2); // Skip node and script name
+function parseColorFlags(args) {
+  // args should be process.argv.slice(2) or similar - work on it directly to remove flags
+  if (!Array.isArray(args)) {
+    args = (args || process.argv).slice(2);
+  }
   
   if (args.includes('--no-color')) {
     setColorMode('disable');
+    const idx = args.indexOf('--no-color');
+    args.splice(idx, 1);
   } else if (args.includes('--force-color')) {
     setColorMode('force');
+    const idx = args.indexOf('--force-color');
+    args.splice(idx, 1);
   } else if (args.includes('--color')) {
     setColorMode('force');
+    const idx = args.indexOf('--color');
+    args.splice(idx, 1);
   }
   
   return _colorMode;

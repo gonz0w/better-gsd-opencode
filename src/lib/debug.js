@@ -349,14 +349,20 @@ function inspectPlans(phaseNum) {
 
 /**
  * Parse CLI arguments for debug/trace flags.
- * @param {string[]} [argv=process.argv] - Arguments to parse
+ * @param {string[]} args - Arguments array (e.g., process.argv.slice(2))
  * @returns {Object} { debug: boolean, trace: boolean }
  */
-function parseDebugFlags(argv = process.argv) {
-  const args = argv.slice(2);
+function parseDebugFlags(args) {
+  // args should be process.argv.slice(2) - work on it directly to remove flags
+  if (!Array.isArray(args)) {
+    args = (args || process.argv).slice(2);
+  }
   
-  _debugEnabled = args.includes('--debug');
-  _traceEnabled = args.includes('--trace');
+  const debugIdx = args.indexOf('--debug');
+  const traceIdx = args.indexOf('--trace');
+  
+  _debugEnabled = debugIdx !== -1;
+  _traceEnabled = traceIdx !== -1;
   
   // Trace enables debug too
   if (_traceEnabled) {
@@ -366,6 +372,14 @@ function parseDebugFlags(argv = process.argv) {
   // Enable colors when debug is on
   if (_debugEnabled && !args.includes('--no-color')) {
     format.setColorMode('force');
+  }
+  
+  // Remove flags from args
+  if (traceIdx !== -1) {
+    args.splice(traceIdx, 1);
+  }
+  if (debugIdx !== -1) {
+    args.splice(debugIdx, 1);
   }
   
   return {
