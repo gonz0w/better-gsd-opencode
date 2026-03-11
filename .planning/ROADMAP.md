@@ -110,7 +110,10 @@
 2. User sees velocity sparkline inline with session output showing trend (e.g., "Velocity: ▁▃▅▇▅▄▆")
 3. User can run dashboard command to see overview of key metrics in terminal
 
-**Plans:** TBD
+**Plans:** 
+  - ✅ 101-01: Burndown chart module (VIS-04)
+  - ✅ 101-02: Sparkline module (VIS-05)
+  - ✅ 101-03: Terminal dashboard (VIS-06)
 
 ---
 
