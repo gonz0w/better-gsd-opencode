@@ -9,9 +9,9 @@ See: `.planning/PROJECT.md` (updated 2026-03-11)
 
 ## Current Position
 
-**Phase:** Not started (defining requirements)
-**Current Plan:** —
-**Status:** Defining requirements
+**Phase:** 98 (in progress)
+**Current Plan:** 02 (of 2)
+**Status:** Executing NL Foundation
 **Last Activity:** 2026-03-11 — Milestone v11.0 started
 
 ## Performance Metrics
@@ -97,6 +97,13 @@ None yet.
 
 ### Blockers/Concerns
 
+- [98-01]: Created NL intent classification (plan/execute/verify/query) with confidence scoring (exact=1.0, keyword=0.8).
+- [98-01]: Created parameter extraction for phase numbers ("phase N", "pN", 2-digit), flags (--flag, -f, keyword), and targets.
+- [98-01]: Created command registry with 31 phrases and 16 aliases.
+- [98-02]: Fuzzy matching using Fuse.js with threshold 0.4.
+- [98-02]: Disambiguation prompts when confidence < 0.8.
+- [98-02]: Help fallback with contextual suggestions by intent category.
+- [98-02]: Short alias priority (p, e) over NL phrases for backward compatibility.
 - Keep single-file CLI deploy behavior intact while adding CLI tool integrations.
 - Bun runtime migration breaks single-file esbuild deploy - deferred to v2+ exploration.
 - Shell injection prevention required for all subprocess calls (use execFileSync with array args).
