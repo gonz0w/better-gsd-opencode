@@ -479,17 +479,6 @@ Subcommands:
   'verify:token-budget': `Usage: bgsd-tools verify:token-budget
 
 Show token counts for workflow files vs budgets.`,
-  'verify:orphans': `Usage: bgsd-tools verify:orphans
-
-Run reachability audit to find orphaned exports, files, workflows, templates, and config entries.
-
-Checks:
-  - Orphaned exports (functions/classes not imported by any file)
-  - Orphaned files (source files not imported by any other file)
-  - Orphaned workflows (workflows not referenced by commands/agents)
-  - Orphaned templates (templates not referenced by workflows/commands)
-  - Orphaned configs (skills referenced by agents that don't exist)`,
-
   // util namespace
   'util:config-get': `Usage: bgsd-tools util:config-get <key.path>
 

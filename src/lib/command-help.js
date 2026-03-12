@@ -141,7 +141,6 @@ const COMMAND_BRIEF = {
   'verify:context-budget': 'Check context usage',
   'verify:token-budget': 'Check token usage',
   'verify:review': 'Review code changes',
-  'verify:orphans': 'Find orphaned code',
   'verify:search-decisions': 'Search decisions',
   'verify:search-lessons': 'Search lessons learned',
   

@@ -4,7 +4,6 @@ const { debugLog } = require('./output');
 const { loadConfig } = require('./config');
 const { MODEL_PROFILES } = require('./constants');
 const { cachedRegex, PHASE_DIR_NUMBER } = require('./regex-cache');
-const { startTimer, endTimer, isProfilingEnabled } = require('./profiler');
 
 // ─── File Helpers ────────────────────────────────────────────────────────────
 
@@ -36,13 +35,9 @@ function getCacheEngine() {
 const dirCache = new Map();
 
 function safeReadFile(filePath) {
-  const timer = startTimer('file:read-uncached:' + filePath.split('/').pop());
   try {
-    const result = fs.readFileSync(filePath, 'utf-8');
-    endTimer(timer);
-    return result;
+    return fs.readFileSync(filePath, 'utf-8');
   } catch (e) {
-    endTimer(timer);
     debugLog('file.read', 'read failed', e);
     return null;
   }
@@ -54,13 +49,11 @@ function safeReadFile(filePath) {
  * Use safeReadFile directly when you need a guaranteed fresh read.
  */
 function cachedReadFile(filePath) {
-  const timer = startTimer('file:read:' + filePath.split('/').pop());
   const cacheEngine = getCacheEngine();
   
   // Try to get from persistent cache (CacheEngine checks staleness via mtime)
   const cached = cacheEngine.get(filePath);
   if (cached !== null) {
-    endTimer(timer);
     debugLog('file.cache', `cache hit: ${filePath}`);
     return cached;
   }
@@ -78,7 +71,6 @@ function cachedReadFile(filePath) {
     }
     cacheEngine.set(filePath, content);
   }
-  endTimer(timer);
   return content;
 }
 

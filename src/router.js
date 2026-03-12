@@ -100,7 +100,6 @@ function lazyGit() { return _modules.git || (_modules.git = require('./lib/git')
 function lazyOrchestration() { return _modules.orchestration || (_modules.orchestration = require('./lib/orchestration')); }
 function lazyCache() { return _modules.cache || (_modules.cache = require('./commands/cache')); }
 function lazyAgent() { return _modules.agent || (_modules.agent = require('./commands/agent')); }
-function lazyProfiler() { return _modules.profiler || (_modules.profiler = require('./commands/profiler')); }
 function lazyResearch() { return _modules.research || (_modules.research = require('./commands/research')); }
 function lazyTools() { return _modules.tools || (_modules.tools = require('./commands/tools')); }
 function lazyRuntime() { return _modules.runtime || (_modules.runtime = require('./commands/runtime')); }
@@ -239,18 +238,6 @@ async function main() {
   } else if (command && KNOWN_NAMESPACES.includes(command)) {
     // Space-separated: "init execute-phase 79" → treat first arg as namespace
     namespace = command;
-  }
-
-  // ─── Profiler: opt-in performance timing via BGSD_PROFILE=1 ────────────
-  const { startTimer: profStart, endTimer: profEnd, writeBaseline, isProfilingEnabled } = require('./lib/profiler');
-  const cmdTimer = profStart('command:' + (command || 'unknown'));
-
-  if (isProfilingEnabled()) {
-    const profSub = args[1] && !args[1].startsWith('-') ? args[1] : '';
-    process.on('exit', () => {
-      profEnd(cmdTimer);
-      writeBaseline(cwd, (command || 'unknown') + (profSub ? '-' + profSub : ''));
-    });
   }
 
   if (!command) {
@@ -1046,30 +1033,8 @@ Use without --exact for fuzzy matching.`);
               }), raw);
               break;
             }
-            default:
+              default:
               error('Unknown git subcommand: ' + gitSub + '. Available: log, diff-summary, blame, branch-info, rewind, trajectory-branch');
-          }
-        } else if (subcommand === 'profiler') {
-          const profSub = restArgs[0];
-          if (profSub === 'compare') {
-            lazyProfiler().cmdProfilerCompare(restArgs.slice(1));
-          } else if (profSub === 'cache-speedup') {
-            await lazyProfiler().cmdProfilerCacheSpeedup(restArgs.slice(1));
-          } else if (!profSub || profSub === '--help' || profSub === '-h') {
-            process.stderr.write(`Usage: bgsd-tools util:profiler <subcommand> [options]
-
-Performance profiler commands.
-
-Subcommands:
-  compare            Compare two baseline profiles and show timing deltas
-  cache-speedup      Measure cache speedup by running commands with/without cache
-
-Examples:
-  bgsd-tools util:profiler compare --before baseline.json --after current.json
-  bgsd-tools util:profiler cache-speedup --runs 3 --command "state validate"
-`);
-          } else {
-            error(`Unknown profiler subcommand: ${profSub}. Available: compare, cache-speedup`);
           }
         } else if (subcommand === 'tools') {
           lazyTools().cmdToolsStatus(cwd, raw);
@@ -1237,7 +1202,7 @@ Examples:
           const formatted = examples.map(ex => examplesMod.formatExample(ex, verbose)).join('\n');
           output({ command, examples, formatted }, raw);
         } else {
-          error(`Unknown util subcommand: ${subcommand}. Available: config-get, config-set, env, current-timestamp, list-todos, todo, memory, mcp, classify, frontmatter, progress, websearch, history-digest, trace-requirement, codebase, cache, agent, resolve-model, template, generate-slug, verify-path-exists, config-ensure-section, config-migrate, scaffold, phase-plan-index, state-snapshot, summary-extract, quick-summary, extract-sections, git, profiler, tools, runtime, measure, recovery, history, examples`);
+          error(`Unknown util subcommand: ${subcommand}. Available: config-get, config-set, env, current-timestamp, list-todos, todo, memory, mcp, classify, frontmatter, progress, websearch, history-digest, trace-requirement, codebase, cache, agent, resolve-model, template, generate-slug, verify-path-exists, config-ensure-section, config-migrate, scaffold, phase-plan-index, state-snapshot, summary-extract, quick-summary, extract-sections, git, tools, runtime, measure, recovery, history, examples`);
         }
         break;
       }

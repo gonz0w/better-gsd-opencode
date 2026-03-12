@@ -1,40 +1,36 @@
-# Milestone v11.1 Requirements
+# Milestone v11.2 Requirements
 
-**Version:** v11.1
-**Name:** Command Execution & Polish
-**Started:** 2026-03-11
+**Version:** v11.2
+**Name:** Code Cleanup
+**Started:** 2026-03-12
 
 ## Current Requirements
 
-### Command Routing (ROUTE-01 - ROUTE-03)
+### Phase 106: Code Cleanup (CLEAN-01 - CLEAN-05)
 
-- [ ] **ROUTE-01**: Direct slash command execution — `/bgsd milestone new` executes new-milestone workflow without intermediate prompts or clarification
-- [ ] **ROUTE-02**: All 41 slash commands route to correct workflow on first attempt
-- [ ] **ROUTE-03**: Command routing is deterministic — same command always routes to same workflow
+- [x] **CLEAN-01**: Audit src/ for unused exports — Scan src/ directory for exported functions/variables that are never imported within the codebase
+- [x] **CLEAN-02**: Remove verify:orphans — Delete the verify:orphans command and related code (one-time cleanup)
+- [x] **CLEAN-03**: Remove test infrastructure from bundle — Strip node:test, test files, and test utilities from the build output
+- [x] **CLEAN-04**: Remove performance profiling from bundle — Strip profiler.js, benchmarking code from the build output
+- [x] **CLEAN-05**: Measure bundle reduction — Report before/after bundle size to quantify improvements
 
-### Zero Friction (FRIC-01 - FRIC-03)
+### Phase 107: Unused Exports Cleanup (UNUSED-01 - UNUSED-03)
 
-- [ ] **FRIC-01**: No clarification loops — commands execute without asking "did you mean X?"
-- [ ] **FRIC-02**: Smart defaults — when ambiguity exists, use most likely option based on context
-- [ ] **FRIC-03**: Explicit override available — users can always specify exact intent if needed
+- [ ] **UNUSED-01**: Scan src/ for all exports — Use AST analysis to find all exported functions and variables
+- [ ] **UNUSED-02**: Identify unused exports — Determine which exports are never imported within src/
+- [ ] **UNUSED-03**: Remove unused exports — Remove verified unused exports after confirmation
 
-### Polish & Fixes (POLY-01 - POLY-03)
+### Phase 108: Dead Code Removal (DEAD-01 - DEAD-03)
 
-- [ ] **POLY-01**: Fix command confusion scenarios — handle edge cases where routing fails
-- [ ] **POLY-02**: Streamline workflow execution — reduce unnecessary steps in command chain
-- [ ] **POLY-03**: Error messages are actionable — when routing fails, suggest correct command
+- [ ] **DEAD-01**: Detect unreachable code — Find code paths that can never execute (after return/throw/break)
+- [ ] **DEAD-02**: Analyze control flow — Identify dead branches and unreachable functions
+- [ ] **DEAD-03**: Remove dead code — Remove unreachable code after verification
 
-## Future Requirements (Deferred)
+### Phase 109: Duplicate Code Merge (DUPE-01 - DUPE-03)
 
-- Enhanced intent recognition using ML/NLP
-- Command history-based learning
-- Predictive command suggestions
-
-## Out of Scope
-
-- New command types — focus on improving existing command routing
-- Major architecture changes — incremental improvements to current system
-- Additional slash commands — maintain current 41 command surface
+- [ ] **DUPE-01**: Find duplicate patterns — Identify duplicate or similar code across src/
+- [ ] **DUPE-02**: Design consolidation — Determine how to extract common patterns into shared utilities
+- [ ] **DUPE-03**: Merge duplicates — Consolidate duplicate code into shared utilities
 
 ---
 
@@ -42,12 +38,17 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| ROUTE-01 | TBD | - |
-| ROUTE-02 | TBD | - |
-| ROUTE-03 | TBD | - |
-| FRIC-01 | TBD | - |
-| FRIC-02 | TBD | - |
-| FRIC-03 | TBD | - |
-| POLY-01 | TBD | - |
-| POLY-02 | TBD | - |
-| POLY-03 | TBD | - |
+| CLEAN-01 | 106 | Complete |
+| CLEAN-02 | 106 | Complete |
+| CLEAN-03 | 106 | Complete |
+| CLEAN-04 | 106 | Complete |
+| CLEAN-05 | 106 | Complete |
+| UNUSED-01 | 107 | Pending |
+| UNUSED-02 | 107 | Pending |
+| UNUSED-03 | 107 | Pending |
+| DEAD-01 | 108 | Pending |
+| DEAD-02 | 108 | Pending |
+| DEAD-03 | 108 | Pending |
+| DUPE-01 | 109 | Pending |
+| DUPE-02 | 109 | Pending |
+| DUPE-03 | 109 | Pending |
