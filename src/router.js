@@ -434,8 +434,16 @@ Use without --exact for fuzzy matching.`);
             }
             const forceFlag = restArgs.includes('--force');
             lazyPhase().cmdMilestoneComplete(cwd, restArgs[1], { name: milestoneName, archivePhases, force: forceFlag }, raw);
+          } else if (msSub === 'summary') {
+            // Pass remaining args directly to cmdMilestoneSummary
+            const summaryArgs = restArgs.slice(1);
+            const { cmdMilestoneSummary } = require('./commands/milestone');
+            cmdMilestoneSummary(cwd, summaryArgs, raw);
+          } else if (msSub === 'info') {
+            const { cmdMilestoneInfo } = require('./commands/milestone');
+            cmdMilestoneInfo(cwd, raw);
           } else {
-            error('Unknown milestone subcommand. Available: complete');
+            error('Unknown milestone subcommand. Available: complete, summary, info');
           }
         } else if (subcommand === 'phase') {
           const phaseSub = restArgs[0];
