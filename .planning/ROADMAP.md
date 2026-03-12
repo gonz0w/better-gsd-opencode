@@ -2,9 +2,11 @@
 
 ## Milestones
 
-- 🆕 **v11.2 Code Cleanup** - Phase 106 (2026-03-12)
-  - ✅ Phase 106: Code Cleanup — Remove unused code, test infrastructure, and performance tools from bundle
-  - Phase 107-109: Additional cleanup and optimization
+- 🆕 **v11.2 Code Cleanup** - Phases 106-109 (2026-03-12)
+  - ✅ Phase 106: Code Cleanup — Remove verify:orphans, profiler, test infrastructure
+  - Phase 107: Unused Exports Cleanup — Find and remove unused exports from src/
+  - Phase 108: Dead Code Removal — Find and remove unreachable code paths
+  - Phase 109: Duplicate Code Merge — Find duplicate code patterns and consolidate
 - 🆕 **v11.1 Command Execution & Polish** - Phases 103-105 (2026-03-11)
   - ✅ Phase 103: Direct Command Routing — Simplify wrapper → workflow → CLI chain
   - Phase 104: Zero Friction — Remove clarification loops, smart defaults
@@ -28,7 +30,10 @@
 
 ## Phases
 
-- [ ] **Phase 106: Code Cleanup** — Remove unused code, test infrastructure, and performance tools from bundle
+- [ ] **Phase 106: Code Cleanup** — Remove verify:orphans, profiler, test infrastructure from bundle
+- [ ] **Phase 107: Unused Exports Cleanup** — Find and remove unused exports from src/ directory
+- [ ] **Phase 108: Dead Code Removal** — Find and remove unreachable code paths
+- [ ] **Phase 109: Duplicate Code Merge** — Find duplicate code patterns and consolidate
 - [x] **Phase 103: Direct Command Routing** — Simplify wrapper → workflow → CLI chain ✅
 - [x] **Phase 104: Zero Friction** — Remove clarification loops, smart defaults ✅
 - [ ] **Phase 105: Polish & Fixes** — Fix edge cases, streamline execution
@@ -355,11 +360,62 @@
 
 ---
 
+### Phase 107: Unused Exports Cleanup
+**Goal:** Find and remove unused exports from src/ directory
+
+**Depends on:** Phase 106
+
+**Requirements:** UNUSED-01, UNUSED-02, UNUSED-03
+
+**Success Criteria** (what must be TRUE):
+1. Scan src/ for all exported functions/variables
+2. Identify which exports are never imported within the codebase
+3. Remove unused exports after verification
+
+**Plans:** TBD
+
+---
+
+### Phase 108: Dead Code Removal
+**Goal:** Find and remove unreachable code paths
+
+**Depends on:** Phase 107
+
+**Requirements:** DEAD-01, DEAD-02, DEAD-03
+
+**Success Criteria** (what must be TRUE):
+1. Identify code paths that can never execute (after return/throw/break in loops)
+2. Remove unreachable code after verification
+3. Verify no runtime errors after removal
+
+**Plans:** TBD
+
+---
+
+### Phase 109: Duplicate Code Merge
+**Goal:** Find duplicate code patterns and consolidate
+
+**Depends on:** Phase 108
+
+**Requirements:** DUPE-01, DUPE-02, DUPE-03
+
+**Success Criteria** (what must be TRUE):
+1. Identify duplicate code patterns across src/
+2. Extract common patterns into shared utilities
+3. Verify functionality after consolidation
+
+**Plans:** TBD
+
+---
+
 ## Coverage Map
 
 | Phase | Requirements | Count | Status | Completed |
 |-------|--------------|-------|--------|-----------|
 | 106 | CLEAN-01, CLEAN-02, CLEAN-03, CLEAN-04, CLEAN-05 | 5 | Complete | 2026-03-12 |
+| 107 | UNUSED-01, UNUSED-02, UNUSED-03 | 3 | Not Started | - |
+| 108 | DEAD-01, DEAD-02, DEAD-03 | 3 | Not Started | - |
+| 109 | DUPE-01, DUPE-02, DUPE-03 | 3 | Not Started | - |
 | 98 | NL-01, NL-02, NL-03, NL-04 | 4 | Pending | - |
 | 99 | NL-05, NL-06, NL-07 | 3 | Pending | - |
 | 100 | VIS-01, VIS-02, VIS-03 | 3 | Pending | - |
