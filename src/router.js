@@ -195,6 +195,27 @@ async function main() {
     args.splice(exactIdx, 1);
   }
 
+  // Parse --defaults flag: use smart defaults for optional parameters
+  const defaultsIdx = args.indexOf('--defaults');
+  const useDefaults = defaultsIdx !== -1;
+  if (defaultsIdx !== -1) {
+    args.splice(defaultsIdx, 1);
+  }
+
+  // Smart defaults map - applied when --defaults flag is present
+  const defaultsMap = {
+    phase: 'next',      // Use next incomplete phase
+    force: false,       // Don't force by default
+    verbose: false,     // Compact output by default
+    confirm: true,      // Auto-confirm by default
+    recursive: false,   // Non-recursive by default
+    includeArchived: false
+  };
+
+  // Store defaults flag globally for command handlers to access
+  global._bgsdDefaults = useDefaults;
+  global._bgsdDefaultsMap = useDefaults ? defaultsMap : null;
+
   const command = args[0];
   const cwd = process.cwd();
 
