@@ -779,6 +779,8 @@ async function main() {
           } else {
             error('Unknown frontmatter subcommand. Available: get, set, merge, validate');
           }
+        } else if (subcommand === 'validate-commands') {
+          lazyMisc().cmdValidateCommands(cwd, {}, raw);
         } else if (subcommand === 'progress') {
           const progSub = restArgs[0] || 'json';
           lazyMisc().cmdProgressRender(cwd, progSub, raw);
