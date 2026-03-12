@@ -5,6 +5,121 @@ const { parseGoalDescription, generateClarifyingQuestions, extractRequirements }
 const { detectIntents, parseCompoundCommand, sequenceIntents, detectAndParse } = require('./multi-intent-detector.js');
 const { detectCommandType, getSuggestions, buildSuggestionChain } = require('./suggestion-engine.js');
 const { parse: nlParse } = require('./nl-parser.js');
+const fs = require('fs');
+const path = require('path');
+
+// Configuration constants
+const CONFIDENCE_THRESHOLD = 0.6; // 60% - auto-execute above this
+const CONTEXT_BOOST = 0.15; // Boost confidence when command aligns with current phase
+
+// Cached context for fast lookup
+let contextCache = null;
+let contextCacheTime = 0;
+const CONTEXT_CACHE_TTL = 60000; // 1 minute TTL
+
+/**
+ * Get project context from STATE.md
+ * @returns {Object} Context {currentPhase, milestone, recentCommands}
+ */
+function getProjectContext() {
+  const now = Date.now();
+  
+  // Return cached context if still fresh
+  if (contextCache && (now - contextCacheTime) < CONTEXT_CACHE_TTL) {
+    return contextCache;
+  }
+  
+  try {
+    const statePath = path.join(process.cwd(), '.planning', 'STATE.md');
+    
+    if (!fs.existsSync(statePath)) {
+      return { currentPhase: null, milestone: null, recentCommands: [] };
+    }
+    
+    const content = fs.readFileSync(statePath, 'utf8');
+    
+    // Extract current phase from STATE.md
+    const phaseMatch = content.match(/\*\*Phase:\*\*\s*(\d+[-\w]+)/);
+    const currentPhase = phaseMatch ? phaseMatch[1] : null;
+    
+    // Extract milestone
+    const milestoneMatch = content.match(/\|v?[\d.]+\s*\|\s*(\d+[-\w]+)\s*\|.*?\|.*?\|.*?\|/);
+    const milestone = milestoneMatch ? milestoneMatch[1] : null;
+    
+    // Extract recent completed plans/commands
+    const recentCommands = [];
+    const lastSessionMatch = content.match(/\*\*Last session:\*\*\s*([^\n]+)/);
+    const lastActivityMatch = content.match(/\*\*Last Activity:\*\*\s*([^\n]+)/);
+    
+    contextCache = {
+      currentPhase,
+      milestone,
+      recentCommands,
+      lastSession: lastSessionMatch ? lastSessionMatch[1].trim() : null,
+      lastActivity: lastActivityMatch ? lastActivityMatch[1].trim() : null
+    };
+    contextCacheTime = now;
+    
+    return contextCache;
+  } catch (error) {
+    return { currentPhase: null, milestone: null, recentCommands: [] };
+  }
+}
+
+/**
+ * Calculate context-based confidence boost
+ * If command aligns with current project phase, boost confidence
+ * @param {Object} parsedResult - Result from nlParse
+ * @param {Object} context - Project context
+ * @returns {number} Confidence boost (0-0.3)
+ */
+function calculateContextBoost(parsedResult, context) {
+  if (!context || !context.currentPhase) {
+    return 0;
+  }
+  
+  const { command, params } = parsedResult;
+  if (!command) return 0;
+  
+  // Extract phase number from command
+  const commandPhase = params?.phase;
+  
+  // If user explicitly specified a phase, check if it matches current
+  if (commandPhase) {
+    // Normalize phase comparison (e.g., "103" matches "103-direct-command-routing")
+    const currentPhaseNum = context.currentPhase.replace(/-.+$/, '');
+    if (String(commandPhase) === currentPhaseNum) {
+      return CONTEXT_BOOST;
+    }
+    return 0;
+  }
+  
+  // If no explicit phase, check if command intent matches current phase context
+  // E.g., if in planning phase, boost "plan" commands
+  const phaseNum = context.currentPhase.match(/^(\d+)/)?.[1];
+  if (!phaseNum) return 0;
+  
+  // Infer intent from command
+  const intentMap = {
+    'plan': ['plan:phase', 'plan:roadmap', 'milestone:new'],
+    'execute': ['execute:phase', 'execute:quick', 'execute:commit', 'session:resume'],
+    'verify': ['verify:work', 'verify:phase', 'verify:state']
+  };
+  
+  for (const [intent, commands] of Object.entries(intentMap)) {
+    if (commands.includes(command)) {
+      // Boost based on phase range (rough heuristic)
+      // Planning phases (100-109) boost plan commands
+      // Execution phases boost execute commands
+      const phaseNumInt = parseInt(phaseNum, 10);
+      if (intent === 'plan' && phaseNumInt >= 100 && phaseNumInt < 110) {
+        return CONTEXT_BOOST * 0.5; // Smaller boost for inferred intent
+      }
+    }
+  }
+  
+  return 0;
+}
 
 /**
  * Parse goal description - main entry point
@@ -19,7 +134,8 @@ function parseGoal(text, options = {}) {
     return {
       type: 'error',
       message: 'Empty input',
-      suggestions: getSuggestions('utility')
+      suggestions: getSuggestions('utility'),
+      confidence: 0
     };
   }
 
@@ -46,7 +162,8 @@ function parseGoal(text, options = {}) {
       return {
         type: 'requirements',
         requirements,
-        suggestions: getSuggestions('planning')
+        suggestions: getSuggestions('planning'),
+        confidence: 0.95 // High confidence for direct requirement extraction
       };
     }
     
@@ -58,7 +175,8 @@ function parseGoal(text, options = {}) {
         type: 'clarifying_questions',
         questions,
         parsed,
-        suggestions: getSuggestions('utility')
+        suggestions: getSuggestions('utility'),
+        confidence: 0.5 // Medium confidence - needs clarification
       };
     }
 
@@ -67,16 +185,39 @@ function parseGoal(text, options = {}) {
     return {
       type: 'requirements',
       requirements,
-      suggestions: getSuggestions('planning')
+      suggestions: getSuggestions('planning'),
+      confidence: 0.9 // High confidence once requirements extracted
     };
   }
 
   // Fall back to standard NL parser
   const parsed = nlParse(trimmed);
+  
+  // Add context-based confidence boost
+  let confidence = parsed.confidence || 0;
+  let autoExecute = false;
+  
+  // If bypassClarification is true (from direct routing), always execute
+  if (bypassClarification) {
+    autoExecute = true;
+    confidence = Math.min(confidence + 0.2, 1.0);
+  } else {
+    // Get project context for confidence boost
+    const context = getProjectContext();
+    const contextBoost = calculateContextBoost(parsed, context);
+    confidence = Math.min(confidence + contextBoost, 1.0);
+    
+    // Threshold-based auto-execution: >= 60% = auto, < 60% = prompt
+    autoExecute = confidence >= CONFIDENCE_THRESHOLD;
+  }
+  
   return {
     type: 'command',
     parsed,
-    suggestions: getSuggestions(parsed.command || 'utility')
+    suggestions: getSuggestions(parsed.command || 'utility'),
+    confidence,
+    autoExecute,
+    threshold: CONFIDENCE_THRESHOLD
   };
 }
 
@@ -102,7 +243,9 @@ function handleCompoundCommand(text, options = {}) {
       message: 'Which phase?',
       intents: sequenced,
       clarification: 'Please specify a phase number for the command(s)',
-      suggestions: getSuggestions('utility')
+      suggestions: getSuggestions('utility'),
+      confidence: 0.4,
+      autoExecute: false
     };
   }
 
@@ -112,7 +255,9 @@ function handleCompoundCommand(text, options = {}) {
     intents: sequenced,
     chain: chain.chain,
     missingLinks: chain.missing,
-    suggestions: getSuggestions(sequenced[sequenced.length - 1].intent)
+    suggestions: getSuggestions(sequenced[sequenced.length - 1].intent),
+    confidence: 0.85,
+    autoExecute: true // Compound commands with phase specified are auto-executable
   };
 }
 
@@ -140,5 +285,9 @@ module.exports = {
   sequenceIntents,
   detectCommandType,
   getSuggestions,
-  buildSuggestionChain
+  buildSuggestionChain,
+  // New exports for confidence and context
+  getProjectContext,
+  calculateContextBoost,
+  CONFIDENCE_THRESHOLD
 };
