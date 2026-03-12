@@ -1,7 +1,6 @@
 'use strict';
 
 const { debugLog } = require('./output');
-const { startTimer, endTimer } = require('./profiler');
 
 // ─── Token Estimation ────────────────────────────────────────────────────────
 
@@ -33,14 +32,10 @@ function getTokenizer() {
  */
 function estimateTokens(text) {
   if (!text || typeof text !== 'string') return 0;
-  const timer = startTimer('markdown:estimate-tokens');
   try {
     const fn = getTokenizer();
-    const result = fn(text);
-    endTimer(timer);
-    return result;
+    return fn(text);
   } catch (e) {
-    endTimer(timer);
     debugLog('context.estimateTokens', 'estimation failed, using fallback', e);
     return Math.ceil(text.length / 4);
   }
@@ -184,9 +179,7 @@ function scopeContextForAgent(result, agentType) {
  * @returns {object} Compact state object
  */
 function compactPlanState(stateRaw) {
-  const timer = startTimer('markdown:compact-state');
   if (!stateRaw || typeof stateRaw !== 'string') {
-    endTimer(timer);
     return { phase: null, progress: null, status: null, last_activity: null, decisions: [], blockers: [] };
   }
 
@@ -226,7 +219,6 @@ function compactPlanState(stateRaw) {
     }
   }
 
-  endTimer(timer);
   return {
     phase,
     progress,

@@ -3,7 +3,6 @@
 const fs = require('fs');
 const path = require('path');
 const { LANGUAGE_MAP } = require('./codebase-intel');
-const { startTimer, endTimer } = require('./profiler');
 
 // ─── TypeScript Stripping ────────────────────────────────────────────────────
 
@@ -618,20 +617,17 @@ function needsTypeStripping(filePath) {
  * @returns {{ signatures: object[], language: string|null, error?: string }}
  */
 function extractSignatures(filePath, options) {
-  const timer = startTimer('ast:parse:' + path.basename(filePath));
   const opts = options || {};
 
   let code;
   try {
     code = opts.code || fs.readFileSync(filePath, 'utf-8');
   } catch (e) {
-    endTimer(timer);
     return { signatures: [], language: null, error: 'file_not_found' };
   }
 
   const language = detectLanguage(filePath);
   if (!language) {
-    endTimer(timer);
     return { signatures: [], language: null, error: 'unknown_language' };
   }
 
@@ -645,13 +641,11 @@ function extractSignatures(filePath, options) {
     const ast = parseWithAcorn(parseCode);
     if (ast) {
       const signatures = walkAstForSignatures(ast, parseCode);
-      endTimer(timer);
       return { signatures, language };
     }
 
     // Acorn failed — try regex fallback for JS
     const regexSigs = extractJsSignaturesRegex(code);
-    endTimer(timer);
     return {
       signatures: regexSigs,
       language,
@@ -662,7 +656,6 @@ function extractSignatures(filePath, options) {
   // Non-JS: use DETECTOR_REGISTRY
   const detector = DETECTOR_REGISTRY[language];
   if (!detector) {
-    endTimer(timer);
     return { signatures: [], language, error: 'no_detector' };
   }
 
@@ -681,10 +674,8 @@ function extractSignatures(filePath, options) {
       signatures.push(detector.extractSignature(match, lineNum));
     }
 
-    endTimer(timer);
     return { signatures, language };
   } catch {
-    endTimer(timer);
     return { signatures: [], language, error: 'parse_failed' };
   }
 }
@@ -701,18 +692,15 @@ function extractSignatures(filePath, options) {
  * @returns {{ named: string[], default: string|null, reExports: string[], cjsExports: string[], type: 'esm'|'cjs'|'mixed', language: string|null, error?: string }}
  */
 function extractExports(filePath) {
-  const timer = startTimer('ast:exports:' + path.basename(filePath));
   let code;
   try {
     code = fs.readFileSync(filePath, 'utf-8');
   } catch (e) {
-    endTimer(timer);
     return { named: [], default: null, reExports: [], cjsExports: [], type: 'cjs', language: null, error: 'file_not_found' };
   }
 
   const language = detectLanguage(filePath);
   if (!language || !isJsFamily(language)) {
-    endTimer(timer);
     return { named: [], default: null, reExports: [], cjsExports: [], type: 'cjs', language, error: 'unsupported_language' };
   }
 
@@ -738,7 +726,6 @@ function extractExports(filePath) {
   if (hasEsm && hasCjs) type = 'mixed';
   else if (hasEsm) type = 'esm';
 
-  endTimer(timer);
   return {
     named: esmResult.named,
     default: esmResult.default,

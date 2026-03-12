@@ -379,7 +379,6 @@ function validateCommandRegistry() {
       'review': null,
       'context-budget': null,
       'token-budget': null,
-      'orphans': null,
       'regression': null,
       'quality': null
     },

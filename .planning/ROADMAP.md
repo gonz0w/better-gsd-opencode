@@ -3,7 +3,8 @@
 ## Milestones
 
 - 🆕 **v11.2 Code Cleanup** - Phase 106 (2026-03-12)
-  - Phase 106: Code Cleanup — Remove unused code, test infrastructure, and performance tools from bundle
+  - ✅ Phase 106: Code Cleanup — Remove unused code, test infrastructure, and performance tools from bundle
+  - Phase 107-109: Additional cleanup and optimization
 - 🆕 **v11.1 Command Execution & Polish** - Phases 103-105 (2026-03-11)
   - ✅ Phase 103: Direct Command Routing — Simplify wrapper → workflow → CLI chain
   - Phase 104: Zero Friction — Remove clarification loops, smart defaults
@@ -350,7 +351,7 @@
 4. All performance profiling removed from bundle (profiler.js, benchmarking)
 5. Bundle size measurably reduced after cleanup
 
-**Plans:** TBD
+**Plans:** 106-01 (complete) — Removed verify:orphans command and performance profiler from bundle
 
 ---
 
@@ -358,7 +359,7 @@
 
 | Phase | Requirements | Count | Status | Completed |
 |-------|--------------|-------|--------|-----------|
-| 106 | CLEAN-01, CLEAN-02, CLEAN-03, CLEAN-04, CLEAN-05 | 5 | Not Started | - |
+| 106 | CLEAN-01, CLEAN-02, CLEAN-03, CLEAN-04, CLEAN-05 | 5 | Complete | 2026-03-12 |
 | 98 | NL-01, NL-02, NL-03, NL-04 | 4 | Pending | - |
 | 99 | NL-05, NL-06, NL-07 | 3 | Pending | - |
 | 100 | VIS-01, VIS-02, VIS-03 | 3 | Pending | - |
