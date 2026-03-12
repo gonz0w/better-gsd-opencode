@@ -9,10 +9,10 @@ See: `.planning/PROJECT.md` (updated 2026-03-11)
 
 ## Current Position
 
-**Phase:** 104-zero-friction (complete)
-**Current Plan:** 3/3
-**Total Plans in Phase:** 3
-**Status:** Phase complete — ready for Phase 105
+**Phase:** 105-polish-and-fixes
+**Current Plan:** 1/1
+**Total Plans in Phase:** 1
+**Status:** Phase complete
 **Last Activity:** 2026-03-12
 
 ## Performance Metrics
@@ -113,6 +113,9 @@ See: `.planning/PROJECT.md` (updated 2026-03-11)
 - [Phase 104-02]: 60% confidence threshold for auto-execution vs prompting, context boost (15%) when command aligns with current phase
 - [Phase 104-02]: User choice learning stores overrides in local config, boosts confidence for previously chosen options
 - [Phase 104-03]: Verified all 77 commands route correctly, all success criteria confirmed TRUE
+- [Phase 105-01]: Added confidence threshold (90% high, 60% low) to getSimilarCommands for command confusion handling
+- [Phase 105-01]: Added --defaults flag to bypass prompts with smart defaultsMap in router.js
+- [Phase 105-01]: Enhanced error formatting with formatErrorBrief() and examples support in error.js
 
 ### Pending Todos
 
@@ -130,8 +133,8 @@ None - all v11.0 features implemented
 
 ## Session Continuity
 
-**Last session:** 2026-03-12T02:30:00.000Z
-**Stopped at:** Phase 105 context gathered
+**Last session:** 2026-03-12T02:45:00.000Z
+**Stopped at:** Phase 105-01 plan complete
 
-**Next step:** `/bgsd plan phase 105` to create execution plans
+**Next step:** Phase 105 complete, ready for Phase 106
 
