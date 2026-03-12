@@ -100,7 +100,7 @@
 2. Unnecessary steps in command chain are removed
 3. Error messages include actionable suggestions for correction
 
-**Plans:** TBD
+**Plans:** 105-01 (wave 1, 3 tasks)
 
 ---
 
