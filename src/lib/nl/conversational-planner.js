@@ -9,11 +9,11 @@ const { parse: nlParse } = require('./nl-parser.js');
 /**
  * Parse goal description - main entry point
  * @param {string} text - User's goal description
- * @param {Object} options - Options {answers: {}}
+ * @param {Object} options - Options {answers: {}, bypassClarification: boolean}
  * @returns {Object} Parsed result with clarifying questions or requirements
  */
 function parseGoal(text, options = {}) {
-  const { answers } = options;
+  const { answers, bypassClarification = false } = options;
   
   if (!text || typeof text !== 'string') {
     return {
@@ -28,7 +28,7 @@ function parseGoal(text, options = {}) {
   // First check if it's a compound command
   const intentDetection = detectIntents(trimmed);
   if (intentDetection.isCompound) {
-    return handleCompoundCommand(trimmed);
+    return handleCompoundCommand(trimmed, { bypassClarification });
   }
 
   // Check if it looks like a goal description (natural language)
@@ -39,6 +39,17 @@ function parseGoal(text, options = {}) {
   if (isGoalDescription) {
     // Use requirement extractor
     const parsed = parseGoalDescription(trimmed);
+    
+    // If bypassClarification is true, skip clarifying questions and extract requirements directly
+    if (bypassClarification) {
+      const requirements = extractRequirements(trimmed, answers || {});
+      return {
+        type: 'requirements',
+        requirements,
+        suggestions: getSuggestions('planning')
+      };
+    }
+    
     const questions = generateClarifyingQuestions(parsed);
     
     if (questions.length > 0 && !answers) {
@@ -72,9 +83,11 @@ function parseGoal(text, options = {}) {
 /**
  * Handle compound commands using multi-intent-detector
  * @param {string} text - Compound command text
+ * @param {Object} options - Options {bypassClarification: boolean}
  * @returns {Object} Parsed result with intents
  */
-function handleCompoundCommand(text) {
+function handleCompoundCommand(text, options = {}) {
+  const { bypassClarification = false } = options;
   const parsed = parseCompoundCommand(text);
   const sequenced = sequenceIntents(parsed);
   const chain = buildSuggestionChain(sequenced);
@@ -82,7 +95,8 @@ function handleCompoundCommand(text) {
   // Check for missing phase numbers
   const missingPhase = sequenced.some(i => !i.target || i.target === 'current');
   
-  if (missingPhase && !text.match(/phase\s*\d+/i)) {
+  // If bypassClarification is true, skip asking for phase and use defaults
+  if (missingPhase && !text.match(/phase\s*\d+/i) && !bypassClarification) {
     return {
       type: 'needs_phase',
       message: 'Which phase?',

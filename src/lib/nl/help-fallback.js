@@ -6,15 +6,16 @@ const { INTENTS } = require('./command-registry.js');
 /**
  * Get fallback suggestions for unrecognized input
  * @param {string} input - User input
- * @param {Object} context - Optional context {intent, params, etc.}
+ * @param {Object} context - Optional context {intent, params, bypass: boolean}
  * @returns {Array} Array of suggestion objects grouped by category
  */
 function getFallbackSuggestions(input, context = {}) {
   const suggestions = [];
   const normalizedInput = (input || '').toLowerCase().trim();
   
-  // Get intent from context if available
+  // Get intent and bypass from context if available
   const intent = context.intent || null;
+  const bypass = context.bypass || false;
   
   // Build suggestions based on intents
   for (const [intentName, keywords] of Object.entries(INTENTS)) {
@@ -48,7 +49,8 @@ function getFallbackSuggestions(input, context = {}) {
   }
   
   // Add "did you mean" style suggestions if input is close to known commands
-  if (normalizedInput.length > 2) {
+  // Skip if bypass is true (direct command routing mode)
+  if (!bypass && normalizedInput.length > 2) {
     const didYouMean = generateDidYouMean(normalizedInput);
     if (didYouMean.length > 0) {
       suggestions.unshift({
