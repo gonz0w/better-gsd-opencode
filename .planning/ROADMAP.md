@@ -79,7 +79,9 @@
   3. User can see estimated token savings per candidate and per category, with total projected savings for the milestone
   4. Candidates that fail the rubric are explicitly marked as "keep in LLM" with rationale
 
-**Plans:** TBD
+**Plans:**
+- 110-01: Audit scanner, rubric scorer, token estimator, CLI command (wave 1, 3 tasks)
+- 110-02: TTY formatted output, catalog artifact, success criteria validation (wave 2, 2 tasks)
 
 ---
 
