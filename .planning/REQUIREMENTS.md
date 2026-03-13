@@ -2,8 +2,8 @@
 
 ## Test Suite Stabilization
 
-- [ ] **TEST-01**: User can run `npm test` and see all tests pass — Bun runtime banner suppressed in piped mode via `process.stdout.isTTY` guard
-- [ ] **TEST-02**: User can run tests without missing profiler module errors — profiler import paths resolved or mocked
+- [x] **TEST-01**: User can run `npm test` and see all tests pass — Bun runtime banner suppressed in piped mode via `process.stdout.isTTY` guard
+- [x] **TEST-02**: User can run tests without missing profiler module errors — profiler import paths resolved or mocked
 - [ ] **TEST-03**: User can run plugin tests in isolation — test setup handles missing plugin context gracefully
 - [ ] **TEST-04**: User can trust test assertions — stale infrastructure assertions updated to match current output
 - [ ] **TEST-05**: User can run config migration tests — expected migration outputs updated for current schema
