@@ -1,7 +1,7 @@
 import { getProjectState } from './project-state.js';
 import { parsePlans } from './parsers/index.js';
 import { evaluateDecisions } from '../lib/decision-rules.js';
-import { readdirSync, existsSync } from 'fs';
+import { readdirSync, existsSync, readFileSync } from 'fs';
 import { join } from 'path';
 
 /**
@@ -87,6 +87,9 @@ export function enrichCommand(input, output, cwd) {
   // Phase-aware detection: scan command parts for a phase number argument
   const phaseNum = detectPhaseArg(input.parts);
 
+  // Resolve effective phase number (explicit arg or current from STATE.md)
+  let effectivePhaseNum = phaseNum;
+
   if (phaseNum) {
     // Phase-specific enrichment
     const phaseDir = resolvePhaseDir(phaseNum, resolvedCwd);
@@ -125,6 +128,7 @@ export function enrichCommand(input, output, cwd) {
     const currentPhaseMatch = state.phase.match(/^(\d+)/);
     if (currentPhaseMatch) {
       const curPhaseNum = parseInt(currentPhaseMatch[1], 10);
+      effectivePhaseNum = curPhaseNum;
       enrichment.phase_number = String(curPhaseNum);
 
       if (currentPhase) {
@@ -137,6 +141,112 @@ export function enrichCommand(input, output, cwd) {
       }
     }
   }
+
+  // ─── Extended enrichment inputs for decision rules ─────────────────────────
+  // Purely additive — each derivation wrapped in try/catch
+
+  // Plan/summary counts (for progress-route, plan-existence-route rules)
+  try {
+    if (enrichment.phase_dir) {
+      const phaseDirFull = join(resolvedCwd, enrichment.phase_dir);
+      if (!enrichment.plans) {
+        // Plan enumeration may not have run in the else-if branch
+        const plans = parsePlans(effectivePhaseNum, resolvedCwd);
+        if (plans && plans.length > 0) {
+          enrichment.plans = plans.map(p => p.path ? p.path.split('/').pop() : null).filter(Boolean);
+          const summaryFiles = listSummaryFiles(phaseDirFull);
+          enrichment.incomplete_plans = enrichment.plans.filter(planFile => {
+            const summaryFile = planFile.replace('-PLAN.md', '-SUMMARY.md');
+            return !summaryFiles.includes(summaryFile);
+          });
+        }
+      }
+      enrichment.plan_count = enrichment.plans ? enrichment.plans.length : 0;
+      const summaryFiles = listSummaryFiles(phaseDirFull);
+      enrichment.summary_count = summaryFiles.length;
+
+      // UAT gap count: scan for *-UAT.md with "status: diagnosed"
+      try {
+        const allFiles = readdirSync(phaseDirFull);
+        const uatFiles = allFiles.filter(f => f.endsWith('-UAT.md'));
+        let uatGapCount = 0;
+        for (const uf of uatFiles) {
+          try {
+            const content = readFileSync(join(phaseDirFull, uf), 'utf-8');
+            if (content.includes('status: diagnosed')) uatGapCount++;
+          } catch { /* skip unreadable UAT files */ }
+        }
+        enrichment.uat_gap_count = uatGapCount;
+      } catch { enrichment.uat_gap_count = 0; }
+    }
+  } catch { /* plan/summary count derivation failed */ }
+
+  // File existence checks for plan-existence-route and state-assessment rules
+  try {
+    if (enrichment.phase_dir && effectivePhaseNum) {
+      const paddedPhase = String(effectivePhaseNum).padStart(4, '0');
+      enrichment.has_research = existsSync(join(resolvedCwd, enrichment.phase_dir, paddedPhase + '-RESEARCH.md'));
+      enrichment.has_context = existsSync(join(resolvedCwd, enrichment.phase_dir, paddedPhase + '-CONTEXT.md'));
+    }
+  } catch { /* file existence check failed */ }
+
+  // Task types for execution-pattern rule (from first incomplete plan)
+  try {
+    if (enrichment.incomplete_plans && enrichment.incomplete_plans.length > 0 && effectivePhaseNum) {
+      const plans = parsePlans(effectivePhaseNum, resolvedCwd);
+      if (plans && plans.length > 0) {
+        // Find the first incomplete plan by matching filenames
+        const firstIncompleteName = enrichment.incomplete_plans[0];
+        const incompletePlan = plans.find(p => p.path && p.path.endsWith(firstIncompleteName));
+        if (incompletePlan && incompletePlan.tasks) {
+          enrichment.task_types = incompletePlan.tasks.map(t => t.type).filter(Boolean);
+        }
+      }
+    }
+  } catch { /* task type extraction failed */ }
+
+  // State-assessment file existence
+  try {
+    enrichment.state_exists = existsSync(join(resolvedCwd, '.planning/STATE.md'));
+    enrichment.project_exists = existsSync(join(resolvedCwd, '.planning/PROJECT.md'));
+    enrichment.roadmap_exists = existsSync(join(resolvedCwd, '.planning/ROADMAP.md'));
+  } catch { /* state assessment failed */ }
+
+  // Current and highest phase numbers
+  try {
+    if (effectivePhaseNum) {
+      enrichment.current_phase = effectivePhaseNum;
+    }
+    if (roadmap && roadmap.phases && roadmap.phases.length > 0) {
+      enrichment.highest_phase = Math.max(...roadmap.phases.map(p => parseFloat(p.number)).filter(n => !isNaN(n)));
+    } else {
+      enrichment.highest_phase = null;
+    }
+  } catch { enrichment.highest_phase = null; }
+
+  // Previous summary checks (for previous-check-gate rule)
+  try {
+    if (enrichment.phase_dir) {
+      const phaseDirFull = join(resolvedCwd, enrichment.phase_dir);
+      const summaryFiles = listSummaryFiles(phaseDirFull);
+      enrichment.has_previous_summary = summaryFiles.length > 0;
+      if (summaryFiles.length > 0) {
+        const lastSummary = summaryFiles.sort().pop();
+        const content = readFileSync(join(phaseDirFull, lastSummary), 'utf-8');
+        enrichment.has_unresolved_issues = content.includes('unresolved') || content.includes('Unresolved');
+        enrichment.has_blockers = content.includes('blocker') || content.includes('Blocker');
+      } else {
+        enrichment.has_unresolved_issues = false;
+        enrichment.has_blockers = false;
+      }
+    }
+  } catch { /* previous summary check failed */ }
+
+  // CI gate inputs
+  try {
+    enrichment.ci_enabled = config ? Boolean(config.ci) : false;
+    enrichment.has_test_command = Boolean(config && config.test_command);
+  } catch { /* CI config check failed */ }
 
   // In-process decision evaluation (ENGINE-02: no subprocess overhead)
   try {

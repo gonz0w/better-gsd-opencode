@@ -1,12 +1,35 @@
+var __create = Object.create;
 var __defProp = Object.defineProperty;
+var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
 var __getOwnPropNames = Object.getOwnPropertyNames;
+var __getProtoOf = Object.getPrototypeOf;
+var __hasOwnProp = Object.prototype.hasOwnProperty;
 var __esm = (fn, res) => function __init() {
   return fn && (res = (0, fn[__getOwnPropNames(fn)[0]])(fn = 0)), res;
+};
+var __commonJS = (cb, mod) => function __require() {
+  return mod || (0, cb[__getOwnPropNames(cb)[0]])((mod = { exports: {} }).exports, mod), mod.exports;
 };
 var __export = (target, all) => {
   for (var name in all)
     __defProp(target, name, { get: all[name], enumerable: true });
 };
+var __copyProps = (to, from, except, desc) => {
+  if (from && typeof from === "object" || typeof from === "function") {
+    for (let key of __getOwnPropNames(from))
+      if (!__hasOwnProp.call(to, key) && key !== except)
+        __defProp(to, key, { get: () => from[key], enumerable: !(desc = __getOwnPropDesc(from, key)) || desc.enumerable });
+  }
+  return to;
+};
+var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__getProtoOf(mod)) : {}, __copyProps(
+  // If the importer is in node compatibility mode or this is not an ESM
+  // file that has been converted to a CommonJS file using a Babel-
+  // compatible transform (i.e. "__esModule" has not been set), then set
+  // "default" to the CommonJS "module.exports" for node compatibility.
+  isNodeMode || !mod || !mod.__esModule ? __defProp(target, "default", { value: mod, enumerable: true }) : target,
+  mod
+));
 
 // src/plugin/parsers/state.js
 import { readFileSync } from "fs";
@@ -661,6 +684,366 @@ var init_parsers = __esm({
   }
 });
 
+// src/lib/decision-rules.js
+var require_decision_rules = __commonJS({
+  "src/lib/decision-rules.js"(exports, module) {
+    function resolveContextGate(state) {
+      const present = Boolean(state && state.context_present);
+      return { value: present, confidence: "HIGH", rule_id: "context-gate" };
+    }
+    function resolveProgressRoute(state) {
+      const {
+        plan_count = 0,
+        summary_count = 0,
+        uat_gap_count = 0,
+        current_phase,
+        highest_phase,
+        roadmap_exists = false,
+        project_exists = false,
+        state_exists = false
+      } = state || {};
+      if (!state_exists && !roadmap_exists && !project_exists) {
+        return { value: "no-project", confidence: "HIGH", rule_id: "progress-route" };
+      }
+      if (!state_exists) {
+        return { value: "no-state", confidence: "HIGH", rule_id: "progress-route" };
+      }
+      if (!roadmap_exists && project_exists) {
+        return { value: "F", confidence: "HIGH", rule_id: "progress-route" };
+      }
+      if (uat_gap_count > 0) {
+        return { value: "E", confidence: "HIGH", rule_id: "progress-route" };
+      }
+      if (summary_count < plan_count) {
+        return { value: "A", confidence: "HIGH", rule_id: "progress-route" };
+      }
+      if (summary_count === plan_count && plan_count > 0) {
+        return current_phase < highest_phase ? { value: "C", confidence: "HIGH", rule_id: "progress-route" } : { value: "D", confidence: "HIGH", rule_id: "progress-route" };
+      }
+      if (plan_count === 0) {
+        return { value: "B", confidence: "HIGH", rule_id: "progress-route" };
+      }
+      return { value: "F", confidence: "MEDIUM", rule_id: "progress-route" };
+    }
+    function resolveResumeRoute(state) {
+      const {
+        has_state = false,
+        has_roadmap = false,
+        has_plans = false,
+        has_incomplete_plans = false,
+        has_blockers = false,
+        phase_complete = false
+      } = state || {};
+      if (!has_state) {
+        return { value: "initialize", confidence: "HIGH", rule_id: "resume-route" };
+      }
+      if (has_blockers) {
+        return { value: "resolve-blockers", confidence: "HIGH", rule_id: "resume-route" };
+      }
+      if (has_incomplete_plans) {
+        return { value: "continue-execution", confidence: "HIGH", rule_id: "resume-route" };
+      }
+      if (phase_complete && has_roadmap) {
+        return { value: "next-phase", confidence: "HIGH", rule_id: "resume-route" };
+      }
+      if (has_plans && !has_incomplete_plans) {
+        return { value: "verify-or-advance", confidence: "MEDIUM", rule_id: "resume-route" };
+      }
+      if (!has_plans && has_roadmap) {
+        return { value: "plan-phase", confidence: "HIGH", rule_id: "resume-route" };
+      }
+      return { value: "review-state", confidence: "MEDIUM", rule_id: "resume-route" };
+    }
+    function resolveExecutionPattern(state) {
+      const { task_types = [] } = state || {};
+      const hasDecisionCheckpoints = task_types.some(
+        (t) => typeof t === "string" && t.startsWith("checkpoint:decision")
+      );
+      const hasOtherCheckpoints = task_types.some(
+        (t) => typeof t === "string" && t.startsWith("checkpoint:") && !t.startsWith("checkpoint:decision")
+      );
+      if (hasDecisionCheckpoints) {
+        return { value: "C", confidence: "HIGH", rule_id: "execution-pattern" };
+      }
+      if (hasOtherCheckpoints) {
+        return { value: "B", confidence: "HIGH", rule_id: "execution-pattern" };
+      }
+      return { value: "A", confidence: "HIGH", rule_id: "execution-pattern" };
+    }
+    function resolveContextBudgetGate(state) {
+      const { warning = false, mode = "interactive" } = state || {};
+      if (!warning) {
+        return { value: "proceed", confidence: "HIGH", rule_id: "context-budget-gate" };
+      }
+      if (mode === "yolo") {
+        return { value: "warn", confidence: "HIGH", rule_id: "context-budget-gate" };
+      }
+      return { value: "stop", confidence: "HIGH", rule_id: "context-budget-gate" };
+    }
+    function resolvePreviousCheckGate(state) {
+      const {
+        has_previous_summary = false,
+        has_unresolved_issues = false,
+        has_blockers = false
+      } = state || {};
+      if (!has_previous_summary) {
+        return { value: "proceed", confidence: "HIGH", rule_id: "previous-check-gate" };
+      }
+      if (has_blockers) {
+        return { value: "block", confidence: "HIGH", rule_id: "previous-check-gate" };
+      }
+      if (has_unresolved_issues) {
+        return { value: "warn", confidence: "HIGH", rule_id: "previous-check-gate" };
+      }
+      return { value: "proceed", confidence: "HIGH", rule_id: "previous-check-gate" };
+    }
+    function resolveCiGate(state) {
+      const {
+        ci_enabled = false,
+        has_test_command = false,
+        tests_passing = true
+      } = state || {};
+      if (!ci_enabled) {
+        return { value: "skip", confidence: "HIGH", rule_id: "ci-gate" };
+      }
+      if (!has_test_command) {
+        return { value: "warn", confidence: "HIGH", rule_id: "ci-gate" };
+      }
+      if (!tests_passing) {
+        return { value: "warn", confidence: "HIGH", rule_id: "ci-gate" };
+      }
+      return { value: "run", confidence: "HIGH", rule_id: "ci-gate" };
+    }
+    function resolvePlanExistenceRoute(state) {
+      const {
+        plan_count = 0,
+        has_research = false,
+        has_context = false
+      } = state || {};
+      if (plan_count > 0) {
+        return { value: "has-plans", confidence: "HIGH", rule_id: "plan-existence-route" };
+      }
+      if (has_research || has_context) {
+        return { value: "needs-planning", confidence: "HIGH", rule_id: "plan-existence-route" };
+      }
+      return { value: "needs-research", confidence: "HIGH", rule_id: "plan-existence-route" };
+    }
+    function resolveBranchHandling(state) {
+      const {
+        branching_strategy = "none",
+        has_branch = false,
+        branch_behind = false
+      } = state || {};
+      if (branching_strategy === "none") {
+        return { value: "skip", confidence: "HIGH", rule_id: "branch-handling" };
+      }
+      if (!has_branch) {
+        return { value: "create", confidence: "MEDIUM", rule_id: "branch-handling" };
+      }
+      if (branch_behind) {
+        return { value: "update", confidence: "MEDIUM", rule_id: "branch-handling" };
+      }
+      return { value: "use-existing", confidence: "MEDIUM", rule_id: "branch-handling" };
+    }
+    function resolveAutoAdvance(state) {
+      const {
+        auto_advance_config = false,
+        auto_flag = false
+      } = state || {};
+      const shouldAdvance = Boolean(auto_advance_config || auto_flag);
+      return { value: shouldAdvance, confidence: "HIGH", rule_id: "auto-advance" };
+    }
+    function resolvePhaseArgParse(state) {
+      const { raw_arg } = state || {};
+      if (raw_arg === void 0 || raw_arg === null || raw_arg === "") {
+        return { value: null, confidence: "HIGH", rule_id: "phase-arg-parse" };
+      }
+      const str = String(raw_arg).trim();
+      const match = str.match(/^(?:phase\s+)?(\d+(?:\.\d+)?)/i);
+      if (match) {
+        const num = parseFloat(match[1]);
+        if (!isNaN(num) && num > 0) {
+          return { value: num, confidence: "HIGH", rule_id: "phase-arg-parse" };
+        }
+      }
+      return { value: null, confidence: "HIGH", rule_id: "phase-arg-parse" };
+    }
+    function resolveDebugHandlerRoute(state) {
+      const { return_type } = state || {};
+      if (!return_type || typeof return_type !== "string") {
+        return { value: "manual", confidence: "MEDIUM", rule_id: "debug-handler-route" };
+      }
+      const type = return_type.toLowerCase();
+      if (type === "fix" || type === "auto-fix") {
+        return { value: "fix", confidence: "MEDIUM", rule_id: "debug-handler-route" };
+      }
+      if (type === "plan" || type === "needs-plan") {
+        return { value: "plan", confidence: "MEDIUM", rule_id: "debug-handler-route" };
+      }
+      if (type === "continue" || type === "resolved") {
+        return { value: "continue", confidence: "MEDIUM", rule_id: "debug-handler-route" };
+      }
+      return { value: "manual", confidence: "MEDIUM", rule_id: "debug-handler-route" };
+    }
+    var DECISION_REGISTRY = [
+      {
+        id: "context-gate",
+        name: "Context Gate Check",
+        category: "state-assessment",
+        description: "Checks if bgsd-context is present (enricher loaded)",
+        inputs: ["context_present"],
+        outputs: ["boolean"],
+        confidence_range: ["HIGH"],
+        resolve: resolveContextGate
+      },
+      {
+        id: "progress-route",
+        name: "Progress Workflow Route Selection",
+        category: "workflow-routing",
+        description: "Determines which route (A-F) the progress workflow should take",
+        inputs: ["plan_count", "summary_count", "uat_gap_count", "current_phase", "highest_phase", "roadmap_exists", "project_exists", "state_exists"],
+        outputs: ["route_letter"],
+        confidence_range: ["HIGH", "MEDIUM"],
+        resolve: resolveProgressRoute
+      },
+      {
+        id: "resume-route",
+        name: "Resume Project Next-Action",
+        category: "workflow-routing",
+        description: "Determines the next action when resuming a project",
+        inputs: ["has_state", "has_roadmap", "has_plans", "has_incomplete_plans", "has_blockers", "phase_complete"],
+        outputs: ["action_string"],
+        confidence_range: ["HIGH", "MEDIUM"],
+        resolve: resolveResumeRoute
+      },
+      {
+        id: "execution-pattern",
+        name: "Execution Pattern Selection",
+        category: "execution-mode",
+        description: "Determines execute-plan Pattern A/B/C based on task types",
+        inputs: ["task_types"],
+        outputs: ["pattern_letter"],
+        confidence_range: ["HIGH"],
+        resolve: resolveExecutionPattern
+      },
+      {
+        id: "context-budget-gate",
+        name: "Context Budget Warning Gate",
+        category: "state-assessment",
+        description: "Checks if plan execution should proceed based on context budget",
+        inputs: ["warning", "mode"],
+        outputs: ["proceed_warn_stop"],
+        confidence_range: ["HIGH"],
+        resolve: resolveContextBudgetGate
+      },
+      {
+        id: "previous-check-gate",
+        name: "Previous Summary Blocker Check",
+        category: "state-assessment",
+        description: "Checks if previous SUMMARY has unresolved issues or blockers",
+        inputs: ["has_previous_summary", "has_unresolved_issues", "has_blockers"],
+        outputs: ["proceed_warn_block"],
+        confidence_range: ["HIGH"],
+        resolve: resolvePreviousCheckGate
+      },
+      {
+        id: "ci-gate",
+        name: "CI Quality Gate Check",
+        category: "execution-mode",
+        description: "Determines whether to run CI, skip, or warn about configuration",
+        inputs: ["ci_enabled", "has_test_command", "tests_passing"],
+        outputs: ["run_skip_warn"],
+        confidence_range: ["HIGH"],
+        resolve: resolveCiGate
+      },
+      {
+        id: "plan-existence-route",
+        name: "Plan Existence Route",
+        category: "workflow-routing",
+        description: "Determines if a phase has plans or needs planning/research",
+        inputs: ["plan_count", "has_research", "has_context"],
+        outputs: ["routing_advice"],
+        confidence_range: ["HIGH"],
+        resolve: resolvePlanExistenceRoute
+      },
+      {
+        id: "branch-handling",
+        name: "Branch Merge Strategy",
+        category: "configuration",
+        description: "Determines branch handling strategy based on config and state",
+        inputs: ["branching_strategy", "has_branch", "branch_behind"],
+        outputs: ["strategy"],
+        confidence_range: ["HIGH", "MEDIUM"],
+        resolve: resolveBranchHandling
+      },
+      {
+        id: "auto-advance",
+        name: "Auto-Advance Config Check",
+        category: "configuration",
+        description: "Determines if plan should auto-advance to next plan after completion",
+        inputs: ["auto_advance_config", "auto_flag"],
+        outputs: ["boolean"],
+        confidence_range: ["HIGH"],
+        resolve: resolveAutoAdvance
+      },
+      {
+        id: "phase-arg-parse",
+        name: "Phase Argument Parser",
+        category: "argument-parsing",
+        description: "Parses a raw argument string into a phase number",
+        inputs: ["raw_arg"],
+        outputs: ["number_or_null"],
+        confidence_range: ["HIGH"],
+        resolve: resolvePhaseArgParse
+      },
+      {
+        id: "debug-handler-route",
+        name: "Debug Return Handler Route",
+        category: "workflow-routing",
+        description: "Determines action based on debug return type (fix/plan/manual/continue)",
+        inputs: ["return_type"],
+        outputs: ["action_string"],
+        confidence_range: ["MEDIUM"],
+        resolve: resolveDebugHandlerRoute
+      }
+    ];
+    function evaluateDecisions2(command, state) {
+      if (!state || typeof state !== "object") return {};
+      const results = {};
+      const stateKeys = new Set(Object.keys(state));
+      for (const rule of DECISION_REGISTRY) {
+        const hasInput = rule.inputs.some((input) => stateKeys.has(input));
+        if (hasInput) {
+          try {
+            results[rule.id] = rule.resolve(state);
+          } catch (_e) {
+            results[rule.id] = { value: null, confidence: "LOW", rule_id: rule.id, error: true };
+          }
+        }
+      }
+      return results;
+    }
+    module.exports = {
+      // Individual decision functions
+      resolveContextGate,
+      resolveProgressRoute,
+      resolveResumeRoute,
+      resolveExecutionPattern,
+      resolveContextBudgetGate,
+      resolvePreviousCheckGate,
+      resolveCiGate,
+      resolvePlanExistenceRoute,
+      resolveBranchHandling,
+      resolveAutoAdvance,
+      resolvePhaseArgParse,
+      resolveDebugHandlerRoute,
+      // Registry and aggregator
+      DECISION_REGISTRY,
+      evaluateDecisions: evaluateDecisions2
+    };
+  }
+});
+
 // src/plugin/index.js
 import { join as join16 } from "path";
 import { homedir as homedir7 } from "os";
@@ -1170,7 +1553,8 @@ ${parts.join("\n")}
 
 // src/plugin/command-enricher.js
 init_parsers();
-import { readdirSync as readdirSync2, existsSync as existsSync2 } from "fs";
+var import_decision_rules = __toESM(require_decision_rules());
+import { readdirSync as readdirSync2, existsSync as existsSync2, readFileSync as readFileSync7 } from "fs";
 import { join as join9 } from "path";
 function enrichCommand(input, output, cwd) {
   if (!input || !output) return;
@@ -1217,6 +1601,7 @@ function enrichCommand(input, output, cwd) {
     milestone_name: currentMilestone ? currentMilestone.name : null
   };
   const phaseNum = detectPhaseArg(input.parts);
+  let effectivePhaseNum = phaseNum;
   if (phaseNum) {
     const phaseDir = resolvePhaseDir(phaseNum, resolvedCwd);
     if (phaseDir) {
@@ -1248,6 +1633,7 @@ function enrichCommand(input, output, cwd) {
     const currentPhaseMatch = state.phase.match(/^(\d+)/);
     if (currentPhaseMatch) {
       const curPhaseNum = parseInt(currentPhaseMatch[1], 10);
+      effectivePhaseNum = curPhaseNum;
       enrichment.phase_number = String(curPhaseNum);
       if (currentPhase) {
         enrichment.phase_name = currentPhase.name;
@@ -1257,6 +1643,109 @@ function enrichCommand(input, output, cwd) {
         enrichment.phase_dir = phaseDir;
       }
     }
+  }
+  try {
+    if (enrichment.phase_dir) {
+      const phaseDirFull = join9(resolvedCwd, enrichment.phase_dir);
+      if (!enrichment.plans) {
+        const plans = parsePlans(effectivePhaseNum, resolvedCwd);
+        if (plans && plans.length > 0) {
+          enrichment.plans = plans.map((p) => p.path ? p.path.split("/").pop() : null).filter(Boolean);
+          const summaryFiles2 = listSummaryFiles(phaseDirFull);
+          enrichment.incomplete_plans = enrichment.plans.filter((planFile) => {
+            const summaryFile = planFile.replace("-PLAN.md", "-SUMMARY.md");
+            return !summaryFiles2.includes(summaryFile);
+          });
+        }
+      }
+      enrichment.plan_count = enrichment.plans ? enrichment.plans.length : 0;
+      const summaryFiles = listSummaryFiles(phaseDirFull);
+      enrichment.summary_count = summaryFiles.length;
+      try {
+        const allFiles = readdirSync2(phaseDirFull);
+        const uatFiles = allFiles.filter((f) => f.endsWith("-UAT.md"));
+        let uatGapCount = 0;
+        for (const uf of uatFiles) {
+          try {
+            const content = readFileSync7(join9(phaseDirFull, uf), "utf-8");
+            if (content.includes("status: diagnosed")) uatGapCount++;
+          } catch {
+          }
+        }
+        enrichment.uat_gap_count = uatGapCount;
+      } catch {
+        enrichment.uat_gap_count = 0;
+      }
+    }
+  } catch {
+  }
+  try {
+    if (enrichment.phase_dir && effectivePhaseNum) {
+      const paddedPhase = String(effectivePhaseNum).padStart(4, "0");
+      enrichment.has_research = existsSync2(join9(resolvedCwd, enrichment.phase_dir, paddedPhase + "-RESEARCH.md"));
+      enrichment.has_context = existsSync2(join9(resolvedCwd, enrichment.phase_dir, paddedPhase + "-CONTEXT.md"));
+    }
+  } catch {
+  }
+  try {
+    if (enrichment.incomplete_plans && enrichment.incomplete_plans.length > 0 && effectivePhaseNum) {
+      const plans = parsePlans(effectivePhaseNum, resolvedCwd);
+      if (plans && plans.length > 0) {
+        const firstIncompleteName = enrichment.incomplete_plans[0];
+        const incompletePlan = plans.find((p) => p.path && p.path.endsWith(firstIncompleteName));
+        if (incompletePlan && incompletePlan.tasks) {
+          enrichment.task_types = incompletePlan.tasks.map((t) => t.type).filter(Boolean);
+        }
+      }
+    }
+  } catch {
+  }
+  try {
+    enrichment.state_exists = existsSync2(join9(resolvedCwd, ".planning/STATE.md"));
+    enrichment.project_exists = existsSync2(join9(resolvedCwd, ".planning/PROJECT.md"));
+    enrichment.roadmap_exists = existsSync2(join9(resolvedCwd, ".planning/ROADMAP.md"));
+  } catch {
+  }
+  try {
+    if (effectivePhaseNum) {
+      enrichment.current_phase = effectivePhaseNum;
+    }
+    if (roadmap && roadmap.phases && roadmap.phases.length > 0) {
+      enrichment.highest_phase = Math.max(...roadmap.phases.map((p) => parseFloat(p.number)).filter((n) => !isNaN(n)));
+    } else {
+      enrichment.highest_phase = null;
+    }
+  } catch {
+    enrichment.highest_phase = null;
+  }
+  try {
+    if (enrichment.phase_dir) {
+      const phaseDirFull = join9(resolvedCwd, enrichment.phase_dir);
+      const summaryFiles = listSummaryFiles(phaseDirFull);
+      enrichment.has_previous_summary = summaryFiles.length > 0;
+      if (summaryFiles.length > 0) {
+        const lastSummary = summaryFiles.sort().pop();
+        const content = readFileSync7(join9(phaseDirFull, lastSummary), "utf-8");
+        enrichment.has_unresolved_issues = content.includes("unresolved") || content.includes("Unresolved");
+        enrichment.has_blockers = content.includes("blocker") || content.includes("Blocker");
+      } else {
+        enrichment.has_unresolved_issues = false;
+        enrichment.has_blockers = false;
+      }
+    }
+  } catch {
+  }
+  try {
+    enrichment.ci_enabled = config ? Boolean(config.ci) : false;
+    enrichment.has_test_command = Boolean(config && config.test_command);
+  } catch {
+  }
+  try {
+    const decisions = (0, import_decision_rules.evaluateDecisions)(command, enrichment);
+    if (decisions && Object.keys(decisions).length > 0) {
+      enrichment.decisions = decisions;
+    }
+  } catch {
   }
   if (output.parts) {
     output.parts.unshift({
@@ -1688,7 +2177,7 @@ var bgsd_validate = {
 import { z as z3 } from "zod";
 init_state();
 init_plan();
-import { readFileSync as readFileSync7, writeFileSync as writeFileSync2, mkdirSync as mkdirSync2, rmdirSync, existsSync as existsSync3, statSync as statSync2 } from "fs";
+import { readFileSync as readFileSync8, writeFileSync as writeFileSync2, mkdirSync as mkdirSync2, rmdirSync, existsSync as existsSync3, statSync as statSync2 } from "fs";
 import { join as join10 } from "path";
 var LOCK_STALE_MS = 1e4;
 var VALID_ACTIONS = ["complete-task", "uncomplete-task", "add-blocker", "remove-blocker", "record-decision", "advance"];
@@ -1755,7 +2244,7 @@ var bgsd_progress = {
       }
       try {
         const statePath = join10(projectDir, ".planning", "STATE.md");
-        let content = readFileSync7(statePath, "utf-8");
+        let content = readFileSync8(statePath, "utf-8");
         const { state } = projectState;
         let actionResult = null;
         switch (args.action) {
@@ -2180,7 +2669,7 @@ function createFileWatcher(cwd, options = {}) {
 }
 
 // src/plugin/idle-validator.js
-import { existsSync as existsSync5, readFileSync as readFileSync8, writeFileSync as writeFileSync3 } from "fs";
+import { existsSync as existsSync5, readFileSync as readFileSync9, writeFileSync as writeFileSync3 } from "fs";
 import { join as join13 } from "path";
 import { execSync } from "child_process";
 import { homedir as homedir4 } from "os";
@@ -2205,14 +2694,14 @@ function createIdleValidator(cwd, notifier, fileWatcher, config) {
   }
   function readStateMd() {
     try {
-      return readFileSync8(join13(planningDir, "STATE.md"), "utf-8");
+      return readFileSync9(join13(planningDir, "STATE.md"), "utf-8");
     } catch {
       return null;
     }
   }
   function readRoadmapMd() {
     try {
-      return readFileSync8(join13(planningDir, "ROADMAP.md"), "utf-8");
+      return readFileSync9(join13(planningDir, "ROADMAP.md"), "utf-8");
     } catch {
       return null;
     }
@@ -2313,7 +2802,7 @@ function createIdleValidator(cwd, notifier, fileWatcher, config) {
         const configPath = join13(planningDir, "config.json");
         if (existsSync5(configPath)) {
           try {
-            const raw = readFileSync8(configPath, "utf-8");
+            const raw = readFileSync9(configPath, "utf-8");
             JSON.parse(raw);
           } catch {
             const defaults = {
@@ -2483,7 +2972,7 @@ function createStuckDetector(notifier, config) {
 }
 
 // src/plugin/advisory-guardrails.js
-import { readFileSync as readFileSync9 } from "fs";
+import { readFileSync as readFileSync10 } from "fs";
 import { join as join15, basename, extname, isAbsolute, resolve } from "path";
 import { homedir as homedir6 } from "os";
 var NAMING_PATTERNS = {
@@ -2540,7 +3029,7 @@ function isTestFile(filePath) {
 function loadConventionRules(cwd, confidenceThreshold) {
   try {
     const agentsPath = join15(cwd, "AGENTS.md");
-    const content = readFileSync9(agentsPath, "utf-8");
+    const content = readFileSync10(agentsPath, "utf-8");
     const conventionNames = ["kebab-case", "camelCase", "PascalCase", "snake_case", "UPPER_SNAKE_CASE"];
     for (const conv of conventionNames) {
       if (content.includes(conv)) {
@@ -2551,7 +3040,7 @@ function loadConventionRules(cwd, confidenceThreshold) {
   }
   try {
     const intelPath = join15(cwd, ".planning", "codebase", "codebase-intel.json");
-    const intel = JSON.parse(readFileSync9(intelPath, "utf-8"));
+    const intel = JSON.parse(readFileSync10(intelPath, "utf-8"));
     if (intel.conventions?.naming?.dominant && (intel.conventions.naming.confidence || 0) >= confidenceThreshold) {
       return {
         dominant: intel.conventions.naming.dominant,
@@ -2566,7 +3055,7 @@ function detectTestConfig(cwd) {
   const result = { command: null, sourceExts: /* @__PURE__ */ new Set() };
   try {
     const pkgPath = join15(cwd, "package.json");
-    const pkg = JSON.parse(readFileSync9(pkgPath, "utf-8"));
+    const pkg = JSON.parse(readFileSync10(pkgPath, "utf-8"));
     if (pkg.scripts?.test) {
       result.command = `npm test`;
     } else if (pkg.scripts?.check) {
@@ -2578,7 +3067,7 @@ function detectTestConfig(cwd) {
   if (!result.command) {
     try {
       const pyProject = join15(cwd, "pyproject.toml");
-      readFileSync9(pyProject, "utf-8");
+      readFileSync10(pyProject, "utf-8");
       result.command = "pytest";
       result.sourceExts = /* @__PURE__ */ new Set([".py"]);
     } catch {
