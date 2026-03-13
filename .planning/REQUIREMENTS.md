@@ -54,22 +54,22 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status | Test Command |
 |-------------|-------|--------|--------------|
-| AUDIT-01 | TBD | Pending | npm test |
-| AUDIT-02 | TBD | Pending | npm test |
-| AUDIT-03 | TBD | Pending | npm test |
-| ENGINE-01 | TBD | Pending | npm test |
-| ENGINE-02 | TBD | Pending | npm test |
-| ENGINE-03 | TBD | Pending | npm test |
-| ENGINE-04 | TBD | Pending | npm test |
-| FLOW-01 | TBD | Pending | npm test |
-| FLOW-02 | TBD | Pending | npm test |
-| FLOW-03 | TBD | Pending | npm test |
+| AUDIT-01 | Phase 110 | Pending | npm test |
+| AUDIT-02 | Phase 110 | Pending | npm test |
+| AUDIT-03 | Phase 110 | Pending | npm test |
+| ENGINE-01 | Phase 111 | Pending | npm test |
+| ENGINE-02 | Phase 111 | Pending | npm test |
+| ENGINE-03 | Phase 111 | Pending | npm test |
+| ENGINE-04 | Phase 111 | Pending | npm test |
+| FLOW-01 | Phase 112 | Pending | npm test |
+| FLOW-02 | Phase 112 | Pending | npm test |
+| FLOW-03 | Phase 112 | Pending | npm test |
 
 **Coverage:**
 - v11.3 requirements: 10 total
-- Mapped to phases: 0
-- Unmapped: 10
+- Mapped to phases: 10
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-03-13*
-*Last updated: 2026-03-13 after initial definition*
+*Last updated: 2026-03-13 after roadmap creation*

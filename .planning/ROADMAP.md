@@ -2,6 +2,10 @@
 
 ## Milestones
 
+- 🆕 **v11.3 LLM Offloading** - Phases 110-112 (2026-03-13)
+  - Phase 110: Audit & Decision Framework — Scan codebase, catalog offloading candidates, establish rubric
+  - Phase 111: Decision Engine & Enrichment — Build decision-rules.js, decision engine, CLI command, confidence model
+  - Phase 112: Workflow Integration & Measurement — Extend bgsd-context, simplify workflows, measure token savings
 - 🆕 **v11.2 Code Cleanup** - Phases 106-109 (2026-03-12)
   - ✅ Phase 106: Code Cleanup — Remove verify:orphans, profiler, test infrastructure
   - Phase 107: Unused Exports Cleanup — Find and remove unused exports from src/
@@ -30,6 +34,9 @@
 
 ## Phases
 
+- [ ] **Phase 110: Audit & Decision Framework** — Scan codebase for LLM-offloadable decisions, catalog candidates with rubric scoring, estimate token savings
+- [ ] **Phase 111: Decision Engine & Enrichment** — Build shared decision-rules.js module, in-process decision engine, CLI decisions command, progressive confidence model
+- [ ] **Phase 112: Workflow Integration & Measurement** — Extend bgsd-context with pre-computed decisions, simplify workflows, measure before/after token savings
 - [ ] **Phase 106: Code Cleanup** — Remove verify:orphans, profiler, test infrastructure from bundle
 - [ ] **Phase 107: Unused Exports Cleanup** — Find and remove unused exports from src/ directory
 - [ ] **Phase 108: Dead Code Removal** — Find and remove unreachable code paths
@@ -52,12 +59,63 @@
 
 ---
 
-*Roadmap updated: 2026-03-12*
-*Ready for: /bgsd plan phase 106*
+*Roadmap updated: 2026-03-13*
+*Ready for: /bgsd plan phase 110*
 
 ---
 
 # Phase Details
+
+### Phase 110: Audit & Decision Framework
+**Goal:** Catalog all LLM-offloadable decisions in the codebase with honest scoring against a decision criteria rubric, producing a prioritized catalog with token savings estimates
+
+**Depends on:** Nothing (first phase of v11.3)
+
+**Requirements:** AUDIT-01, AUDIT-02, AUDIT-03
+
+**Success Criteria** (what must be TRUE):
+  1. User can run a CLI scan command that identifies every decision point across workflows and agents where the LLM is doing work that code could handle
+  2. Each identified candidate has a rubric score showing whether it passes the 3 critical criteria (finite inputs, deterministic output, no NLU needed) plus 4 preferred criteria
+  3. User can see estimated token savings per candidate and per category, with total projected savings for the milestone
+  4. Candidates that fail the rubric are explicitly marked as "keep in LLM" with rationale
+
+**Plans:** TBD
+
+---
+
+### Phase 111: Decision Engine & Enrichment
+**Goal:** Build the programmatic decision infrastructure — shared rules module, in-process engine, CLI access, and confidence-gated fallback — so deterministic decisions are resolved by code instead of LLM
+
+**Depends on:** Phase 110 (needs catalog of validated candidates to implement)
+
+**Requirements:** ENGINE-01, ENGINE-02, ENGINE-03, ENGINE-04
+
+**Success Criteria** (what must be TRUE):
+  1. A shared `decision-rules.js` module provides pure functions (lookup tables, weighted scoring, template functions) that resolve deterministic decisions without LLM involvement
+  2. The plugin's decision engine evaluates rules in-process during existing hooks — no new subprocess overhead for decision resolution
+  3. User can run `decisions` CLI command to query what decisions are available, inspect their logic, and debug resolution for a given state
+  4. Every decision returns `{value, confidence}` where HIGH confidence is authoritative, MEDIUM invites LLM confirmation, and LOW falls back to LLM — no decision kills the LLM escape hatch
+  5. Contract tests validate output format for every offloaded decision to prevent regression avalanche
+
+**Plans:** TBD
+
+---
+
+### Phase 112: Workflow Integration & Measurement
+**Goal:** Connect the decision engine to workflows via bgsd-context enrichment and validate real-world token savings with before/after telemetry
+
+**Depends on:** Phase 111 (workflows can't consume pre-computed decisions until the engine exists)
+
+**Requirements:** FLOW-01, FLOW-02, FLOW-03
+
+**Success Criteria** (what must be TRUE):
+  1. The `<bgsd-context>` JSON injected into workflows includes a `decisions` field with pre-computed routing, paths, execution plans, and other resolved decisions
+  2. Workflow .md files are simplified to consume pre-computed decisions from context instead of re-deriving them via LLM reasoning — measurably fewer LLM reasoning steps per workflow
+  3. Token savings telemetry captures before/after LLM call counts per workflow, with total savings reported and compared against Phase 110 estimates
+
+**Plans:** TBD
+
+---
 
 ### Phase 103: Direct Command Routing
 
@@ -412,6 +470,9 @@
 
 | Phase | Requirements | Count | Status | Completed |
 |-------|--------------|-------|--------|-----------|
+| 110 | AUDIT-01, AUDIT-02, AUDIT-03 | 3 | Not Started | - |
+| 111 | ENGINE-01, ENGINE-02, ENGINE-03, ENGINE-04 | 4 | Not Started | - |
+| 112 | FLOW-01, FLOW-02, FLOW-03 | 3 | Not Started | - |
 | 106 | CLEAN-01, CLEAN-02, CLEAN-03, CLEAN-04, CLEAN-05 | 5 | Complete | 2026-03-12 |
 | 107 | UNUSED-01, UNUSED-02, UNUSED-03 | 3 | Not Started | - |
 | 108 | DEAD-01, DEAD-02, DEAD-03 | 3 | Not Started | - |
@@ -432,5 +493,5 @@
 | 104 | 1/3 | In Progress|  | - |
 | 105 | POLY-01, POLY-02, POLY-03 | 3 | Not Started | - |
 
-**Total: 15 requirements across 4 v11.2 phases | 54 requirements across 22 phases total**
+**Total: 10 v11.3 requirements across 3 phases | 64 requirements across 25 phases total**
 
