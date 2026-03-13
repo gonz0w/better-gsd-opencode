@@ -49,6 +49,7 @@ if (!process.env.BGSD_RUNTIME_DETECTED) {
  */
 function showRuntimeBanner(runtime, verbose = false) {
   if (!runtime) return;
+  if (!process.stdout.isTTY) return;
   
   const isBun = runtime.available && runtime.preference !== 'node';
   const isFallback = runtime.preference === 'node' || (runtime.preference === 'auto' && !runtime.available);
