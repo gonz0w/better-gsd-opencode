@@ -2,7 +2,7 @@
 
 ## What This Is
 
-A single-file Node.js CLI built from 34 organized `src/` modules via esbuild, producing `bin/bgsd-tools.cjs`. It provides structured data operations for AI-driven project planning workflows running in the host editor. Seventeen versions shipped: v1.0 (test suite, module split, observability), v1.1 (context reduction — 46.7% CLI, 54.6% workflow, 67% reference compression), v2.0 (state validation, cross-session memory, quality scoring), v3.0 (intent engineering — INTENT.md, drift validation, workflow injection), v4.0 (environment awareness, MCP profiling, worktree parallelism), v5.0 (codebase intelligence — convention extraction, dependency graphs, lifecycle awareness), v6.0 (UX overhaul — shared formatting engine, TTY-aware smart output, branded CLI), v7.0 (agent orchestration — AST intelligence, task routing, context efficiency, TDD execution, review gates), v7.1 (trajectory engineering — checkpoint, pivot, compare, choose, decision journal, dead-end detection), v8.0 (performance & agent architecture — SQLite caching, agent consolidation 11→9, namespace routing, profiler instrumentation, token budgets, RACI matrix), v8.1 (RAG-powered research — YouTube integration, NotebookLM synthesis, multi-source orchestration, 4-tier degradation, session persistence), v8.2 (cleanup & validation — dead code removal, namespace-only routing, 24-40% init speedup, RACI handoff contracts), v8.3 (agent quality & skills — OpenCode skills architecture with 27 skills and 52.4% agent line reduction, agent consistency audit, GitHub CI agent overhaul, 766 tests fully green), v9.0 (embedded plugin experience — always-on context injection, native LLM tools, event-driven sync, advisory guardrails), v9.1 (performance acceleration — valibot validation, fast-glob discovery, compile-cache, SQLite statement caching, safe adoption controls), v9.2 (CLI tool integrations — ripgrep, fd, jq, yq, bat, gh, Bun runtime), v9.3 (quality, performance & agent sharpening — command consolidation, deterministic context, Bun validation, benchmark adapter), and v10.0 (agent intelligence & UX — planning/verification/execution intelligence, multi-agent collaboration, rich TTY output, interactive workflows).
+A single-file Node.js CLI built from 53 organized `src/` modules via esbuild, producing `bin/bgsd-tools.cjs`. It provides structured data operations for AI-driven project planning workflows running in the host editor. Eighteen versions shipped: v1.0 (test suite, module split, observability), v1.1 (context reduction — 46.7% CLI, 54.6% workflow, 67% reference compression), v2.0 (state validation, cross-session memory, quality scoring), v3.0 (intent engineering — INTENT.md, drift validation, workflow injection), v4.0 (environment awareness, MCP profiling, worktree parallelism), v5.0 (codebase intelligence — convention extraction, dependency graphs, lifecycle awareness), v6.0 (UX overhaul — shared formatting engine, TTY-aware smart output, branded CLI), v7.0 (agent orchestration — AST intelligence, task routing, context efficiency, TDD execution, review gates), v7.1 (trajectory engineering — checkpoint, pivot, compare, choose, decision journal, dead-end detection), v8.0 (performance & agent architecture — SQLite caching, agent consolidation 11→9, namespace routing, profiler instrumentation, token budgets, RACI matrix), v8.1 (RAG-powered research — YouTube integration, NotebookLM synthesis, multi-source orchestration, 4-tier degradation, session persistence), v8.2 (cleanup & validation — dead code removal, namespace-only routing, 24-40% init speedup, RACI handoff contracts), v8.3 (agent quality & skills — OpenCode skills architecture with 27 skills and 52.4% agent line reduction, agent consistency audit, GitHub CI agent overhaul, 766 tests fully green), v9.0 (embedded plugin experience — always-on context injection, native LLM tools, event-driven sync, advisory guardrails), v9.1 (performance acceleration — valibot validation, fast-glob discovery, compile-cache, SQLite statement caching, safe adoption controls), v9.2 (CLI tool integrations — ripgrep, fd, jq, yq, bat, gh, Bun runtime), v9.3 (quality, performance & agent sharpening — command consolidation, deterministic context, Bun validation, benchmark adapter), and v10.0 (agent intelligence & UX — planning/verification/execution intelligence, multi-agent collaboration, rich TTY output, interactive workflows).
 
 ## Core Value
 
@@ -10,27 +10,23 @@ Manage and deliver high-quality software with high-quality documentation, while 
 
 ## Current State
 
-**Last shipped:** v11.2 Code Cleanup (2026-03-12)
+**Last shipped:** v11.3 LLM Offloading (2026-03-13)
 
-## Current Milestone: v11.3 LLM Offloading
+## No Active Milestone
 
-**Goal:** Reduce LLM calls by pushing deterministic decisions into programmatic code — the plugin should handle what code can handle, faster and cheaper than asking the LLM.
+Ready to start next milestone — `/bgsd-new-milestone`
 
-**Target features:**
-- Codebase scan:
-  - Comprehensive audit of workflows, agents, and commands to identify decisions currently made by LLM that are deterministic
-  - Catalog of offloading opportunities ranked by frequency and complexity
-- Programmatic decision-making:
-  - Move simple/deterministic decisions from LLM prompts into plugin code
-  - Auto-resolution of routine choices (file paths, command routing, parameter defaults)
-  - Code-driven validation and pre-checks that currently rely on LLM reasoning
-- Workflow optimization:
-  - Reduce round-trips between LLM and CLI by batching or pre-computing
-  - Plugin-side logic for common patterns (phase numbering, requirement IDs, state transitions)
+<details>
+<summary>Previous: v11.3 LLM Offloading (shipped 2026-03-13)</summary>
 
-## Active Milestone
+- Audit scanner finding 87 LLM-offloadable decision candidates with rubric scoring and token estimation
+- 12 pure decision functions with progressive confidence model (HIGH/MEDIUM/LOW) and 85 contract tests
+- CLI decisions namespace for querying, inspecting, and debugging decision resolution
+- Extended bgsd-context enrichment with 15+ pre-computed decision inputs and 46 contract tests
+- 13 workflows simplified to consume pre-computed decisions (82% LLM reasoning reduction)
+- summary:generate CLI command pre-building SUMMARY.md from git/plan data, reducing LLM writing by 50%+
 
-v11.3 LLM Offloading — See Current Milestone above.
+</details>
 
 <details>
 <summary>Previous: v10.0 Agent Intelligence & UX (shipped 2026-03-11)</summary>
@@ -188,9 +184,15 @@ See `.planning/MILESTONES.md` for full history of v1.0 through v8.2.
 - ✓ Profiler instrumentation and baseline comparison tool — v8.0
 - ✓ Auto changelog generation in milestone wrapup workflow — v8.0
 
+- ✓ Audit scanner with rubric scoring for LLM-offloadable decisions — v11.3
+- ✓ 12 pure decision functions with progressive confidence model (HIGH/MEDIUM/LOW) — v11.3
+- ✓ CLI decisions namespace (list/inspect/evaluate) with in-process enricher integration — v11.3
+- ✓ bgsd-context enrichment with pre-computed decisions consumed by 13 workflows — v11.3
+- ✓ summary:generate CLI command pre-building SUMMARY.md from git/plan data — v11.3
+
 ### Active
 
-v11.3 milestone is active — LLM Offloading
+No active milestone.
 
 ### Out of Scope
 
@@ -208,14 +210,14 @@ v11.3 milestone is active — LLM Offloading
 
 ## Context
 
-Shipped v1.0 through v8.3. 766 tests passing, 34 src/ modules, ~1163KB bundle, esbuild bundler.
+Shipped v1.0 through v11.3. 1014 tests (414 passing), 53 src/ modules, ~799KB bundle, esbuild bundler.
 Platform: OC (host editor).
 Tech stack: Node.js >= 22.5 (required for `node:sqlite` caching), node:test, esbuild, tokenx (bundled), acorn (bundled).
-Source: 34 modules — `src/lib/` (18 modules) and `src/commands/` (14 modules) + router + index.
+Source: 53 modules — `src/lib/` (35 modules) and `src/commands/` (23 modules) + router + index.
 Deploy pipeline: `npm run build` → esbuild bundle → `deploy.sh` with smoke test and rollback.
 9 specialized AI agents, 41 slash commands, 45 workflows, 27 skills.
 
-Known tech debt: Bundle at ~1163KB (over 1050KB budget). `node:sqlite` is Stability 1.2 (Release Candidate).
+Known tech debt: `node:sqlite` is Stability 1.2 (Release Candidate). Test suite has 600 failures needing investigation (mostly JSON parse errors from Bun runtime banner).
 
 ## Constraints
 
@@ -264,6 +266,9 @@ Known tech debt: Bundle at ~1163KB (over 1050KB budget). `node:sqlite` is Stabil
 | RACI matrix for agent lifecycle | Every step has exactly one responsible agent | Good — eliminates ambiguity |
 | Token budgets per agent manifest | 60-80K caps prevent context rot | Good — context builder warns on exceedance |
 | Namespace routing (colon syntax) | Semantic grouping for 100+ CLI commands | Good — discoverable, backward-compatible |
+| Progressive confidence model for decisions | HIGH=authoritative, MEDIUM=LLM confirms, LOW=LLM decides | Good — never kills LLM escape hatch |
+| In-process decision engine via enricher | Evaluate rules during existing hooks, no subprocess overhead | Good — zero latency added |
+| Scaffold-then-fill for SUMMARY.md | CLI generates data sections, LLM fills only judgment | Good — 50%+ writing reduction |
 
 ---
-*Last updated: 2026-03-13 after v11.3 milestone start*
+*Last updated: 2026-03-13 after v11.3 milestone completion*

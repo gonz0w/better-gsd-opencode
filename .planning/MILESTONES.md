@@ -360,128 +360,29 @@
 
 ---
 
+## ✅ v11.3 LLM Offloading (Shipped: 2026-03-13)
 
+**Delivered:** Programmatic decision engine offloading deterministic LLM decisions to code, with audit scanner, pure decision functions, workflow integration, and summary generation automation.
 
-## v9.3 Quality, Performance & Agent Sharpening (Shipped: 2026-03-10)
-
-**Phases completed:** 5 phases, 12 plans, 0 tasks
-
-**Key accomplishments:**
-- Agent manifest audit complete with zero capability conflict - each agent has distinct primary responsibility
-- Handoff contracts documented with inputs, outputs, preconditions - all 10 agent pairs covered
-- Created 8 subcommand wrapper commands organizing 41 slash commands into logical groups with routing
-- Consolidated 50 slash commands into 11 (8 wrappers + 3 standalone), removed internal-only commands, updated help docs
-- Gap closure: documented routing approach (host editor native) and marked CMND requirements complete
-- Deterministic context loading with git-hash cache invalidation for 6 agent types
-- Reachability audit system with verify:orphans CLI command to detect orphaned exports, files, workflows, templates, and config entries
-- Bun runtime detection with config persistence and startup banner for 3-5x startup improvement
-- Runtime fallback config and benchmark command working - 1.6x speedup measured (below 3-5x target)
-- Runtime banner correctly shows '[bGSD] Falling back to Node.js' when BGSD_RUNTIME=node
-- Extended benchmark with file I/O, nested traversal, and HTTP server tests showing realistic 1.2-1.6x improvement range
-- Plugin benchmark adapter with /bgsd-measure command capturing startup, execution, memory, and context load metrics
-
----
-
-
-## v10.0 v10.0 (Shipped: 2026-03-11)
-
-**Phases completed:** 5 phases, 9 plans, 6 tasks
+**Phases completed:** 4 phases (110-113), 9 plans
+**Commits:** 49 | **Files changed:** 92 | **Lines:** +15,796 / -16,098
+**Timeline:** 1 day (2026-03-13)
 
 **Key accomplishments:**
-- Enhanced format.js with CLI color control flags, Spinner class, and nested ProgressTracker
-- Created error.js module with structured error classes and formatted output with recovery suggestions
-- Created debug.js module with trace, context dump, and state inspection utilities
-- Integrated format.js, error.js, and debug.js into main CLI with working color and debug flags
-- Enhanced planner skills with dependency detection, task sizing feedback loop, and parallelization analysis
-- Added CLI commands for dependency analysis, scope estimation, and parallelization warnings
-- Added execution intelligence modules for autonomous deviation recovery, complexity-based checkpoint decisions, and stuck/loop pattern detection
+- Built audit scanner finding 87 LLM-offloadable decision candidates with 7-criteria rubric scoring and token estimation (~22K tokens/session savings)
+- Created 12 pure decision functions with progressive confidence model (HIGH/MEDIUM/LOW) and 85 contract tests
+- CLI decisions namespace (list/inspect/evaluate) for querying and debugging decision resolution
+- Extended bgsd-context enrichment with 15+ pre-computed decision inputs and 46 contract tests
+- Simplified 13 workflows to consume pre-computed decisions (82% LLM reasoning reduction, ~27 steps saved per session)
+- Built summary:generate CLI command pre-filling SUMMARY.md from git/plan data, reducing LLM writing by 50%+
+- All 13/13 requirements delivered
 
----
+**What's next:** Ready for next milestone -- `/bgsd-new-milestone`
 
-
-## v10.0 v10.0 (Shipped: 2026-03-11)
-
-**Phases completed:** 5 phases, 9 plans, 6 tasks
-
-**Key accomplishments:**
-- Enhanced format.js with CLI color control flags, Spinner class, and nested ProgressTracker
-- Created error.js module with structured error classes and formatted output with recovery suggestions
-- Created debug.js module with trace, context dump, and state inspection utilities
-- Integrated format.js, error.js, and debug.js into main CLI with working color and debug flags
-- Enhanced planner skills with dependency detection, task sizing feedback loop, and parallelization analysis
-- Added CLI commands for dependency analysis, scope estimation, and parallelization warnings
-- Added execution intelligence modules for autonomous deviation recovery, complexity-based checkpoint decisions, and stuck/loop pattern detection
-
----
-
-
-## v10.0 v10.0 (Shipped: 2026-03-11)
-
-**Phases completed:** 7 phases, 12 plans, 6 tasks
-
-**Key accomplishments:**
-- Enhanced format.js with CLI color control flags, Spinner class, and nested ProgressTracker
-- Created error.js module with structured error classes and formatted output with recovery suggestions
-- Created debug.js module with trace, context dump, and state inspection utilities
-- Integrated format.js, error.js, and debug.js into main CLI with working color and debug flags
-- Enhanced planner skills with dependency detection, task sizing feedback loop, and parallelization analysis
-- Added CLI commands for dependency analysis, scope estimation, and parallelization warnings
-- Added execution intelligence modules for autonomous deviation recovery, complexity-based checkpoint decisions, and stuck/loop pattern detection
-- Structured handoff context transfer, shared context registry, and contract verification for multi-agent collaboration
-- Implemented CLI contextual help with command history, autocomplete hints, and examples
-- Reduced bundle size by ~50% through minification and tree-shaking
-
----
-
-
-## v11.0 v11.0 (Shipped: 2026-03-11)
-
-**Phases completed:** 3 phases, 5 plans, 0 tasks
-
-**Key accomplishments:**
-- ASCII visualization modules for progress bars, milestone completion, and quality scores
-- Unified visualization API with end-to-end verification of ASCII output
-- Intent classification and parameter extraction modules with 31 phrase command registry
-- Fuzzy matching resolver with disambiguation and contextual help fallback
-
----
-
-
-## v11.0 v11.0 (Shipped: 2026-03-11)
-
-**Phases completed:** 5 phases, 10 plans, 7 tasks
-
-**Key accomplishments:**
-- ASCII visualization modules for progress bars, milestone completion, and quality scores
-- Unified visualization API with end-to-end verification of ASCII output
-- ASCII burndown chart visualization with ideal vs actual progress tracking
-- Velocity sparkline visualization for session trend display
-- Terminal dashboard with keyboard navigation for project metrics overview
-- Intent classification and parameter extraction modules with 31 phrase command registry
-- Fuzzy matching resolver with disambiguation and contextual help fallback
-
----
-
-
-## v11.1 v11.1 (Shipped: 2026-03-12)
-
-**Phases completed:** 4 phases, 4 plans, 0 tasks
-
-**Key accomplishments:**
-- CLI tool detection infrastructure with caching, platform-specific install guidance, and graceful fallback wrapper
-- ripgrep, fd, and jq CLI tool wrappers with JSON output parsing, graceful fallback, and unified index exports
-- yq, bat, and gh CLI tool wrappers with unified index.js exports and graceful fallbacks
-- Bun runtime detection with session cache, platform-specific install guidance, and startup benchmark command
-
----
-
-
-## v11.3 LLM Offloading (Shipped: 2026-03-13)
-
-**Phases completed:** 0 phases, 0 plans, 0 tasks
-
-**Key accomplishments:**
-- (none recorded)
+**Archives:**
+- `.planning/milestones/v11.3-ROADMAP.md`
+- `.planning/milestones/v11.3-REQUIREMENTS.md`
+- `.planning/milestones/v11.3-DOCS.md`
 
 ---
 
