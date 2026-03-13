@@ -34,7 +34,7 @@
 
 ## Phases
 
-- [ ] **Phase 110: Audit & Decision Framework** — Scan codebase for LLM-offloadable decisions, catalog candidates with rubric scoring, estimate token savings
+- [x] **Phase 110: Audit & Decision Framework** — Scan codebase for LLM-offloadable decisions, catalog candidates with rubric scoring, estimate token savings (completed 2026-03-13)
 - [ ] **Phase 111: Decision Engine & Enrichment** — Build shared decision-rules.js module, in-process decision engine, CLI decisions command, progressive confidence model
 - [ ] **Phase 112: Workflow Integration & Measurement** — Extend bgsd-context with pre-computed decisions, simplify workflows, measure before/after token savings
 - [ ] **Phase 106: Code Cleanup** — Remove verify:orphans, profiler, test infrastructure from bundle
@@ -80,7 +80,7 @@
   4. Candidates that fail the rubric are explicitly marked as "keep in LLM" with rationale
 
 **Plans:**
-1/2 plans executed
+2/2 plans complete
 - 110-02: TTY formatted output, catalog artifact, success criteria validation (wave 2, 2 tasks)
 
 ---
@@ -472,7 +472,7 @@
 
 | Phase | Requirements | Count | Status | Completed |
 |-------|--------------|-------|--------|-----------|
-| 110 | 1/2 | In Progress|  | - |
+| 110 | 2/2 | Complete   | 2026-03-13 | - |
 | 111 | ENGINE-01, ENGINE-02, ENGINE-03, ENGINE-04 | 4 | Not Started | - |
 | 112 | FLOW-01, FLOW-02, FLOW-03 | 3 | Not Started | - |
 | 106 | CLEAN-01, CLEAN-02, CLEAN-03, CLEAN-04, CLEAN-05 | 5 | Complete | 2026-03-12 |

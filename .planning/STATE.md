@@ -10,16 +10,17 @@ See: `.planning/PROJECT.md` (updated 2026-03-13)
 ## Current Position
 
 **Phase:** 110 (Audit & Decision Framework)
-**Current Plan:** 01 complete, next: 02
-**Status:** In Progress
-**Last Activity:** 2026-03-13 — Completed 0110-01 (audit scanner, rubric, token estimator)
+**Current Plan:** 02 complete — phase done
+**Status:** Complete
+**Last Activity:** 2026-03-13 — Completed 0110-02 (TTY output, catalog artifact, SC validation)
 
-Progress: [█████░░░░░] 50%
+Progress: [██████████] 100%
 
 ## Execution Notes
 
-**Phase 110 (audit-decision-framework):** In progress
+**Phase 110 (audit-decision-framework):** Complete
 - Plan 0110-01: Audit scanner, rubric scorer, token estimator — 87 candidates found (15 min)
+- Plan 0110-02: TTY formatted output, catalog artifact, all 4 SC validated (7 min)
 
 **Phase 108 (dead-code-removal):** Executed 2026-03-12
 - Plan 108-01: Static analysis with ESLint (0 unreachable code found)
@@ -33,7 +34,7 @@ Progress: [█████░░░░░] 50%
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 207 (v1.0-v11.0)
+- Total plans completed: 208 (v1.0-v11.0)
 - Average duration: ~15 min/plan
 - Total execution time: ~38 hours
 
@@ -56,6 +57,8 @@ Progress: [█████░░░░░] 50%
 - [v11.3 roadmap]: Estimated ~39K tokens/session savings from P1 offloading opportunities
 - [0110-01]: New 'audit' namespace in router — cleaner separation from util namespace for audit-specific commands
 - [0110-01]: Audit scanner found 87 decision candidates (85 offloadable, 2 keep-in-LLM) with ~22K tokens/session savings estimated
+- [0110-02]: Catalog artifact auto-written on every scan (no --save flag) — always fresh for Phase 111
+- [0110-02]: 5 of 7 RESEARCH.md categories found — model-selection and file-resolution already offloaded to code
 
 ### Pending Todos
 
@@ -67,6 +70,6 @@ None — research complete with HIGH confidence, ready for planning.
 
 ## Session Continuity
 
-**Last session:** 2026-03-13T13:40:46Z
-**Stopped at:** Completed 0110-01-PLAN.md
-**Next step:** Execute 0110-02-PLAN.md — `/bgsd execute phase 110`
+**Last session:** 2026-03-13T13:52:37Z
+**Stopped at:** Completed 0110-02-PLAN.md — Phase 110 done
+**Next step:** Plan Phase 111 (Decision Engine) — `/bgsd plan phase 111`
