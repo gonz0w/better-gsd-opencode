@@ -10,16 +10,17 @@ See: `.planning/PROJECT.md` (updated 2026-03-13)
 ## Current Position
 
 **Phase:** 112 (Workflow Integration & Measurement)
-**Current Plan:** 01 complete, 02 pending
-**Status:** In progress
+**Current Plan:** 01 complete, 02 complete
+**Status:** Complete
 **Last Activity:** 2026-03-13
 
-Progress: [█████░░░░░] 50%
+Progress: [██████████] 100%
 
 ## Execution Notes
 
-**Phase 112 (workflow-integration-measurement):** In progress
+**Phase 112 (workflow-integration-measurement):** Complete
 - Plan 0112-01: Extended command-enricher with 15+ decision rule inputs, 46 contract tests (9 min)
+- Plan 0112-02: 13 workflows consume decisions from bgsd-context, added decisions:savings report (7 min)
 
 **Phase 111 (decision-engine-enrichment):** Complete
 - Plan 0111-01: 12 pure decision functions, registry, 85 contract tests (6 min)
@@ -52,6 +53,7 @@ Progress: [█████░░░░░] 50%
 | v11.3 | 3 (110-112) | 10 | In Progress |
 | v11.2 | 4 (106-109) | 15 | Complete |
 | v11.1 | 4 (103-105) | 9 | Complete |
+| Phase 0112 P02 | 7 min | 2 tasks | 14 files |
 
 ## Accumulated Context
 
@@ -72,6 +74,7 @@ Progress: [█████░░░░░] 50%
 - [0112-01]: Each enrichment derivation wrapped in individual try/catch — failure in one field doesn't break enrichment
 - [0112-01]: Task types extracted from first incomplete plan only (not all plans) per research recommendation
 - [0112-01]: UAT gap detection uses simple readFileSync + string.includes() — no heavy parsing
+- [Phase 0112-02]: Workflows consume pre-computed decisions first and preserve existing derivation as fallback — Delivers token savings while maintaining backward compatibility when bgsd-context decisions are absent
 
 ### Pending Todos
 
@@ -83,6 +86,6 @@ None — research complete with HIGH confidence, ready for planning.
 
 ## Session Continuity
 
-**Last session:** 2026-03-13T16:10:56Z
-**Stopped at:** Completed 0112-01-PLAN.md
-**Next step:** Execute Phase 112 Plan 02 (workflow simplification + measurement)
+**Last session:** 2026-03-13T17:28:43.825Z
+**Stopped at:** Completed 0112-02-PLAN.md
+**Next step:** Run milestone verification/closure for v11.3 (audit + complete-milestone)

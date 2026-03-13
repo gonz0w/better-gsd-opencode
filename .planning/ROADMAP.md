@@ -36,7 +36,7 @@
 
 - [x] **Phase 110: Audit & Decision Framework** — Scan codebase for LLM waste, replace deterministic LLM calls with inline code, remove old audit CLI artifacts (completed 2026-03-13)
 - [x] **Phase 111: Decision Engine & Enrichment** — Build shared decision-rules.js module, in-process decision engine, CLI decisions command, progressive confidence model (completed 2026-03-13)
-- [ ] **Phase 112: Workflow Integration & Measurement** — Extend bgsd-context with pre-computed decisions, simplify workflows, measure before/after token savings
+- [x] **Phase 112: Workflow Integration & Measurement** — Extend bgsd-context with pre-computed decisions, simplify workflows, measure before/after token savings (completed 2026-03-13)
 - [ ] **Phase 106: Code Cleanup** — Remove verify:orphans, profiler, test infrastructure from bundle
 - [ ] **Phase 107: Unused Exports Cleanup** — Find and remove unused exports from src/ directory
 - [ ] **Phase 108: Dead Code Removal** — Find and remove unreachable code paths
@@ -118,7 +118,7 @@
   3. Token savings telemetry captures before/after LLM call counts per workflow, with total savings reported and compared against Phase 110 estimates
 
 **Plans:**
-1/2 plans executed
+2/2 plans complete
 - 0112-02: Workflow simplifications + measurement report (wave 2, FLOW-02, FLOW-03)
 
 ---
@@ -478,7 +478,7 @@
 |-------|--------------|-------|--------|-----------|
 | 110 | AUDIT-01, AUDIT-02, AUDIT-03 | Complete    | 2026-03-13 | - |
 | 111 | 2/2 | Complete    | 2026-03-13 | - |
-| 112 | 1/2 | In Progress|  | - |
+| 112 | 2/2 | Complete   | 2026-03-13 | - |
 | 106 | CLEAN-01, CLEAN-02, CLEAN-03, CLEAN-04, CLEAN-05 | 5 | Complete | 2026-03-12 |
 | 107 | UNUSED-01, UNUSED-02, UNUSED-03 | 3 | Not Started | - |
 | 108 | DEAD-01, DEAD-02, DEAD-03 | 3 | Not Started | - |
