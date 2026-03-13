@@ -11,7 +11,7 @@ See: `.planning/PROJECT.md` (updated 2026-03-13)
 
 **Phase:** 113 (Programmatic Summary Generation)
 **Current Plan:** Not started
-**Status:** Milestone complete
+**Status:** v11.3 milestone complete
 **Last Activity:** 2026-03-13
 
 Progress: [██████████] 100%
