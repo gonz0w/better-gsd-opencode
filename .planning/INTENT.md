@@ -1,9 +1,9 @@
-**Revision:** 13
+**Revision:** 14
 **Created:** 2026-02-25
-**Updated:** 2026-03-10
+**Updated:** 2026-03-13
 
 <objective>
-An intelligent agent orchestration engine for building large-scale software with a deeply embedded plugin experience. This milestone emphasizes rigorous performance benchmarking against modern OpenCode plugins, targeted latency reduction, and selective adoption of dependencies/new technology where measurable speed gains justify complexity.
+An intelligent agent orchestration engine for building large-scale software with a deeply embedded plugin experience. This milestone emphasizes reducing LLM dependency by pushing deterministic decisions into programmatic code — the plugin should handle what code can handle, faster and cheaper than asking the LLM.
 </objective>
 
 <users>
@@ -115,6 +115,10 @@ Orchestration should feel invisible — the right agent gets the right task with
 </health>
 
 <history>
+### v9.2 — 2026-03-13
+- **Modified** objective: An intelligent agent orchestration engine for building large-scale software with a deeply embedded plugin experience. This milestone emphasizes reducing LLM dependency by pushing deterministic decisions into programmatic code — the plugin should handle what code can handle, faster and cheaper than asking the LLM.
+  - Reason: Milestone v11.3: Shift from performance benchmarking to LLM offloading — code should handle deterministic decisions
+
 ### v11.1 — 2026-03-11
 - **Added** outcomes: DO-60 (Direct command execution), DO-61 (Zero friction), DO-62 (Polish).
   - Reason: Milestone v11.1: Command Execution & Polish — address user pain point about command routing confusion
