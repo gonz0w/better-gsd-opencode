@@ -100,7 +100,7 @@
   5. Contract tests validate output format for every offloaded decision to prevent regression avalanche
 
 **Plans:**
-- 0111-01: Decision rules module with pure functions, registry, and contract tests (wave 1, ENGINE-01, ENGINE-04)
+1/2 plans executed
 - 0111-02: CLI decisions command, enricher integration, router wiring (wave 2, ENGINE-02, ENGINE-03)
 
 ---
@@ -475,7 +475,7 @@
 | Phase | Requirements | Count | Status | Completed |
 |-------|--------------|-------|--------|-----------|
 | 110 | AUDIT-01, AUDIT-02, AUDIT-03 | Complete    | 2026-03-13 | - |
-| 111 | ENGINE-01, ENGINE-02, ENGINE-03, ENGINE-04 | 4 | Not Started | - |
+| 111 | 1/2 | In Progress|  | - |
 | 112 | FLOW-01, FLOW-02, FLOW-03 | 3 | Not Started | - |
 | 106 | CLEAN-01, CLEAN-02, CLEAN-03, CLEAN-04, CLEAN-05 | 5 | Complete | 2026-03-12 |
 | 107 | UNUSED-01, UNUSED-02, UNUSED-03 | 3 | Not Started | - |

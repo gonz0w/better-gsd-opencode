@@ -15,10 +15,10 @@ Requirements for LLM Offloading milestone. Each maps to roadmap phases.
 
 ### Decision Engine & Rules
 
-- [ ] **ENGINE-01**: Shared decision-rules.js module provides pure functions for deterministic decisions (lookup tables, weighted scoring, template functions)
+- [x] **ENGINE-01**: Shared decision-rules.js module provides pure functions for deterministic decisions (lookup tables, weighted scoring, template functions)
 - [ ] **ENGINE-02**: Plugin decision engine makes in-process decisions via existing hooks without subprocess overhead
 - [ ] **ENGINE-03**: CLI decisions command allows querying and debugging decision logic from the command line
-- [ ] **ENGINE-04**: Progressive confidence model (HIGH/MEDIUM/LOW) gates decisions — HIGH is authoritative, MEDIUM/LOW invite LLM override
+- [x] **ENGINE-04**: Progressive confidence model (HIGH/MEDIUM/LOW) gates decisions — HIGH is authoritative, MEDIUM/LOW invite LLM override
 
 ### Workflow Integration
 
@@ -57,10 +57,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 | AUDIT-01 | Phase 110 | Complete | npm test |
 | AUDIT-02 | Phase 110 | Complete | npm test |
 | AUDIT-03 | Phase 110 | Complete | npm test |
-| ENGINE-01 | Phase 111 | Pending | npm test |
+| ENGINE-01 | Phase 111 | Complete | npm test |
 | ENGINE-02 | Phase 111 | Pending | npm test |
 | ENGINE-03 | Phase 111 | Pending | npm test |
-| ENGINE-04 | Phase 111 | Pending | npm test |
+| ENGINE-04 | Phase 111 | Complete | npm test |
 | FLOW-01 | Phase 112 | Pending | npm test |
 | FLOW-02 | Phase 112 | Pending | npm test |
 | FLOW-03 | Phase 112 | Pending | npm test |
