@@ -2,10 +2,11 @@
 
 ## Milestones
 
-- 🆕 **v11.3 LLM Offloading** - Phases 110-112 (2026-03-13)
+- 🆕 **v11.3 LLM Offloading** - Phases 110-113 (2026-03-13)
   - Phase 110: Audit & Decision Framework — Scan codebase, catalog offloading candidates, establish rubric
   - Phase 111: Decision Engine & Enrichment — Build decision-rules.js, decision engine, CLI command, confidence model
   - Phase 112: Workflow Integration & Measurement — Extend bgsd-context, simplify workflows, measure token savings
+  - Phase 113: Programmatic Summary Generation — Pre-build SUMMARY.md from git/plan data, LLM fills only judgment sections
 - 🆕 **v11.2 Code Cleanup** - Phases 106-109 (2026-03-12)
   - ✅ Phase 106: Code Cleanup — Remove verify:orphans, profiler, test infrastructure
   - Phase 107: Unused Exports Cleanup — Find and remove unused exports from src/
@@ -37,6 +38,7 @@
 - [x] **Phase 110: Audit & Decision Framework** — Scan codebase for LLM waste, replace deterministic LLM calls with inline code, remove old audit CLI artifacts (completed 2026-03-13)
 - [x] **Phase 111: Decision Engine & Enrichment** — Build shared decision-rules.js module, in-process decision engine, CLI decisions command, progressive confidence model (completed 2026-03-13)
 - [x] **Phase 112: Workflow Integration & Measurement** — Extend bgsd-context with pre-computed decisions, simplify workflows, measure before/after token savings (completed 2026-03-13)
+- [ ] **Phase 113: Programmatic Summary Generation** — Pre-build SUMMARY.md from git history and plan metadata, reduce LLM summary work by 50%+
 - [ ] **Phase 106: Code Cleanup** — Remove verify:orphans, profiler, test infrastructure from bundle
 - [ ] **Phase 107: Unused Exports Cleanup** — Find and remove unused exports from src/ directory
 - [ ] **Phase 108: Dead Code Removal** — Find and remove unreachable code paths
@@ -123,6 +125,21 @@
 
 ---
 
+### Phase 113: Programmatic Summary Generation
+
+**Goal:** Build a `summary:generate` CLI command that pre-builds SUMMARY.md from git history, plan metadata, and STATE.md — reducing LLM summary writing from full authorship to filling in 3-4 judgment sections
+
+**Depends on:** Phase 112 (continues the LLM offloading pattern established in v11.3)
+
+**Requirements:** SUM-01, SUM-02, SUM-03
+
+**Success Criteria** (what must be TRUE):
+  1. `summary:generate` command produces a pre-filled SUMMARY.md with frontmatter (phase, plan, subsystem, tags, key-files), performance section (duration, timestamps), task commits (from git log), and files created/modified (from git diff) — all without LLM involvement
+  2. The execute-plan workflow calls `summary:generate` to get a pre-built scaffold, and the LLM only fills in: one-liner, accomplishments, decisions made, and deviations — at least 50% less LLM writing per summary
+  3. Generated summaries pass `verify:summary` validation and `summary-extract` parsing without regressions
+
+---
+
 ### Phase 103: Direct Command Routing
 
 **Goal:** Simplify the wrapper → workflow → CLI chain so `/bgsd {cmd} {sub}` executes immediately
@@ -137,7 +154,7 @@
 3. Command routing is deterministic — same command always routes to same workflow
 
 **Plans:**
-- 103-01: Map current command routing (wave 1)
+1/2 plans executed
 - 103-02: Implement direct routing (wave 2)
 - 103-03: Verify all 41 commands route correctly (wave 3)
 

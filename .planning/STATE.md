@@ -10,13 +10,16 @@ See: `.planning/PROJECT.md` (updated 2026-03-13)
 ## Current Position
 
 **Phase:** 113 (Programmatic Summary Generation)
-**Current Plan:** Not started
-**Status:** Ready to plan
+**Current Plan:** 01 complete
+**Status:** In progress
 **Last Activity:** 2026-03-13
 
-Progress: [██████████] 100%
+Progress: [█████░░░░░] 50%
 
 ## Execution Notes
+
+**Phase 113 (programmatic-summary-generation):** In progress
+- Plan 0113-01: cmdSummaryGenerate with git data extraction, merge/preserve, 20 contract tests (14 min)
 
 **Phase 112 (workflow-integration-measurement):** Complete
 - Plan 0112-01: Extended command-enricher with 15+ decision rule inputs, 46 contract tests (9 min)
@@ -43,7 +46,7 @@ Progress: [██████████] 100%
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 209 (v1.0-v11.0)
+- Total plans completed: 210 (v1.0-v11.3)
 - Average duration: ~15 min/plan
 - Total execution time: ~38 hours
 
@@ -78,6 +81,9 @@ Progress: [██████████] 100%
 - [0112-01]: UAT gap detection uses simple readFileSync + string.includes() — no heavy parsing
 - [Phase 0112-02]: Workflows consume pre-computed decisions first and preserve existing derivation as fallback — Delivers token savings while maintaining backward compatibility when bgsd-context decisions are absent
 - [Phase 0112-03]: decisions:savings uses dynamic workflow scanning instead of static data — Each Pre-computed block saves exactly 1 LLM reasoning step, BEFORE_ESTIMATES kept as static baseline
+- [0113-01]: Used phase_number from findPhaseInternal for filenames — preserves zero-padding matching directory structure
+- [0113-01]: Scope matching accepts both 0113-01 and 113-01 for backward compat with varying commit conventions
+- [0113-01]: Merge/preserve detects filled sections by absence of TODO: markers — simple and reliable
 
 ### Pending Todos
 
@@ -89,6 +95,6 @@ None — research complete with HIGH confidence, ready for planning.
 
 ## Session Continuity
 
-**Last session:** 2026-03-13T18:23:15.503Z
-**Stopped at:** Phase 113 context gathered
-**Next step:** Discuss/plan Phase 113 — build summary:generate CLI command
+**Last session:** 2026-03-13T18:57:26Z
+**Stopped at:** Completed 0113-01-PLAN.md
+**Next step:** None — phase 113 has 1 plan, now complete
