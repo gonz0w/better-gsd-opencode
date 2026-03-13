@@ -34,7 +34,7 @@
 
 ## Phases
 
-- [x] **Phase 110: Audit & Decision Framework** — Scan codebase for LLM-offloadable decisions, catalog candidates with rubric scoring, estimate token savings (completed 2026-03-13)
+- [ ] **Phase 110: Audit & Decision Framework** — Scan codebase for LLM waste, replace deterministic LLM calls with inline code, remove old audit CLI artifacts
 - [ ] **Phase 111: Decision Engine & Enrichment** — Build shared decision-rules.js module, in-process decision engine, CLI decisions command, progressive confidence model
 - [ ] **Phase 112: Workflow Integration & Measurement** — Extend bgsd-context with pre-computed decisions, simplify workflows, measure before/after token savings
 - [ ] **Phase 106: Code Cleanup** — Remove verify:orphans, profiler, test infrastructure from bundle
@@ -66,22 +66,20 @@
 
 # Phase Details
 
-### Phase 110: Audit & Decision Framework
-**Goal:** Catalog all LLM-offloadable decisions in the codebase with honest scoring against a decision criteria rubric, producing a prioritized catalog with token savings estimates
+### Phase 110: Audit & Decision Framework (Rescoped)
+**Goal:** Scan the codebase for places where LLM calls handle deterministic work that code could do, then directly replace those calls with inline code logic. Remove old audit CLI artifacts from prior scope.
 
 **Depends on:** Nothing (first phase of v11.3)
 
 **Requirements:** AUDIT-01, AUDIT-02, AUDIT-03
 
 **Success Criteria** (what must be TRUE):
-  1. User can run a CLI scan command that identifies every decision point across workflows and agents where the LLM is doing work that code could handle
-  2. Each identified candidate has a rubric score showing whether it passes the 3 critical criteria (finite inputs, deterministic output, no NLU needed) plus 4 preferred criteria
-  3. User can see estimated token savings per candidate and per category, with total projected savings for the milestone
-  4. Candidates that fail the rubric are explicitly marked as "keep in LLM" with rationale
+  1. All identified deterministic LLM decision points are replaced with inline code logic (lookup tables, conditionals, enricher pre-computation)
+  2. Old audit CLI artifacts removed (src/commands/audit.js, router references, .planning/audit-catalog.json)
+  3. All 762+ existing tests pass, plus targeted tests added for each replaced decision point
+  4. Workflows that previously required LLM reasoning for deterministic decisions now consume pre-computed values
 
-**Plans:**
-2/2 plans complete
-- 110-02: TTY formatted output, catalog artifact, success criteria validation (wave 2, 2 tasks)
+**Plans:** TBD (replanning from scratch)
 
 ---
 
@@ -472,7 +470,7 @@
 
 | Phase | Requirements | Count | Status | Completed |
 |-------|--------------|-------|--------|-----------|
-| 110 | 2/2 | Complete    | 2026-03-13 | - |
+| 110 | AUDIT-01, AUDIT-02, AUDIT-03 | 3 | Replanning | - |
 | 111 | ENGINE-01, ENGINE-02, ENGINE-03, ENGINE-04 | 4 | Not Started | - |
 | 112 | FLOW-01, FLOW-02, FLOW-03 | 3 | Not Started | - |
 | 106 | CLEAN-01, CLEAN-02, CLEAN-03, CLEAN-04, CLEAN-05 | 5 | Complete | 2026-03-12 |

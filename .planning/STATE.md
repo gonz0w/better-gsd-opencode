@@ -10,11 +10,11 @@ See: `.planning/PROJECT.md` (updated 2026-03-13)
 ## Current Position
 
 **Phase:** 110 (Audit & Decision Framework)
-**Current Plan:** Not started
-**Status:** Ready to plan
+**Current Plan:** Replanning (rescoped)
+**Status:** Planning
 **Last Activity:** 2026-03-13
 
-Progress: [██████████] 100%
+Progress: [░░░░░░░░░░] 0%
 
 ## Execution Notes
 
