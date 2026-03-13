@@ -1,5 +1,7 @@
 'use strict';
 
+const fs = require('fs');
+const path = require('path');
 const { DECISION_REGISTRY, evaluateDecisions } = require('../lib/decision-rules');
 const { output } = require('../lib/output');
 const { banner, sectionHeader, formatTable, summaryLine, actionHint, color, SYMBOLS } = require('../lib/format');
@@ -137,6 +139,102 @@ function formatDecisionsSavings(data) {
 }
 
 
+// ─── Workflow Scanning ───────────────────────────────────────────────────────
+
+/**
+ * Resolve the workflows directory.
+ * Priority: override → bin-relative (dev workspace) → BGSD_HOME → __dirname-relative
+ * In development: bin/ is at project root, so ../workflows works.
+ * In production: BGSD_HOME points to the installed plugin directory.
+ *
+ * @param {string} [overrideDir] - Optional explicit workflows directory
+ * @returns {string} Path to workflows directory
+ */
+function resolveWorkflowsDir(overrideDir) {
+  if (overrideDir && fs.existsSync(overrideDir)) return overrideDir;
+
+  // From bin/bgsd-tools.cjs: go up one to project root, then into workflows/
+  // This works in dev workspace where bin/ and workflows/ are siblings
+  const binRelative = path.resolve(path.dirname(process.argv[1] || __filename), '..', 'workflows');
+  if (fs.existsSync(binRelative)) return binRelative;
+
+  const BGSD_HOME = process.env.BGSD_HOME ||
+    path.resolve(__dirname, '..', '..');
+  const workflowsDir = path.join(BGSD_HOME, 'workflows');
+  if (fs.existsSync(workflowsDir)) return workflowsDir;
+
+  // Fallback: dev workspace via __dirname
+  const devWorkflows = path.resolve(__dirname, '..', '..', 'workflows');
+  return devWorkflows;
+}
+
+/**
+ * Scan workflow files for Pre-computed decision and value blocks.
+ * Returns per-workflow integration point data.
+ *
+ * @param {string} workflowsDir - Path to workflows directory
+ * @returns {{ workflow: string, integration_points: number, decisions: string[], model_precompute: string[], type: string }[]}
+ */
+function scanWorkflowDecisions(workflowsDir) {
+  if (!fs.existsSync(workflowsDir)) return [];
+
+  const files = fs.readdirSync(workflowsDir).filter(f => f.endsWith('.md')).sort();
+  const results = [];
+
+  for (const file of files) {
+    const content = fs.readFileSync(path.join(workflowsDir, file), 'utf-8');
+
+    // Count Pre-computed decision blocks and extract decision names
+    const decisionBlocks = content.match(/Pre-computed decision[^:]*:/g) || [];
+    const decisionNames = [];
+    const decisionMatches = content.matchAll(/decisions\.([a-z][a-z0-9-]*)/g);
+    for (const m of decisionMatches) {
+      if (!decisionNames.includes(m[1])) decisionNames.push(m[1]);
+    }
+
+    // Count Pre-computed value blocks and extract model names
+    const valueBlocks = content.match(/Pre-computed value:/g) || [];
+    const modelNames = [];
+    const modelMatches = content.matchAll(/(executor_model|verifier_model|checker_model)/g);
+    // Only count model matches inside Pre-computed value blocks
+    if (valueBlocks.length > 0) {
+      for (const m of modelMatches) {
+        if (!modelNames.includes(m[1])) modelNames.push(m[1]);
+      }
+    }
+
+    const integrationPoints = decisionBlocks.length + valueBlocks.length;
+    if (integrationPoints > 0) {
+      results.push({
+        workflow: file,
+        integration_points: integrationPoints,
+        decisions: decisionNames,
+        model_precompute: modelNames,
+        type: 'measured',
+      });
+    }
+  }
+
+  return results;
+}
+
+/**
+ * Static reference table of BEFORE LLM reasoning step counts per workflow.
+ * These represent the reasoning steps that existed BEFORE the decision engine.
+ * They can't be measured dynamically — they are the baseline for comparison.
+ */
+const BEFORE_ESTIMATES = {
+  'progress.md': 7,
+  'execute-plan.md': 5,
+  'execute-phase.md': 4,
+  'resume-project.md': 5,
+  'discuss-phase.md': 2,
+  'plan-phase.md': 2,
+  'transition.md': 3,
+  'debug.md': 3,
+  'audit-milestone.md': 2,
+};
+
 // ─── Command Handlers ────────────────────────────────────────────────────────
 
 /**
@@ -262,28 +360,36 @@ function cmdDecisionsEvaluate(cwd, args, raw) {
 
 /**
  * cmdDecisionsSavings — Report before/after LLM reasoning step counts per workflow.
+ * Dynamically scans workflow files for Pre-computed decision/value blocks.
  *
  * @param {string} cwd - Project root
- * @param {string[]} args - CLI arguments
+ * @param {string[]} args - CLI arguments [--workflows-dir <path>]
  * @param {boolean} raw - Raw JSON output mode
  */
 function cmdDecisionsSavings(cwd, args, raw) {
-  const SAVINGS_DATA = [
-    { workflow: 'progress.md', before: 7, after: 1, decisions: ['progress-route'] },
-    { workflow: 'execute-plan.md', before: 5, after: 1, decisions: ['execution-pattern', 'context-budget-gate', 'previous-check-gate'] },
-    { workflow: 'execute-phase.md', before: 4, after: 1, decisions: ['branch-handling', 'ci-gate'] },
-    { workflow: 'resume-project.md', before: 5, after: 1, decisions: ['resume-route'] },
-    { workflow: 'discuss-phase.md', before: 2, after: 0, decisions: ['auto-advance'] },
-    { workflow: 'plan-phase.md', before: 2, after: 0, decisions: ['auto-advance'] },
-    { workflow: 'transition.md', before: 3, after: 1, decisions: ['auto-advance', 'branch-handling'] },
-    { workflow: 'debug.md', before: 3, after: 1, decisions: ['debug-handler-route', 'model-resolution'] },
-    { workflow: 'audit-milestone.md', before: 2, after: 0, decisions: ['model-resolution'] },
-  ];
+  // Parse optional --workflows-dir flag
+  let overrideDir;
+  const dirIdx = args.indexOf('--workflows-dir');
+  if (dirIdx !== -1 && args[dirIdx + 1]) {
+    overrideDir = args[dirIdx + 1];
+  }
 
-  const workflows = SAVINGS_DATA.map(w => ({
-    ...w,
-    saved: w.before - w.after,
-  }));
+  const workflowsDir = resolveWorkflowsDir(overrideDir);
+  const scanned = scanWorkflowDecisions(workflowsDir);
+
+  // Build workflow savings: each integration point saves 1 LLM reasoning step
+  const workflows = scanned.map(w => {
+    const before = BEFORE_ESTIMATES[w.workflow] || w.integration_points;
+    const after = Math.max(0, before - w.integration_points);
+    return {
+      workflow: w.workflow,
+      before,
+      after,
+      saved: before - after,
+      decisions: [...w.decisions, ...w.model_precompute],
+      integration_points: w.integration_points,
+    };
+  });
 
   const totalBefore = workflows.reduce((sum, w) => sum + w.before, 0);
   const totalAfter = workflows.reduce((sum, w) => sum + w.after, 0);
@@ -291,14 +397,18 @@ function cmdDecisionsSavings(cwd, args, raw) {
   const percentReduction = totalBefore > 0 ? Math.round((totalSaved / totalBefore) * 100) : 0;
 
   const result = {
+    source: 'scanned',
+    workflows_dir: workflowsDir,
     workflows,
     totals: {
       before: totalBefore,
       after: totalAfter,
       saved: totalSaved,
       percent_reduction: percentReduction,
+      workflows_scanned: scanned.length,
+      total_integration_points: scanned.reduce((sum, w) => sum + w.integration_points, 0),
     },
-    note: 'Counts are per-invocation. High-traffic workflows multiply savings.',
+    note: 'Counts from dynamic workflow scanning. Each Pre-computed block saves 1 LLM reasoning step.',
   };
 
   output(result, { formatter: formatDecisionsSavings });
@@ -317,4 +427,7 @@ module.exports = {
   formatDecisionsInspect,
   formatDecisionsEvaluate,
   formatDecisionsSavings,
+  resolveWorkflowsDir,
+  scanWorkflowDecisions,
+  BEFORE_ESTIMATES,
 };
