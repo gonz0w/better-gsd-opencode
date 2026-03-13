@@ -117,7 +117,9 @@
   2. Workflow .md files are simplified to consume pre-computed decisions from context instead of re-deriving them via LLM reasoning — measurably fewer LLM reasoning steps per workflow
   3. Token savings telemetry captures before/after LLM call counts per workflow, with total savings reported and compared against Phase 110 estimates
 
-**Plans:** TBD
+**Plans:**
+- 0112-01: Enrichment expansion + contract tests (wave 1, FLOW-01)
+- 0112-02: Workflow simplifications + measurement report (wave 2, FLOW-02, FLOW-03)
 
 ---
 
