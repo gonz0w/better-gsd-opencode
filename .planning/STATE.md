@@ -5,16 +5,14 @@
 See: `.planning/PROJECT.md` (updated 2026-03-13)
 
 **Core value:** Manage and deliver high-quality software with high-quality documentation, while continuously reducing token usage and improving performance
-**Current focus:** Between milestones — v11.3 LLM Offloading complete
+**Current focus:** v11.4 Housekeeping & Stabilization — test suite repair, planning debt cleanup, CLI command audit
 
 ## Current Position
 
-**Phase:** None (milestone complete)
-**Current Plan:** Not started
-**Status:** Between milestones
-**Last Activity:** 2026-03-13
-
-Progress: [██████████] 100%
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-03-13 — Milestone v11.4 started
 
 ## Execution Notes
 

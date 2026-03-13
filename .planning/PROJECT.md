@@ -12,9 +12,17 @@ Manage and deliver high-quality software with high-quality documentation, while 
 
 **Last shipped:** v11.3 LLM Offloading (2026-03-13)
 
-## No Active Milestone
+## Current Milestone: v11.4 Housekeeping & Stabilization
 
-Ready to start next milestone — `/bgsd-new-milestone`
+**Goal:** Clean up accumulated planning debt, stabilize the test suite, audit CLI command routing, and reset INTENT.md for future milestones.
+
+**Target features:**
+- INTENT.md overhaul — archive completed outcomes, remove stale entries, reset to clean state
+- Test suite stabilization — fix 600 Bun runtime banner failures to get back to green
+- Planning artifact cleanup — normalize MILESTONES.md, PROJECT.md, remove cruft
+- Out-of-scope review — update and prune out-of-scope list
+- Constraint/decision audit — archive resolved constraints and decisions
+- CLI command routing audit — find missing, unused, or broken command routes
 
 <details>
 <summary>Previous: v11.3 LLM Offloading (shipped 2026-03-13)</summary>
@@ -192,7 +200,7 @@ See `.planning/MILESTONES.md` for full history of v1.0 through v8.2.
 
 ### Active
 
-No active milestone.
+See `.planning/REQUIREMENTS.md` for v11.4 requirements.
 
 ### Out of Scope
 
@@ -271,4 +279,4 @@ Known tech debt: `node:sqlite` is Stability 1.2 (Release Candidate). Test suite 
 | Scaffold-then-fill for SUMMARY.md | CLI generates data sections, LLM fills only judgment | Good — 50%+ writing reduction |
 
 ---
-*Last updated: 2026-03-13 after v11.3 milestone completion*
+*Last updated: 2026-03-13 after v11.4 milestone start*
