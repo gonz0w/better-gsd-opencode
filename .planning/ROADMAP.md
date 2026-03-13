@@ -99,7 +99,9 @@
   4. Every decision returns `{value, confidence}` where HIGH confidence is authoritative, MEDIUM invites LLM confirmation, and LOW falls back to LLM — no decision kills the LLM escape hatch
   5. Contract tests validate output format for every offloaded decision to prevent regression avalanche
 
-**Plans:** TBD
+**Plans:**
+- 0111-01: Decision rules module with pure functions, registry, and contract tests (wave 1, ENGINE-01, ENGINE-04)
+- 0111-02: CLI decisions command, enricher integration, router wiring (wave 2, ENGINE-02, ENGINE-03)
 
 ---
 
