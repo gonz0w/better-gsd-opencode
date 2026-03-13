@@ -1,4 +1,4 @@
-**Revision:** 16
+**Revision:** 17
 **Created:** 2026-02-25
 **Updated:** 2026-03-13
 
@@ -55,6 +55,7 @@ An intelligent agent orchestration engine for building large-scale software with
 - DO-67 [P2]: Execution speed improved — Measurable latency reduction for hot paths
 - DO-68 [P2]: DO-68|P1|Comprehensive audit identifies all decisions currently delegated to LLM that could be handled programmatically — catalogued by frequency and complexity
 - DO-69 [P2]: DO-69|P1|Deterministic decisions offloaded from LLM to plugin code — file paths, command routing, parameter defaults, state transitions handled in code
+- DO-70 [P2]: DO-70|P1|Workflow round-trips reduced — plugin pre-computes or batches work that previously required LLM reasoning
 </outcomes>
 
 <criteria>
@@ -124,6 +125,8 @@ Orchestration should feel invisible — the right agent gets the right task with
   - Reason: Milestone v11.3: LLM Offloading audit
 - **Added** DO-69 [P2]: DO-69|P1|Deterministic decisions offloaded from LLM to plugin code — file paths, command routing, parameter defaults, state transitions handled in code
   - Reason: Milestone v11.3: LLM Offloading implementation
+- **Added** DO-70 [P2]: DO-70|P1|Workflow round-trips reduced — plugin pre-computes or batches work that previously required LLM reasoning
+  - Reason: Milestone v11.3: Reduce LLM round-trips
 
 ### v11.1 — 2026-03-11
 - **Added** outcomes: DO-60 (Direct command execution), DO-61 (Zero friction), DO-62 (Polish).
