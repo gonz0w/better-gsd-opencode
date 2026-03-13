@@ -34,7 +34,7 @@
 
 ## Phases
 
-- [ ] **Phase 110: Audit & Decision Framework** — Scan codebase for LLM waste, replace deterministic LLM calls with inline code, remove old audit CLI artifacts
+- [x] **Phase 110: Audit & Decision Framework** — Scan codebase for LLM waste, replace deterministic LLM calls with inline code, remove old audit CLI artifacts (completed 2026-03-13)
 - [ ] **Phase 111: Decision Engine & Enrichment** — Build shared decision-rules.js module, in-process decision engine, CLI decisions command, progressive confidence model
 - [ ] **Phase 112: Workflow Integration & Measurement** — Extend bgsd-context with pre-computed decisions, simplify workflows, measure before/after token savings
 - [ ] **Phase 106: Code Cleanup** — Remove verify:orphans, profiler, test infrastructure from bundle
@@ -80,7 +80,7 @@
   4. Workflows that previously required LLM reasoning for deterministic decisions now consume pre-computed values
 
 **Plans:**
-- 0110-01: Remove old audit CLI artifacts + severity.js cross-reference (wave 1, AUDIT-03)
+2/2 plans complete
 - 0110-02: Inline replace 4 LLM decision points in enricher + tests (wave 1, AUDIT-01, AUDIT-02)
 
 ---
@@ -472,7 +472,7 @@
 
 | Phase | Requirements | Count | Status | Completed |
 |-------|--------------|-------|--------|-----------|
-| 110 | AUDIT-01, AUDIT-02, AUDIT-03 | 3 | Replanning | - |
+| 110 | AUDIT-01, AUDIT-02, AUDIT-03 | Complete    | 2026-03-13 | - |
 | 111 | ENGINE-01, ENGINE-02, ENGINE-03, ENGINE-04 | 4 | Not Started | - |
 | 112 | FLOW-01, FLOW-02, FLOW-03 | 3 | Not Started | - |
 | 106 | CLEAN-01, CLEAN-02, CLEAN-03, CLEAN-04, CLEAN-05 | 5 | Complete | 2026-03-12 |
