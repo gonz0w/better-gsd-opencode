@@ -306,6 +306,12 @@ Resume file: None
 
 **MANDATORY: Verify milestone status before presenting next steps.**
 
+**Pre-computed decision (auto-advance):** If `decisions.auto-advance` exists in `<bgsd-context>`, use its `.value` (boolean) to determine whether to auto-advance. Skip config/flag check below.
+
+**Pre-computed decision (branch-handling):** If `decisions.branch-handling` exists in `<bgsd-context>`, use its `.value` (skip/create/update/use-existing) for any branch operations during transition. Skip branch state evaluation.
+
+**Fallback** (if decisions not available):
+
 **Use the transition result from `bgsd-tools plan:phase complete`:**
 
 The `is_last_phase` field from the phase complete result tells you directly:

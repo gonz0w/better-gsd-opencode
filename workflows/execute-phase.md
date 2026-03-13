@@ -55,6 +55,10 @@ If `phase_found` false or `plan_count` 0 → error. No STATE.md but `.planning/`
 </step>
 
 <step name="handle_branching">
+**Pre-computed decision:** If `decisions.branch-handling` exists in `<bgsd-context>`, use its `.value` (skip/create/update/use-existing). Skip branch state evaluation below.
+
+**Fallback** (if decisions not available):
+
 If `branching_strategy` is `"none"`: skip.
 Otherwise use pre-computed `branch_name`:
 ```bash
@@ -388,6 +392,10 @@ After all waves, report:
 
 <step name="ci_quality_gate">
 **Optional CI quality gate — push, PR, code scanning, fix loop, auto-merge.**
+
+**Pre-computed decision:** If `decisions.ci-gate` exists in `<bgsd-context>`, use its `.value` (run/skip/warn). Skip CI flag evaluation below.
+
+**Fallback** (if decisions not available):
 
 Determine if CI gate should run using `CI_FLAG` from initialize step:
 - `CI_FLAG="force"` → run CI regardless of config

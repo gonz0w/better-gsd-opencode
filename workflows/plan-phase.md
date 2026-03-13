@@ -146,6 +146,10 @@ Route to offer_next or auto_advance.
 
 ## 15. Auto-Advance
 
+**Pre-computed decision:** If `decisions.auto-advance` exists in `<bgsd-context>`, use its `.value` (boolean). Skip config/flag check below.
+
+**Fallback** (if decisions not available):
+
 If `--auto` or `config-get workflow.auto_advance` true:
 ```
 Task(prompt="Run /bgsd-execute-phase ${PHASE} --auto", subagent_type="general", description="Execute Phase ${PHASE}")

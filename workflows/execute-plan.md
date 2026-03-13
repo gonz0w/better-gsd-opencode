@@ -33,6 +33,10 @@ PLAN_START_EPOCH=$(date +%s)
 </step>
 
 <step name="context_budget_check">
+**Pre-computed decision:** If `decisions.context-budget-gate` exists in `<bgsd-context>`, use its `.value` (proceed/warn/stop) to determine budget action. Skip CLI budget command interpretation below.
+
+**Fallback** (if decisions not available):
+
 ```bash
 BUDGET=$(node __OPENCODE_CONFIG__/bgsd-oc/bin/bgsd-tools.cjs verify:context-budget "${PLAN_PATH}" 2>/dev/null)
 ```
@@ -42,6 +46,10 @@ If no warning: continue silently.
 </step>
 
 <step name="parse_segments">
+**Pre-computed decision:** If `decisions.execution-pattern` exists in `<bgsd-context>`, use its `.value` as the pattern letter (A/B/C). Skip checkpoint type scanning below.
+
+**Fallback** (if decisions not available):
+
 ```bash
 grep -n "type=\"checkpoint" .planning/phases/XX-name/{phase}-{plan}-PLAN.md
 ```
@@ -78,6 +86,10 @@ Read PLAN.md — this IS the execution instructions. If plan references CONTEXT.
 </step>
 
 <step name="previous_phase_check">
+**Pre-computed decision:** If `decisions.previous-check-gate` exists in `<bgsd-context>`, use its `.value` (proceed/warn/block). Skip previous SUMMARY analysis below.
+
+**Fallback** (if decisions not available):
+
 If previous SUMMARY has unresolved issues or blockers: ask proceed/address/review.
 </step>
 

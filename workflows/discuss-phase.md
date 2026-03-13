@@ -402,6 +402,10 @@ node __OPENCODE_CONFIG__/bgsd-oc/bin/bgsd-tools.cjs execute:commit "docs(state):
 </step>
 
 <step name="auto_advance">
+**Pre-computed decision:** If `decisions.auto-advance` exists in `<bgsd-context>`, use its `.value` (boolean). Skip config/flag check below.
+
+**Fallback** (if decisions not available):
+
 Check for auto-advance trigger:
 
 1. Parse `--auto` flag from $ARGUMENTS

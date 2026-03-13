@@ -114,6 +114,10 @@ Present complete project status to user:
 </step>
 
 <step name="determine_next_action">
+**Pre-computed decision:** If `decisions.resume-route` exists in `<bgsd-context>`, use its `.value` as the primary next action. Skip condition evaluation below.
+
+**Fallback** (if decisions not available):
+
 Based on project state, determine the most logical next action:
 
 **If interrupted agent exists:**

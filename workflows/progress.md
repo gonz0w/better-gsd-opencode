@@ -104,6 +104,10 @@ CONTEXT: [✓ if has_context | - if not]
 <step name="route">
 **Determine next action based on verified counts.**
 
+**Pre-computed decision:** If `decisions.progress-route` exists in `<bgsd-context>`, use its `.value` directly as the route letter (A/B/C/D/E/F or no-project/no-state). Skip file counting and routing table evaluation below — jump directly to the corresponding Route section.
+
+**Fallback** (if decisions not available):
+
 **Step 1: Count plans, summaries, and issues in current phase**
 
 List files in the current phase directory:

@@ -17,6 +17,10 @@ Read all execution_context files before starting.
 Extract from `<bgsd-context>` JSON: `milestone_version`, `milestone_name`, `phase_count`, `completed_phases`, `commit_docs`.
 
 Resolve verifier model:
+
+**Pre-computed value:** If `verifier_model` or `checker_model` exists in `<bgsd-context>`, use it as `CHECKER_MODEL`. Skip subprocess call below.
+
+**Fallback** (if not available in context):
 ```bash
 CHECKER_MODEL=$(node __OPENCODE_CONFIG__/bgsd-oc/bin/bgsd-tools.cjs util:resolve-model bgsd-verifier)
 ```

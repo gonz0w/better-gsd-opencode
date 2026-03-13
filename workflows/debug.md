@@ -13,6 +13,10 @@ INIT=$(node __OPENCODE_CONFIG__/bgsd-oc/bin/bgsd-tools.cjs verify:state load)
 ```
 
 Extract `commit_docs` from init JSON. Resolve debugger model:
+
+**Pre-computed value:** If `executor_model` exists in `<bgsd-context>`, use it as `DEBUGGER_MODEL`. Skip subprocess call below.
+
+**Fallback** (if not available in context):
 ```bash
 DEBUGGER_MODEL=$(node __OPENCODE_CONFIG__/bgsd-oc/bin/bgsd-tools.cjs util:resolve-model bgsd-debugger --raw)
 ```
@@ -77,6 +81,10 @@ Task(
 ```
 
 ## 4. Handle Agent Return
+
+**Pre-computed decision:** If `decisions.debug-handler-route` exists in `<bgsd-context>`, use its `.value` as a suggestion for which return handler to use (MEDIUM confidence — LLM may override based on actual agent output). Skip agent return type interpretation below.
+
+**Fallback** (if decisions not available):
 
 **If `## ROOT CAUSE FOUND`:**
 - Display root cause and evidence summary
