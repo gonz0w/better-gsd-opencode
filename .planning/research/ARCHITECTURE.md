@@ -1,732 +1,455 @@
-# Architecture Research — LLM Offloading Integration
+# Architecture Research — Planning Artifact Quality Audit
 
-**Domain:** Programmatic Decision-Making Integration  
+**Domain:** Planning artifact formatting, stale references, and structural cleanup  
 **Researched:** 2026-03-13  
 **Confidence:** HIGH  
-**Research mode:** Architecture — How programmatic decisions integrate with existing bGSD architecture
+**Research mode:** Ecosystem — What inconsistencies exist and how to fix them
 
 ---
 
 <!-- section: compact -->
 <architecture_compact>
 
-**Architecture:** Three-layer decision pipeline (Plugin hooks → CLI commands → Workflow prompts) with new decision engine module bridging plugin.js and bgsd-tools.cjs
+**Architecture:** Four planning artifacts (MILESTONES.md, PROJECT.md, STATE.md, config.json) with accumulated formatting debt across 18 milestones
 
-**Major components:**
+**Issue summary:**
 
-| Component | Responsibility |
-|-----------|----------------|
-| `src/plugin/decision-engine.js` | In-process deterministic decision resolution for plugin hooks |
-| `src/lib/decisions.js` | CLI-callable decision functions for workflow-invoked decisions |
-| `src/lib/decision-rules.js` | Shared rule definitions consumed by both plugin and CLI layers |
-| Plugin hooks (existing) | Intercept points where decisions currently flow to LLM |
-| CLI commands (existing) | Data providers that already compute deterministic results |
-| Workflow prompts (existing) | LLM instructions that embed decision-requesting patterns |
+| File | Issues Found | Severity |
+|------|-------------|----------|
+| MILESTONES.md | 11 issues | 3 formatting, 3 structural, 5 missing |
+| PROJECT.md | 14 issues | 4 formatting, 6 stale, 4 structural |
+| STATE.md | 2 issues | 2 stale |
+| config.json | 1 issue | 1 stale |
+| INTENT.md | 2 issues | 2 formatting |
 
-**Key patterns:** Rule-based resolution, decision registry, fallback-to-LLM, progressive offloading
+**Key patterns:** Non-chronological ordering, missing checkmarks, orphaned HTML tags, stale numeric claims, missing milestone entries
 
-**Anti-patterns:** Duplicating decision logic across plugin/CLI, offloading non-deterministic decisions, breaking LLM escape hatch
+**Anti-patterns:** Mixing `--` and `—` for dashes, inconsistent archive references, keeping struck-through items in active lists
 
-**Scaling priority:** Start with highest-frequency deterministic decisions (phase numbering, file paths, state transitions), measure token savings before expanding
+**Fix priority:** Formatting fixes first (safe, mechanical), then stale data updates (need verification), then structural changes (highest impact)
 </architecture_compact>
 <!-- /section -->
 
 ---
 
 <!-- section: standard_architecture -->
-## System Overview — Current vs. Target
+## Issue Catalog
 
-### Current Architecture: Three Independent Layers
+### MILESTONES.md — 11 Issues
 
-```
-┌───────────────────────────────────────────────────────────────────────────┐
-│                    HOST EDITOR (OpenCode)                                  │
-│                                                                           │
-│  ┌─────────────────────────────────────────────────────────────────────┐  │
-│  │                         LLM Agent                                    │  │
-│  │  • Reads workflow prompts                                           │  │
-│  │  • Makes ALL decisions (deterministic + non-deterministic)          │  │
-│  │  • Calls CLI for data                                               │  │
-│  │  • Calls plugin tools for state mutations                           │  │
-│  └──────────┬───────────────────────────┬──────────────────────────────┘  │
-│             │ workflow prompts           │ tool calls                      │
-│             ▼                           ▼                                 │
-│  ┌───────────────────┐      ┌────────────────────────────────────────┐   │
-│  │  45 Workflows     │      │  plugin.js (6 hooks + 5 tools)        │   │
-│  │  (markdown)       │      │  • system prompt injection             │   │
-│  │  • Decision logic │      │  • command enrichment                  │   │
-│  │    embedded in    │      │  • compaction context                  │   │
-│  │    natural lang   │      │  • advisory guardrails                 │   │
-│  └──────────┬────────┘      │  • stuck detection                    │   │
-│             │ execSync      │  • idle validation                    │   │
-│             ▼               └──────────────┬─────────────────────────┘   │
-│  ┌──────────────────────────────────────────┴────────────────────────┐   │
-│  │              bgsd-tools.cjs (CLI — 100+ commands)                  │   │
-│  │  ┌─────────┐ ┌──────────┐ ┌───────────┐ ┌────────────────────┐   │   │
-│  │  │ router  │→│ commands │→│  lib/      │→│ .planning/ files   │   │   │
-│  │  │ (1 file)│ │ (22 files)│ │ (26 files)│ │ (data on disk)     │   │   │
-│  │  └─────────┘ └──────────┘ └───────────┘ └────────────────────┘   │   │
-│  └───────────────────────────────────────────────────────────────────┘   │
-└───────────────────────────────────────────────────────────────────────────┘
-```
+#### FORMATTING (3 issues)
 
-**Problem:** The LLM sits at the top and makes every decision — including ones that are fully deterministic and could be resolved by code. Each LLM decision costs tokens and latency.
+**F-01: Missing ✅ checkmark on v10.0**  
+- **File:** MILESTONES.md:108  
+- **Current:** `## v10.0 Agent Intelligence & UX (Shipped: 2026-03-11)`  
+- **Expected:** `## ✅ v10.0 Agent Intelligence & UX (Shipped: 2026-03-11)`  
+- **Fix:** Add `✅ ` prefix to match all other shipped milestones  
+- **Effort:** 1 line edit
 
-### Target Architecture: Decision Engine Layer
+**F-02: Inconsistent "What's next" command references**  
+- **File:** MILESTONES.md:152, 178, 204  
+- **Current:** Lines 152, 178, 204 reference `/gsd-new-milestone` (old pre-rebrand command name)  
+- **Expected:** `/bgsd-new-milestone` (current command name)  
+- **Other entries:** Lines 22, 47, 73, 99, 123, 380 correctly use `/bgsd milestone new` or `/bgsd-new-milestone`  
+- **Fix:** Replace 3 stale `/gsd-new-milestone` references with `/bgsd-new-milestone`  
+- **Effort:** 3 line edits
 
-```
-┌───────────────────────────────────────────────────────────────────────────┐
-│                    HOST EDITOR (OpenCode)                                  │
-│                                                                           │
-│  ┌─────────────────────────────────────────────────────────────────────┐  │
-│  │                         LLM Agent                                    │  │
-│  │  • Reads workflow prompts (SIMPLIFIED — fewer decision points)      │  │
-│  │  • Makes ONLY non-deterministic decisions                           │  │
-│  │  • Receives pre-computed suggestions via system prompt               │  │
-│  │  • Calls CLI for data + decisions combined                          │  │
-│  └──────────┬───────────────────────────┬──────────────────────────────┘  │
-│             │ simplified workflows      │ tool calls (enriched)           │
-│             ▼                           ▼                                 │
-│  ┌───────────────────┐      ┌────────────────────────────────────────┐   │
-│  │  45 Workflows     │      │  plugin.js (hooks + tools + decisions) │   │
-│  │  (trimmed)        │      │  • system prompt + DECISION INJECTION  │   │
-│  │  • Fewer decision │      │  • command enrichment + PRE-RESOLUTION │   │
-│  │    points         │      │  • advisory guardrails                 │   │
-│  └──────────┬────────┘      │  ┌──────────────────────────────────┐  │   │
-│             │ execSync      │  │  decision-engine.js (NEW)        │  │   │
-│             ▼               │  │  • Rule evaluation in-process    │  │   │
-│  ┌────────────────────────┐ │  │  • Pre-compute & inject results  │  │   │
-│  │  bgsd-tools.cjs (CLI)  │ │  │  • Fallback flag for LLM        │  │   │
-│  │  ┌──────────────────┐  │ │  └──────────────────────────────────┘  │   │
-│  │  │ decisions.js     │  │ └──────────────────┬─────────────────────┘   │
-│  │  │ (NEW — shared    │  │                    │                          │
-│  │  │  decision logic) │  │                    │                          │
-│  │  ├──────────────────┤  │                    │                          │
-│  │  │ decision-rules.js│◄─┼────────────────────┘                          │
-│  │  │ (NEW — shared    │  │  (imported by both plugin and CLI)            │
-│  │  │  rule defs)      │  │                                               │
-│  │  └──────────────────┘  │                                               │
-│  └────────────────────────┘                                               │
-└───────────────────────────────────────────────────────────────────────────┘
-```
+**F-03: Inconsistent "What's next" dash format**  
+- **File:** MILESTONES.md:380  
+- **Current:** `Ready for next milestone -- /bgsd-new-milestone` (double hyphen)  
+- **Expected:** `Ready for next milestone — /bgsd-new-milestone` (em dash, matching other entries)  
+- **Fix:** Replace `--` with `—`  
+- **Effort:** 1 line edit
 
-### Component Responsibilities
+#### STRUCTURAL (3 issues)
 
-| Component | Responsibility | Typical Implementation |
-|-----------|----------------|------------------------|
-| `decision-engine.js` (plugin) | In-process decision resolution during plugin hooks | Evaluates rules against parsed project state, injects results into system prompt and command enrichment |
-| `decisions.js` (CLI lib) | CLI-accessible decision functions for workflow-invoked resolution | Exports decision functions callable via `bgsd-tools.cjs util:decide <type>` |
-| `decision-rules.js` (shared) | Rule definitions (the "what to decide") | JSON-like rule registry with conditions, resolution functions, confidence levels |
-| Existing plugin hooks | Injection points for pre-computed decisions | `system.transform` injects decision context; `command.execute.before` pre-resolves params |
-| Existing CLI commands | Data providers + now decision resolvers | Commands like `init:execute-phase` already compute deterministic values |
-| Existing workflows | Simplified prompts that consume pre-resolved decisions | Replace "figure out X" with "use pre-resolved X from `<bgsd-context>`" |
+**S-01: Non-chronological ordering**  
+- **File:** MILESTONES.md (entire file)  
+- **Current order:** v9.3, v9.2, v8.3, v8.2, v10.0, _blank line_, v7.1, v7.0, v6.0, v5.0, v4.0, v3.0, v2.0, v1.1, v1.0, v11.3  
+- **Expected order (newest-first):** v11.3, v10.0, v9.3, v9.2, v8.3, v8.2, v7.1, v7.0, v6.0, v5.0, v4.0, v3.0, v2.0, v1.1, v1.0  
+- **Problems:**  
+  - v11.3 is at the bottom (should be at top as most recent shipped)  
+  - v10.0 is sandwiched between v8.2 and v7.1  
+  - Blank line 132-133 between v10.0 and v7.1 (spurious)  
+- **Fix:** Reorder all entries newest-first by ship date  
+- **Effort:** Block move, ~15 minutes
 
-<!-- /section -->
+**S-02: v9.2 entry describes wrong milestone**  
+- **File:** MILESTONES.md:31-53  
+- **Current heading:** `v9.2 CLI Tool Integrations & Runtime Modernization (Shipped: 2026-03-10)`  
+- **Current body text:** "Deep plugin integration with always-on context injection, native LLM tools, event-driven state synchronization, and advisory guardrails" — this is v9.0's description, not v9.2  
+- **Current archive references:** Points to `v9.0-ROADMAP.md`, `v9.0-REQUIREMENTS.md`, `v9.0-DOCS.md` — wrong version prefix  
+- **Evidence:** The v9.2 heading says "CLI Tool Integrations" but the description matches v9.0 "Embedded Plugin Experience"  
+- **Fix:** Replace body text with actual v9.2 content (from PROJECT.md lines 70-78: tool detection, ripgrep/fd/jq, yq/bat/gh, Bun runtime). Fix archive references to `v9.2-*`  
+- **Effort:** Rewrite 1 entry, ~10 minutes
+
+**S-03: Missing `v9.2-DOCS.md` archive**  
+- **File:** MILESTONES.md:50 (references `v9.0-DOCS.md`) and filesystem  
+- **Current:** Archive entry references `v9.0-DOCS.md` (which is v9.0's docs file)  
+- **Actual archives on disk:** `v9.2-REQUIREMENTS.md`, `v9.2-ROADMAP.md` exist; `v9.2-DOCS.md` does NOT exist  
+- **Fix:** Either create `v9.2-DOCS.md` from git history, or remove the DOCS archive line if none was generated  
+- **Effort:** 5 minutes
+
+#### MISSING ENTRIES (5 issues)
+
+**M-01: v8.0 Performance & Agent Architecture — missing from MILESTONES.md**  
+- **Evidence:** Archives exist (`v8.0-ROADMAP.md`, `v8.0-REQUIREMENTS.md`, `v8.0-DOCS.md`, `v8.0-phases`). PROJECT.md references it (line 5). Requirements section references it (lines 188-194)  
+- **Fix:** Add v8.0 entry between v8.2 and v7.1  
+- **Effort:** Write 1 new entry, ~10 minutes
+
+**M-02: v8.1 RAG-Powered Research — missing from MILESTONES.md**  
+- **Evidence:** Archives exist (`v8.1-ROADMAP.md`, `v8.1-REQUIREMENTS.md`, `v8.1-phases`). PROJECT.md line 5 references v8.1  
+- **Fix:** Add v8.1 entry between v8.2 and v8.0  
+- **Effort:** Write 1 new entry, ~10 minutes
+
+**M-03: v9.1 Performance Acceleration — missing from MILESTONES.md**  
+- **Evidence:** Archives exist (`v9.1-ROADMAP.md`, `v9.1-REQUIREMENTS.md`, `v9.1-DOCS.md`). PROJECT.md lines 80-89 describe it. No `v9.1-phases` directory exists  
+- **Fix:** Add v9.1 entry between v9.2 and v9.0  
+- **Effort:** Write 1 new entry, ~10 minutes
+
+**M-04: v11.0 Natural Interface & Insights — missing from MILESTONES.md**  
+- **Evidence:** Archives exist (`v11.0-ROADMAP.md`, `v11.0-REQUIREMENTS.md`, `v11.0-DOCS.md`, `v11.0-phases`). PROJECT.md lines 54-65 describe it  
+- **Fix:** Add v11.0 entry between v11.3 and v10.0  
+- **Effort:** Write 1 new entry, ~10 minutes
+
+**M-05: v11.1 and v11.2 — missing from MILESTONES.md**  
+- **Evidence:** v11.1 archives exist (`v11.1-ROADMAP.md`, `v11.1-REQUIREMENTS.md`, `v11.1-DOCS.md`, `v11.1-phases`). v11.2 has no archives at all but is referenced in INTENT.md history (line 93). INTENT.md history references v11.1 (line 76) and v11.2 (line 93)  
+- **Fix:** Add v11.1 entry. For v11.2, determine if it shipped (check git history) or was folded into another milestone. If shipped, add entry; if not, note in v11.1 or remove INTENT.md reference  
+- **Effort:** Write 1-2 new entries, ~15 minutes
 
 ---
 
-<!-- section: three_layer_integration -->
-## Three-Layer Integration Analysis
+### PROJECT.md — 14 Issues
 
-### Layer 1: Plugin Hooks (In-Process, Fastest)
+#### FORMATTING (4 issues)
 
-The plugin runs **in-process** with the host editor — no subprocess overhead. This is the optimal location for high-frequency, low-latency decisions.
+**F-04: Orphaned `</details>` tag**  
+- **File:** PROJECT.md:68  
+- **Current:** Line 68 has a standalone `</details>` that doesn't close any `<details>` block  
+- **Context:** Line 65 closes the v11.0 block. Line 67 is blank. Line 68 is the orphan. Line 70 opens a new v9.2 block  
+- **Fix:** Delete line 68  
+- **Effort:** 1 line delete
 
-**Current hooks that already make decisions programmatically:**
+**F-05: Broken table rows in Key Decisions**  
+- **File:** PROJECT.md:268-270  
+- **Current:** Three rows are missing the `Outcome` column (only 2 cells instead of 3):
+  ```
+  | Trajectory exploration over worktrees | Sequential exploration sufficient; worktrees disk-expensive |
+  | Automatic pivot without human signal | Human-in-the-loop is a core GSD principle |
+  | Trajectory analytics | Deferred to future milestone |
+  ```
+- **Expected:** All rows should have 3 columns: `| Decision | Rationale | Outcome |`  
+- **Fix:** Add outcome column. These appear to be "deferred" decisions — add `Deferred` or `N/A — declined` as outcome  
+- **Effort:** 3 line edits
 
-| Hook | Current Decision | How It Works |
-|------|-----------------|--------------|
-| `system.transform` | What context to inject | `buildSystemPrompt()` reads state, computes phase/plan/milestone info |
-| `command.execute.before` | What enrichment to inject | `enrichCommand()` detects phase args, resolves paths, counts plans |
-| `tool.execute.after` | Whether agent is stuck | `stuckDetector.trackToolCall()` counts error repeats |
-| `event` (idle) | Whether state needs validation | `idleValidator.onIdle()` checks cooldowns, runs checks |
-| `tool.execute.after` | Whether conventions violated | `guardrails.onToolAfter()` checks naming patterns |
+**F-06: Key Decisions table has no visual separation between categories**  
+- **File:** PROJECT.md:267-270  
+- **Current:** Lines 267-270 are "declined/deferred" decisions mixed inline with "accepted" decisions above them (lines 243-266) with no separator  
+- **Fix:** Add a section header or separator comment between accepted and declined decisions  
+- **Effort:** 1 line addition
 
-**New decisions to add at plugin layer:**
+**F-07: v9.2 Previous section has wrong milestone name in heading**  
+- **File:** PROJECT.md:71  
+- **Current:** `Previous: v9.2 CLI Tool Integrations & Runtime Modernization`  
+- **Note:** This heading is correct per PROJECT.md line 5 context. But MILESTONES.md's body text for v9.2 describes v9.0. One of them is wrong — verify against `v9.2-ROADMAP.md` to determine which  
+- **Fix:** Verify and align both files to match the actual v9.2 roadmap  
+- **Effort:** Cross-reference, ~5 minutes
 
-| Decision | Current Owner | Offload Logic |
-|----------|--------------|---------------|
-| Next task to execute | LLM reads plan | Plugin parses plan XML, computes next incomplete task |
-| Whether phase is complete | LLM checks summaries | Plugin counts plan files vs summary files |
-| Whether to run tests | LLM decides | Plugin checks if source files changed since last test |
-| Current plan number | LLM reads STATE.md | Plugin already parses this — expose more explicitly |
-| Phase directory path | LLM computes from slug | Plugin already resolves this in `enrichCommand()` |
-| Model recommendation | LLM guesses | `orchestration.js` already computes — pipe to plugin |
+#### STALE DATA (6 issues)
 
-**Integration pattern for plugin-layer decisions:**
+**D-01: Module count "53 src/ modules" is stale**  
+- **File:** PROJECT.md:5, 221, 224  
+- **Current:** "53 src/ modules" and "53 modules"  
+- **Actual:** 119 JS files total in `src/`. `src/lib/` has 35 files, `src/commands/` has 24 files. Total varies depending on counting subdirectories  
+- **Fix:** Update to actual counts. Line 224 says "35 modules" for lib (correct) and "23 modules" for commands (actual: 24)  
+- **Effort:** 3 line edits after accurate count
 
-```javascript
-// src/plugin/decision-engine.js
-import { getProjectState } from './project-state.js';
-import { evaluateRules } from './decision-rules.js'; // Shared rules
+**D-02: "34-module split" decision reference is stale**  
+- **File:** PROJECT.md:246  
+- **Current:** `34-module split (18 lib + 14 commands + router + index)`  
+- **Actual:** 35 lib + 24 commands + router + index = 61+  
+- **Fix:** Update to current counts  
+- **Effort:** 1 line edit
 
-export function resolveDecisions(cwd, context) {
-  const projectState = getProjectState(cwd);
-  if (!projectState) return { decisions: [], fallback: true };
+**D-03: "1014 tests (414 passing)" is confusing**  
+- **File:** PROJECT.md:221  
+- **Current:** `1014 tests (414 passing)`  
+- **Note:** 1014 total with only 414 passing means 600 failures. This is accurate per the known tech debt note (line 228) but the parenthetical format implies "414 out of 1014" which is unusual. Most entries elsewhere say "X tests passing (Y failures)"  
+- **Fix:** Reformat to `1014 tests (600 failing — Bun runtime banner issue)` or `414 tests passing, 600 failing` for clarity  
+- **Effort:** 1 line edit
 
-  const decisions = evaluateRules(projectState, context);
+**D-04: "45 workflows" count is wrong**  
+- **File:** PROJECT.md:226  
+- **Current:** `45 workflows`  
+- **Actual:** 44 workflow files in `workflows/`  
+- **Fix:** Update to 44  
+- **Effort:** 1 line edit
 
-  // Each decision: { id, type, value, confidence, fallback }
-  // confidence: HIGH = code is certain, MEDIUM = likely correct, LOW = suggest to LLM
-  // fallback: true = LLM should verify, false = code answer is authoritative
+**D-05: Struck-through out-of-scope item still listed**  
+- **File:** PROJECT.md:211  
+- **Current:** `~~SQLite codebase index~~ — Reconsidered for v8.0 as read cache layer`  
+- **Note:** This was reconsidered, implemented in v8.0 (SQLite caching), and shipped. It's no longer out of scope — it's delivered. Having a struck-through item with a note about reconsidering is confusing cruft  
+- **Fix:** Remove the line entirely. The SQLite caching is documented as a delivered feature in Requirements line 188  
+- **Effort:** 1 line delete
 
-  return { decisions, fallback: false };
-}
-```
+**D-06: Node.js constraint says "18+" but Context section says "22.5"**  
+- **File:** PROJECT.md:235 vs 223  
+- **Current constraint (line 235):** `Node.js 18+: Minimum version (for fetch, node:test)`  
+- **Current context (line 223):** `Node.js >= 22.5 (required for node:sqlite caching)`  
+- **package.json engines:** `"node": ">=18"`  
+- **Note:** Both are technically true — 18 is the floor, 22.5 enables sqlite. But the constraint doesn't mention the 22.5 preference  
+- **Fix:** Update constraint to note both: "Node.js 18+ minimum (22.5+ recommended for `node:sqlite` caching)"  
+- **Effort:** 1 line edit
 
-**Injection via existing `system.transform` hook:**
+#### STRUCTURAL (4 issues)
 
-```javascript
-// In src/plugin/index.js — extend existing systemTransform
-const systemTransform = safeHook('system.transform', async (input, output) => {
-  const sysDir = directory || process.cwd();
-  const prompt = buildSystemPrompt(sysDir);
-  if (prompt && output?.system) output.system.push(prompt);
+**R-01: "See REQUIREMENTS.md" reference to non-existent file**  
+- **File:** PROJECT.md:203  
+- **Current:** `See .planning/REQUIREMENTS.md for v11.4 requirements.`  
+- **Actual:** `.planning/REQUIREMENTS.md` does not exist. INTENT.md has the v11.4 outcomes  
+- **Fix:** Either create REQUIREMENTS.md as part of milestone setup, or change reference to INTENT.md  
+- **Effort:** 1 line edit or file creation
 
-  // NEW: inject pre-resolved decisions
-  const decisions = resolveDecisions(sysDir, { hook: 'system' });
-  if (decisions.decisions.length > 0) {
-    const xml = formatDecisionsXml(decisions);
-    output.system.push(xml);
-  }
-});
-```
+**R-02: Previous milestones in `<details>` blocks skip v11.1, v11.2**  
+- **File:** PROJECT.md:27-123  
+- **Current sequence:** v11.3, v10.0, v11.0, v9.2, v9.1, v9.0, v8.3, v1.0-v8.2  
+- **Missing:** v11.1, v11.2 (if they shipped)  
+- **Also wrong:** Non-chronological order (v11.0 appears after v10.0)  
+- **Fix:** Add missing entries, reorder chronologically  
+- **Effort:** ~15 minutes
 
-### Layer 2: CLI Commands (Subprocess, Reliable)
+**R-03: Key Decisions table is growing unbounded**  
+- **File:** PROJECT.md:239-279  
+- **Current:** 37 decisions spanning v1.0 through v11.3. Table is 40 lines long  
+- **Recommendation:** Archive decisions from early milestones (v1.0-v7.1) into a collapsed `<details>` block. Keep only decisions from the last 3-4 milestones as active  
+- **Effort:** ~10 minutes
 
-The CLI runs as a subprocess via `execSync`. It's the right place for decisions that:
-- Need heavy computation (AST parsing, dependency analysis)
-- Are invoked explicitly by workflows
-- Need persistent caching (SQLite L1/L2)
+**R-04: Requirements section lists 45 individual validated requirements**  
+- **File:** PROJECT.md:128-199  
+- **Current:** 45 checkmarked requirements with version tags  
+- **Recommendation:** This section is 71 lines and growing. Consider archiving v1.0-v8.0 requirements into a collapsed `<details>` block, keeping only recent (v8.2+) requirements visible  
+- **Effort:** ~10 minutes
 
-**Current CLI commands that already resolve decisions:**
+---
 
-| Command | Decision It Resolves | Current Consumer |
-|---------|---------------------|-----------------|
-| `init:execute-phase` | Phase dir, plan list, branching | execute-phase workflow |
-| `init:plan-phase` | Phase info, research status, models | plan-phase workflow |
-| `util:classify plan` | Task complexity, model recommendation | Orchestration |
-| `plan:find-phase` | Phase number from partial input | Multiple workflows |
-| `verify:state validate` | State consistency issues | Idle validator |
-| `util:resolve-model` | Model for agent/profile | Agent spawning |
+### STATE.md — 2 Issues
 
-**New CLI decision commands to add:**
+**D-07: "211 plans completed" may be stale**  
+- **File:** STATE.md:28  
+- **Current:** `Total plans completed: 211 (v1.0-v11.3)`  
+- **Note:** This should be verified against actual milestone data. The MILESTONES.md entries that include plan counts sum to: 14+10+13+10+13+14+12+12+15+11+14+12+15+35+11+12+9 = 242 plans. However, not all milestones are listed in MILESTONES.md (5 are missing)  
+- **Fix:** Recalculate from MILESTONES.md after all entries are added  
+- **Effort:** 5 minutes after MILESTONES.md is fixed
 
-| Command | Decision | Currently Done By |
-|---------|----------|-------------------|
-| `util:decide next-action` | What the agent should do next | LLM reads state + reasons |
-| `util:decide phase-transition` | Whether to advance phase | LLM checks completeness |
-| `util:decide commit-message` | Conventional commit prefix | LLM generates from diff |
-| `util:decide plan-template` | Which plan template to use | LLM reasons about type |
-| `util:decide file-placement` | Where a new file should go | LLM reasons about conventions |
+**D-08: v11.3 execution notes reference "4 phases (110-113)"**  
+- **File:** STATE.md:19  
+- **Note:** This is accurate for v11.3. However, the previous milestone notes are only from v11.3 — earlier session context has been compacted away. This is fine for session continuity but creates an incomplete historical record  
+- **Fix:** No action needed — this is by design  
+- **Effort:** 0
 
-**Integration pattern:**
+---
 
-```javascript
-// src/lib/decisions.js — shared decision logic
-function decideNextAction(cwd) {
-  const state = parseState(cwd);
-  const plans = findPhasePlans(cwd, state.phase);
-  const summaries = findPhaseSummaries(cwd, state.phase);
+### config.json — 1 Issue
 
-  if (!plans.length) return { action: 'plan-phase', confidence: 'HIGH' };
-  if (summaries.length < plans.length) return { action: 'execute-phase', confidence: 'HIGH' };
-  if (summaries.length === plans.length) return { action: 'verify-work', confidence: 'HIGH' };
+**D-09: Bun version "1.3.10" may be stale**  
+- **File:** config.json:3  
+- **Current:** `"detected": "1.3.10"`  
+- **Note:** This was auto-detected at some point and persisted. If Bun has been updated on this system, the config is stale  
+- **Fix:** Re-run Bun detection or remove the cached version (it's re-detected on startup)  
+- **Effort:** 1 field edit or delete
 
-  return { action: null, confidence: 'LOW', fallback: true };
-}
-```
+---
 
-### Layer 3: Workflow Prompts (LLM-Consumed, Simplified)
+### INTENT.md — 2 Issues
 
-Workflows are markdown prompts that the LLM reads and follows. They currently embed decision logic in natural language that the LLM must reason through.
+**F-08: History entries not in chronological order**  
+- **File:** INTENT.md:55-101  
+- **Current order:** v11.4 (2026-03-13), v9.2 (2026-03-13), v11.1 (2026-03-11), v10.0 (2026-03-10), v9.3 (2026-03-10), v9.0 (2026-03-09), v8.3 (2026-03-08), v11.2 (2026-03-12), v8.2 (2026-03-06), v7.1 (2026-03-02)  
+- **Problems:** v9.2 at line 71 is dated 2026-03-13 but is between v11.4 and v11.1. v11.2 at line 93 is dated 2026-03-12 but appears after v8.3 (2026-03-08)  
+- **Fix:** Reorder by date descending (newest first): v11.4, v11.2, v11.1, v10.0, v9.3, v9.2, v9.0, v8.3, v8.2, v7.1  
+- **Effort:** Block reorder, ~5 minutes
 
-**Current pattern (expensive):**
-```markdown
-## 4. Determine Next Step
-Parse STATE.md to find current phase. Check if plans exist.
-If no plans → run plan-phase. If incomplete plans → execute next.
-If all complete → run verify-work.
-```
-
-**Target pattern (pre-resolved):**
-```markdown
-## 4. Next Step
-Use `next_action` from `<bgsd-context>` JSON:
-- `plan-phase` → Run plan-phase workflow
-- `execute-phase` → Run execute-phase workflow  
-- `verify-work` → Run verify-work workflow
-```
-
-**The `<bgsd-context>` block already exists** — the `command.execute.before` hook injects it for every `/bgsd-*` command. Extending it with pre-resolved decisions is a natural evolution:
-
-```json
-{
-  "phase_number": "3",
-  "phase_dir": ".planning/phases/03-testing",
-  "plans": ["03-01-PLAN.md", "03-02-PLAN.md"],
-  "incomplete_plans": ["03-02-PLAN.md"],
-  "decisions": {
-    "next_action": "execute-phase",
-    "next_plan": "03-02-PLAN.md",
-    "phase_complete": false,
-    "suggested_commit_prefix": "feat",
-    "test_command": "npm test"
-  }
-}
-```
+**F-09: "v9.2" label on INTENT.md history entry is likely wrong**  
+- **File:** INTENT.md:71  
+- **Current:** `### v9.2 — 2026-03-13` with content about "LLM offloading" — that's v11.3 scope, not v9.2  
+- **Note:** The date 2026-03-13 and content about "LLM offloading audit" match v11.3. This label appears to be a copy-paste error  
+- **Fix:** Relabel to `### v11.3 — 2026-03-13` or merge with the v11.4 entry above it  
+- **Effort:** 1 line edit
 
 <!-- /section -->
 
 ---
 
 <!-- section: patterns -->
-## Architectural Patterns
+## Fix Prioritization
 
-### Pattern 1: Decision Registry
+### Wave 1: Safe Mechanical Fixes (est. 30 min)
 
-**What:** Central registry of decision rules that can be evaluated by both plugin (ESM) and CLI (CJS) layers.
+All formatting — no judgment needed, no data verification required.
 
-**When to use:** For every deterministic decision being offloaded from LLM to code.
+| ID | File | Fix | Lines |
+|----|------|-----|-------|
+| F-01 | MILESTONES.md:108 | Add `✅` to v10.0 heading | 1 |
+| F-02 | MILESTONES.md:152,178,204 | Replace `/gsd-new-milestone` → `/bgsd-new-milestone` | 3 |
+| F-03 | MILESTONES.md:380 | Replace `--` → `—` | 1 |
+| F-04 | PROJECT.md:68 | Delete orphaned `</details>` | 1 |
+| F-05 | PROJECT.md:268-270 | Add missing `Outcome` column to 3 table rows | 3 |
+| F-08 | INTENT.md:55-101 | Reorder history entries chronologically | Block move |
+| F-09 | INTENT.md:71 | Relabel `v9.2` → `v11.3` | 1 |
 
-**Trade-offs:**
-- ✅ Single source of truth for decision logic
-- ✅ Testable in isolation (pure functions)
-- ✅ Both plugin and CLI can consume
-- ❌ Requires careful module format handling (ESM/CJS boundary)
+### Wave 2: Stale Data Updates (est. 20 min)
 
-**Critical constraint:** The plugin is ESM (`src/plugin/`), the CLI is CJS (`src/lib/`). They are built as separate bundles by esbuild. Shared decision rules must work in both formats.
+Require counting/verification against filesystem.
 
-**Solution:** Write decision rules as pure functions in `src/lib/decision-rules.js` (CJS). The plugin can import the bundled output or the esbuild build can inline the shared module into both bundles. Since esbuild already bundles both targets, this is transparent — just `require()` in CJS and the build handles it.
+| ID | File | Fix | Lines |
+|----|------|-----|-------|
+| D-01 | PROJECT.md:5,221,224 | Update module counts to actuals | 3 |
+| D-02 | PROJECT.md:246 | Update "34-module" decision text | 1 |
+| D-03 | PROJECT.md:221 | Clarify test count format | 1 |
+| D-04 | PROJECT.md:226 | Fix workflow count 45→44 | 1 |
+| D-05 | PROJECT.md:211 | Remove struck-through SQLite item | 1 |
+| D-06 | PROJECT.md:235 | Update Node.js constraint to mention 22.5 | 1 |
+| D-09 | config.json:3 | Re-detect or remove stale Bun version | 1 |
 
-```javascript
-// src/lib/decision-rules.js (CJS — consumed by both builds)
-'use strict';
+### Wave 3: Structural Fixes (est. 60 min)
 
-const DECISION_RULES = {
-  'next-action': {
-    evaluate(state, roadmap, plans, summaries) {
-      if (!plans || plans.length === 0) return { value: 'plan-phase', confidence: 'HIGH' };
-      const incomplete = plans.filter(p => !summaries.includes(p.replace('-PLAN.md', '-SUMMARY.md')));
-      if (incomplete.length > 0) return { value: 'execute-phase', confidence: 'HIGH' };
-      return { value: 'verify-work', confidence: 'HIGH' };
-    }
-  },
+Require writing new content or reorganizing sections.
 
-  'phase-complete': {
-    evaluate(state, roadmap, plans, summaries) {
-      if (!plans || plans.length === 0) return { value: false, confidence: 'LOW' };
-      return {
-        value: summaries.length >= plans.length,
-        confidence: 'HIGH'
-      };
-    }
-  },
-
-  'commit-prefix': {
-    evaluate(state, roadmap, plans, summaries, context) {
-      const phase = state?.phase || '';
-      if (/test/i.test(phase)) return { value: 'test', confidence: 'HIGH' };
-      if (/refactor/i.test(phase)) return { value: 'refactor', confidence: 'HIGH' };
-      if (/fix/i.test(phase)) return { value: 'fix', confidence: 'HIGH' };
-      if (/doc/i.test(phase)) return { value: 'docs', confidence: 'HIGH' };
-      return { value: 'feat', confidence: 'MEDIUM' };
-    }
-  }
-};
-
-module.exports = { DECISION_RULES };
-```
-
-### Pattern 2: Progressive Offloading (Confidence-Gated)
-
-**What:** Each decision has a confidence level. HIGH confidence = code is authoritative. MEDIUM = code suggests, LLM confirms. LOW = code provides data, LLM decides.
-
-**When to use:** For all offloaded decisions — prevents premature automation of nuanced decisions.
-
-**Trade-offs:**
-- ✅ Safe — bad decisions fall back to LLM
-- ✅ Measurable — can track confidence vs. LLM override rate
-- ❌ LLM must still read LOW-confidence suggestions (partial savings only)
-
-```javascript
-// Decision result format
-{
-  id: 'next-action',
-  value: 'execute-phase',
-  confidence: 'HIGH',     // HIGH | MEDIUM | LOW
-  fallback: false,         // true = LLM should verify/override
-  rationale: '1 incomplete plan in phase 3',
-  metadata: { incomplete_plan: '03-02-PLAN.md' }
-}
-```
-
-**Workflow consumption:**
-```markdown
-<!-- HIGH confidence: use directly -->
-Next action: ${decisions.next_action.value}
-
-<!-- MEDIUM confidence: use with brief validation -->
-Suggested commit prefix: ${decisions.commit_prefix.value}
-(verify this matches the change type)
-
-<!-- LOW confidence: use as input to LLM reasoning -->
-Possible next action: ${decisions.next_action.value}
-Rationale: ${decisions.next_action.rationale}
-Make your own determination.
-```
-
-### Pattern 3: Enrichment Extension (Zero New Hooks)
-
-**What:** Extend the existing `enrichCommand()` function and `<bgsd-context>` JSON to include pre-resolved decisions — no new hooks needed.
-
-**When to use:** Always — this is the integration seam.
-
-**Trade-offs:**
-- ✅ Zero API changes to host editor integration
-- ✅ Uses existing, tested infrastructure
-- ✅ Backward compatible — new fields in existing JSON
-- ❌ All decisions must be computable at command-start time
-
-**Implementation:**
-
-```javascript
-// In src/plugin/command-enricher.js — extend enrichCommand()
-function enrichCommand(input, output, cwd) {
-  // ... existing enrichment logic ...
-
-  // NEW: resolve decisions based on command type
-  const decisions = resolveDecisionsForCommand(command, projectState);
-  if (decisions) {
-    enrichment.decisions = decisions;
-  }
-
-  // ... existing output injection ...
-}
-```
+| ID | File | Fix | Lines |
+|----|------|-----|-------|
+| S-01 | MILESTONES.md | Reorder all entries chronologically | Block moves |
+| S-02 | MILESTONES.md:31-53 | Rewrite v9.2 entry with correct content | ~25 lines |
+| S-03 | MILESTONES.md:50 | Fix/remove v9.2-DOCS.md archive ref | 1 |
+| M-01–M-05 | MILESTONES.md | Add 6 missing milestone entries | ~150 lines |
+| R-01 | PROJECT.md:203 | Fix REQUIREMENTS.md reference | 1 |
+| R-02 | PROJECT.md:27-123 | Add missing milestones, reorder `<details>` | ~20 lines |
+| R-03 | PROJECT.md:239-279 | Archive old decisions into `<details>` | ~10 lines |
+| R-04 | PROJECT.md:128-199 | Archive old requirements into `<details>` | ~10 lines |
+| D-07 | STATE.md:28 | Recalculate plan total after MILESTONES.md fix | 1 |
 
 <!-- /section -->
 
 ---
 
 <!-- section: data_flow -->
-## Data Flow
+## Archive Integrity Audit
 
-### Current Flow: LLM Decides Everything
+### Archive Reference vs. Filesystem Cross-Check
 
-```
-User types: /bgsd-execute-phase 3
-    │
-    ▼
-[command.execute.before hook]
-    │ enrichCommand() → <bgsd-context> JSON
-    │   (phase_dir, plans, config)
-    ▼
-[LLM reads workflow: execute-phase.md]
-    │ LLM reasons: "phase 3 has 2 plans, 1 complete..."
-    │ LLM decides: "execute plan 03-02-PLAN.md next"
-    │ LLM decides: "run sequentially (no parallelization)"
-    │ LLM decides: "use sonnet model"
-    │                     ← 4 LLM decisions, ~500 tokens each
-    ▼
-[LLM calls CLI]
-    │ bgsd-tools.cjs init:execute-phase 3
-    │ bgsd-tools.cjs util:classify phase 3
-    ▼
-[CLI returns data]
-    │ JSON results
-    ▼
-[LLM reasons about results]
-    │ LLM decides: "spawn executor subagent"
-    │                     ← 1 more LLM decision
-    ▼
-[Execution begins]
-```
+| Milestone | ROADMAP | REQUIREMENTS | DOCS | Phases Dir | In MILESTONES.md | Notes |
+|-----------|---------|-------------|------|-----------|-----------------|-------|
+| v1.0 | ✅ | ✅ | ❌ | ✅ | ✅ | No DOCS — pre-DOCS era |
+| v1.1 | ✅ | ✅ | ❌ | ✅ | ✅ | No DOCS — pre-DOCS era |
+| v2.0 | ✅ | ✅ | ❌ | ✅ | ✅ | No DOCS — pre-DOCS era |
+| v3.0 | ✅ | ✅ | ❌ | ✅ | ✅ | No DOCS — pre-DOCS era |
+| v4.0 | ✅ | ✅ | ❌ | ✅ | ✅ | No DOCS — pre-DOCS era |
+| v5.0 | ✅ | ✅ | ❌ | ✅ | ✅ | No DOCS — pre-DOCS era |
+| v6.0 | ✅ | ✅ | ❌ | ✅ | ✅ | No DOCS — pre-DOCS era |
+| v7.0 | ✅ | ✅ | ❌ | ✅ | ✅ | No DOCS — pre-DOCS era |
+| v7.1 | ✅ | ✅ | ❌ | ✅ | ✅ | No DOCS — pre-DOCS era |
+| v8.0 | ✅ | ✅ | ✅ | ✅ | ❌ MISSING | Not in MILESTONES.md |
+| v8.1 | ✅ | ✅ | ❌ | ✅ | ❌ MISSING | Not in MILESTONES.md, no DOCS |
+| v8.2 | ✅ | ✅ | ✅ | ✅ | ✅ | OK |
+| v8.3 | ✅ | ✅ | ✅ | ✅ | ✅ | OK |
+| v9.0 | ✅ | ✅ | ✅ | ✅ | ✅ via v9.2 entry* | v9.2 entry has v9.0 content* |
+| v9.1 | ✅ | ✅ | ✅ | ❌ | ❌ MISSING | No phases dir, not in MILESTONES.md |
+| v9.2 | ✅ | ✅ | ❌ | ❌ | ✅ but wrong content* | v9.2 entry describes v9.0 |
+| v9.3 | ✅ | ✅ | ✅ | ✅ | ✅ | OK |
+| v10.0 | ✅ | ✅ | ✅ | ✅ | ✅ (missing ✅) | Missing checkmark |
+| v11.0 | ✅ | ✅ | ✅ | ✅ | ❌ MISSING | Not in MILESTONES.md |
+| v11.1 | ✅ | ✅ | ✅ | ✅ | ❌ MISSING | Not in MILESTONES.md |
+| v11.2 | ❌ | ❌ | ❌ | ❌ | ❌ MISSING | No archives at all, only INTENT ref |
+| v11.3 | ✅ | ✅ | ✅ | ✅ | ✅ | OK, but at bottom of file |
 
-### Target Flow: Code Decides Deterministic Parts
-
-```
-User types: /bgsd-execute-phase 3
-    │
-    ▼
-[command.execute.before hook]
-    │ enrichCommand() → <bgsd-context> JSON
-    │   (phase_dir, plans, config)
-    │ resolveDecisions() → decisions block
-    │   next_plan: "03-02-PLAN.md"
-    │   execution_mode: "sequential"
-    │   recommended_model: "sonnet"
-    │   phase_complete: false
-    │                     ← 0 LLM decisions needed for these
-    ▼
-[LLM reads SIMPLIFIED workflow]
-    │ LLM sees pre-resolved decisions in <bgsd-context>
-    │ LLM confirms/overrides (MEDIUM/LOW confidence only)
-    │ LLM handles ONLY non-deterministic decisions
-    │   (e.g., "should I ask user about this blocker?")
-    │                     ← ~1 LLM decision instead of 5
-    ▼
-[Execution begins — faster, cheaper]
-```
-
-### Key Data Flows After Offloading
-
-1. **System prompt injection:** `buildSystemPrompt()` → already injects phase/plan → **ADD** decision summary for "what to do next"
-2. **Command enrichment:** `enrichCommand()` → already injects paths/config → **ADD** resolved decisions per command type
-3. **Compaction context:** `buildCompactionContext()` → already preserves sacred/trajectory → **ADD** last-known decisions for session continuity
-4. **Plugin tools:** `bgsd_progress` → already mutates state → **ADD** auto-compute next step after state change
-
-<!-- /section -->
-
----
-
-<!-- section: module_placement -->
-## Where Decision Logic Should Live
-
-### Decision Placement Matrix
-
-| Decision Type | Frequency | Latency Req | Location | Rationale |
-|--------------|-----------|-------------|----------|-----------|
-| Next action (plan/execute/verify) | Every command | <10ms | Plugin `decision-engine.js` | Hot path, pure state lookup |
-| Phase completion status | Every command | <10ms | Plugin `decision-engine.js` | Already computed in `getProjectState()` |
-| Next plan to execute | Per execute-phase | <10ms | Plugin `command-enricher.js` | Already resolves `incomplete_plans` |
-| Execution mode (seq/parallel) | Per execute-phase | <50ms | CLI `decisions.js` | Needs plan classification (heavy) |
-| Model recommendation | Per agent spawn | <50ms | CLI `orchestration.js` (existing) | Already implemented, needs surfacing |
-| Commit prefix suggestion | Per commit | <5ms | Plugin `decision-engine.js` | Phase name → prefix is pure string match |
-| File placement convention | Per new file | <10ms | Plugin `advisory-guardrails.js` | Already has convention detection |
-| Template selection | Per plan creation | <20ms | CLI `decisions.js` | Needs frontmatter analysis |
-| Phase numbering (next decimal) | Per phase add | <10ms | CLI `phase.js` (existing) | Already implemented as `cmdPhaseNextDecimal` |
-| Requirement ID generation | Per requirement | <5ms | CLI `decisions.js` | Deterministic counter |
-
-### Module Architecture
-
-```
-src/
-├── plugin/                      # ESM — in-process with host editor
-│   ├── decision-engine.js       # NEW — evaluates rules, returns decisions
-│   ├── command-enricher.js      # MODIFIED — calls decision-engine, injects results
-│   ├── context-builder.js       # MODIFIED — includes decision summary in system prompt
-│   ├── project-state.js         # EXISTING — provides state for decisions
-│   ├── parsers/                 # EXISTING — parse .planning/ files
-│   └── tools/                   # EXISTING — LLM-callable tools
-│       └── bgsd-progress.js     # MODIFIED — auto-resolve next step after mutation
-│
-├── lib/                         # CJS — bundled into bgsd-tools.cjs
-│   ├── decision-rules.js        # NEW — shared rule definitions (pure functions)
-│   ├── decisions.js             # NEW — CLI-callable decision resolvers
-│   ├── orchestration.js         # EXISTING — already classifies tasks/plans
-│   ├── helpers.js               # EXISTING — findPhaseInternal, getPhaseTree
-│   └── ...
-│
-├── commands/                    # CJS — CLI command handlers
-│   └── (no new command files)   # Decisions exposed via existing namespaces
-│
-└── router.js                    # MODIFIED — add util:decide route
-```
-
-### Structure Rationale
-
-- **`decision-rules.js` in `src/lib/`:** CJS module containing pure functions. esbuild bundles this into both the CJS CLI bundle AND the ESM plugin bundle. No runtime module format issues.
-- **`decision-engine.js` in `src/plugin/`:** ESM module that imports rules and evaluates them against `getProjectState()`. Runs in-process — no subprocess overhead.
-- **`decisions.js` in `src/lib/`:** CJS module for CLI access. Workflows can call `bgsd-tools.cjs util:decide <type>` when they need explicit decision resolution (rare — most go through enrichment).
-- **No new command files:** Add `util:decide` route to existing `src/commands/misc.js` or create thin `src/commands/decide.js`. Prefer extending misc.js to avoid module count growth.
-
-<!-- /section -->
-
----
-
-<!-- section: build_integration -->
-## Build & Deploy Integration
-
-### Two-Bundle Architecture (Existing)
-
-The project already builds two bundles via esbuild:
-
-| Bundle | Entry Point | Format | Output | Contains |
-|--------|-------------|--------|--------|----------|
-| CLI | `src/index.js` | CJS | `bin/bgsd-tools.cjs` | router, commands, lib modules |
-| Plugin | `src/plugin/index.js` | ESM | `plugin.js` | hooks, tools, parsers, event subsystems |
-
-**Key insight:** `decision-rules.js` must be importable by both bundles. Since esbuild bundles dependencies inline, this is automatic — both entry points can `require()` or `import` the same source file, and esbuild duplicates it into each bundle. This is already how `constants.js` and helper functions work.
-
-### Build Order for New Modules
-
-1. **`src/lib/decision-rules.js`** — Pure rule definitions, no dependencies on other src/ modules
-2. **`src/lib/decisions.js`** — Decision resolvers, depends on `helpers.js`, `decision-rules.js`
-3. **`src/plugin/decision-engine.js`** — Plugin-side resolver, depends on `decision-rules.js`, `project-state.js`
-4. **Modify `src/plugin/command-enricher.js`** — Call decision-engine, inject results
-5. **Modify `src/plugin/context-builder.js`** — Include decision summary in system prompt
-6. **Modify `src/router.js`** — Add `util:decide` route
-7. **Modify workflows** — Replace LLM decision points with `<bgsd-context>` consumption
-
-### Dependency Graph (New Modules)
-
-```
-                    ┌──────────────────────┐
-                    │  decision-rules.js   │  ← Pure functions, no deps
-                    │  (CJS, shared)       │
-                    └──────┬───────┬───────┘
-                           │       │
-              ┌────────────┘       └────────────┐
-              ▼                                  ▼
-  ┌───────────────────────┐          ┌────────────────────────┐
-  │  decisions.js         │          │  decision-engine.js    │
-  │  (CJS, CLI bundle)   │          │  (ESM, plugin bundle)  │
-  │  deps: helpers.js,    │          │  deps: project-state,  │
-  │        decision-rules │          │        decision-rules   │
-  └───────────┬───────────┘          └──────────┬─────────────┘
-              │                                  │
-              ▼                                  ▼
-  ┌───────────────────────┐          ┌────────────────────────┐
-  │  router.js            │          │  command-enricher.js   │
-  │  (util:decide route)  │          │  (injects decisions)   │
-  └───────────────────────┘          ├────────────────────────┤
-                                     │  context-builder.js    │
-                                     │  (system prompt)       │
-                                     └────────────────────────┘
-```
-
-### Bundle Size Impact
-
-| Component | Estimated Size (source) | Estimated Bundled |
-|-----------|------------------------|-------------------|
-| `decision-rules.js` | ~3KB | ~1.5KB (minified, duplicated in both bundles) |
-| `decisions.js` | ~2KB | ~1KB (minified, CLI only) |
-| `decision-engine.js` | ~2KB | ~1KB (minified, plugin only) |
-| **Total new code** | ~7KB | ~3.5KB per bundle |
-| **Current CLI bundle** | ~1163KB | +2.5KB = ~1166KB |
-| **Current plugin bundle** | ~30KB | +2.5KB = ~33KB |
-
-**Conclusion:** Well within all size budgets. Minimal bundle impact.
+**\*Critical finding:** The v9.2 MILESTONES.md entry (lines 31-53) contains v9.0's description and archive references. The actual v9.2 content (CLI tool integrations) appears only in PROJECT.md.
 
 <!-- /section -->
 
 ---
 
 <!-- section: anti_patterns -->
-## Anti-Patterns
+## Anti-Patterns Found
 
-### Anti-Pattern 1: Duplicating Logic Across Plugin and CLI
+### Anti-Pattern 1: Append-Only MILESTONES.md
 
-**What people do:** Write the same decision function in both `src/plugin/` (ESM) and `src/lib/` (CJS).
+**What happened:** New milestones were appended at the bottom or inserted at random positions rather than maintained in chronological order.  
+**Why it's wrong:** Makes it impossible to scan the file top-to-bottom and understand project history.  
+**Do this instead:** Always insert new milestone entries at the top (newest-first) during milestone wrapup. Add to the wrapup workflow as an explicit step.
 
-**Why it's wrong:** Two implementations drift apart. Bug fixes must be applied twice. Tests must cover both.
+### Anti-Pattern 2: Copy-Paste Milestone Entries
 
-**Do this instead:** Write decision rules once in `src/lib/decision-rules.js` (CJS). Let esbuild bundle it into both outputs. The plugin's `decision-engine.js` imports rules; the CLI's `decisions.js` imports the same rules.
+**What happened:** v9.2 entry was created by copying v9.0's entry and only updating the heading, not the body.  
+**Why it's wrong:** Creates inaccurate historical records.  
+**Do this instead:** Generate milestone entries from archived ROADMAP data during wrapup. The `summary:generate` command (v11.3) could be extended to produce MILESTONES.md entries.
 
-### Anti-Pattern 2: Offloading Non-Deterministic Decisions
+### Anti-Pattern 3: Keeping Resolved Items in Active Sections
 
-**What people do:** Try to programmatically decide things like "is this code change good enough?" or "should we add a test for this?"
+**What happened:** Struck-through out-of-scope items (line 211), stale module counts, and 37 accumulated decisions pollute active planning sections.  
+**Why it's wrong:** Every token spent reading resolved/stale content is wasted. Adds noise for both humans and AI agents.  
+**Do this instead:** Archive resolved items into `<details>` blocks or into separate files. Keep active sections lean — only current/actionable content visible.
 
-**Why it's wrong:** These are judgment calls that require LLM reasoning. Offloading them produces brittle, wrong results.
+### Anti-Pattern 4: Missing Milestone Entries
 
-**Do this instead:** Only offload decisions with clear, testable deterministic logic: "is phase complete?" (count files), "what's the next plan?" (sort by number), "what commit prefix?" (match phase name pattern). If you can't write a unit test with exact expected output, it's not deterministic.
-
-### Anti-Pattern 3: Breaking the LLM Escape Hatch
-
-**What people do:** Remove decision instructions from workflows entirely, forcing the code path with no override.
-
-**Why it's wrong:** Edge cases exist. The LLM needs the ability to override code decisions when context demands it.
-
-**Do this instead:** Always provide decisions as suggestions in `<bgsd-context>`, not as commands. Workflow text says "use pre-resolved value from context" not "this value is mandatory." MEDIUM/LOW confidence decisions explicitly invite LLM override.
-
-### Anti-Pattern 4: Adding New Plugin Hooks
-
-**What people do:** Create new hook types to intercept more decision points.
-
-**Why it's wrong:** The host editor's hook API is fixed. New hooks require host editor changes. Current 6 hooks are sufficient.
-
-**Do this instead:** Extend existing hooks. `system.transform` can inject any decision context. `command.execute.before` can pre-resolve any command parameter. `tool.execute.after` can trigger any post-action decision. No new hooks needed.
-
-### Anti-Pattern 5: Making Decision Logic Async
-
-**What people do:** Use `async/await` in decision-rules.js for file reads.
-
-**Why it's wrong:** Decision rules should be pure functions that receive pre-parsed state. Async I/O in the decision layer makes it harder to test, harder to compose, and slower (awaiting in hot paths).
-
-**Do this instead:** Parse state once (via `getProjectState()` or CLI's cached file reads), then pass the parsed data to synchronous rule evaluation functions.
+**What happened:** 6 milestones (v8.0, v8.1, v9.1, v11.0, v11.1, v11.2) were shipped but never added to MILESTONES.md.  
+**Why it's wrong:** MILESTONES.md is supposed to be the authoritative history. Missing entries break traceability.  
+**Do this instead:** Make MILESTONES.md entry creation a required step in the milestone wrapup workflow — not optional, not "do it later."
 
 <!-- /section -->
 
 ---
 
 <!-- section: integration -->
-## Integration Points
+## Recommendations for Execution
 
-### Internal Boundaries
+### Phase Structure Recommendation
 
-| Boundary | Communication | Notes |
-|----------|---------------|-------|
-| Plugin ↔ Decision Engine | Direct function call (in-process) | `decision-engine.js` is imported by `command-enricher.js` and `context-builder.js` |
-| Decision Engine ↔ Rules | Direct require/import (bundled) | `decision-rules.js` bundled into both outputs by esbuild |
-| CLI ↔ Decisions | Direct require (same bundle) | `decisions.js` in same CJS bundle as router |
-| Workflows ↔ Decisions | Via `<bgsd-context>` JSON | Workflows read pre-resolved `decisions` field from injected JSON |
-| Plugin Tools ↔ Decisions | Post-mutation decision refresh | `bgsd_progress.execute()` invalidates cache → next system prompt reflects new state |
+This is purely non-behavioral cleanup — no code changes, no test changes. It can be done in a single phase with 2-3 plans:
 
-### Existing Integration Points (No Changes Needed)
+**Plan 1: Mechanical Fixes (Wave 1 + Wave 2)**  
+- All formatting fixes (F-01 through F-09)  
+- All stale data updates (D-01 through D-09)  
+- ~15 issues, ~50 minutes, fully autonomous
 
-| Integration | Current Status | Impact |
-|-------------|---------------|--------|
-| `getProjectState()` | Parses STATE, ROADMAP, PLAN, CONFIG, PROJECT, INTENT | Decision engine consumes this — no changes needed |
-| `parseState()` cache | Map-based, invalidated on file change | Decisions always see fresh state after mutations |
-| `parsePlans()` cache | Map-based with phase-scoped keys | Plan completion decisions use this directly |
-| `invalidateAll()` | Clears all parser caches | Called by file watcher on .planning/ changes |
-| `safeHook()` wrapper | Retry, timeout, circuit breaker | All decision injection goes through existing safe hooks |
+**Plan 2: MILESTONES.md Structural Overhaul (Wave 3 core)**  
+- Reorder entries chronologically  
+- Fix v9.2 entry content  
+- Add 5-6 missing milestone entries (reconstruct from archived ROADMAPs)  
+- ~60 minutes, mostly autonomous (may need v11.2 status clarification)
 
-### Workflow Integration Examples
+**Plan 3: PROJECT.md Streamlining (Wave 3 optional)**  
+- Archive old decisions into `<details>` block  
+- Archive old requirements into `<details>` block  
+- Reorder `<details>` milestone sections chronologically  
+- Fix REQUIREMENTS.md reference  
+- ~30 minutes, fully autonomous
 
-**execute-phase.md — Before:**
-```markdown
-<step name="determine_next_plan">
-Check incomplete_plans from init JSON.
-If multiple incomplete plans, determine execution order by plan number.
-Select the lowest-numbered incomplete plan.
-</step>
-```
+### Verification Criteria
 
-**execute-phase.md — After:**
-```markdown
-<step name="determine_next_plan">
-Use `decisions.next_plan` from `<bgsd-context>`.
-If absent, fall back to lowest-numbered entry in `incomplete_plans`.
-</step>
-```
-
-**Token savings:** ~200 tokens of LLM reasoning eliminated per execution.
-
----
-
-## Confidence Assessment
-
-| Area | Level | Reason |
-|------|-------|--------|
-| Plugin integration pattern | HIGH | Extends existing hooks and enrichment — proven infrastructure |
-| CLI integration pattern | HIGH | Follows established module + router pattern |
-| Shared rules via esbuild | HIGH | Already proven — constants.js works this way |
-| Workflow simplification | HIGH | `<bgsd-context>` injection is battle-tested |
-| Bundle size impact | HIGH | ~3.5KB per bundle, well within budgets |
-| ESM/CJS boundary handling | HIGH | esbuild already handles this for 34 modules |
-| Progressive confidence model | MEDIUM | Concept is sound but threshold tuning needs real data |
-| Token savings estimates | MEDIUM | Per-decision savings clear; total savings depend on audit results |
-
-<!-- /section -->
+After all fixes:
+- [ ] Every heading in MILESTONES.md has `✅` prefix and `(Shipped: YYYY-MM-DD)` suffix  
+- [ ] MILESTONES.md entries are ordered newest-first with no gaps  
+- [ ] Every milestone with archived files has a matching MILESTONES.md entry  
+- [ ] All archive paths in MILESTONES.md point to files that exist  
+- [ ] PROJECT.md has no orphaned HTML tags (paired `<details>`/`</details>`)  
+- [ ] All numeric claims in PROJECT.md Context section match filesystem reality  
+- [ ] Out-of-scope section has no struck-through or delivered items  
+- [ ] Key Decisions table has consistent 3-column format  
+- [ ] INTENT.md history is ordered chronologically (newest-first)  
 
 ---
 
 ## Sources
 
-1. **plugin.js source** — `src/plugin/index.js` (155 lines) — Current 6-hook architecture with tool registry
-2. **command-enricher.js** — `src/plugin/command-enricher.js` — Existing `<bgsd-context>` injection pattern
-3. **context-builder.js** — `src/plugin/context-builder.js` — System prompt and compaction context builders
-4. **router.js** — `src/router.js` — Namespace routing with lazy-loaded command modules
-5. **orchestration.js** — `src/lib/orchestration.js` — Existing task classification and execution mode selection
-6. **build.cjs** — Dual-bundle esbuild config (CJS CLI + ESM plugin)
-7. **advisory-guardrails.js** — `src/plugin/advisory-guardrails.js` — Example of decision-making in plugin layer
-8. **stuck-detector.js** — `src/plugin/stuck-detector.js` — Example of pattern detection in plugin layer
-9. **bgsd-progress.js** — `src/plugin/tools/bgsd-progress.js` — State mutation tool with cache invalidation
-10. **execute-phase workflow** — `workflows/execute-phase.md` — Example of LLM decision points in workflows
+1. **MILESTONES.md** — 388 lines, 15 milestone entries examined  
+2. **PROJECT.md** — 282 lines, all sections examined  
+3. **STATE.md** — 52 lines, all sections examined  
+4. **config.json** — 8 lines, all keys examined  
+5. **INTENT.md** — 102 lines, history section examined  
+6. **Filesystem** — `ls .planning/milestones/` for archive cross-reference (71 files, 21 version prefixes)  
+7. **Filesystem** — `ls src/lib/`, `ls src/commands/`, `ls commands/`, `ls workflows/` for count verification  
 
 ---
 
-*Architecture research for: LLM Offloading Integration*  
-*Researched: 2026-03-13*
+*Architecture research for: Planning Artifact Quality Audit*  
+*Researched: 2026-03-13*  
+*Confidence: HIGH — All findings verified against filesystem*

@@ -1,244 +1,251 @@
-# Stack Research — LLM Offloading
+# Stack Research — Test Suite Failure Analysis
 
-**Domain:** Programmatic Decision-Making for LLM Offloading in Node.js CLI
+**Domain:** Test infrastructure stabilization for bGSD CLI plugin
 **Researched:** 2026-03-13
-**Confidence:** HIGH
+**Confidence:** HIGH (all findings verified via live test runs and source inspection)
 
 <!-- section: compact -->
 <stack_compact>
 <!-- Compact view for planners. Keep under 25 lines. -->
 
-**Core stack (zero new dependencies):**
+**Test infrastructure:** 1014 tests, 21 suites, node:test runner, execSync-based CLI invocation
 
-| Technology | Purpose | Version |
-|------------|---------|---------|
-| Node.js built-in regex/string | Markdown decision point scanning | built-in |
-| acorn + AST walking (bundled) | Identify decision patterns in JS code | ^8.16 (bundled) |
-| Custom decision tables (Map/Object) | Deterministic routing, parameter defaults | built-in |
-| Template literals + string interpolation | Deterministic output generation | built-in |
-| JSON Schema-like validation (valibot) | Input validation pre-LLM | ^1.2 (existing) |
+**Root cause:** Bun runtime banner (console.log to stdout) poisons JSON output parsed by tests
 
-**Already in codebase — leverage, don't add:**
-- `src/lib/orchestration.js` — task complexity classifier, execution mode selector, task router
-- `src/lib/nl/` — intent classifier, command registry, fuzzy resolver, parameter extractor
-- `src/lib/recovery/` — deviation classifier, checkpoint advisor, stuck detector
-- `src/lib/frontmatter.js` — YAML frontmatter parser with LRU cache
-- `src/lib/regex-cache.js` — LRU-bounded compiled regex cache
+**Failure breakdown:**
 
-**Avoid:** Rule engines (json-rules-engine, nools — overkill), template engines (handlebars, mustache — heavy), AST tools beyond acorn (ts-morph, jscodeshift — massive)
+| Category | Failures | Fix |
+|----------|----------|-----|
+| Banner: `[bGSD] Running with Bun v...` | 551 | Suppress banner in non-TTY/JSON mode |
+| Banner: `[bGSD] Falling back to Node.js` | 40 | Same fix (remove fallback banner entirely) |
+| Missing `src/lib/profiler` module | 3 | Remove/skip stale tests referencing deleted module |
+| Plugin parser edge cases | 7 | Test isolation fix (ROADMAP.md.backup, live project assumptions) |
+| Env/infra/misc edge cases | 6 | Individual fixes (baselines dir, config-migrate, context-budget) |
+| **Total** | **607** | |
 
-**Install:** None. Zero new dependencies. All capabilities exist in Node.js built-ins + existing bundled tools.
+**Minimal fix:** Guard `showRuntimeBanner()` in `src/router.js` to skip when `_gsdOutputMode === 'json'` or `!process.stdout.isTTY`. One line change, 589 tests fixed.
+
+**Avoid:** Changing test helpers (runGsdTools), adding env vars to test scripts, using stderr for banner
 </stack_compact>
 <!-- /section -->
 
 <!-- section: recommended_stack -->
-## Recommended Stack
+## Root Cause Analysis
 
-### Core Principle: Zero New Dependencies
+### Primary Failure: Bun Runtime Banner (591 of 607 failures)
 
-The LLM offloading milestone should add **no new production dependencies**. Every capability needed already exists in the codebase or in Node.js built-ins. The project's single-file architecture and ~1163KB bundle mean every byte matters. The right approach is **code patterns, not library additions.**
+**Source file:** `src/router.js` lines 50-70, 170-176
 
-### Core Technologies (All Already Available)
+**Mechanism:** When `bin/bgsd-tools.cjs` starts up, the router module:
+1. Detects Bun availability via `detectBun()` in `src/lib/cli-tools/bun-runtime.js`
+2. Since Bun 1.3.10 is installed on this system, `_runtimeDetected.available = true`
+3. On line 173: `const showBanner = isVerbose || (_runtimeDetected && _runtimeDetected.available);`
+4. Banner always shows when Bun is present, regardless of output mode
+5. `showRuntimeBanner()` uses `console.log()` which writes to stdout
+6. Tests call CLI via `execSync` (piped stdout) and `JSON.parse()` the output
+7. Output becomes `[bGSD] Running with Bun v1.3.10\n{"key":"value",...}` — invalid JSON
 
-| Technology | Version | Purpose | Why Recommended |
-|------------|---------|---------|-----------------|
-| Decision table pattern (plain JS) | built-in | Map deterministic choices to outcomes | Simplest possible pattern: `Map<conditions, result>`. Already used in `orchestration.js` (MODEL_MAP, COMPLEXITY_LABELS), `recovery/autoRecovery.js` (DEVIATION_PATTERNS), `conventions.js` (NAMING_PATTERNS). Add more, don't add a library. |
-| acorn + custom walkers (bundled) | ^8.16 | Scan workflow .md files for decision patterns | Already bundled at ~114KB. `src/lib/ast.js` has full AST walking, signature extraction, complexity scoring. Extend for markdown/prompt analysis. |
-| Regex pattern matching (built-in) | built-in | Scan markdown prompts for decision points | 309+ regex patterns already in codebase. `regex-cache.js` provides LRU caching. Extend with patterns that identify "LLM deciding something deterministic." |
-| valibot (existing dep) | ^1.2 | Validate inputs before they reach LLM | Already a production dependency. Use for pre-validating parameters, catching invalid states programmatically instead of asking LLM to validate. |
-| Template literal functions (built-in) | built-in | Generate deterministic outputs | Replace LLM-generated boilerplate (SUMMARY.md shells, commit messages, state updates) with parameterized templates. Already used in `format.js` formatting engine. |
-| Weighted scoring (plain JS) | built-in | Multi-factor decision scoring | Already implemented: `orchestration.js` classifyTaskComplexity, `recovery/checkpointAdvisor.js` COMPLEXITY_FACTORS. Pattern is proven: factor scores × weights → threshold → decision. |
+**Two banner variants cause failures:**
 
-### Supporting Patterns (Code, Not Libraries)
+| Banner Text | Condition | Failures |
+|-------------|-----------|----------|
+| `[bGSD] Running with Bun v1.3.10` | Bun detected, not forced via config | 551 |
+| `[bGSD] Falling back to Node.js` | `BGSD_RUNTIME=node` or config `runtime=node` | 40 |
 
-| Pattern | Purpose | When to Use |
-|---------|---------|-------------|
-| Lookup table (Object/Map) | O(1) deterministic decision | File paths, command routing, parameter defaults, model selection |
-| Decision matrix (weighted scoring) | Multi-factor classification | Task complexity, checkpoint type, deviation severity |
-| State machine (switch/if chains) | State-dependent behavior | Workflow step sequencing, plan lifecycle transitions |
-| Template function (tagged template literals) | Deterministic output generation | SUMMARY.md boilerplate, commit messages, state patches |
-| Guard clause chain | Pre-validation before LLM | Parameter validation, file existence checks, format verification |
-| Regex pattern classifier | Text classification | Intent detection, deviation classification, phase number extraction |
+**Verification:** Setting `BGSD_RUNTIME=node BGSD_RUNTIME_DETECTED=true` before test run changes results from 407 pass / 607 fail → 996 pass / 18 fail. This confirms 589 failures are exclusively caused by the banner.
 
-### Existing Modules to Extend (Not Replace)
+**Why it wasn't caught earlier:** The banner was added in v9.2 (CLI Tool Integrations & Runtime Modernization). At that time, Bun may not have been installed on the dev machine, or tests were run without Bun present. The banner only triggers when Bun is actually detected on the system.
 
-| Module | Current Capability | Offloading Extension |
-|--------|-------------------|---------------------|
-| `src/lib/orchestration.js` | Task complexity scoring (1-5), execution mode selection, model routing | Add: plan-level auto-decisions (wave ordering, parallelization eligibility), pre-computed task context |
-| `src/lib/nl/intent-classifier.js` | Keyword-based intent classification (plan/execute/verify/query) | Add: more intents, confidence-weighted fallback, compound intent detection |
-| `src/lib/nl/command-registry.js` | 31 phrase→command mappings, 15 aliases | Add: parameter inference from context, smart defaults per command |
-| `src/lib/recovery/autoRecovery.js` | 12 regex deviation patterns → 4 rule types | Add: more patterns, severity scoring, recovery action templates |
-| `src/lib/recovery/checkpointAdvisor.js` | 7-factor complexity scoring → checkpoint type | Add: task-type-specific factors, historical success rate weighting |
-| `src/lib/frontmatter.js` | YAML parse/reconstruct/splice with LRU cache | Add: frontmatter-driven decision extraction (plan type, wave, autonomous flags) |
-| `src/lib/helpers.js` | findPhaseInternal, resolveModel, generateSlug | Add: deterministic phase resolution, next-plan detection, plan ordering |
-| `src/plugin/context-builder.js` | System prompt construction, compaction context | Add: pre-computed decision hints in context (next action, required files, validation status) |
-| `src/plugin/command-enricher.js` | Auto-inject bgsd-context JSON into commands | Add: richer pre-computed fields (resolved file paths, validation results, suggested actions) |
+### Fix Strategy
 
-### Development Tools (Already Available)
+**Option A (RECOMMENDED): Guard banner on output mode** — 1 line change in `src/router.js`
 
-| Tool | Purpose | Notes |
-|------|---------|-------|
-| node:test (built-in) | Test decision tables and classifiers | 762+ tests already. Add tests for every new decision table. |
-| esbuild (dev dep) | Bundle new code into bgsd-tools.cjs | Already configured. New code in src/ auto-bundles. |
-| acorn (dev dep, bundled) | Analyze workflows for decision points | Already bundled into bgsd-tools.cjs. |
+```javascript
+// Current (line 173):
+const showBanner = isVerbose || (_runtimeDetected && _runtimeDetected.available);
 
-## Installation
-
-```bash
-# Nothing to install. Zero new dependencies.
-# All work is code patterns leveraging existing stack:
-#   - Node.js built-ins (Map, Object, RegExp, template literals)
-#   - acorn (already bundled)
-#   - valibot (already a dependency)
-#   - Existing src/ modules (extend, don't replace)
+// Fixed:
+const showBanner = process.stdout.isTTY
+  && (isVerbose || (_runtimeDetected && _runtimeDetected.available));
 ```
+
+This suppresses the banner in piped/JSON mode (which is what tests use) while preserving it for interactive TTY use. It follows the existing output mode pattern used throughout the codebase (`global._gsdOutputMode` defaults to `'json'` when `!process.stdout.isTTY`).
+
+**Option B: Use stderr for banner** — Changes `console.log` → `console.error` in `showRuntimeBanner()`. Works but pollutes stderr in piped workflows where stderr carries error information. Not recommended.
+
+**Option C: Strip banner in test helper** — Modify `runGsdTools()` in `tests/helpers.cjs` to strip lines starting with `[bGSD]` before JSON.parse. Hack — masks the real bug instead of fixing it.
+
+**Option D: Set env vars in test scripts** — Add `BGSD_RUNTIME_DETECTED=true` to `package.json` test scripts. Workaround — doesn't fix the underlying issue for any consumer that pipes output.
+
+### Secondary Failures (18 remaining after banner fix)
+
+**Evidence:** With banner suppressed (`BGSD_RUNTIME=node BGSD_RUNTIME_DETECTED=true`), 18 tests still fail across 5 suites.
 <!-- /section -->
 
-## Existing Stack Inventory (Relevant to Offloading)
-
-### Already Making Programmatic Decisions
-
-The codebase already has **significant programmatic decision-making** — the milestone is about expanding this coverage, not building from scratch:
-
-1. **Task Classification** (`orchestration.js`): Scores tasks 1-5 using file count, blast radius, test requirements, checkpoint presence, action length. Routes to model (sonnet/opus) based on score.
-
-2. **Execution Mode Selection** (`orchestration.js`): Determines single/sequential/parallel/pipeline mode from plan classifications. Uses checkpoint detection, wave analysis, plan count.
-
-3. **Deviation Classification** (`autoRecovery.js`): 12 regex patterns classify errors into 4 rules (bug/missing_critical/blocking/architectural). Determines auto-fix vs escalate.
-
-4. **Checkpoint Recommendation** (`checkpointAdvisor.js`): 7-factor weighted scoring (file count, task type, dependencies, duration, external services, user setup, tests) → checkpoint type threshold.
-
-5. **Intent Classification** (`nl/intent-classifier.js`): Keyword matching classifies input into plan/execute/verify/query intents with confidence scores.
-
-6. **Command Resolution** (`nl/command-registry.js` + `nl/fuzzy-resolver.js`): 31 phrases + 15 aliases + fuzzy matching → canonical command routing.
-
-7. **Convention Detection** (`conventions.js`): Pattern classifiers for naming, indentation, semicolons, quotes across 640 lines of analysis.
-
-8. **Namespace Routing** (`router.js`): 1000+ lines of deterministic command dispatch via namespace:subcommand pattern with lazy module loading.
-
-9. **Context Enrichment** (`command-enricher.js`): Pre-computes phase info, plan lists, file paths, config flags — injected as JSON before LLM sees the command.
-
-10. **State Validation** (`plugin/parsers/`): 6 parsers (state, roadmap, plan, config, project, intent) with caching — deterministic data extraction from markdown.
-
-### Currently LLM-Dependent (Offloading Targets)
-
-These are decisions the LLM currently makes that are deterministic enough to push into code:
-
-| Decision | Where LLM Makes It | Why It's Deterministic |
-|----------|--------------------|-----------------------|
-| "Which plan to execute next" | Workflow reading STATE.md | Next incomplete plan in wave order — pure data lookup |
-| "What files does this task touch" | Agent reading plan XML | Already in `<files>` tags — just needs extraction |
-| "Is this phase complete" | Workflow checking criteria | Plan count + SUMMARY.md existence = deterministic |
-| "What state to update after task" | Agent updating STATE.md | Progress %, plan number, timestamp = calculable |
-| "Which template to use" | Workflow deciding plan format | Plan type + phase type = lookup table |
-| "Should I run tests" | Agent deciding in workflow | File extension + test file existence = deterministic |
-| "What model for this task" | Agent/workflow deciding | Already scored by orchestration.js — make it authoritative |
-| "What to include in commit message" | Agent composing message | Files changed + task name + plan number = template |
-| "Is this plan well-structured" | Checker agent reviewing | Frontmatter required fields + task XML schema = validation |
-| "What context does this task need" | Agent gathering files | Task `<files>` + plan `<context>` + codebase-intel = computable |
-
 <!-- section: alternatives -->
-## Alternatives Considered
+## Failure Categorization: Residual 18 Tests
 
-| Recommended | Alternative | When to Use Alternative |
-|-------------|-------------|-------------------------|
-| Plain JS decision tables (Map/Object) | json-rules-engine | Never for this project. It adds a dependency for what `if/switch` does. Only justified for user-configurable rule sets with hundreds of rules and runtime hot-reload. |
-| Template literal functions | Handlebars/Mustache/EJS | Never for this project. Template engines are for user-facing themes. CLI output templates are better as JS functions with full language access. |
-| Regex + keyword matching | NLP libraries (compromise, natural) | Never for this project. Our intent space is <50 commands. Keyword matching with fuzzy fallback already achieves >95% accuracy. NLP adds 1-5MB for marginal improvement. |
-| acorn AST walking | jscodeshift / ts-morph | Never for this project. jscodeshift is for codemods (transforming code). ts-morph is 1MB+ and TypeScript-focused. acorn is already bundled and sufficient. |
-| Weighted scoring (plain JS) | TensorFlow.js / brain.js | Never for this project. ML is for non-deterministic classification. Our decisions have known factors with explicit weights — math, not ML. |
-| Custom markdown scanner (regex) | remark/unified AST parser | Probably never. Our markdown scanning is for structured templates with known patterns. Full AST parsing adds 200KB+ for features we don't need. If markdown structure becomes complex enough to need AST, reconsider. |
-| valibot schemas | Ajv / Joi | No. valibot is already a dependency and proven in the codebase. Adding another schema validator violates the zero-dependency principle. |
+### Category 1: Missing `src/lib/profiler` Module (3 tests in `infra`)
 
-## What NOT to Use
+**Tests:**
+- `profiler disabled by default` — tries `require('./src/lib/profiler')` via `node -e`
+- `profiler baseline JSON structure` — expects `.planning/baselines` directory from profiler
+- Related assertion failures
 
-| Avoid | Why | Use Instead |
-|-------|-----|-------------|
-| json-rules-engine | Adds dependency for simple if/switch logic; overkill for <50 decision points | Plain JS Map/Object lookup tables + weighted scoring |
-| Handlebars/Mustache/EJS | Template engines add 50-200KB; tagged template literals are more powerful | Template literal functions: `` `Phase ${num}: ${name}` `` |
-| natural / compromise (NLP) | 1-5MB for marginal accuracy improvement over keyword matching | Extend existing `nl/intent-classifier.js` with more patterns |
-| jscodeshift | Transform-focused, heavy; we only need read-only analysis | acorn + custom walker (already bundled) |
-| ts-morph | 1MB+, TypeScript-focused | acorn with stripTypeScript (already in ast.js) |
-| node-decision-tree / ml-cart | ML for problems that are fully deterministic | Weighted scoring with explicit factor tables |
-| yaml (npm package) | Full YAML parser is 100KB+ | Keep existing frontmatter.js custom parser (handles our subset) |
-| JSONPath / jmespath | Query libraries for complex JSON traversal | Direct property access — our JSON structures are known at build time |
+**Root cause:** The profiler module was likely removed, renamed, or bundled into the CLI during a previous milestone. Tests still reference `./src/lib/profiler` as a standalone module, but it no longer exists at that path.
+
+**Fix:** Either update tests to use the bundled CLI command (`node bin/bgsd-tools.cjs measure:profile`) or remove these stale tests if the profiler is no longer a standalone module.
+
+**Effort:** ~15 min
+
+### Category 2: Plugin Parser Tests (7 tests in `plugin`)
+
+**Tests:**
+- `parseRoadmap handles various milestone formats` — ENOENT on `.planning/ROADMAP.md.backup`
+- `parseState handles extra unknown fields gracefully`
+- `bgsd_status returns structured data from live project`
+- `bgsd_plan no-args returns phases array`
+- `bgsd_plan with phase number returns phase details`
+- `bgsd_plan with invalid phase returns validation_error`
+- `bgsd_plan validates valid and invalid input`
+
+**Root causes:**
+1. ROADMAP.md.backup rename failure: Test creates a backup of the real project's ROADMAP.md but fails to restore it (test isolation issue — modifies live project files)
+2. Plugin tool tests (bgsd_status, bgsd_plan): These test LLM-callable tools that read the live `.planning/` directory. Failures stem from assumptions about the current project state (phase numbers, structure) that may have changed
+
+**Fix:** Improve test isolation — use temp directories instead of modifying the live project. For plugin tool tests, create fixture project state.
+
+**Effort:** ~30 min
+
+### Category 3: Infrastructure Edge Cases (3 tests in `infra`)
+
+**Tests:**
+- `process exit handler is registered for temp file cleanup`
+- `_tmpFiles tracking is wired into output pipeline`
+- `outputJSON() function should push tmpPath to _tmpFiles`
+
+**Root cause:** Tests check for `_tmpFiles` array and `process.on('exit')` registration in the bundle source. Pattern may have changed during a refactor.
+
+**Fix:** Update assertions to match current bundle implementation.
+
+**Effort:** ~15 min
+
+### Category 4: Config Migration (2 tests — 1 `integration`, 1 `infra`)
+
+**Tests:**
+- `already-complete config returns empty migrated_keys`
+- `idempotent on modern config`
+
+**Root cause:** Config migration logic assumes certain config structure that has evolved. Modern configs may have fields that the migration check doesn't recognize as "already migrated."
+
+**Fix:** Update test expectations or config migration detection logic.
+
+**Effort:** ~15 min
+
+### Category 5: Env & Misc (3 tests — 1 `env`, 1 `misc`, 1 `infra`)
+
+**Tests:**
+- `env scan does NOT write manifest when .planning/ does not exist`
+- `context-budget <path> works with file arg`
+- Plus cascading suite failure
+
+**Root cause:** Various individual issues — env manifest write guard, context-budget file path handling.
+
+**Fix:** Individual investigation needed per test.
+
+**Effort:** ~20 min
 <!-- /section -->
 
 <!-- section: patterns -->
-## Stack Patterns by Decision Category
+## Fix Strategy by Wave
 
-**For simple routing decisions (file paths, command selection, defaults):**
-- Use: Lookup table (Map or Object literal)
-- Pattern: `const ROUTE = new Map([['plan', planHandler], ['execute', execHandler]])`
-- Already proven: `router.js` namespace routing, `orchestration.js` MODEL_MAP
-- Why: O(1) lookup, self-documenting, trivially testable
+**Wave 1: Banner suppression (589 tests fixed, ~10 min)**
+- Single change in `src/router.js` line 173
+- Guard `showBanner` on `process.stdout.isTTY`
+- No behavioral change for interactive users
+- Rebuild with `npm run build`
 
-**For multi-factor classification (complexity, severity, checkpoint type):**
-- Use: Weighted factor scoring with threshold mapping
-- Pattern: Score each factor (0-N) × weight → sum → threshold lookup → decision
-- Already proven: `checkpointAdvisor.js` (7 factors), `orchestration.js` (5 factors)
-- Why: Transparent, debuggable, weights are tunable without code changes
+**Wave 2: Stale profiler tests (3 tests, ~15 min)**
+- Remove or update tests referencing `./src/lib/profiler`
+- Check if profiler functionality moved to `measure:profile` CLI command
 
-**For text-based classification (error messages, user input, intent):**
-- Use: Ordered regex pattern array with early exit
-- Pattern: `for (const {pattern, result} of PATTERNS) if (pattern.test(input)) return result;`
-- Already proven: `autoRecovery.js` (12 patterns), `intent-classifier.js` (keyword match)
-- Why: Priority ordering is explicit, patterns are independently testable
+**Wave 3: Plugin test isolation (7 tests, ~30 min)**
+- Fix ROADMAP.md backup/restore in test
+- Create fixture-based tests for plugin tools instead of testing against live project
 
-**For deterministic output generation (summaries, messages, state updates):**
-- Use: Template functions that take structured data and return formatted strings
-- Pattern: `function formatSummary({ phase, plan, tasks, duration }) { return \`...\` }`
-- Already proven: `format.js` (formatTable, progressBar, banner, box, color)
-- Why: Full JS expressiveness, no template language to learn, type-safe with JSDoc
+**Wave 4: Infra assertions + config migration (5 tests, ~30 min)**
+- Update `_tmpFiles` assertions to match current implementation
+- Update config migration test expectations
 
-**For pre-validation (before LLM gets involved):**
-- Use: valibot schemas + guard clause chains
-- Pattern: Validate inputs → check preconditions → resolve defaults → only THEN invoke LLM
-- Already proven: Plugin tools use valibot schemas for args validation
-- Why: Catches 80% of invalid states without spending tokens
+**Wave 5: Individual edge cases (3 tests, ~20 min)**
+- Fix env manifest guard test
+- Fix context-budget file arg handling
+- Verify cascading fixes
 
-**For state-machine-like workflows (lifecycle, plan progression):**
-- Use: Explicit state + transition table
-- Pattern: `const TRANSITIONS = { planning: ['executing'], executing: ['verifying', 'blocked'] }`
-- Currently implicit in workflows — make explicit in code
-- Why: Prevents invalid transitions, enables programmatic state queries
+**Total estimated effort:** ~1.5-2 hours for all 607 → 0 failures
 <!-- /section -->
 
 <!-- section: compatibility -->
-## Version Compatibility
+## Test Infrastructure Details
 
-| Component | Compatible With | Notes |
-|-----------|-----------------|-------|
-| All recommended patterns | Node.js 18+ | Plain JS, no polyfills needed |
-| acorn ^8.16 (bundled) | Node.js 14+ | Already validated in production |
-| valibot ^1.2 (existing) | Node.js 18+ | Already validated in production |
-| esbuild ^0.27 (bundler) | Node.js 18+ | Already bundles 34 modules successfully |
-| Template literal functions | Node.js 6+ | ES2015 feature, universally available |
-| Map/Set data structures | Node.js 0.12+ | Universally available |
+### Current Configuration
 
-## Codebase Integration Points
+| Component | Value | Notes |
+|-----------|-------|-------|
+| Test runner | `node:test` | Built-in, no dependencies |
+| Execution | `execSync` via `runGsdTools()` | Pipes stdout, parses JSON |
+| Concurrency | `--test-concurrency=8` | Parallel suite execution |
+| Force exit | `--test-force-exit` | Prevents hanging on unclosed handles |
+| Node version | v25.7.0 | Running on current system |
+| Bun version | 1.3.10 | Installed, detected by runtime module |
+| Total tests | 1014 | Across 21 test suites |
 
-| New Pattern | Files to Modify/Create | Bundle Impact |
-|-------------|----------------------|---------------|
-| Decision table registry | New: `src/lib/decisions.js` | ~2-5KB (data tables + lookup functions) |
-| Workflow scanner | New: `src/lib/workflow-scanner.js` | ~3-8KB (regex patterns for markdown analysis) |
-| Template functions | New: `src/lib/templates.js` | ~2-4KB (output templates for common artifacts) |
-| Extended command enricher | Modify: `src/plugin/command-enricher.js` | ~1-2KB additional |
-| Extended orchestration | Modify: `src/lib/orchestration.js` | ~1-3KB additional |
-| State transition engine | New or extend: `src/lib/state-machine.js` | ~2-4KB |
-| Pre-validation pipeline | Extend: plugin tools + commands | Distributed ~1KB each |
+### Per-Suite Failure Summary (before fix)
 
-**Total estimated bundle increase: 12-26KB** (1-2% of current 1163KB)
+| Suite | Pass | Fail | Cause |
+|-------|------|------|-------|
+| decisions | 85 | 0 | Clean |
+| enricher-decisions | 46 | 0 | Clean |
+| summary-generate | 20 | 0 | Clean |
+| plugin-advisory-guardrails | 27 | 0 | Clean |
+| misc | 7 | 103 | Banner (103) |
+| codebase | 55 | 67 | Banner (67) |
+| env | 5 | 51 | Banner (50) + 1 edge case |
+| verify | 4 | 53 | Banner (53) |
+| state | 2 | 41 | Banner (41) |
+| plan | 9 | 40 | Banner (40) |
+| intent | 12 | 39 | Banner (39) |
+| trajectory | 28 | 39 | Banner (39) |
+| memory | 7 | 34 | Banner (34) |
+| infra | 34 | 31 | Banner (22) + profiler (3) + tmpFiles (3) + config (2) + misc (1) |
+| worktree | 6 | 30 | Banner (30) |
+| agent | 23 | 19 | Banner (19) |
+| init | 1 | 20 | Banner (20) |
+| integration | 2 | 14 | Banner (13) + config (1) |
+| orchestration | 0 | 11 | Banner (11) |
+| contracts | 0 | 8 | Banner (8) |
+| plugin | 34 | 7 | Parser/tool isolation (7) |
+
+### After Banner Fix (projected)
+
+| Suite | Pass | Fail | Remaining Issues |
+|-------|------|------|------------------|
+| 16 suites | all | 0 | Fully green |
+| infra | 59 | 6 | profiler, tmpFiles, config |
+| plugin | 34 | 7 | parser isolation, tool tests |
+| env | 55 | 1 | manifest guard |
+| integration | 15 | 1 | config migration |
+| misc | 109 | 1 | context-budget |
 
 ## Sources
 
-- Direct codebase analysis: `src/lib/orchestration.js` (528 lines), `src/lib/ast.js` (1186 lines), `src/lib/recovery/autoRecovery.js` (326 lines), `src/lib/recovery/checkpointAdvisor.js` (302 lines), `src/lib/nl/intent-classifier.js` (53 lines), `src/lib/nl/command-registry.js` (76 lines), `src/lib/conventions.js` (640+ lines), `src/lib/frontmatter.js` (166 lines), `src/lib/regex-cache.js` (75 lines)
-- Direct codebase analysis: `src/router.js` (1000+ lines), `plugin.js` (1700+ lines — 6 parsers, context builder, enricher, tools)
-- Direct codebase analysis: `package.json` dependencies — fast-glob, fuse.js, ignore, inquirer, valibot (production); acorn, esbuild, knip, madge, tokenx, zod (dev)
-- .planning/PROJECT.md — constraints (single-file deploy, backward compat, no new agents, Node 18+)
-- Training data analysis of json-rules-engine, Handlebars, jscodeshift, ts-morph, natural — confirmed all are overkill for this use case
+- **Live test run:** `node --test --test-force-exit --test-concurrency=8 tests/*.test.cjs` — 1014 tests, 407 pass, 607 fail
+- **Banner suppression test:** `BGSD_RUNTIME=node BGSD_RUNTIME_DETECTED=true` prefix — 996 pass, 18 fail
+- **Source inspection:** `src/router.js` lines 16-70, 170-176 — banner generation logic
+- **Source inspection:** `src/lib/cli-tools/bun-runtime.js` — Bun detection module (608 lines)
+- **Source inspection:** `tests/helpers.cjs` — `runGsdTools()` helper using `execSync` with piped stdio + `JSON.parse`
+- **Per-suite isolation:** Individual test file runs with/without env variable suppression
 
 ---
-
-*Stack research for: LLM Offloading — Programmatic Decision-Making*
+*Stack research for: bGSD v11.4 test suite stabilization*
 *Researched: 2026-03-13*
