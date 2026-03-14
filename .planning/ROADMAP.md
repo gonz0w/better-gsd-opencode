@@ -74,7 +74,9 @@ This milestone transforms SQLite from a dumb file cache into the structured data
   2. User can have verification routing, research gate, and phase readiness resolved deterministically from SQLite-backed state
   3. User can have milestone completion and commit strategy resolved deterministically from roadmap/change data
   4. User can run `decisions list` and see all 6 new rules registered alongside existing v11.3 rules
-**Plans**: TBD
+**Plans**: 0/2 plans complete
+  - Plan 01 (Wave 1): DB migration + decision functions + PlanningCache methods
+  - Plan 02 (Wave 2): Enricher integration + model consumer migration + test suite
 
 ### Phase 123: Session State
 **Goal**: Session state (position, metrics, accumulated context) lives in SQLite — STATE.md becomes a generated view ensuring markdown and SQL are always consistent
@@ -97,5 +99,5 @@ Phases execute in numeric order: 118 → 119 → 120 → 121 → 122 → 123
 | 119. Parser Integration & Planning Tables | 2/3 | Complete    | 2026-03-14 |
 | 120. Enricher Acceleration | 2/2 | Complete    | 2026-03-14 |
 | 121. Memory Store Migration | 0/3 | Complete    | 2026-03-14 |
-| 122. Decision Rules | 0/0 | Not started | - |
+| 122. Decision Rules | 0/2 | Planned | - |
 | 123. Session State | 0/0 | Not started | - |
