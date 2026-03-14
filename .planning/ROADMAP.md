@@ -7,7 +7,7 @@ This milestone transforms SQLite from a dumb file cache into the structured data
 ## Phases
 
 - [x] **Phase 118: Foundation & Schema** - DataStore class with schema versioning, migration runner, WAL mode, and Map fallback (completed 2026-03-14)
-- [ ] **Phase 119: Parser Integration & Planning Tables** - Write-through cache for parsers with git-hash + mtime invalidation
+- [x] **Phase 119: Parser Integration & Planning Tables** - Write-through cache for parsers with git-hash + mtime invalidation (completed 2026-03-14)
 - [ ] **Phase 120: Enricher Acceleration** - Eliminate 3x/2x parser duplication with SQL-backed enrichment
 - [ ] **Phase 121: Memory Store Migration** - Sacred data (decisions, lessons, trajectories, bookmarks) to SQLite with JSON backup
 - [ ] **Phase 122: Decision Rules** - Six new deterministic decision functions consuming SQLite state
@@ -35,7 +35,7 @@ This milestone transforms SQLite from a dumb file cache into the structured data
   2. User can query plan metadata (frontmatter, task counts, status) from SQLite without re-reading plan markdown files
   3. User can look up requirements by REQ-ID and see phase mappings from SQLite
   4. User can edit a planning markdown file and have SQLite cache automatically invalidated on next command via git-hash + mtime check
-**Plans**: 2/3 plans executed
+**Plans**: 3/3 plans complete
   - Plan 01 (Wave 1): Schema + PlanningCache core layer
   - Plan 02 (Wave 2): Parser integration with SQLite-first write-through
   - Plan 03 (Wave 3): Comprehensive test suite
@@ -89,7 +89,7 @@ Phases execute in numeric order: 118 → 119 → 120 → 121 → 122 → 123
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 118. Foundation & Schema | 3/3 | Complete    | 2026-03-14 |
-| 119. Parser Integration & Planning Tables | 2/3 | In Progress|  |
+| 119. Parser Integration & Planning Tables | 2/3 | Complete    | 2026-03-14 |
 | 120. Enricher Acceleration | 0/0 | Not started | - |
 | 121. Memory Store Migration | 0/0 | Not started | - |
 | 122. Decision Rules | 0/0 | Not started | - |
