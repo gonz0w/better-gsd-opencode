@@ -2,10 +2,10 @@
 
 ## Foundation & Schema
 
-- [ ] **FND-01**: User can run any bGSD command on Node 22.5+ and have a project-local SQLite database automatically created at `.planning/.cache.db` with schema versioning
-- [ ] **FND-02**: User can upgrade to a new bGSD version and have schema migrations run automatically on first command, preserving all existing data
-- [ ] **FND-03**: User can run any bGSD command on Node <22.5 and have all features work via Map fallback with no errors
-- [ ] **FND-04**: User can run bGSD commands with WAL mode and busy timeout enabled, preventing database locking under concurrent invocations
+- [x] **FND-01**: User can run any bGSD command on Node 22.5+ and have a project-local SQLite database automatically created at `.planning/.cache.db` with schema versioning
+- [x] **FND-02**: User can upgrade to a new bGSD version and have schema migrations run automatically on first command, preserving all existing data
+- [x] **FND-03**: User can run any bGSD command on Node <22.5 and have all features work via Map fallback with no errors
+- [x] **FND-04**: User can run bGSD commands with WAL mode and busy timeout enabled, preventing database locking under concurrent invocations
 
 ## Planning Tables
 
@@ -58,10 +58,10 @@ _None deferred — all 6 categories selected for v12.0._
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| FND-01 | Phase 118 | Pending |
-| FND-02 | Phase 118 | Pending |
-| FND-03 | Phase 118 | Pending |
-| FND-04 | Phase 118 | Pending |
+| FND-01 | Phase 118 | Complete |
+| FND-02 | Phase 118 | Complete |
+| FND-03 | Phase 118 | Complete |
+| FND-04 | Phase 118 | Complete |
 | TBL-01 | Phase 119 | Pending |
 | TBL-02 | Phase 119 | Pending |
 | TBL-03 | Phase 119 | Pending |
