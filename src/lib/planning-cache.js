@@ -513,6 +513,49 @@ class PlanningCache {
       return rows.length > 0 ? rows : null;
     } catch { return null; }
   }
+
+  /**
+   * Clear all cached data for a given project root directory.
+   * Removes all rows from phases, milestones, progress, requirements, plans, tasks,
+   * and file_cache where cwd matches. Used for full cache reset (e.g. invalidateAll).
+   *
+   * @param {string} cwd - Project root directory
+   */
+  clearForCwd(cwd) {
+    if (this._isMap()) return;
+
+    try {
+      this._db.exec('BEGIN');
+
+      this._stmt('clear_phases_cwd', 'DELETE FROM phases WHERE cwd = ?').run(cwd);
+      this._stmt('clear_milestones_cwd', 'DELETE FROM milestones WHERE cwd = ?').run(cwd);
+      this._stmt('clear_progress_cwd', 'DELETE FROM progress WHERE cwd = ?').run(cwd);
+      this._stmt('clear_requirements_cwd', 'DELETE FROM requirements WHERE cwd = ?').run(cwd);
+
+      // Delete plans and their tasks (tasks cascade via FK) for this cwd
+      const planPaths = this._stmt(
+        'clear_plan_paths',
+        'SELECT path FROM plans WHERE cwd = ?'
+      ).all(cwd).map(r => r.path);
+      for (const planPath of planPaths) {
+        this._stmt(
+          'clear_tasks_for_plan',
+          'DELETE FROM tasks WHERE plan_path = ?'
+        ).run(planPath);
+      }
+      this._stmt('clear_plans_cwd', 'DELETE FROM plans WHERE cwd = ?').run(cwd);
+
+      // Clear file_cache entries for files under this cwd (path starts with cwd)
+      this._stmt(
+        'clear_file_cache_cwd',
+        "DELETE FROM file_cache WHERE file_path LIKE ? || '%'"
+      ).run(cwd);
+
+      this._db.exec('COMMIT');
+    } catch {
+      try { this._db.exec('ROLLBACK'); } catch { /* ignore */ }
+    }
+  }
 }
 
 // ---------------------------------------------------------------------------
