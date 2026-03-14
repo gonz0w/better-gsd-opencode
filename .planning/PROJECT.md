@@ -10,19 +10,29 @@ Manage and deliver high-quality software with high-quality documentation, while 
 
 ## Current State
 
-**Last shipped:** v11.3 LLM Offloading (2026-03-13)
+**Last shipped:** v11.4 Housekeeping & Stabilization (2026-03-14)
 
-## Current Milestone: v11.4 Housekeeping & Stabilization
+## Current Milestone: v12.0 SQLite-First Data Layer
 
-**Goal:** Clean up accumulated planning debt, stabilize the test suite, audit CLI command routing, and reset INTENT.md for future milestones.
+**Goal:** Transform SQLite from a dumb file cache into the structured data backbone for all workflow operations — parsed state persists across invocations, queries replace file re-parsing, and workflows get deterministic data from SQL instead of subprocess calls or LLM inference.
 
 **Target features:**
-- INTENT.md overhaul — archive completed outcomes, remove stale entries, reset to clean state
-- Test suite stabilization — fix 600 Bun runtime banner failures to get back to green
-- Planning artifact cleanup — normalize MILESTONES.md, PROJECT.md, remove cruft
-- Out-of-scope review — update and prune out-of-scope list
-- Constraint/decision audit — archive resolved constraints and decisions
-- CLI command routing audit — find missing, unused, or broken command routes
+- Structured tables for planning data — phases, plans, tasks, requirements, decisions as proper rows with indexes
+- Cross-invocation persistence — parsed roadmap, plan metadata, phase mappings survive between CLI invocations with git-hash invalidation
+- Session state in SQLite — current position, metrics, accumulated context stored in SQL; STATE.md becomes a generated view
+- Memory store migration — decisions.json, lessons.json, trajectories.json, bookmarks.json into SQLite tables with proper indexes
+- Enricher acceleration — fix duplication (3x listSummaryFiles, 2x parsePlans), pre-compute all workflow data from SQLite
+- New deterministic decisions — 6-8 new rules consuming SQLite-backed state for faster evaluation
+
+<details>
+<summary>Previous: v11.4 Housekeeping & Stabilization (shipped 2026-03-14)</summary>
+
+- Test suite fully stabilized — 1008 pass / 0 fail (Bun banner fix + 18 residual)
+- CLI command routing fixed — verify:handoff, verify:agents added, orphaned ci.js removed
+- Planning artifacts cleaned — MILESTONES.md normalized, PROJECT.md HTML/counts fixed
+- Intent archival system — automatic INTENT.md cleanup during milestone completion
+
+</details>
 
 <details>
 <summary>Previous: v11.3 LLM Offloading (shipped 2026-03-13)</summary>
@@ -197,7 +207,7 @@ See `.planning/MILESTONES.md` for full history of v1.0 through v8.2.
 
 ### Active
 
-See `.planning/REQUIREMENTS.md` for v11.4 requirements.
+See `.planning/REQUIREMENTS.md` for v12.0 requirements.
 
 ### Out of Scope
 
@@ -280,4 +290,4 @@ Known tech debt: `node:sqlite` is Stability 1.2 (Release Candidate). Test suite 
 - ~~Node.js 18+ minimum~~ — Raised to 22.5+ in v11.x for node:sqlite support
 
 ---
-*Last updated: 2026-03-14 after v11.4 constraint audit*
+*Last updated: 2026-03-14 after v12.0 milestone start*
