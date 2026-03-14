@@ -522,9 +522,6 @@ Use without --exact for fuzzy matching.`);
             case 'dead-ends': lazyTrajectory().cmdTrajectoryDeadEnds(cwd, restArgs.slice(1), raw); break;
             default: error('Unknown trajectory subcommand: ' + trajSub + '. Available: checkpoint, list, pivot, compare, choose, dead-ends');
           }
-        } else if (subcommand === 'profile') {
-          // Handle profile via environment variable, not a command
-          error('Set BGSD_PROFILE=1 to enable performance profiling');
         } else {
           error(`Unknown execute subcommand: ${subcommand}. Available: commit, rollback-info, session-diff, session-summary, velocity, worktree, tdd, test-run, trajectory`);
         }
@@ -718,8 +715,36 @@ Use without --exact for fuzzy matching.`);
           lazyFeatures().cmdValidateConfig(cwd, raw);
         } else if (subcommand === 'test-coverage') {
           lazyFeatures().cmdTestCoverage(cwd, raw);
+        } else if (subcommand === 'handoff') {
+          const handoffSub = restArgs[0];
+          const fromIdx = restArgs.indexOf('--from');
+          const toIdx = restArgs.indexOf('--to');
+          const previewIdx = restArgs.indexOf('--preview');
+          const validateIdx = restArgs.indexOf('--validate');
+          lazyVerify().cmdVerifyHandoff(cwd, {
+            subcommand: handoffSub,
+            from: fromIdx !== -1 ? restArgs[fromIdx + 1] : null,
+            to: toIdx !== -1 ? restArgs[toIdx + 1] : null,
+            preview: previewIdx !== -1,
+            validate: validateIdx !== -1 ? restArgs[validateIdx + 1] : null,
+          }, raw);
+        } else if (subcommand === 'agents') {
+          const agentsSub = restArgs[0];
+          const verifyIdx = restArgs.indexOf('--verify');
+          const contractsIdx = restArgs.indexOf('--contracts');
+          const checkOverlapIdx = restArgs.indexOf('--check-overlap');
+          const fromIdx = restArgs.indexOf('--from');
+          const toIdx = restArgs.indexOf('--to');
+          lazyVerify().cmdVerifyAgents(cwd, {
+            subcommand: agentsSub,
+            verify: verifyIdx !== -1,
+            contracts: contractsIdx !== -1,
+            check_overlap: checkOverlapIdx !== -1,
+            from: fromIdx !== -1 ? restArgs[fromIdx + 1] : null,
+            to: toIdx !== -1 ? restArgs[toIdx + 1] : null,
+          }, raw);
         } else {
-          error(`Unknown verify subcommand: ${subcommand}. Available: state, verify, assertions, search-decisions, search-lessons, review, context-budget, token-budget, summary, validate, validate-dependencies, validate-config, test-coverage`);
+          error(`Unknown verify subcommand: ${subcommand}. Available: state, verify, assertions, search-decisions, search-lessons, review, context-budget, token-budget, summary, validate, validate-dependencies, validate-config, test-coverage, handoff, agents`);
         }
         break;
       }
