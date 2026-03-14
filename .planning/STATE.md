@@ -33,6 +33,7 @@ Progress: [██████████] 100%
 
 ### Decisions
 
+- [v11.5]: Implemented verify:handoff and verify:agents CLI commands - enables execute-phase workflow to complete without CLI errors
 - [v11.5]: Command validator synchronized — audit namespace added, 5 stale subcommand lists corrected (CMD-04)
 - [v11.5]: Added 32 COMMAND_HELP entries for util, verify, and cache routes - all routed commands now respond to --help
 - [v11.5]: Removed orphaned ci.js module (329 lines dead code)

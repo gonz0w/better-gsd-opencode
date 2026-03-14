@@ -37,10 +37,10 @@ This milestone eliminates accumulated technical debt across four areas: a broken
   3. User can run `util:validate-commands` and see results matching actual router state
   4. User can run `--help` on any routed command and receive usage information
    5. User sees no duplicate command routes when listing available commands
-**Plans**: 3/4 plans executed
-  - Plan 01 (Wave 1): Implement verify:handoff and verify:agents commands [CMD-01, CMD-02]
-  - Plan 02 (Wave 1): Remove orphaned ci.js, execute:profile, deduplicate runtime/measure [CMD-03, CMD-06]
-  - Plan 03 (Wave 1): Fix commandDiscovery.js validator — add audit namespace, fix 5 stale subcommand lists [CMD-04]
+**Plans**: 4/4 plans executed
+  - Plan 01 (Wave 1): Implement verify:handoff and verify:agents commands [CMD-01, CMD-02] ✓
+  - Plan 02 (Wave 1): Remove orphaned ci.js, execute:profile, deduplicate runtime/measure [CMD-03, CMD-06] ✓
+  - Plan 03 (Wave 1): Fix commandDiscovery.js validator — add audit namespace, fix 5 stale subcommand lists [CMD-04] ✓
   - Plan 04 (Wave 1): Add 32 missing COMMAND_HELP entries for util, verify, cache [CMD-05] ✓
 
 ### Phase 116: Planning Artifact Cleanup
