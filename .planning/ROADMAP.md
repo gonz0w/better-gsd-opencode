@@ -1,83 +1,93 @@
-# Roadmap: bGSD Plugin — v11.4 Housekeeping & Stabilization
+# Roadmap: bGSD Plugin — v12.0 SQLite-First Data Layer
 
 ## Overview
 
-This milestone eliminates accumulated technical debt across four areas: a broken test suite (600 failures from a single Bun banner bug), CLI command routing gaps, stale planning artifacts, and an overgrown INTENT.md. Test stabilization comes first to provide a safety net, followed by code-level routing fixes, then markdown artifact cleanup, and finally an automated intent archival system.
+This milestone transforms SQLite from a dumb file cache into the structured data backbone for all workflow operations. Foundation work (DataStore class, schema versioning, migrations) enables everything that follows. Parser integration populates structured tables with write-through caching. Enricher acceleration eliminates hot-path duplication for the biggest user-visible speedup. Memory store migration carefully moves sacred data to SQLite while preserving JSON backups. New deterministic decision rules consume SQLite-backed state. Finally, session state moves to SQLite with STATE.md becoming a generated view — the most architecturally aggressive change, saved for last when the data layer is proven stable.
 
 ## Phases
 
-- [x] **Phase 114: Test Suite Stabilization** - Fix Bun runtime banner and 18 residual test failures to restore green test suite
-- [x] **Phase 115: CLI Command Routing** - Fix missing routes, remove dead code, sync command validator (completed 2026-03-14)
-- [x] **Phase 116: Planning Artifact Cleanup** - Normalize MILESTONES.md, fix PROJECT.md, audit out-of-scope and decisions (completed 2026-03-14)
-- [x] **Phase 117: Intent Archival System** - Automate INTENT.md outcome archival during milestone completion (completed 2026-03-14)
+- [ ] **Phase 118: Foundation & Schema** - DataStore class with schema versioning, migration runner, WAL mode, and Map fallback
+- [ ] **Phase 119: Parser Integration & Planning Tables** - Write-through cache for parsers with git-hash + mtime invalidation
+- [ ] **Phase 120: Enricher Acceleration** - Eliminate 3x/2x parser duplication with SQL-backed enrichment
+- [ ] **Phase 121: Memory Store Migration** - Sacred data (decisions, lessons, trajectories, bookmarks) to SQLite with JSON backup
+- [ ] **Phase 122: Decision Rules** - Six new deterministic decision functions consuming SQLite state
+- [ ] **Phase 123: Session State** - Session persistence in SQLite with STATE.md as generated view
 
 ## Phase Details
 
-### Phase 114: Test Suite Stabilization
-**Goal**: All 1014 tests pass with zero failures — the test suite provides reliable signal for all subsequent changes
+### Phase 118: Foundation & Schema
+**Goal**: Every bGSD command has access to a reliable, version-managed SQLite database with automatic schema migrations and graceful fallback on older Node versions
 **Depends on**: Nothing (first phase)
-**Requirements**: TEST-01, TEST-02, TEST-03, TEST-04, TEST-05, TEST-06
+**Requirements**: FND-01, FND-02, FND-03, FND-04
 **Success Criteria** (what must be TRUE):
-  1. User can run `npm test` and see zero test failures across all suites
-  2. User can run tests with Bun installed without JSON parse errors from stdout pollution
-  3. User can run plugin tests in isolation without errors from missing project context
-  4. User can trust that test assertions match current CLI output (no stale expected values)
-  5. User can run the full test suite without missing module import errors
-**Plans**: 2/2 plans complete
-  - Plan 01 (Wave 1): Suppress Bun banner + fix profiler tests + rebuild CLI [TEST-01, TEST-02] ✓
-  - Plan 02 (Wave 2): Fix all residual test failures — stale assertions, plugin isolation, config migration, env edge cases [TEST-03, TEST-04, TEST-05, TEST-06] ✓
+  1. User can run any bGSD command on Node 22.5+ and have `.planning/.cache.db` created automatically with correct schema version
+  2. User can upgrade bGSD versions and have schema migrations run transparently on first command — no data loss, no manual steps
+  3. User can run any bGSD command on Node <22.5 and have all features work identically via Map fallback with no errors
+  4. User can run concurrent bGSD commands (multiple terminals, git hooks) without database locking errors
+**Plans**: TBD
 
-### Phase 115: CLI Command Routing
-**Goal**: Every registered CLI command resolves correctly — no missing routes, no orphaned modules, no stale validator data
-**Depends on**: Phase 114
-**Requirements**: CMD-01, CMD-02, CMD-03, CMD-04, CMD-05, CMD-06
+### Phase 119: Parser Integration & Planning Tables
+**Goal**: Parsed planning data (phases, plans, tasks, requirements) persists in SQLite across invocations — queries replace markdown re-parsing on cache hit
+**Depends on**: Phase 118
+**Requirements**: TBL-01, TBL-02, TBL-03, TBL-04
 **Success Criteria** (what must be TRUE):
-  1. User can call every command referenced in workflows without silent failures (including `verify:handoff` and `verify:agents`)
-  2. User can run builds without bundling the orphaned `src/commands/ci.js` module
-  3. User can run `util:validate-commands` and see results matching actual router state
-  4. User can run `--help` on any routed command and receive usage information
-   5. User sees no duplicate command routes when listing available commands
-**Plans**: 4/4 plans complete
-  - Plan 01 (Wave 1): Implement verify:handoff and verify:agents commands [CMD-01, CMD-02] ✓
-  - Plan 02 (Wave 1): Remove orphaned ci.js, execute:profile, deduplicate runtime/measure [CMD-03, CMD-06] ✓
-  - Plan 03 (Wave 1): Fix commandDiscovery.js validator — add audit namespace, fix 5 stale subcommand lists [CMD-04] ✓
-  - Plan 04 (Wave 1): Add 32 missing COMMAND_HELP entries for util, verify, cache [CMD-05] ✓
+  1. User can query phase data from SQLite without triggering ROADMAP.md parsing when cache is valid
+  2. User can query plan metadata (frontmatter, task counts, status) from SQLite without re-reading plan markdown files
+  3. User can look up requirements by REQ-ID and see phase mappings from SQLite
+  4. User can edit a planning markdown file and have SQLite cache automatically invalidated on next command via git-hash + mtime check
+**Plans**: TBD
 
-### Phase 116: Planning Artifact Cleanup
-**Goal**: Planning artifacts are accurate, complete, and consistently formatted — every agent consuming these files gets correct data
-**Depends on**: Phase 114
-**Requirements**: ART-01, ART-02, ART-03, ART-04, ART-05, ART-06, ART-07
+### Phase 120: Enricher Acceleration
+**Goal**: The command enricher serves all workflow data from SQLite on warm starts — zero redundant parser calls, measurably faster command startup
+**Depends on**: Phase 119
+**Requirements**: ENR-01, ENR-02, ENR-03
 **Success Criteria** (what must be TRUE):
-  1. User can read MILESTONES.md and find entries for all 18+ shipped milestones in chronological order with consistent formatting
-  2. User can read PROJECT.md without encountering broken HTML, stale counts, or broken table rows
-  3. User can see an out-of-scope list that reflects actual current exclusions (no stale items from 12+ milestones ago)
-  4. User can see a Key Decisions table where all entries are current and properly formatted
-  5. User can see constraints that are still relevant — resolved constraints archived
-**Plans**: 3/3 plans complete
-  - Plan 01 (Wave 1): Fix MILESTONES.md — add missing entries, fix v9.2 content, normalize formatting [ART-01, ART-02, ART-03] ✓
-  - Plan 02 (Wave 1): Fix PROJECT.md — repair HTML, update counts, clean out-of-scope [ART-04, ART-05, ART-06]
-  - Plan 03 (Wave 1): Update constraints/decisions + add CLI validation [ART-07]
+  1. User can run any `/bgsd-*` command and have enrichment complete with zero redundant parser calls (no 3x listSummaryFiles, no 2x parsePlans)
+  2. User can run commands with warm SQLite cache and have enrichment data served from SQL queries instead of file re-parsing
+  3. User can observe measurably faster command startup with warm SQLite cache compared to cold start (target: enricher <50ms on warm)
+**Plans**: TBD
 
-### Phase 117: Intent Archival System
-**Goal**: INTENT.md is automatically cleaned during milestone completion — completed outcomes archived, active file stays lean
-**Depends on**: Phase 116
-**Requirements**: INT-01, INT-02, INT-03, INT-04
+### Phase 121: Memory Store Migration
+**Goal**: Sacred data (decisions, lessons, trajectories, bookmarks) is searchable via SQL queries while JSON files are preserved as git-trackable backups
+**Depends on**: Phase 118
+**Requirements**: MEM-01, MEM-02, MEM-03
 **Success Criteria** (what must be TRUE):
-  1. User can complete a milestone and have INTENT.md outcomes automatically snapshot to a versioned archive file
-  2. User can complete a milestone and have completed outcomes stripped from active INTENT.md
-  3. User can add new outcomes after archival without ID collisions (IDs continue monotonically)
-  4. User can complete a milestone and have the history section archived alongside outcomes — keeping INTENT.md under 100 lines
-**Plans**: 1/1 plans complete
-  - Plan 01 (Wave 1): Add intent archival to cmdMilestoneComplete + update workflow + guardrails [INT-01, INT-02, INT-03, INT-04] ✓
+  1. User can search decisions, lessons, and trajectories via SQL queries without JSON.parse of entire files
+  2. User can verify that all sacred data was migrated to SQLite with zero loss — JSON backup files remain untouched on disk
+  3. User can add new bookmarks and have them written to both SQLite and JSON (dual-write ensures no data loss during transition)
+**Plans**: TBD
+
+### Phase 122: Decision Rules
+**Goal**: Six new deterministic decision functions resolve common workflow questions from SQLite-backed state — no subprocess calls, no LLM inference needed
+**Depends on**: Phase 120
+**Requirements**: DEC-01, DEC-02, DEC-03, DEC-04, DEC-05, DEC-06
+**Success Criteria** (what must be TRUE):
+  1. User can have model selection resolved deterministically from config + agent role without subprocess calls
+  2. User can have verification routing, research gate, and phase readiness resolved deterministically from SQLite-backed state
+  3. User can have milestone completion and commit strategy resolved deterministically from roadmap/change data
+  4. User can run `decisions list` and see all 6 new rules registered alongside existing v11.3 rules
+**Plans**: TBD
+
+### Phase 123: Session State
+**Goal**: Session state (position, metrics, accumulated context) lives in SQLite — STATE.md becomes a generated view ensuring markdown and SQL are always consistent
+**Depends on**: Phase 119
+**Requirements**: SES-01, SES-02, SES-03
+**Success Criteria** (what must be TRUE):
+  1. User can have current position, last activity, and performance metrics persist in SQLite across invocations without parsing STATE.md
+  2. User can regenerate STATE.md from SQLite state and get identical content — SQL is the programmatic source of truth
+  3. User can view accumulated context (decisions, todos, blockers) from SQLite without parsing STATE.md
+**Plans**: TBD
 
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 114 → 115 → 116 → 117
+Phases execute in numeric order: 118 → 119 → 120 → 121 → 122 → 123
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 114. Test Suite Stabilization | 1/2 | Complete    | 2026-03-14 |
-| 115. CLI Command Routing | 3/4 | Complete    | 2026-03-14 |
-| 116. Planning Artifact Cleanup | 2/3 | Complete    | 2026-03-14 |
-| 117. Intent Archival System | 1/1 | Complete    | 2026-03-14 |
+| 118. Foundation & Schema | 0/0 | Not started | - |
+| 119. Parser Integration & Planning Tables | 0/0 | Not started | - |
+| 120. Enricher Acceleration | 0/0 | Not started | - |
+| 121. Memory Store Migration | 0/0 | Not started | - |
+| 122. Decision Rules | 0/0 | Not started | - |
+| 123. Session State | 0/0 | Not started | - |

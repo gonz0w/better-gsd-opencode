@@ -56,4 +56,28 @@ _None deferred — all 6 categories selected for v12.0._
 
 ## Traceability
 
-_Populated by roadmap — maps REQ-IDs to phases._
+| Requirement | Phase | Status |
+|-------------|-------|--------|
+| FND-01 | Phase 118 | Pending |
+| FND-02 | Phase 118 | Pending |
+| FND-03 | Phase 118 | Pending |
+| FND-04 | Phase 118 | Pending |
+| TBL-01 | Phase 119 | Pending |
+| TBL-02 | Phase 119 | Pending |
+| TBL-03 | Phase 119 | Pending |
+| TBL-04 | Phase 119 | Pending |
+| ENR-01 | Phase 120 | Pending |
+| ENR-02 | Phase 120 | Pending |
+| ENR-03 | Phase 120 | Pending |
+| MEM-01 | Phase 121 | Pending |
+| MEM-02 | Phase 121 | Pending |
+| MEM-03 | Phase 121 | Pending |
+| DEC-01 | Phase 122 | Pending |
+| DEC-02 | Phase 122 | Pending |
+| DEC-03 | Phase 122 | Pending |
+| DEC-04 | Phase 122 | Pending |
+| DEC-05 | Phase 122 | Pending |
+| DEC-06 | Phase 122 | Pending |
+| SES-01 | Phase 123 | Pending |
+| SES-02 | Phase 123 | Pending |
+| SES-03 | Phase 123 | Pending |
