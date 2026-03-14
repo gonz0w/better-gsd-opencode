@@ -387,7 +387,14 @@ function validateCommandRegistry() {
       'regression': null,
       'quality': null,
       'handoff': null,
-      'agents': null
+      'agents': null,
+      'summary': null,
+      'validate': {
+        'consistency': null,
+        'health': null
+      },
+      'validate-config': null,
+      'validate-dependencies': null
     },
     'util': {
       'config-get': null,
@@ -437,7 +444,26 @@ function validateCommandRegistry() {
       'summary-generate': null,
       'quick-summary': null,
       'extract-sections': null,
-      'validate-commands': null
+      'validate-commands': null,
+      'settings': null,
+      'parity-check': null,
+      'verify-path-exists': null,
+      'config-ensure-section': null,
+      'scaffold': null,
+      'phase-plan-index': null,
+      'state-snapshot': null,
+      'summary-extract': null,
+      'summary-generate': null,
+      'quick-summary': null,
+      'extract-sections': null,
+      'tools': null,
+      'runtime': null,
+      'recovery': null,
+      'history': null,
+      'examples': null,
+      'analyze-deps': null,
+      'estimate-scope': null,
+      'test-coverage': null
     },
     'research': {
       'capabilities': null,
@@ -479,7 +505,8 @@ function validateCommandRegistry() {
     'execute:trajectory dead-ends', 'execute:trajectory pivot',
     'plan:intent show', 'util:classify phase', 'util:classify plan',
     'util:codebase ast', 'util:codebase complexity', 'util:codebase context',
-    'util:codebase exports', 'util:codebase repo-map', 'research:collect --resume'
+    'util:codebase exports', 'util:codebase repo-map', 'research:collect --resume',
+    'verify:validate consistency', 'verify:validate health'
   ];
   
   commands.forEach(cmd => {
@@ -518,7 +545,24 @@ function validateCommandRegistry() {
       return;
     }
     
-    // Handle nested subcommands (object with sub-subs)
+    // Handle arrays (simple subcommand list like cache:*, or null for direct commands)
+    if (Array.isArray(namespaceImpl)) {
+      const subcommand = parts[1];
+      if (!namespaceImpl.includes(subcommand)) {
+        issues.push({ command: cmd, issue: `Unknown subcommand: ${subcommand} for namespace ${namespace}` });
+        return;
+      }
+      validCommands.push(cmd);
+      return;
+    }
+    
+    // Handle null (no subcommands, direct command like util:settings)
+    if (namespaceImpl === null) {
+      validCommands.push(cmd);
+      return;
+    }
+    
+    // Handle nested subcommands (object with sub-subs like util:codebase)
     if (typeof namespaceImpl === 'object' && namespaceImpl !== null) {
       const subcommand = parts[1];
       const validSubs = namespaceImpl[subcommand];
@@ -530,33 +574,13 @@ function validateCommandRegistry() {
       
       // If there are nested subcommands, check for them
       if (validSubs !== null && parts.length > 2) {
-        // Handle subcommands with additional parts (e.g., "trajectory choose", "intent show", "codebase ast")
-        // These are treated as a combined key
         const subSubCommand = parts.slice(2).join(' ');
-        // Also check with space separator for commands like "trajectory choose"
         if (!validSubs.includes(subSubCommand) && !validSubs.includes(parts[2])) {
           issues.push({ command: cmd, issue: `Unknown nested subcommand: ${subSubCommand} for ${namespace}:${subcommand}` });
           return;
         }
       }
       
-      validCommands.push(cmd);
-      return;
-    }
-    
-    // Handle flat subcommands (array)
-    if (Array.isArray(namespaceImpl)) {
-      const subcommand = parts[1];
-      if (!namespaceImpl.includes(subcommand)) {
-        issues.push({ command: cmd, issue: `Unknown subcommand: ${subcommand} for namespace ${namespace}` });
-        return;
-      }
-      validCommands.push(cmd);
-      return;
-    }
-    
-    // Handle null (no subcommands, direct command)
-    if (namespaceImpl === null) {
       validCommands.push(cmd);
       return;
     }

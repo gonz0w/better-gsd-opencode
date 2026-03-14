@@ -7,7 +7,7 @@ This milestone eliminates accumulated technical debt across four areas: a broken
 ## Phases
 
 - [x] **Phase 114: Test Suite Stabilization** - Fix Bun runtime banner and 18 residual test failures to restore green test suite
-- [ ] **Phase 115: CLI Command Routing** - Fix missing routes, remove dead code, sync command validator
+- [x] **Phase 115: CLI Command Routing** - Fix missing routes, remove dead code, sync command validator (completed 2026-03-14)
 - [ ] **Phase 116: Planning Artifact Cleanup** - Normalize MILESTONES.md, fix PROJECT.md, audit out-of-scope and decisions
 - [ ] **Phase 117: Intent Archival System** - Automate INTENT.md outcome archival during milestone completion
 
@@ -37,7 +37,7 @@ This milestone eliminates accumulated technical debt across four areas: a broken
   3. User can run `util:validate-commands` and see results matching actual router state
   4. User can run `--help` on any routed command and receive usage information
    5. User sees no duplicate command routes when listing available commands
-**Plans**: 4/4 plans executed
+**Plans**: 4/4 plans complete
   - Plan 01 (Wave 1): Implement verify:handoff and verify:agents commands [CMD-01, CMD-02] ✓
   - Plan 02 (Wave 1): Remove orphaned ci.js, execute:profile, deduplicate runtime/measure [CMD-03, CMD-06] ✓
   - Plan 03 (Wave 1): Fix commandDiscovery.js validator — add audit namespace, fix 5 stale subcommand lists [CMD-04] ✓
@@ -74,6 +74,6 @@ Phases execute in numeric order: 114 → 115 → 116 → 117
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 114. Test Suite Stabilization | 1/2 | Complete    | 2026-03-14 |
-| 115. CLI Command Routing | 3/4 | In Progress|  |
+| 115. CLI Command Routing | 3/4 | Complete    | 2026-03-14 |
 | 116. Planning Artifact Cleanup | 0/0 | Not started | - |
 | 117. Intent Archival System | 0/0 | Not started | - |
