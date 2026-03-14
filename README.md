@@ -1,120 +1,63 @@
-# bGSD (Get Stuff Done) — AI Project Planning for OpenCode
+# bGSD — AI Project Planning & Execution
 
-A structured project planning and execution system for [OpenCode](https://github.com/opencode-ai/opencode). bGSD turns AI-assisted coding from ad-hoc prompting into milestone-driven development with planning, execution, verification, and memory that persists across sessions.
+A structured project lifecycle system for AI-assisted coding. Turns ad-hoc prompting into milestone-driven development with planning, execution, verification, and session memory.
 
-**762 tests** | **Zero runtime dependencies** | **11 slash commands** | **100+ CLI operations** | **10 specialized AI agents** | **v9.3 milestone shipped**
-
-> **Note:** bGSD creates a `~/.config/oc` symlink pointing to `~/.config/opencode` to work around a path mangling issue in the Anthropic auth module. This is created automatically during installation.
+**762+ tests** | **Zero dependencies** | **41 slash commands** | **10 specialized agents**
 
 ---
 
-## The Problem
+## What It Does
 
-AI coding assistants are powerful but chaotic. Without structure, you get:
-- Lost context between sessions
-- No traceability from requirements to code
-- No verification that what was built matches what was asked for
-- No way to pause, resume, or hand off work
-- No learning from past decisions
-- Error cascading from unchecked edits
+bGSD gives your AI editor a complete project workflow: requirements gathering, roadmap creation, phase planning, parallel execution with atomic commits, automated verification, and GitHub CI integration. Everything persists in `.planning/` so context survives across sessions.
 
-## The Solution
-
-bGSD provides a complete project lifecycle inside your AI editor:
+## Example Flow
 
 ```
-Idea → Requirements → Roadmap → Plans → Execution → Verification
-  |                                                        |
-  +-- Intent tracking, session memory, quality gates,  ----+
-      TDD enforcement, review gates, progress metrics
+/bgsd-new-project              # Answer questions about what you want to build
+                                # → Creates requirements, roadmap, phases
+
+/bgsd-plan-phase 1              # Create executable plans for phase 1
+                                # → Breaks work into tasks with file targets
+
+/bgsd-execute-phase 1           # Build it — atomic commits per task, two-stage review
+                                # → Code written, tested, committed
+
+/bgsd-verify-work 1             # Verify output matches requirements
+                                # → Gap report if anything's missing
+
+/bgsd-progress                  # See where things stand, get routed to next action
+
+/bgsd-github-ci                 # Push, create PR, run code scanning, fix loop, auto-merge
 ```
 
-Every step produces structured documents in `.planning/` that agents read for context. Decisions persist. Progress is tracked. Quality is measured. See the **[Planning System](docs/planning-system.md)** for the full `.planning/` structure.
+Each command handles orchestration, agent spawning, and state management automatically. Use `/bgsd-help` for the full command list, or see the [Command Reference](docs/commands.md) for detailed docs.
 
 ---
 
-## Quick Start
+## Key Capabilities
 
-Then in OpenCode:
+- **10 Specialized Agents** — Planner, executor, verifier, debugger, researchers, roadmapper, plan checker, codebase mapper, GitHub CI agent. Two-stage code review embedded in execution.
+- **Wave-Based Parallel Execution** — Plans organized into dependency waves; independent plans run concurrently.
+- **TDD Execution Engine** — Orchestrator-enforced RED/GREEN/REFACTOR gates with anti-pattern detection.
+- **Quality Gates** — Severity-classified findings, test gating, requirement verification, A-F scoring, intent drift detection, stuck/loop recovery.
+- **AST Intelligence** — JS/TS parsing, repo maps, per-function complexity metrics, dependency graphs with cycle detection.
+- **Session Memory** — Decisions, lessons, bookmarks, and trajectory journals persist across sessions and `/clear`.
+- **Git Integration** — Per-task atomic commits, session diffs, rollback info, TDD trailers, branch-per-phase strategies, automated GitHub CI pipeline.
+- **Context Efficiency** — Agent context manifests, compact serialization, task-scoped injection, bounded token budgets.
+- **Model Profiles** — Three tiers (quality/balanced/budget) controlling which model handles each agent role.
+- **RAG Research** — YouTube search, NotebookLM synthesis, multi-source orchestration with graceful degradation.
 
-```
-/bgsd-new-project
-```
+---
 
-That's it. bGSD walks you through everything: what you want to build, how to break it down, and then executes it phase by phase.
-
-### Uninstall
+## Development
 
 ```bash
-npx get-shit-done-oc --uninstall
+npm install && npm run build    # Install deps and build CLI
+npm test                        # Run full test suite (762+ tests)
+./deploy.sh                     # Deploy to live host editor config
 ```
 
-### Update
-
-```bash
-npx get-shit-done-oc@latest
-```
-
-See the **[Getting Started Guide](docs/getting-started.md)** for the full walkthrough, or the **[Expert Guide](docs/expert-guide.md)** if you want full control.
-
----
-
-## Two Flows
-
-**Easy Flow** — Let bGSD drive. Answer questions, approve plans, watch execution:
-
-```
-/bgsd plan project           # Answer "what do you want to build?"
-                             # bGSD creates requirements, roadmap, phases
-/bgsd plan phase 1           # bGSD creates executable plans for phase 1
-/bgsd exec phase 1           # bGSD builds it, commits per-task, verifies
-/bgsd session progress       # See where things stand, get routed to next action
-```
-
-**Expert Flow** — Control every decision. Research domains, discuss assumptions, tune agents:
-
-```
-/bgsd util map                        # Analyze existing code first (brownfield)
-/bgsd plan project                    # Full questioning + parallel research
-/bgsd plan discuss 1                  # Lock down implementation decisions
-/bgsd plan assumptions 1              # See what the AI assumes before planning
-/bgsd plan research 1                # Deep domain research
-/bgsd plan phase 1 --research        # Plan with integrated research
-/bgsd exec phase 1                   # Execute with wave parallelism
-/bgsd verify-work 1                  # Manual UAT testing
-/bgsd milestone audit                # Cross-phase integration check
-```
-
----
-
-## Key Features
-
-**[10 Specialized AI Agents](docs/agents.md)** — Planner, executor, verifier, debugger, researchers, roadmapper, plan checker, codebase mapper, and GitHub CI agent. Two-stage code review (spec compliance + code quality) embedded in execution.
-
-**Intelligent Orchestration** — Task complexity scoring (1-5) drives automatic model selection. Agent context manifests reduce token usage by 40-60%.
-
-**Model Profiles** — Three tiers (quality/balanced/budget) controlling which model handles planning, execution, and verification. See **[Configuration](docs/configuration.md)**.
-
-**Wave-Based Parallel Execution** — Plans organized into dependency waves; independent plans run in parallel.
-
-**[TDD Execution Engine](docs/tdd.md)** — Orchestrator-enforced RED → GREEN → REFACTOR gates with anti-pattern detection and auto test-after-edit.
-
-**Quality Gates** — Two-stage review, severity-classified findings (BLOCKER/WARNING/INFO), test gating, requirement verification, regression detection, A-F quality scoring, intent drift scoring, and stuck/loop detection with recovery.
-
-**AST Intelligence** — Acorn-based JS/TS parsing, ~1k token repo maps, per-function complexity metrics, and module dependency graphs with cycle detection.
-
-**Context Efficiency** — Agent context manifests, compact serialization, task-scoped injection, and bounded token budgets preventing context rot.
-
-**Session Memory** — Decisions, lessons, bookmarks, and trajectory journals persist across `/clear` and session restarts.
-
-**[RAG Research Pipeline](docs/configuration.md)** — YouTube search (yt-dlp), NotebookLM synthesis, multi-source orchestration. Gracefully degrades through 4 tiers down to pure LLM.
-
-**[Trajectory Engineering](docs/architecture.md)** — Checkpoint, compare metrics, pivot, and choose between implementation approaches while preserving planning state.
-
-**Git Integration** — Per-task atomic commits, pre-commit safety checks, session diffs, rollback info, TDD trailers, branch-per-phase strategies, selective rewind, and automated GitHub CI quality gate (push, PR, code scanning, fix loop, auto-merge).
-
-
-**Codebase Intelligence** — Convention extraction, dependency graphs across 6 languages, lifecycle awareness, and environment detection for 26 manifest patterns.
+`deploy.sh` copies commands, workflows, templates, references, agents, hooks, and the built CLI to the host editor's config directory. This is the only deployment step needed during development.
 
 ---
 
@@ -122,68 +65,19 @@ See the **[Getting Started Guide](docs/getting-started.md)** for the full walkth
 
 | Guide | Description |
 |-------|-------------|
-| **[Getting Started](docs/getting-started.md)** | First project walkthrough, easy flow, minimal decisions |
-| **[Expert Guide](docs/expert-guide.md)** | Full control flow, all options, advanced patterns |
-| **[Command Reference](docs/commands.md)** | Every command with arguments, options, and examples |
-| **[Architecture](docs/architecture.md)** | How bGSD works internally, agent system, tool design |
-| **[Agent System](docs/agents.md)** | All 10 agents, their roles, spawning, model profiles |
-| **[Workflows](docs/workflows.md)** | All 46 workflows, what they do, how they connect |
-| **[Planning System](docs/planning-system.md)** | How .planning/ works, document structure, lifecycle |
-| **[Configuration](docs/configuration.md)** | Full configuration reference with all options |
-| **[TDD Guide](docs/tdd.md)** | TDD execution engine, RED-GREEN-REFACTOR, anti-patterns |
-| **[Design Decisions](docs/decisions.md)** | Why bGSD is built the way it is, with rationale |
-| **[Research & Analysis](docs/research.md)** | Competitive audit, research methodology, key findings |
-| **[Version History](docs/milestones.md)** | Every milestone, what shipped, metrics |
-| **[Troubleshooting](docs/troubleshooting.md)** | Common issues and solutions |
-
----
-
-## Commands
-
-bGSD includes **41 slash commands** across project lifecycle, planning, execution, analysis, and configuration. See the **[Full Command Reference](docs/commands.md)**.
-
-| Command | What It Does |
-|---------|-------------|
-| `/bgsd plan project` | Initialize project: questioning, research, roadmap |
-| `/bgsd plan phase [N]` | Create executable plans for a phase |
-| `/bgsd exec phase N` | Execute all plans in a phase |
-| `/bgsd session progress` | View progress, get routed to next action |
-| `/bgsd quick` | Execute small tasks with bGSD guarantees |
-| `/bgsd exec ci` | Push, create PR, run code scanning, fix loop, auto-merge |
-
----
-
-## Development
-
-> **For end users:** Use `npx get-shit-done-oc` to install. The instructions below are for contributors working on bGSD itself.
-
-```bash
-# Clone
-git clone https://github.com/gonz0w/bgsd-oc.git
-cd bgsd-oc
-
-# Install & build
-npm install
-npm run build
-
-# Run tests (node:test, 762 tests)
-npm test
-
-# Test a specific command
-node bin/gsd-tools.cjs state validate --raw
-
-# Deploy to live OpenCode config (dev workflow)
-./deploy.sh
-```
-
-Built with esbuild into a single `bin/gsd-tools.cjs` file. See **[Architecture](docs/architecture.md)** for the full source structure.
-
----
+| [Command Reference](docs/commands.md) | All 41 commands with arguments, options, and examples |
+| [Getting Started](docs/getting-started.md) | First project walkthrough |
+| [Expert Guide](docs/expert-guide.md) | Full control flow and advanced patterns |
+| [Architecture](docs/architecture.md) | Internals, agent system, tool design |
+| [Agent System](docs/agents.md) | All 10 agents, roles, spawning, model profiles |
+| [Planning System](docs/planning-system.md) | `.planning/` structure and document lifecycle |
+| [Configuration](docs/configuration.md) | Full configuration reference |
+| [TDD Guide](docs/tdd.md) | TDD execution engine and anti-patterns |
 
 ## Requirements
 
-- Node.js >= 22.5 (required for `node:sqlite` caching; falls back to in-memory cache on older versions)
-- [OpenCode](https://github.com/opencode-ai/opencode) installed and configured
+- Node.js >= 22.5
+- A compatible AI code editor
 
 ## License
 

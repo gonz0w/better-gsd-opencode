@@ -78,7 +78,7 @@ bGSD uses 10 specialized AI agents, each purpose-built for a specific task. Agen
 
 **Role:** Reviews code changes against project conventions and plan spec before completion.
 
-> **Note:** Code review is a step within the `execute-plan.md` workflow, not a standalone agent with its own definition file. The review logic lives in `src/lib/review/` and is invoked by the executor after plan completion. This keeps the agent count at 9 while retaining full review capabilities.
+> **Note:** Code review is a step within the `execute-plan.md` workflow, not a standalone agent with its own definition file. The review logic lives in `src/lib/review/` and is invoked by the executor after plan completion. This keeps the agent count at 10 while retaining full review capabilities.
 
 **Inputs:** Git diff, PLAN.md task requirements, CONVENTIONS.md, dependency graph.
 

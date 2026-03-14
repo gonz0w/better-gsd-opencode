@@ -88,7 +88,7 @@ Checkable requirements with traceable IDs.
 
 **Updated:** During milestone planning and as requirements are completed.
 
-**Why it exists:** Provides clear, measurable targets. The traceability table ensures every requirement maps to a phase. The `/bgsd-trace-requirement` command traces from requirement to plan to code on disk.
+**Why it exists:** Provides clear, measurable targets. The traceability table ensures every requirement maps to a phase. The `/bgsd-trace` command traces from requirement to plan to code on disk.
 
 ---
 
@@ -129,7 +129,7 @@ The living state of the project. Changes frequently.
 
 **Updated:** After every plan completion, decision, blocker, or session boundary.
 
-**Why it exists:** Enables session resumption. When an agent starts with `/bgsd-resume-work`, STATE.md tells it exactly where things stand. The `state validate` command detects drift between STATE.md and filesystem reality.
+**Why it exists:** Enables session resumption. When an agent starts with `/bgsd-resume`, STATE.md tells it exactly where things stand. The `state validate` command detects drift between STATE.md and filesystem reality.
 
 ---
 

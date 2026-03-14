@@ -36,7 +36,7 @@ Common issues and solutions for bGSD.
 **Fix:** Adjust planning depth:
 - Use `/bgsd-discuss-phase` before planning to lock down scope
 - Set `depth` in config: `"quick"`, `"standard"`, or `"deep"`
-- Use `/bgsd-list-phase-assumptions` to check what the AI assumes before planning
+- Use `/bgsd-list-assumptions` to check what the AI assumes before planning
 
 ### Plan quality review keeps requesting revisions
 
@@ -67,7 +67,7 @@ Common issues and solutions for bGSD.
 **Fix:**
 ```
 /clear                     # Clear context
-/bgsd-resume-work           # Restores state from files
+/bgsd-resume           # Restores state from files
 ```
 
 bGSD is designed for context resets. All state lives in `.planning/` files, not in conversation history.
@@ -78,7 +78,7 @@ bGSD is designed for context resets. All state lives in `.planning/` files, not 
 
 **Fix:**
 1. Run `/bgsd-progress` to see current state
-2. Run `/bgsd-resume-work` to restore context
+2. Run `/bgsd-resume` to restore context
 3. Continue with `/bgsd-execute-phase <N>` — it picks up where it left off
 
 ### Tests failing during execution

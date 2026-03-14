@@ -52,7 +52,7 @@ Gather implementation decisions through adaptive questioning. Produces CONTEXT.m
 
 ---
 
-#### `/bgsd-list-phase-assumptions`
+#### `/bgsd-list-assumptions`
 
 Surface the AI's assumptions about a phase approach before planning. Conversational only — no files created.
 
@@ -126,6 +126,18 @@ Execute small ad-hoc tasks with bGSD tracking (atomic commits, state updates) bu
 **Workflow:** `workflows/quick.md`
 **Agents:** gsd-planner, gsd-executor, optionally gsd-plan-checker and gsd-verifier
 **Creates:** `.planning/quick/{num}-{slug}/PLAN.md`, `SUMMARY.md`
+
+---
+
+#### `/bgsd-quick-task`
+
+Execute a quick task without full phase planning. Alias for `/bgsd-quick` with simplified invocation.
+
+| Argument | Description |
+|----------|-------------|
+| `[description]` | Task description |
+
+**Workflow:** `workflows/quick.md`
 
 ---
 
@@ -226,7 +238,7 @@ Audit milestone against original intent. Cross-phase integration check.
 
 ---
 
-#### `/bgsd-plan-milestone-gaps`
+#### `/bgsd-plan-gaps`
 
 Create phases to close all gaps identified by milestone audit.
 
@@ -245,7 +257,7 @@ Check project progress and get intelligently routed to the next action.
 
 ---
 
-#### `/bgsd-resume-work`
+#### `/bgsd-resume`
 
 Restore context from a previous session.
 
@@ -253,7 +265,7 @@ Restore context from a previous session.
 
 ---
 
-#### `/bgsd-pause-work`
+#### `/bgsd-pause`
 
 Create a handoff file for session continuity.
 
@@ -381,14 +393,6 @@ Display the complete bGSD command reference.
 
 ---
 
-#### `/bgsd-reapply-patches`
-
-Reapply local modifications after a GSD update. Intelligently merges user's previously saved local changes back into newly installed files, handling conflicts when both upstream and local versions changed.
-
-**Workflow:** Inline (no external workflow)
-
----
-
 ### Analytics & Utility
 
 #### `/bgsd-velocity`
@@ -399,7 +403,7 @@ Show execution velocity metrics: plans completed per day, average duration, and 
 
 ---
 
-#### `/bgsd-codebase-impact`
+#### `/bgsd-impact`
 
 Show module dependencies and blast radius for given files. Analyzes which modules import/reference the specified files.
 
@@ -475,7 +479,7 @@ Parse test output and apply pass/fail gating. Detects test framework (ExUnit, Go
 
 ---
 
-#### `/bgsd-trace-requirement`
+#### `/bgsd-trace`
 
 Trace a requirement from REQUIREMENTS.md through plans to actual files on disk. Shows the full implementation chain for a specific requirement ID.
 
