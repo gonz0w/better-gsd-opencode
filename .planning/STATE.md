@@ -10,7 +10,7 @@ See: `.planning/PROJECT.md` (updated 2026-03-14)
 ## Current Position
 
 **Phase:** 119 of 123 (Parser Integration Planning Tables)
-**Current Plan:** Plan 02 complete (Phase complete)
+**Current Plan:** Plan 03 complete (Phase complete)
 **Status:** In progress
 **Last Activity:** 2026-03-14
 
@@ -27,6 +27,7 @@ Progress: [████████░░] 80%
 - v12.0 Phase 118 Plan 03: 4 min, 2 tasks, 1 file (52 tests)
 - v12.0 Phase 119 Plan 01: 4 min, 2 tasks, 4 files
 - v12.0 Phase 119 Plan 02: 24 min, 3 tasks, 6 files
+- v12.0 Phase 119 Plan 03: 16 min, 2 tasks, 2 files (71 tests)
 - Trend: Stable
 
 *Updated after each plan completion*
@@ -48,6 +49,8 @@ Progress: [████████░░] 80%
 - [Phase 119-02]: ESM plugin cannot import CJS db.js — esbuild __require wrapper fails in native ESM; created ESM-native db-cache.js using top-level await dynamic import('node:sqlite')
 - [Phase 119-02]: storeRoadmap field name adaptation: parser uses camelCase (planCount) but DB schema uses snake_case (plan_count) — adapt in write-through call
 - [Phase 119-02]: raw is null on cache hits (markdown not stored in SQLite) — in-memory Map cache retains full object with raw after first parse in session
+- [Phase 119-03]: clearForCwd() added to PlanningCache — was specified in Plan 02 but not implemented; added as blocking deviation since tests require it for end-to-end invalidation flow — Rule 3 blocking fix
+- [Phase 119-03]: PlanningCache test isolation uses string cwds ('/test/project/tblXX') per describe group — avoids SQLite getDb() singleton collision while providing logical scoping across groups
 
 ### Roadmap Evolution
 
@@ -64,6 +67,6 @@ None.
 
 ## Session Continuity
 
-**Last session:** 2026-03-14T17:03:11Z
-**Stopped at:** Completed 0119-02-PLAN.md
+**Last session:** 2026-03-14T17:25:17.959Z
+**Stopped at:** Completed 0119-03-PLAN.md
 **Next step:** Phase 119 complete — proceed to Phase 120 (query integration)
