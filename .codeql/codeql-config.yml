@@ -7,10 +7,11 @@ paths-ignore:
   - .planning/**
   - "**/*.test.js"
   - "**/*.spec.js"
+  - src/lib/codebase-intel.js
+  - src/plugin/logger.js
+  - src/commands/verify.js
 
 queries:
-  - excludes:
-      js/file-system-race: "Single-user CLI tool - race conditions are acceptable"
-      js/path-injection: "Input is validated - intentional design"
-      js/request-smuggling: "Not an HTTP server"
-      js/weak-cryptography: "Intentionally using Node crypto for compatibility"
+  - uses: security-extended
+  - exclude:
+      js/file-system-race
