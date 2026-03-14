@@ -849,7 +849,55 @@ var init_roadmap = __esm({
 
 // src/plugin/parsers/plan.js
 import { readFileSync as readFileSync3, readdirSync } from "fs";
-import { join as join6 } from "path";
+import { join as join6, dirname } from "path";
+function _getPlanningCache2(cwd) {
+  try {
+    const db = getDb(cwd);
+    return new PlanningCache(db);
+  } catch {
+    return null;
+  }
+}
+function _cwdFromPlanPath(planPath) {
+  let dir = dirname(planPath);
+  while (dir !== dirname(dir)) {
+    if (dir.endsWith("/.planning") || dir.includes("/.planning/")) {
+      const planningIdx = dir.indexOf("/.planning");
+      if (planningIdx !== -1) {
+        return dir.slice(0, planningIdx) || "/";
+      }
+    }
+    dir = dirname(dir);
+  }
+  return null;
+}
+function _buildPlanFromCache(planRow) {
+  const frontmatter = planRow.frontmatter_json ? JSON.parse(planRow.frontmatter_json) : {};
+  const tasks = (planRow.tasks || []).map((t) => Object.freeze({
+    type: t.type || "auto",
+    name: t.name || null,
+    files: t.files_json ? JSON.parse(t.files_json) : [],
+    action: t.action || null,
+    verify: t.verify || null,
+    done: t.done || null
+  }));
+  return Object.freeze({
+    raw: null,
+    // not stored in cache
+    path: planRow.path,
+    frontmatter: Object.freeze(frontmatter),
+    objective: planRow.objective || null,
+    context: null,
+    // not stored separately — available on fresh parse
+    tasks: Object.freeze(tasks),
+    verification: null,
+    // not stored separately
+    successCriteria: null,
+    // not stored separately
+    output: null
+    // not stored separately
+  });
+}
 function extractFrontmatter(content) {
   if (!content || typeof content !== "string") return {};
   if (!content.startsWith("---\n")) return {};
@@ -934,9 +982,22 @@ function extractTasks(content) {
   }
   return tasks;
 }
-function parsePlan(planPath) {
+function parsePlan(planPath, cwd) {
   if (_planCache.has(planPath)) {
     return _planCache.get(planPath);
+  }
+  const resolvedCwd = cwd || _cwdFromPlanPath(planPath) || process.cwd();
+  const planningCache = _getPlanningCache2(resolvedCwd);
+  if (planningCache) {
+    const freshness = planningCache.checkFreshness(planPath);
+    if (freshness === "fresh") {
+      const planRow = planningCache.getPlan(planPath);
+      if (planRow) {
+        const result2 = _buildPlanFromCache(planRow);
+        _planCache.set(planPath, result2);
+        return result2;
+      }
+    }
   }
   let raw;
   try {
@@ -960,6 +1021,9 @@ function parsePlan(planPath) {
     successCriteria: extractXmlSection(raw, "success_criteria"),
     output: extractXmlSection(raw, "output")
   });
+  if (planningCache) {
+    planningCache.storePlan(planPath, resolvedCwd, result);
+  }
   _planCache.set(planPath, result);
   return result;
 }
@@ -991,7 +1055,30 @@ function parsePlans(phaseNum, cwd) {
   } catch {
     return Object.freeze([]);
   }
-  const plans = planFiles.map((f) => parsePlan(join6(phaseDir, f))).filter(Boolean);
+  const planningCache = _getPlanningCache2(resolvedCwd);
+  if (planningCache && planFiles.length > 0) {
+    const planPaths = planFiles.map((f) => join6(phaseDir, f));
+    const freshnessResult = planningCache.checkAllFreshness(planPaths);
+    if (freshnessResult.stale.length === 0 && freshnessResult.missing.length === 0) {
+      const phaseNumStr = String(phaseNum);
+      const cachedRows = planningCache.getPlansForPhase(phaseNumStr, resolvedCwd);
+      if (cachedRows && cachedRows.length === planFiles.length) {
+        const plans2 = cachedRows.map((row) => {
+          const planRow = planningCache.getPlan(row.path);
+          if (!planRow) return null;
+          const result = _buildPlanFromCache(planRow);
+          _planCache.set(row.path, result);
+          return result;
+        }).filter(Boolean);
+        if (plans2.length === planFiles.length) {
+          const frozen2 = Object.freeze(plans2);
+          _plansCache.set(cacheKey, frozen2);
+          return frozen2;
+        }
+      }
+    }
+  }
+  const plans = planFiles.map((f) => parsePlan(join6(phaseDir, f), resolvedCwd)).filter(Boolean);
   const frozen = Object.freeze(plans);
   _plansCache.set(cacheKey, frozen);
   return frozen;
@@ -1003,10 +1090,21 @@ function invalidatePlans(cwd) {
         _plansCache.delete(key);
       }
     }
+    const planPaths = [];
     for (const key of _planCache.keys()) {
       if (key.startsWith(cwd)) {
         _planCache.delete(key);
+        planPaths.push(key);
       }
+    }
+    try {
+      const planningCache = _getPlanningCache2(cwd);
+      if (planningCache) {
+        for (const planPath of planPaths) {
+          planningCache.invalidateFile(planPath);
+        }
+      }
+    } catch {
     }
   } else {
     _planCache.clear();
@@ -1015,7 +1113,8 @@ function invalidatePlans(cwd) {
 }
 var _planCache, _plansCache, FM_DELIMITERS, FM_KEY_VALUE;
 var init_plan = __esm({
-  "src/plugin/parsers/plan.js"() {
+  async "src/plugin/parsers/plan.js"() {
+    await init_db_cache();
     _planCache = /* @__PURE__ */ new Map();
     _plansCache = /* @__PURE__ */ new Map();
     FM_DELIMITERS = /^---\n([\s\S]+?)\n---/;
@@ -1276,13 +1375,13 @@ var init_parsers = __esm({
   async "src/plugin/parsers/index.js"() {
     init_state();
     await init_roadmap();
-    init_plan();
+    await init_plan();
     init_config();
     init_project();
     init_intent();
     init_state();
     await init_roadmap();
-    init_plan();
+    await init_plan();
     init_config();
     init_project();
     init_intent();
@@ -1842,7 +1941,7 @@ function createToolRegistry(safeHookFn) {
 // src/plugin/project-state.js
 init_state();
 await init_roadmap();
-init_plan();
+await init_plan();
 init_config();
 init_project();
 init_intent();
@@ -2468,7 +2567,7 @@ var bgsd_status = {
 // src/plugin/tools/bgsd-plan.js
 import { z } from "zod";
 await init_roadmap();
-init_plan();
+await init_plan();
 var bgsd_plan = {
   description: "Get roadmap overview or detailed phase information.\n\nTwo modes:\n- No args: returns all phases with status, goal, and plan count (roadmap summary)\n- With phase number: returns detailed phase info (goal, requirements, success criteria, dependencies) plus plan contents (tasks, objectives) if plans exist\n\nUse no-args mode to understand project structure. Use phase mode to dive into specific phase details.",
   args: {
@@ -2781,7 +2880,7 @@ var bgsd_validate = {
 // src/plugin/tools/bgsd-progress.js
 import { z as z3 } from "zod";
 init_state();
-init_plan();
+await init_plan();
 import { readFileSync as readFileSync8, writeFileSync as writeFileSync2, mkdirSync as mkdirSync2, rmdirSync, existsSync as existsSync4, statSync as statSync3 } from "fs";
 import { join as join11 } from "path";
 var LOCK_STALE_MS = 1e4;
@@ -3823,7 +3922,7 @@ function createAdvisoryGuardrails(cwd, notifier, config) {
 init_config();
 init_state();
 await init_roadmap();
-init_plan();
+await init_plan();
 init_config();
 init_project();
 init_intent();
