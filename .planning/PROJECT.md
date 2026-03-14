@@ -232,7 +232,7 @@ Known tech debt: `node:sqlite` is Stability 1.2 (Release Candidate). Test suite 
 - **Backward compatibility**: All regex/parser changes must accept both old and new formats
 - **No breaking changes**: Existing ROADMAP.md, STATE.md, PLAN.md files must keep working
 - **Single-file deploy**: `deploy.sh` must continue to work — bundle to single file if splitting source
-- **Node.js 18+**: Minimum version (for fetch, node:test) — formalized in package.json
+- **Node.js 22.5+**: Minimum version (for `node:sqlite` caching, fallback to Map on older) — formalized in package.json
 - **Test against current project**: Always test against current working directory's `.planning/`
 - **Agent cap**: Maximum 9 agent roles; new intelligence delivered as CLI data, not new agents
 
@@ -265,9 +265,9 @@ Known tech debt: `node:sqlite` is Stability 1.2 (Release Candidate). Test suite 
 | Reason capture via --reason flag | gsd-tools runs via execFileSync, no interactive prompts | Good — CLI-compatible |
 | Advisory dead-end context | Never crash, null when absent, matching existing patterns | Good — zero-risk integration |
 
-| Trajectory exploration over worktrees | Sequential exploration sufficient; worktrees disk-expensive |
-| Automatic pivot without human signal | Human-in-the-loop is a core GSD principle |
-| Trajectory analytics | Deferred to future milestone |
+| Trajectory exploration over worktrees | Sequential exploration sufficient; worktrees disk-expensive | Deferred — not adopted |
+| Automatic pivot without human signal | Human-in-the-loop is a core GSD principle | Rejected — violates core principle |
+| Trajectory analytics | Deferred to future milestone | Deferred — not scheduled |
 | `node:sqlite` over `better-sqlite3` | Preserves single-file deploy, zero dependencies | Good — graceful Map fallback on Node <22.5 |
 | Two-layer cache (Map L1 + SQLite L2) | In-memory for speed, SQLite for persistence across invocations | Good — transparent to consumers via cachedReadFile |
 | Agent consolidation 11→9 | Merged integration-checker→verifier, synthesizer→roadmapper | Good — fewer agents, same capabilities |
@@ -279,4 +279,9 @@ Known tech debt: `node:sqlite` is Stability 1.2 (Release Candidate). Test suite 
 | Scaffold-then-fill for SUMMARY.md | CLI generates data sections, LLM fills only judgment | Good — 50%+ writing reduction |
 
 ---
-*Last updated: 2026-03-13 after v11.4 milestone start*
+
+### Archived Constraints
+- ~~Node.js 18+ minimum~~ — Raised to 22.5+ in v11.x for `node:sqlite` support with graceful Map fallback
+
+---
+*Last updated: 2026-03-14 after v11.4 constraint audit*
