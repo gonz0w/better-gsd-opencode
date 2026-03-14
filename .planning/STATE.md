@@ -10,8 +10,8 @@ See: `.planning/PROJECT.md` (updated 2026-03-13)
 ## Current Position
 
 **Phase:** 115 of 117 (CLI Command Routing)
-**Current Plan:** 02
-**Status:** Ready to plan
+**Current Plan:** 03
+**Status:** Plan complete
 **Last Activity:** 2026-03-14
 
 Progress: [██████████] 100%
@@ -33,6 +33,8 @@ Progress: [██████████] 100%
 
 ### Decisions
 
+- [v11.5]: Command validator synchronized — audit namespace added, 5 stale subcommand lists corrected (CMD-04)
+- [v11.5]: Added 32 COMMAND_HELP entries for util, verify, and cache routes - all routed commands now respond to --help
 - [v11.5]: Removed orphaned ci.js module (329 lines dead code)
 - [v11.5]: Removed execute:profile dead route from router
 - [v11.5]: Deduplicated runtime/measure commands - only util:runtime and util:measure work
@@ -53,6 +55,6 @@ None.
 
 ## Session Continuity
 
-**Last session:** 2026-03-14T00:39:03Z
-**Stopped at:** Completed 115-02-PLAN.md (CLI command routing deduplicated)
+**Last session:** 2026-03-14T00:40:00Z
+**Stopped at:** Completed 115-04-PLAN.md (all CLI commands have --help)
 **Next step:** Ready for next plan in Phase 115
