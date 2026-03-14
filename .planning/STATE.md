@@ -5,13 +5,13 @@
 See: `.planning/PROJECT.md` (updated 2026-03-13)
 
 **Core value:** Manage and deliver high-quality software with high-quality documentation, while continuously reducing token usage and improving performance
-**Current focus:** Phase 115 — CLI Command Routing (v11.5 CLI Refinement)
+**Current focus:** Phase 116 — Planning Artifact Cleanup
 
 ## Current Position
 
-**Phase:** 115 of 117 (CLI Command Routing)
-**Current Plan:** Not started
-**Status:** Ready to plan
+**Phase:** 116 of 117 (Planning Artifact Cleanup)
+**Current Plan:** 01 (Complete)
+**Status:** Ready for next plan
 **Last Activity:** 2026-03-14
 
 Progress: [██████████] 100%
@@ -45,6 +45,7 @@ Progress: [██████████] 100%
 - [v11.3]: Progressive confidence model (HIGH/MEDIUM/LOW) gates all decisions — never kills LLM escape hatch
 - [v11.3]: In-process decision engine via enricher — zero subprocess overhead
 - [v11.3]: Scaffold-then-fill pattern for SUMMARY.md — CLI generates data, LLM fills judgment sections
+- [v116-01]: Cleaned MILESTONES.md — added 4 missing milestones (v9.1, v11.0, v11.1, v11.2), reordered to 21 entries chronologically, standardized formatting
 
 ### Pending Todos
 
@@ -56,6 +57,6 @@ None.
 
 ## Session Continuity
 
-**Last session:** 2026-03-14T01:27:06.829Z
-**Stopped at:** Phase 116 context gathered
-**Next step:** Ready for next plan in Phase 115
+**Last session:** 2026-03-14T01:56:49.000Z
+**Stopped at:** Completed Phase 116 Plan 1 (MILESTONES.md cleanup)
+**Next step:** Ready for next plan in Phase 116
