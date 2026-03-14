@@ -257,9 +257,14 @@ class SQLiteDatabase {
     }
 
     // Verify busy_timeout
+    // Note: PRAGMA busy_timeout returns { timeout: N }, not { busy_timeout: N }
     try {
       const btResult = this._db.prepare('PRAGMA busy_timeout').get();
-      if (btResult && btResult.busy_timeout !== 5000) {
+      // Check either the 'timeout' key (node:sqlite format) or 'busy_timeout' key
+      const currentTimeout = btResult
+        ? (btResult.timeout !== undefined ? btResult.timeout : btResult.busy_timeout)
+        : undefined;
+      if (currentTimeout !== undefined && currentTimeout !== 5000) {
         // Re-apply via PRAGMA if constructor didn't take
         this._db.exec('PRAGMA busy_timeout = 5000');
       }
