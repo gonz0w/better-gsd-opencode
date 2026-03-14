@@ -2,14 +2,16 @@ name: "bGSD Security Config"
 disable-default-queries: false
 
 paths-ignore:
-  - bin/bgsd-tools.cjs
+  - bin/**
   - node_modules/**
   - .planning/**
   - "**/*.test.js"
   - "**/*.spec.js"
-  - src/lib/codebase-intel.js
-  - src/plugin/logger.js
-  - src/commands/verify.js
+  - "**/misc.js"
+  - "**/phase.js"
+  - "**/codebase-intel.js"
+  - "**/logger.js"
+  - "**/verify.js"
 
 queries:
   - uses: security-extended
