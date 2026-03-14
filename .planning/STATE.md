@@ -10,8 +10,8 @@ See: `.planning/PROJECT.md` (updated 2026-03-14)
 ## Current Position
 
 **Phase:** 120 of 123 (Enricher Acceleration)
-**Current Plan:** Plan 02 complete — Phase 120 complete
-**Status:** Phase 120 complete — all 2 plans done (ENR-01, ENR-02, ENR-03 satisfied)
+**Current Plan:** Not started
+**Status:** Ready to plan
 **Last Activity:** 2026-03-14
 
 Progress: [████████░░] 81%
