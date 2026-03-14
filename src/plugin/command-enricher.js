@@ -333,6 +333,125 @@ export function enrichCommand(input, output, cwd) {
     enrichment.has_test_command = Boolean(config && config.test_command);
   } catch { /* CI config check failed */ }
 
+  // ─── Phase 122: Inputs for new/expanded decision rules ────────────────────
+  // model-selection (DEC-01): agent_type derived from command name
+  try {
+    const COMMAND_TO_AGENT = {
+      'bgsd-execute-phase':    'bgsd-executor',
+      'bgsd-execute-plan':     'bgsd-executor',
+      'bgsd-quick':            'bgsd-executor',
+      'bgsd-quick-task':       'bgsd-executor',
+      'bgsd-plan-phase':       'bgsd-planner',
+      'bgsd-discuss-phase':    'bgsd-planner',
+      'bgsd-research-phase':   'bgsd-phase-researcher',
+      'bgsd-verify-work':      'bgsd-verifier',
+      'bgsd-audit-milestone':  'bgsd-verifier',
+      'bgsd-github-ci':        'bgsd-verifier',
+      'bgsd-map-codebase':     'bgsd-codebase-mapper',
+      'bgsd-debug':            'bgsd-debugger',
+    };
+    const agentType = COMMAND_TO_AGENT[command] || null;
+    if (agentType) {
+      enrichment.agent_type = agentType;
+    }
+    enrichment.model_profile = config ? (config.model_profile || 'balanced') : 'balanced';
+    // db handle passed to model-selection rule for SQLite-backed lookup
+    try {
+      enrichment.db = getDb(resolvedCwd);
+    } catch { /* db unavailable — rule falls back to static */ }
+  } catch { /* model-selection inputs failed */ }
+
+  // verification-routing (DEC-02): files_modified_count from first incomplete plan frontmatter
+  try {
+    if (enrichment.incomplete_plans && enrichment.incomplete_plans.length > 0 && effectivePhaseNum) {
+      const p = ensurePlans(effectivePhaseNum);
+      if (p && p.length > 0) {
+        const firstIncompleteName = enrichment.incomplete_plans[0];
+        const incompletePlan = p.find(pl => pl.path && pl.path.endsWith(firstIncompleteName));
+        if (incompletePlan && incompletePlan.frontmatter) {
+          const filesModified = incompletePlan.frontmatter.files_modified;
+          if (Array.isArray(filesModified)) {
+            enrichment.files_modified_count = filesModified.length;
+          }
+        }
+        // task_count from first incomplete plan task count
+        if (incompletePlan && incompletePlan.tasks) {
+          enrichment.task_count = incompletePlan.tasks.length;
+        }
+      }
+    }
+    // verifier_enabled already set above from config
+  } catch { /* verification-routing inputs failed */ }
+
+  // research-gate (DEC-03): phase_has_external_deps heuristic
+  try {
+    if (enrichment.phase_goal) {
+      const goal = enrichment.phase_goal.toLowerCase();
+      enrichment.phase_has_external_deps = /api|external|integration|webhook|oauth|stripe|github/.test(goal);
+    } else {
+      enrichment.phase_has_external_deps = false;
+    }
+    // research_enabled already set above from config
+  } catch { /* research-gate inputs failed */ }
+
+  // plan-existence-route expansion (DEC-04): deps_complete
+  try {
+    if (enrichment.incomplete_plans && enrichment.incomplete_plans.length > 0 && effectivePhaseNum) {
+      const p = ensurePlans(effectivePhaseNum);
+      if (p && p.length > 0) {
+        const firstIncompleteName = enrichment.incomplete_plans[0];
+        const incompletePlan = p.find(pl => pl.path && pl.path.endsWith(firstIncompleteName));
+        if (incompletePlan && incompletePlan.frontmatter && incompletePlan.frontmatter.depends_on) {
+          const deps = incompletePlan.frontmatter.depends_on;
+          if (Array.isArray(deps) && deps.length > 0 && roadmap) {
+            // Check if all depends_on phases are complete (have summaries)
+            let allComplete = true;
+            for (const dep of deps) {
+              const depNum = parseFloat(String(dep).replace(/[^0-9.]/g, ''));
+              if (!isNaN(depNum)) {
+                const depPhase = roadmap.getPhase ? roadmap.getPhase(depNum) : null;
+                if (depPhase && depPhase.status !== 'complete') {
+                  allComplete = false;
+                  break;
+                }
+              }
+            }
+            enrichment.deps_complete = allComplete;
+          } else {
+            enrichment.deps_complete = true; // no deps → complete
+          }
+        } else {
+          enrichment.deps_complete = true; // no depends_on field
+        }
+      }
+    }
+  } catch { /* deps_complete check failed */ }
+
+  // milestone-completion (DEC-05): phases_total, phases_complete
+  try {
+    if (roadmap && roadmap.phases && roadmap.phases.length > 0) {
+      enrichment.phases_total = roadmap.phases.length;
+      enrichment.phases_complete = roadmap.phases.filter(p => p.status === 'complete').length;
+      // milestone_name already set above
+    }
+  } catch { /* milestone-completion inputs failed */ }
+
+  // commit-strategy (DEC-06): plan_type, is_tdd, task_count
+  try {
+    if (enrichment.incomplete_plans && enrichment.incomplete_plans.length > 0 && effectivePhaseNum) {
+      const p = ensurePlans(effectivePhaseNum);
+      if (p && p.length > 0) {
+        const firstIncompleteName = enrichment.incomplete_plans[0];
+        const incompletePlan = p.find(pl => pl.path && pl.path.endsWith(firstIncompleteName));
+        if (incompletePlan && incompletePlan.frontmatter) {
+          const planType = incompletePlan.frontmatter.type || 'execute';
+          enrichment.plan_type = planType;
+          enrichment.is_tdd = planType === 'tdd';
+        }
+      }
+    }
+  } catch { /* commit-strategy inputs failed */ }
+
   // In-process decision evaluation (ENGINE-02: no subprocess overhead)
   try {
     const decisions = evaluateDecisions(command, enrichment);
