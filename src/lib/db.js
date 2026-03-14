@@ -246,6 +246,39 @@ const MIGRATIONS = [
       CREATE INDEX IF NOT EXISTS idx_mem_bookmarks_cwd ON memory_bookmarks(cwd);
     `);
   },
+
+  // Version 4: Phase 122 — model_profiles table for SQLite-backed model selection
+  function migration_v4(rawDb) {
+    rawDb.exec(`
+      CREATE TABLE IF NOT EXISTS model_profiles (
+        agent_type     TEXT NOT NULL,
+        cwd            TEXT NOT NULL,
+        quality_model  TEXT NOT NULL DEFAULT 'opus',
+        balanced_model TEXT NOT NULL DEFAULT 'sonnet',
+        budget_model   TEXT NOT NULL DEFAULT 'haiku',
+        override_model TEXT,
+        PRIMARY KEY (agent_type, cwd)
+      );
+      CREATE INDEX IF NOT EXISTS idx_model_profiles_cwd ON model_profiles(cwd);
+    `);
+
+    // Auto-seed defaults from static MODEL_PROFILES constant (CWD = '__defaults__')
+    // Uses INSERT OR IGNORE for idempotency
+    const { MODEL_PROFILES } = require('./constants');
+    const stmt = rawDb.prepare(
+      `INSERT OR IGNORE INTO model_profiles
+       (agent_type, cwd, quality_model, balanced_model, budget_model)
+       VALUES (?, '__defaults__', ?, ?, ?)`
+    );
+    for (const [agentType, profile] of Object.entries(MODEL_PROFILES)) {
+      stmt.run(
+        agentType,
+        profile.quality || 'opus',
+        profile.balanced || 'sonnet',
+        profile.budget || 'haiku'
+      );
+    }
+  },
 ];
 
 // ---------------------------------------------------------------------------

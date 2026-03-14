@@ -853,6 +853,128 @@ class PlanningCache {
     }
   }
 
+  // -------------------------------------------------------------------------
+  // Model Profile Operations (Phase 122)
+  // -------------------------------------------------------------------------
+
+  /**
+   * Get model profile row for a specific cwd and agent type.
+   * Falls back to '__defaults__' cwd if no project-specific override exists.
+   *
+   * @param {string} cwd - Project root directory
+   * @param {string} agentType - Agent type (e.g. 'bgsd-planner')
+   * @returns {{ quality_model: string, balanced_model: string, budget_model: string, override_model: string|null }|null}
+   */
+  getModelProfile(cwd, agentType) {
+    if (this._isMap()) return null;
+    try {
+      // First try project-specific override
+      const row = this._stmt(
+        'mp_get_cwd',
+        'SELECT * FROM model_profiles WHERE agent_type = ? AND cwd = ?'
+      ).get(agentType, cwd);
+      if (row) return row;
+      // Fall back to defaults
+      const defaultRow = this._stmt(
+        'mp_get_default',
+        "SELECT * FROM model_profiles WHERE agent_type = ? AND cwd = '__defaults__'"
+      ).get(agentType);
+      return defaultRow || null;
+    } catch { return null; }
+  }
+
+  /**
+   * Upsert a model profile row for a specific cwd and agent type.
+   *
+   * @param {string} cwd - Project root directory
+   * @param {string} agentType - Agent type
+   * @param {{ quality_model?: string, balanced_model?: string, budget_model?: string, override_model?: string }} profile
+   */
+  storeModelProfile(cwd, agentType, profile) {
+    if (this._isMap()) return;
+    try {
+      this._stmt(
+        'mp_upsert',
+        `INSERT OR REPLACE INTO model_profiles
+         (agent_type, cwd, quality_model, balanced_model, budget_model, override_model)
+         VALUES (?, ?, ?, ?, ?, ?)`
+      ).run(
+        agentType,
+        cwd,
+        profile.quality_model || 'opus',
+        profile.balanced_model || 'sonnet',
+        profile.budget_model || 'haiku',
+        profile.override_model || null
+      );
+    } catch {
+      // Non-critical
+    }
+  }
+
+  /**
+   * Get all model profiles for a cwd.
+   * Falls back to '__defaults__' rows for any agent type without a cwd-specific row.
+   *
+   * @param {string} cwd - Project root directory
+   * @returns {Array|null} Array of model profile rows, or null on miss/error
+   */
+  getModelProfiles(cwd) {
+    if (this._isMap()) return null;
+    try {
+      // Get all profiles for cwd
+      const rows = this._stmt(
+        'mp_all_cwd',
+        'SELECT * FROM model_profiles WHERE cwd = ? ORDER BY agent_type'
+      ).all(cwd);
+      if (rows && rows.length > 0) return rows;
+      // Fall back to defaults
+      const defaults = this._stmt(
+        'mp_all_defaults',
+        "SELECT * FROM model_profiles WHERE cwd = '__defaults__' ORDER BY agent_type"
+      ).all();
+      return defaults && defaults.length > 0 ? defaults : null;
+    } catch { return null; }
+  }
+
+  /**
+   * Seed model profile defaults for a project cwd from '__defaults__' rows.
+   * No-op if project-specific rows already exist for this cwd.
+   *
+   * @param {string} cwd - Project root directory
+   */
+  seedModelDefaults(cwd) {
+    if (this._isMap()) return;
+    try {
+      // Skip if already seeded
+      const existing = this._stmt(
+        'mp_count_cwd',
+        'SELECT COUNT(*) AS cnt FROM model_profiles WHERE cwd = ?'
+      ).get(cwd);
+      if (existing && existing.cnt > 0) return;
+
+      // Copy from '__defaults__'
+      const defaults = this._stmt(
+        'mp_seed_defaults',
+        "SELECT * FROM model_profiles WHERE cwd = '__defaults__'"
+      ).all();
+      if (!defaults || defaults.length === 0) return;
+
+      const ins = this._stmt(
+        'mp_seed_insert',
+        `INSERT OR IGNORE INTO model_profiles
+         (agent_type, cwd, quality_model, balanced_model, budget_model, override_model)
+         VALUES (?, ?, ?, ?, ?, ?)`
+      );
+      this._db.exec('BEGIN');
+      for (const row of defaults) {
+        ins.run(row.agent_type, cwd, row.quality_model, row.balanced_model, row.budget_model, row.override_model || null);
+      }
+      this._db.exec('COMMIT');
+    } catch {
+      try { this._db.exec('ROLLBACK'); } catch { /* ignore */ }
+    }
+  }
+
   /**
    * Clear all cached data for a given project root directory.
    * Removes all rows from phases, milestones, progress, requirements, plans, tasks,

@@ -49,10 +49,10 @@ class MapBackend {
 }
 
 // ---------------------------------------------------------------------------
-// Schema SQL (version 3 — planning tables + memory stores)
+// Schema SQL (version 4 — planning tables + memory stores + model_profiles)
 // ---------------------------------------------------------------------------
 
-const SCHEMA_V3_SQL = `
+const SCHEMA_V4_SQL = `
   CREATE TABLE IF NOT EXISTS _meta (key TEXT PRIMARY KEY, value TEXT);
   CREATE TABLE IF NOT EXISTS file_cache (
     file_path TEXT PRIMARY KEY,
@@ -176,6 +176,16 @@ const SCHEMA_V3_SQL = `
   CREATE INDEX IF NOT EXISTS idx_mem_trajectories_category ON memory_trajectories(category);
   CREATE INDEX IF NOT EXISTS idx_mem_trajectories_phase ON memory_trajectories(phase);
   CREATE INDEX IF NOT EXISTS idx_mem_bookmarks_cwd ON memory_bookmarks(cwd);
+  CREATE TABLE IF NOT EXISTS model_profiles (
+    agent_type     TEXT NOT NULL,
+    cwd            TEXT NOT NULL,
+    quality_model  TEXT NOT NULL DEFAULT 'opus',
+    balanced_model TEXT NOT NULL DEFAULT 'sonnet',
+    budget_model   TEXT NOT NULL DEFAULT 'haiku',
+    override_model TEXT,
+    PRIMARY KEY (agent_type, cwd)
+  );
+  CREATE INDEX IF NOT EXISTS idx_model_profiles_cwd ON model_profiles(cwd);
 `;
 
 // ---------------------------------------------------------------------------
@@ -214,13 +224,13 @@ class SQLiteBackend {
       version = row ? row.user_version : 0;
     } catch {}
 
-    if (version >= 3) return;
+    if (version >= 4) return;
 
     try {
       this._db.exec('BEGIN');
-      this._db.exec(SCHEMA_V3_SQL);
+      this._db.exec(SCHEMA_V4_SQL);
       this._db.exec("INSERT OR REPLACE INTO _meta (key, value) VALUES ('created_at', '" + new Date().toISOString() + "')");
-      this._db.exec('PRAGMA user_version = 3');
+      this._db.exec('PRAGMA user_version = 4');
       this._db.exec('COMMIT');
     } catch {
       try { this._db.exec('ROLLBACK'); } catch {}
@@ -234,9 +244,9 @@ class SQLiteBackend {
         this._db = new _DatabaseSync(this._dbPath);
         this._db.exec('PRAGMA journal_mode = WAL');
         this._db.exec('BEGIN');
-        this._db.exec(SCHEMA_V3_SQL);
+        this._db.exec(SCHEMA_V4_SQL);
         this._db.exec("INSERT OR REPLACE INTO _meta (key, value) VALUES ('created_at', '" + new Date().toISOString() + "')");
-        this._db.exec('PRAGMA user_version = 3');
+        this._db.exec('PRAGMA user_version = 4');
         this._db.exec('COMMIT');
       } catch {
         this._degraded = true;
@@ -545,6 +555,62 @@ export class PlanningCache {
       const rows = this._stmt('pr_all', 'SELECT * FROM progress WHERE cwd = ? ORDER BY phase').all(cwd);
       return rows.length > 0 ? rows : null;
     } catch { return null; }
+  }
+
+  /**
+   * Get model profile row for a specific cwd and agent type.
+   * Falls back to '__defaults__' cwd if no project-specific override exists.
+   *
+   * @param {string} cwd - Project root directory
+   * @param {string} agentType - Agent type (e.g. 'bgsd-planner')
+   * @returns {{ quality_model: string, balanced_model: string, budget_model: string, override_model: string|null }|null}
+   */
+  getModelProfile(cwd, agentType) {
+    if (this._isMap()) return null;
+    try {
+      const row = this._stmt('mp_get_cwd', 'SELECT * FROM model_profiles WHERE agent_type = ? AND cwd = ?').get(agentType, cwd);
+      if (row) return row;
+      const defaultRow = this._stmt('mp_get_def', "SELECT * FROM model_profiles WHERE agent_type = ? AND cwd = '__defaults__'").get(agentType);
+      return defaultRow || null;
+    } catch { return null; }
+  }
+
+  /**
+   * Get all model profiles for a cwd. Falls back to '__defaults__' if none found.
+   *
+   * @param {string} cwd - Project root directory
+   * @returns {Array|null}
+   */
+  getModelProfiles(cwd) {
+    if (this._isMap()) return null;
+    try {
+      const rows = this._stmt('mp_all_cwd', 'SELECT * FROM model_profiles WHERE cwd = ? ORDER BY agent_type').all(cwd);
+      if (rows && rows.length > 0) return rows;
+      const defaults = this._stmt('mp_all_def', "SELECT * FROM model_profiles WHERE cwd = '__defaults__' ORDER BY agent_type").all();
+      return defaults && defaults.length > 0 ? defaults : null;
+    } catch { return null; }
+  }
+
+  /**
+   * Seed model profile defaults for a project cwd from '__defaults__' rows.
+   * No-op if project-specific rows already exist for this cwd.
+   *
+   * @param {string} cwd - Project root directory
+   */
+  seedModelDefaults(cwd) {
+    if (this._isMap()) return;
+    try {
+      const existing = this._stmt('mp_count', 'SELECT COUNT(*) AS cnt FROM model_profiles WHERE cwd = ?').get(cwd);
+      if (existing && existing.cnt > 0) return;
+      const defaults = this._stmt('mp_seed_def', "SELECT * FROM model_profiles WHERE cwd = '__defaults__'").all();
+      if (!defaults || defaults.length === 0) return;
+      const ins = this._stmt('mp_seed_ins', `INSERT OR IGNORE INTO model_profiles (agent_type, cwd, quality_model, balanced_model, budget_model, override_model) VALUES (?, ?, ?, ?, ?, ?)`);
+      this._db.exec('BEGIN');
+      for (const row of defaults) {
+        ins.run(row.agent_type, cwd, row.quality_model, row.balanced_model, row.budget_model, row.override_model || null);
+      }
+      this._db.exec('COMMIT');
+    } catch { try { this._db.exec('ROLLBACK'); } catch {} }
   }
 }
 
