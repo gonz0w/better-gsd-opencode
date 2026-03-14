@@ -35,7 +35,10 @@ This milestone transforms SQLite from a dumb file cache into the structured data
   2. User can query plan metadata (frontmatter, task counts, status) from SQLite without re-reading plan markdown files
   3. User can look up requirements by REQ-ID and see phase mappings from SQLite
   4. User can edit a planning markdown file and have SQLite cache automatically invalidated on next command via git-hash + mtime check
-**Plans**: TBD
+**Plans**: 0/3 plans
+  - Plan 01 (Wave 1): Schema + PlanningCache core layer
+  - Plan 02 (Wave 2): Parser integration with SQLite-first write-through
+  - Plan 03 (Wave 3): Comprehensive test suite
 
 ### Phase 120: Enricher Acceleration
 **Goal**: The command enricher serves all workflow data from SQLite on warm starts — zero redundant parser calls, measurably faster command startup
@@ -86,7 +89,7 @@ Phases execute in numeric order: 118 → 119 → 120 → 121 → 122 → 123
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 118. Foundation & Schema | 3/3 | Complete    | 2026-03-14 |
-| 119. Parser Integration & Planning Tables | 0/0 | Not started | - |
+| 119. Parser Integration & Planning Tables | 0/3 | Not started | - |
 | 120. Enricher Acceleration | 0/0 | Not started | - |
 | 121. Memory Store Migration | 0/0 | Not started | - |
 | 122. Decision Rules | 0/0 | Not started | - |
