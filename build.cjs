@@ -277,8 +277,9 @@ async function build() {
     console.log(`\nWrote ${baselinesDir}/build-analysis.json`);
 
     // Write raw metafile for ad-hoc analysis
-    fs.writeFileSync('/tmp/bgsd-metafile.json', JSON.stringify(result.metafile, null, 2));
-    console.log('Wrote /tmp/bgsd-metafile.json');
+    const metafilePath = require('path').join(baselinesDir, 'metafile.json');
+    fs.writeFileSync(metafilePath, JSON.stringify(result.metafile, null, 2), { mode: 0o600 });
+    console.log(`Wrote ${metafilePath}`);
   }
 
   // --- Manifest generation: list all deployable files ---

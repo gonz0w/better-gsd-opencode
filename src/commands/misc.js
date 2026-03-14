@@ -104,21 +104,12 @@ function cmdConfigEnsureSection(cwd, raw) {
   const configPath = path.join(cwd, '.planning', 'config.json');
   const planningDir = path.join(cwd, '.planning');
 
-  // Ensure .planning directory exists
+  // Ensure .planning directory exists (recursive: true is a no-op if it already exists)
   try {
-    if (!fs.existsSync(planningDir)) {
-      fs.mkdirSync(planningDir, { recursive: true });
-    }
+    fs.mkdirSync(planningDir, { recursive: true });
   } catch (err) {
     debugLog('config.ensure', 'mkdir failed', err);
     error('Failed to create .planning directory: ' + err.message);
-  }
-
-  // Check if config already exists
-  if (fs.existsSync(configPath)) {
-    const result = { created: false, reason: 'already_exists' };
-    output(result, raw, 'exists');
-    return;
   }
 
   // Detect Brave Search API key availability
@@ -156,13 +147,28 @@ function cmdConfigEnsureSection(cwd, raw) {
     workflow: { ...hardcoded.workflow, ...(userDefaults.workflow || {}) },
   };
 
+  // Use exclusive-create flag to atomically check existence + write (no TOCTOU race)
+  let fd;
   try {
-    fs.writeFileSync(configPath, JSON.stringify(defaults, null, 2), 'utf-8');
+    fd = fs.openSync(configPath, 'wx');
+  } catch (err) {
+    if (err.code === 'EEXIST') {
+      const result = { created: false, reason: 'already_exists' };
+      output(result, raw, 'exists');
+      return;
+    }
+    debugLog('config.ensure', 'write failed', err);
+    error('Failed to create config.json: ' + err.message);
+  }
+  try {
+    fs.writeFileSync(fd, JSON.stringify(defaults, null, 2), 'utf-8');
     const result = { created: true, path: '.planning/config.json' };
     output(result, raw, 'created');
   } catch (err) {
     debugLog('config.ensure', 'write failed', err);
     error('Failed to create config.json: ' + err.message);
+  } finally {
+    fs.closeSync(fd);
   }
 }
 
@@ -962,12 +968,22 @@ function cmdTemplateFill(cwd, templateType, options, raw) {
   const fullContent = `---\n${reconstructFrontmatter(frontmatter)}\n---\n\n${body}\n`;
   const outPath = path.join(cwd, phaseInfo.directory, fileName);
 
-  if (fs.existsSync(outPath)) {
-    output({ error: 'File already exists', path: path.relative(cwd, outPath) }, raw);
-    return;
+  // Use exclusive-create flag to atomically check existence + write (no TOCTOU race)
+  let fd;
+  try {
+    fd = fs.openSync(outPath, 'wx');
+  } catch (err) {
+    if (err.code === 'EEXIST') {
+      output({ error: 'File already exists', path: path.relative(cwd, outPath) }, raw);
+      return;
+    }
+    throw err;
   }
-
-  fs.writeFileSync(outPath, fullContent, 'utf-8');
+  try {
+    fs.writeFileSync(fd, fullContent, 'utf-8');
+  } finally {
+    fs.closeSync(fd);
+  }
   const relPath = path.relative(cwd, outPath);
   output({ created: true, path: relPath, template: templateType }, raw, relPath);
 }
@@ -1321,8 +1337,8 @@ function cmdFrontmatterGet(cwd, filePath, field, raw) {
 function cmdFrontmatterSet(cwd, filePath, field, value, raw) {
   if (!filePath || !field || value === undefined) { error('file, field, and value required'); }
   const fullPath = path.isAbsolute(filePath) ? filePath : path.join(cwd, filePath);
-  if (!fs.existsSync(fullPath)) { output({ error: 'File not found', path: filePath }, raw); return; }
   const content = cachedReadFile(fullPath);
+  if (content === null) { output({ error: 'File not found', path: filePath }, raw); return; }
   const fm = extractFrontmatter(content);
   let parsedValue;
   try { parsedValue = JSON.parse(value); } catch (e) { debugLog('frontmatter.set', 'JSON parse value failed, using string', e); parsedValue = value; }
@@ -1335,8 +1351,8 @@ function cmdFrontmatterSet(cwd, filePath, field, value, raw) {
 function cmdFrontmatterMerge(cwd, filePath, data, raw) {
   if (!filePath || !data) { error('file and data required'); }
   const fullPath = path.isAbsolute(filePath) ? filePath : path.join(cwd, filePath);
-  if (!fs.existsSync(fullPath)) { output({ error: 'File not found', path: filePath }, raw); return; }
   const content = cachedReadFile(fullPath);
+  if (content === null) { output({ error: 'File not found', path: filePath }, raw); return; }
   const fm = extractFrontmatter(content);
   let mergeData;
   try { mergeData = JSON.parse(data); } catch (e) { debugLog('frontmatter.merge', 'JSON parse --data failed', e); error('Invalid JSON for --data'); return; }
@@ -1497,12 +1513,22 @@ function cmdScaffold(cwd, type, options, raw) {
       error(`Unknown scaffold type: ${type}. Available: context, uat, verification, phase-dir`);
   }
 
-  if (fs.existsSync(filePath)) {
-    output({ created: false, reason: 'already_exists', path: filePath }, raw, 'exists');
-    return;
+  // Use exclusive-create flag to atomically check existence + write (no TOCTOU race)
+  let fd;
+  try {
+    fd = fs.openSync(filePath, 'wx');
+  } catch (err) {
+    if (err.code === 'EEXIST') {
+      output({ created: false, reason: 'already_exists', path: filePath }, raw, 'exists');
+      return;
+    }
+    throw err;
   }
-
-  fs.writeFileSync(filePath, content, 'utf-8');
+  try {
+    fs.writeFileSync(fd, content, 'utf-8');
+  } finally {
+    fs.closeSync(fd);
+  }
   const relPath = path.relative(cwd, filePath);
   output({ created: true, path: relPath }, raw, relPath);
 }
@@ -1511,29 +1537,31 @@ function cmdTdd(cwd, subcommand, parsedArgs, raw) {
   const testCmd = parsedArgs['test-cmd'];
   const snip = (s) => (s || '').slice(0, 500);
 
-  if (subcommand === 'validate-red' || subcommand === 'validate-green' || subcommand === 'validate-refactor') {
-    if (!testCmd) { error('--test-cmd required'); }
-    const phase = subcommand.replace('validate-', '');
-    const expectFail = phase === 'red';
+  // Helper: run test command safely via execFile with shell
+  // testCmd is intentionally user-provided (e.g., "npm test") and must be shell-evaluated
+  function runTestCmd(cmd) {
+    const { execFileSync } = require('child_process');
     let exitCode = 0, out = '';
     try {
-      out = execSync(testCmd, { encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'], timeout: 120000, cwd });
+      out = execFileSync('/bin/sh', ['-c', cmd], { encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'], timeout: 120000, cwd });
     } catch (e) {
       exitCode = e.status || 1;
       out = (e.stdout || '') + (e.stderr || '');
     }
+    return { exitCode, out };
+  }
+
+  if (subcommand === 'validate-red' || subcommand === 'validate-green' || subcommand === 'validate-refactor') {
+    if (!testCmd) { error('--test-cmd required'); }
+    const phase = subcommand.replace('validate-', '');
+    const expectFail = phase === 'red';
+    const { exitCode, out } = runTestCmd(testCmd);
     const valid = expectFail ? exitCode !== 0 : exitCode === 0;
     if (!valid) process.exitCode = 1;
     output({ phase, valid, test_exit_code: exitCode, output_snippet: snip(out) }, raw);
   } else if (subcommand === 'auto-test') {
     if (!testCmd) { error('--test-cmd required'); }
-    let exitCode = 0, out = '';
-    try {
-      out = execSync(testCmd, { encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'], timeout: 120000, cwd });
-    } catch (e) {
-      exitCode = e.status || 1;
-      out = (e.stdout || '') + (e.stderr || '');
-    }
+    const { exitCode, out } = runTestCmd(testCmd);
     output({ passed: exitCode === 0, exit_code: exitCode, output_snippet: snip(out) }, raw);
   } else if (subcommand === 'detect-antipattern') {
     const phase = parsedArgs.phase;

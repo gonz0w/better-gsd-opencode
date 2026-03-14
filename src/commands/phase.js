@@ -22,18 +22,8 @@ function cmdPhasesList(cwd, options, raw) {
   const phasesDir = path.join(cwd, '.planning', 'phases');
   const { type, phase, includeArchived } = options;
 
-  // If no phases directory, return empty
-  if (!fs.existsSync(phasesDir)) {
-    if (type) {
-      output({ files: [], count: 0 }, raw, '');
-    } else {
-      output({ directories: [], count: 0 }, raw, '');
-    }
-    return;
-  }
-
   try {
-    // Get all phase directories
+    // Get all phase directories (readdirSync throws ENOENT if dir missing)
     const entries = fs.readdirSync(phasesDir, { withFileTypes: true });
     let dirs = entries.filter(e => e.isDirectory()).map(e => e.name);
 
@@ -97,6 +87,14 @@ function cmdPhasesList(cwd, options, raw) {
     // Default: list directories
     output({ directories: dirs, count: dirs.length }, raw, dirs.join('\n'));
   } catch (e) {
+    if (e.code === 'ENOENT') {
+      if (type) {
+        output({ files: [], count: 0 }, raw, '');
+      } else {
+        output({ directories: [], count: 0 }, raw, '');
+      }
+      return;
+    }
     debugLog('phase.list', 'list phases failed', e);
     error('Failed to list phases: ' + e.message);
   }
@@ -105,21 +103,6 @@ function cmdPhasesList(cwd, options, raw) {
 function cmdPhaseNextDecimal(cwd, basePhase, raw) {
   const phasesDir = path.join(cwd, '.planning', 'phases');
   const normalized = normalizePhaseName(basePhase);
-
-  // Check if phases directory exists
-  if (!fs.existsSync(phasesDir)) {
-    output(
-      {
-        found: false,
-        base_phase: normalized,
-        next: `${normalized}.1`,
-        existing: [],
-      },
-      raw,
-      `${normalized}.1`
-    );
-    return;
-  }
 
   try {
     const entries = fs.readdirSync(phasesDir, { withFileTypes: true });
@@ -167,6 +150,19 @@ function cmdPhaseNextDecimal(cwd, basePhase, raw) {
       nextDecimal
     );
   } catch (e) {
+    if (e.code === 'ENOENT') {
+      output(
+        {
+          found: false,
+          base_phase: normalized,
+          next: `${normalized}.1`,
+          existing: [],
+        },
+        raw,
+        `${normalized}.1`
+      );
+      return;
+    }
     debugLog('phase.nextDecimal', 'calculate next decimal failed', e);
     error('Failed to calculate next decimal phase: ' + e.message);
   }
@@ -178,11 +174,13 @@ function cmdPhaseAdd(cwd, description, raw) {
   }
 
   const roadmapPath = path.join(cwd, '.planning', 'ROADMAP.md');
-  if (!fs.existsSync(roadmapPath)) {
-    error('ROADMAP.md not found');
+  let content;
+  try {
+    content = fs.readFileSync(roadmapPath, 'utf-8');
+  } catch (e) {
+    if (e.code === 'ENOENT') error('ROADMAP.md not found');
+    throw e;
   }
-
-  const content = cachedReadFile(roadmapPath);
   const slug = generateSlugInternal(description);
 
   // Find highest integer phase number
@@ -236,11 +234,13 @@ function cmdPhaseInsert(cwd, afterPhase, description, raw) {
   }
 
   const roadmapPath = path.join(cwd, '.planning', 'ROADMAP.md');
-  if (!fs.existsSync(roadmapPath)) {
-    error('ROADMAP.md not found');
+  let content;
+  try {
+    content = fs.readFileSync(roadmapPath, 'utf-8');
+  } catch (e) {
+    if (e.code === 'ENOENT') error('ROADMAP.md not found');
+    throw e;
   }
-
-  const content = cachedReadFile(roadmapPath);
   const slug = generateSlugInternal(description);
 
   // Normalize input then strip leading zeros for flexible matching
@@ -323,10 +323,6 @@ function cmdPhaseRemove(cwd, targetPhase, options, raw) {
   const roadmapPath = path.join(cwd, '.planning', 'ROADMAP.md');
   const phasesDir = path.join(cwd, '.planning', 'phases');
   const force = options.force || false;
-
-  if (!fs.existsSync(roadmapPath)) {
-    error('ROADMAP.md not found');
-  }
 
   // Normalize the target
   const normalized = normalizePhaseName(targetPhase);
@@ -459,7 +455,13 @@ function cmdPhaseRemove(cwd, targetPhase, options, raw) {
   }
 
   // Update ROADMAP.md
-  let roadmapContent = cachedReadFile(roadmapPath);
+  let roadmapContent;
+  try {
+    roadmapContent = fs.readFileSync(roadmapPath, 'utf-8');
+  } catch (e) {
+    if (e.code === 'ENOENT') error('ROADMAP.md not found');
+    throw e;
+  }
 
   // Remove the target phase section - escape all regex special chars
   const targetEscaped = targetPhase.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -521,8 +523,9 @@ function cmdPhaseRemove(cwd, targetPhase, options, raw) {
 
   // Update STATE.md phase count
   const statePath = path.join(cwd, '.planning', 'STATE.md');
-  if (fs.existsSync(statePath)) {
-    let stateContent = cachedReadFile(statePath);
+  let stateUpdated = false;
+  try {
+    let stateContent = fs.readFileSync(statePath, 'utf-8');
     const totalPattern = /(\*\*Total Phases:\*\*\s*)(\d+)/;
     const totalMatch = stateContent.match(totalPattern);
     if (totalMatch) {
@@ -537,6 +540,9 @@ function cmdPhaseRemove(cwd, targetPhase, options, raw) {
     }
     fs.writeFileSync(statePath, stateContent, 'utf-8');
     invalidateFileCache(statePath);
+    stateUpdated = true;
+  } catch (e) {
+    if (e.code !== 'ENOENT') throw e;
   }
 
   const result = {
@@ -545,7 +551,7 @@ function cmdPhaseRemove(cwd, targetPhase, options, raw) {
     renamed_directories: renamedDirs,
     renamed_files: renamedFiles,
     roadmap_updated: true,
-    state_updated: fs.existsSync(statePath),
+    state_updated: stateUpdated,
   };
 
   output(result, raw);
@@ -568,12 +574,16 @@ function cmdRequirementsMarkComplete(cwd, reqIdsRaw, raw) {
   }
 
   const reqPath = path.join(cwd, '.planning', 'REQUIREMENTS.md');
-  if (!fs.existsSync(reqPath)) {
-    output({ updated: false, reason: 'REQUIREMENTS.md not found', ids: reqIds }, raw, 'no requirements file');
-    return;
+  let reqContent;
+  try {
+    reqContent = fs.readFileSync(reqPath, 'utf-8');
+  } catch (e) {
+    if (e.code === 'ENOENT') {
+      output({ updated: false, reason: 'REQUIREMENTS.md not found', ids: reqIds }, raw, 'no requirements file');
+      return;
+    }
+    throw e;
   }
-
-  let reqContent = cachedReadFile(reqPath);
   const updated = [];
   const notFound = [];
 
@@ -635,8 +645,9 @@ function cmdPhaseComplete(cwd, phaseNum, raw) {
   const summaryCount = phaseInfo.summaries.length;
 
   // Update ROADMAP.md: mark phase complete
-  if (fs.existsSync(roadmapPath)) {
-    let roadmapContent = cachedReadFile(roadmapPath);
+  let roadmapUpdated = false;
+  try {
+    let roadmapContent = fs.readFileSync(roadmapPath, 'utf-8');
 
     const checkboxPattern = new RegExp(
       `(-\\s*\\[)[ ](\\]\\s*.*Phase\\s+${phaseNum.replace('.', '\\.')}[:\\s][^\\n]*)`,
@@ -665,17 +676,18 @@ function cmdPhaseComplete(cwd, phaseNum, raw) {
 
     fs.writeFileSync(roadmapPath, roadmapContent, 'utf-8');
     invalidateFileCache(roadmapPath);
+    roadmapUpdated = true;
 
     // Update REQUIREMENTS.md traceability for this phase's requirements
     const reqPath = path.join(cwd, '.planning', 'REQUIREMENTS.md');
-    if (fs.existsSync(reqPath)) {
+    try {
       const reqMatch = roadmapContent.match(
         new RegExp(`Phase\\s+${phaseNum.replace('.', '\\.')}[\\s\\S]*?\\*\\*Requirements:?\\*\\*:?\\s*([^\\n]+)`, 'i')
       );
 
       if (reqMatch) {
         const reqIds = reqMatch[1].replace(/[\[\]]/g, '').split(/[,\s]+/).map(r => r.trim()).filter(Boolean);
-        let reqContent = cachedReadFile(reqPath);
+        let reqContent = fs.readFileSync(reqPath, 'utf-8');
 
         for (const reqId of reqIds) {
           reqContent = reqContent.replace(
@@ -691,7 +703,11 @@ function cmdPhaseComplete(cwd, phaseNum, raw) {
         fs.writeFileSync(reqPath, reqContent, 'utf-8');
         invalidateFileCache(reqPath);
       }
+    } catch (e) {
+      if (e.code !== 'ENOENT') throw e;
     }
+  } catch (e) {
+    if (e.code !== 'ENOENT') throw e;
   }
 
   // Find next phase — check both disk directories AND ROADMAP.md phase sections
@@ -722,9 +738,9 @@ function cmdPhaseComplete(cwd, phaseNum, raw) {
 
   // 2. Also check ROADMAP.md for phases beyond current (sections + checklist)
   let uncheckedRoadmapPhases = [];
-  if (fs.existsSync(roadmapPath)) {
-    try {
-      const roadmapContent = cachedReadFile(roadmapPath);
+  try {
+    {
+      const roadmapContent = fs.readFileSync(roadmapPath, 'utf-8');
 
       // Collect all ### Phase N: sections
       const sectionPhases = [];
@@ -782,12 +798,15 @@ function cmdPhaseComplete(cwd, phaseNum, raw) {
           nextPhaseName = nm ? nm[1].trim().replace(/\s+/g, '-').toLowerCase() : null;
         }
       }
-    } catch (e) { debugLog('phase.complete', 'roadmap phase validation failed', e); }
+    }
+  } catch (e) {
+    if (e.code !== 'ENOENT') { debugLog('phase.complete', 'roadmap phase validation failed', e); }
   }
 
   // Update STATE.md
-  if (fs.existsSync(statePath)) {
-    let stateContent = cachedReadFile(statePath);
+  let stateUpdated = false;
+  try {
+    let stateContent = fs.readFileSync(statePath, 'utf-8');
 
     stateContent = stateContent.replace(
       /(\*\*Current Phase:\*\*\s*).*/,
@@ -823,6 +842,9 @@ function cmdPhaseComplete(cwd, phaseNum, raw) {
 
     fs.writeFileSync(statePath, stateContent, 'utf-8');
     invalidateFileCache(statePath);
+    stateUpdated = true;
+  } catch (e) {
+    if (e.code !== 'ENOENT') throw e;
   }
 
   const result = {
@@ -833,8 +855,8 @@ function cmdPhaseComplete(cwd, phaseNum, raw) {
     next_phase_name: nextPhaseName,
     is_last_phase: isLastPhase,
     date: today,
-    roadmap_updated: fs.existsSync(roadmapPath),
-    state_updated: fs.existsSync(statePath),
+    roadmap_updated: roadmapUpdated,
+    state_updated: stateUpdated,
   };
 
   // Include warning if there are unchecked phases remaining in the roadmap
@@ -914,40 +936,57 @@ function cmdMilestoneComplete(cwd, version, options, raw) {
   } catch (e) { debugLog('milestone.complete', 'frontmatter extraction failed', e); }
 
   // Archive ROADMAP.md
-  if (fs.existsSync(roadmapPath)) {
-    const roadmapContent = cachedReadFile(roadmapPath);
+  let roadmapArchived = false;
+  try {
+    const roadmapContent = fs.readFileSync(roadmapPath, 'utf-8');
     fs.writeFileSync(path.join(archiveDir, `${version}-ROADMAP.md`), roadmapContent, 'utf-8');
+    roadmapArchived = true;
+  } catch (e) {
+    if (e.code !== 'ENOENT') throw e;
   }
 
   // Archive REQUIREMENTS.md
-  if (fs.existsSync(reqPath)) {
-    const reqContent = cachedReadFile(reqPath);
+  let reqArchived = false;
+  try {
+    const reqContent = fs.readFileSync(reqPath, 'utf-8');
     const archiveHeader = `# Requirements Archive: ${version} ${milestoneName}\n\n**Archived:** ${today}\n**Status:** SHIPPED\n\nFor current requirements, see \`.planning/REQUIREMENTS.md\`.\n\n---\n\n`;
     fs.writeFileSync(path.join(archiveDir, `${version}-REQUIREMENTS.md`), archiveHeader + reqContent, 'utf-8');
+    reqArchived = true;
+  } catch (e) {
+    if (e.code !== 'ENOENT') throw e;
   }
 
   // Archive audit file if exists
+  let auditArchived = false;
   const auditFile = path.join(cwd, '.planning', `${version}-MILESTONE-AUDIT.md`);
-  if (fs.existsSync(auditFile)) {
+  try {
     fs.renameSync(auditFile, path.join(archiveDir, `${version}-MILESTONE-AUDIT.md`));
+    auditArchived = true;
+  } catch (e) {
+    if (e.code !== 'ENOENT') throw e;
   }
 
   // Create/append MILESTONES.md entry
   const accomplishmentsList = accomplishments.map(a => `- ${a}`).join('\n');
   const milestoneEntry = `## ${version} ${milestoneName} (Shipped: ${today})\n\n**Phases completed:** ${phaseCount} phases, ${totalPlans} plans, ${totalTasks} tasks\n\n**Key accomplishments:**\n${accomplishmentsList || '- (none recorded)'}\n\n---\n\n`;
 
-  if (fs.existsSync(milestonesPath)) {
-    const existing = cachedReadFile(milestonesPath);
+  try {
+    const existing = fs.readFileSync(milestonesPath, 'utf-8');
     fs.writeFileSync(milestonesPath, existing + '\n' + milestoneEntry, 'utf-8');
     invalidateFileCache(milestonesPath);
-  } else {
-    fs.writeFileSync(milestonesPath, `# Milestones\n\n${milestoneEntry}`, 'utf-8');
-    invalidateFileCache(milestonesPath);
+  } catch (e) {
+    if (e.code === 'ENOENT') {
+      fs.writeFileSync(milestonesPath, `# Milestones\n\n${milestoneEntry}`, 'utf-8');
+      invalidateFileCache(milestonesPath);
+    } else {
+      throw e;
+    }
   }
 
   // Update STATE.md
-  if (fs.existsSync(statePath)) {
-    let stateContent = cachedReadFile(statePath);
+  let milestoneStateUpdated = false;
+  try {
+    let stateContent = fs.readFileSync(statePath, 'utf-8');
     stateContent = stateContent.replace(
       /(\*\*Status:\*\*\s*).*/,
       `$1${version} milestone complete`
@@ -962,6 +1001,9 @@ function cmdMilestoneComplete(cwd, version, options, raw) {
     );
     fs.writeFileSync(statePath, stateContent, 'utf-8');
     invalidateFileCache(statePath);
+    milestoneStateUpdated = true;
+  } catch (e) {
+    if (e.code !== 'ENOENT') throw e;
   }
 
   // Auto-archive phase directories
@@ -993,9 +1035,9 @@ function cmdMilestoneComplete(cwd, version, options, raw) {
 
   // Reorganize ROADMAP.md - collapse completed phases in <details> block
   let roadmapReorganized = false;
-  if (fs.existsSync(roadmapPath)) {
-    try {
-      let roadmapContent = cachedReadFile(roadmapPath);
+  try {
+    {
+      let roadmapContent = fs.readFileSync(roadmapPath, 'utf-8');
       
       // Extract completed phases (those that were archived)
       const completedPhaseSections = [];
@@ -1094,7 +1136,9 @@ function cmdMilestoneComplete(cwd, version, options, raw) {
         invalidateFileCache(roadmapPath);
         roadmapReorganized = true;
       }
-    } catch (e) { debugLog('milestone.complete', 'roadmap reorganization failed', e); }
+    }
+  } catch (e) {
+    if (e.code !== 'ENOENT') { debugLog('milestone.complete', 'roadmap reorganization failed', e); }
   }
 
   // Generate vX.X-DOCS.md artifact
@@ -1111,9 +1155,11 @@ function cmdMilestoneComplete(cwd, version, options, raw) {
       } catch (e) { /* no previous tags */ }
       
       if (prevTag) {
-        changelog = execSync(`git log ${prevTag}..HEAD --oneline --format="%h %s" 2>/dev/null | head -50`, { cwd, encoding: 'utf-8' });
+        // Use execFileSync to avoid shell injection from prevTag
+        const { execFileSync } = require('child_process');
+        changelog = execFileSync('git', ['log', `${prevTag}..HEAD`, '--oneline', '--format=%h %s', '-n', '50'], { cwd, encoding: 'utf-8' });
       } else {
-        changelog = execSync('git log --oneline --format="%h %s" 2>/dev/null | head -50', { cwd, encoding: 'utf-8' });
+        changelog = execSync('git log --oneline --format="%h %s" -n 50', { cwd, encoding: 'utf-8' });
       }
     } catch (e) { changelog = '(no git history)'; }
     
@@ -1123,8 +1169,8 @@ function cmdMilestoneComplete(cwd, version, options, raw) {
     let velocity = 'Unknown';
     let currentFocus = 'General';
     
-    if (fs.existsSync(statePath)) {
-      const stateContent = cachedReadFile(statePath);
+    try {
+      const stateContent = fs.readFileSync(statePath, 'utf-8');
       const phaseMatch = stateContent.match(/\*\*Phase:\*\*\s*(\d+)/);
       if (phaseMatch) currentPhase = phaseMatch[1];
       const plansMatch = stateContent.match(/Total plans completed:\s*(\d+)/);
@@ -1133,6 +1179,8 @@ function cmdMilestoneComplete(cwd, version, options, raw) {
       if (velMatch) velocity = velMatch[1];
       const focusMatch = stateContent.match(/Current focus:\s*([^\n]+)/);
       if (focusMatch) currentFocus = focusMatch[1].trim();
+    } catch (e) {
+      if (e.code !== 'ENOENT') throw e;
     }
     
     const docsContent = `# Milestone ${version} Documentation
@@ -1197,7 +1245,9 @@ See \`.planning/milestones/${version}-ROADMAP.md\` and \`.planning/milestones/${
       `.planning/MILESTONES.md`,
       `.planning/STATE.md`,
       `.planning/ROADMAP.md`,
-    ].filter(f => fs.existsSync(path.join(cwd, f)));
+    ].filter(f => {
+      try { fs.accessSync(path.join(cwd, f)); return true; } catch { return false; }
+    });
     
     if (commitFiles.length > 0) {
       execSync(`git add ${commitFiles.join(' ')}`, { cwd, encoding: 'utf-8' });
@@ -1220,9 +1270,9 @@ See \`.planning/milestones/${version}-ROADMAP.md\` and \`.planning/milestones/${
     tasks: totalTasks,
     accomplishments,
     archived: {
-      roadmap: fs.existsSync(path.join(archiveDir, `${version}-ROADMAP.md`)),
-      requirements: fs.existsSync(path.join(archiveDir, `${version}-REQUIREMENTS.md`)),
-      audit: fs.existsSync(path.join(archiveDir, `${version}-MILESTONE-AUDIT.md`)),
+      roadmap: roadmapArchived,
+      requirements: reqArchived,
+      audit: auditArchived,
       phases: phasesArchived,
       docs: docsCreated,
     },
@@ -1234,7 +1284,7 @@ See \`.planning/milestones/${version}-ROADMAP.md\` and \`.planning/milestones/${
       commit_created: commitCreated,
     },
     milestones_updated: true,
-    state_updated: fs.existsSync(statePath),
+    state_updated: milestoneStateUpdated,
   };
 
   // Archive INTENT.md as part of milestone completion
@@ -1256,12 +1306,16 @@ function archiveIntent(cwd, version) {
   const intentPath = path.join(cwd, '.planning', 'INTENT.md');
   const archiveDir = path.join(cwd, '.planning', 'archive');
   
-  if (!fs.existsSync(intentPath)) {
-    debugLog('archiveIntent', 'INTENT.md not found, skipping');
-    return { archived: false, reason: 'INTENT.md not found' };
+  let content;
+  try {
+    content = fs.readFileSync(intentPath, 'utf-8');
+  } catch (e) {
+    if (e.code === 'ENOENT') {
+      debugLog('archiveIntent', 'INTENT.md not found, skipping');
+      return { archived: false, reason: 'INTENT.md not found' };
+    }
+    throw e;
   }
-
-  const content = cachedReadFile(intentPath);
   
   // Create archive directory
   fs.mkdirSync(archiveDir, { recursive: true });

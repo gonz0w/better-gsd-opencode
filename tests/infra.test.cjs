@@ -212,8 +212,9 @@ describe('temp file cleanup', () => {
   test('exit handler cleans up tracked files', () => {
     // Create a temp file that mimics what bgsd-tools would create,
     // then verify the cleanup pattern works
-    const tmpPath = path.join(require('os').tmpdir(), `gsd-test-cleanup-${Date.now()}.json`);
-    fs.writeFileSync(tmpPath, '{}', 'utf-8');
+    const crypto = require('crypto');
+    const tmpPath = path.join(require('os').tmpdir(), `gsd-test-cleanup-${crypto.randomBytes(8).toString('hex')}.json`);
+    fs.writeFileSync(tmpPath, '{}', { encoding: 'utf-8', mode: 0o600 });
     assert.ok(fs.existsSync(tmpPath), 'Temp file should exist before cleanup');
 
     // Simulate the cleanup logic directly
