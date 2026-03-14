@@ -100,7 +100,7 @@ Score 0-30 = aligned, 31-60 = drifting, 61-100 = significantly misaligned.
 Before planning, see what the AI assumes:
 
 ```
-/bgsd-list-phase-assumptions 1
+/bgsd-list-assumptions 1
 ```
 
 Surfaces assumptions across 5 areas with confidence levels:
@@ -300,7 +300,7 @@ Spawns `gsd-verifier` to verify cross-phase wiring:
 Produces `MILESTONE-AUDIT.md`. If gaps found:
 
 ```
-/bgsd-plan-milestone-gaps     # Creates fix phases for all gaps
+/bgsd-plan-gaps     # Creates fix phases for all gaps
 ```
 
 ### Quality Scoring
@@ -779,7 +779,7 @@ Save preferred settings globally at `~/.gsd/defaults.json`. These are applied wh
 # -> Answer questions, approve research, review roadmap
 
 # 3. For each phase:
-/bgsd-list-phase-assumptions 1        # Check AI's assumptions
+/bgsd-list-assumptions 1        # Check AI's assumptions
 /bgsd-discuss-phase 1                  # Lock implementation decisions
 /bgsd-plan-phase 1 --research          # Plan with domain research
 /bgsd-execute-phase 1                  # Execute with wave parallelism
@@ -791,7 +791,7 @@ Save preferred settings globally at `~/.gsd/defaults.json`. These are applied wh
 
 # 5. Before milestone completion:
 /bgsd-audit-milestone                  # Cross-phase integration check
-/bgsd-plan-milestone-gaps              # Fix any integration gaps
+/bgsd-plan-gaps              # Fix any integration gaps
 
 # 6. Complete milestone:
 /bgsd-complete-milestone

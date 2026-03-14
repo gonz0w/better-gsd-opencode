@@ -158,7 +158,7 @@ bGSD archives the milestone, creates a historical record in `MILESTONES.md`, tag
 Need to stop mid-phase?
 
 ```
-/bgsd-pause-work
+/bgsd-pause
 ```
 
 Creates a `.continue-here.md` file capturing exactly where you are, what's done, what's remaining, and your current mental context.
@@ -168,7 +168,7 @@ Creates a `.continue-here.md` file capturing exactly where you are, what's done,
 Next session:
 
 ```
-/bgsd-resume-work
+/bgsd-resume
 ```
 
 bGSD reads the handoff file and restores full context. You're back exactly where you left off.
@@ -347,7 +347,7 @@ Adjust planning depth in `/bgsd-settings`, or use `/bgsd-discuss-phase` before p
 
 ```
 /clear                                # Clear context, then resume
-/bgsd-resume-work                      # Restores state from files
+/bgsd-resume                      # Restores state from files
 ```
 
 bGSD is designed for context resets. All state lives in `.planning/` files, not in conversation history.

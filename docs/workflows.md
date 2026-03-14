@@ -37,7 +37,7 @@ Workflows are **not code**. They are prompts that any LLM can follow. The determ
 |----------|---------|-------------|
 | `plan-phase.md` | `/bgsd-plan-phase` | Creates PLAN.md files: optional research → planner agent → plan-checker review |
 | `discuss-phase.md` | `/bgsd-discuss-phase` | Interactive decision gathering, produces CONTEXT.md |
-| `list-phase-assumptions.md` | `/bgsd-list-phase-assumptions` | Surfaces AI assumptions (conversational, no files created) |
+| `list-phase-assumptions.md` | `/bgsd-list-assumptions` | Surfaces AI assumptions (conversational, no files created) |
 | `research-phase.md` | `/bgsd-research-phase` | Spawns phase researcher for domain investigation |
 | `tdd.md` | (internal) | TDD plan execution workflow (RED-GREEN-REFACTOR state machine) |
 
@@ -65,7 +65,7 @@ Workflows are **not code**. They are prompts that any LLM can follow. The determ
 | `new-milestone.md` | `/bgsd-new-milestone` | Start new milestone: questioning, research, requirements, roadmap |
 | `complete-milestone.md` | `/bgsd-complete-milestone` | Archive milestone, create historical record, tag release |
 | `audit-milestone.md` | `/bgsd-audit-milestone` | Cross-phase integration check via gsd-verifier |
-| `plan-milestone-gaps.md` | `/bgsd-plan-milestone-gaps` | Create fix phases for audit gaps |
+| `plan-milestone-gaps.md` | `/bgsd-plan-gaps` | Create fix phases for audit gaps |
 
 ### Roadmap Management (3 workflows)
 
@@ -79,8 +79,8 @@ Workflows are **not code**. They are prompts that any LLM can follow. The determ
 
 | Workflow | Command | What It Does |
 |----------|---------|-------------|
-| `resume-project.md` | `/bgsd-resume-work` | Restore context from previous session |
-| `pause-work.md` | `/bgsd-pause-work` | Create handoff file (.continue-here.md) |
+| `resume-project.md` | `/bgsd-resume` | Restore context from previous session |
+| `pause-work.md` | `/bgsd-pause` | Create handoff file (.continue-here.md) |
 | `progress.md` | `/bgsd-progress` | Show progress, intelligently route to next action |
 
 ### Todo Management (2 workflows)
@@ -118,14 +118,14 @@ These are thin wrappers that call `gsd-tools.cjs` for data and format the output
 | Workflow | Command | What It Does |
 |----------|---------|-------------|
 | `cmd-velocity.md` | `/bgsd-velocity` | Execution velocity metrics and completion forecast |
-| `cmd-codebase-impact.md` | `/bgsd-codebase-impact` | Module dependencies and blast radius analysis |
+| `cmd-codebase-impact.md` | `/bgsd-impact` | Module dependencies and blast radius analysis |
 | `cmd-context-budget.md` | `/bgsd-context-budget` | Token usage estimation for plan files |
 | `cmd-rollback-info.md` | `/bgsd-rollback-info` | Commits and revert command for a plan |
 | `cmd-search-decisions.md` | `/bgsd-search-decisions` | Search past decisions across STATE.md and archives |
 | `cmd-search-lessons.md` | `/bgsd-search-lessons` | Search completed phase lessons for patterns |
 | `cmd-session-diff.md` | `/bgsd-session-diff` | Git commits since last session activity |
 | `cmd-test-run.md` | `/bgsd-test-run` | Parse test output with pass/fail gating |
-| `cmd-trace-requirement.md` | `/bgsd-trace-requirement` | Trace requirement from spec to files on disk |
+| `cmd-trace-requirement.md` | `/bgsd-trace` | Trace requirement from spec to files on disk |
 | `cmd-validate-config.md` | `/bgsd-validate-config` | Schema validation for config.json |
 | `cmd-validate-deps.md` | `/bgsd-validate-deps` | Phase dependency graph validation |
 
@@ -228,11 +228,11 @@ Several workflows spawn multiple agents simultaneously:
 ### Session Continuity
 
 ```
-/bgsd-pause-work:
+/bgsd-pause:
   Read STATE.md → Capture current context
   Write .continue-here.md with position + mental context
 
-/bgsd-resume-work:
+/bgsd-resume:
   Read .continue-here.md → Restore context
   Read STATE.md → Verify position
   Route to next action
