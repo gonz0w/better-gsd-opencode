@@ -577,8 +577,13 @@ function preCommitChecks(cwd, force) {
   if (statusResult.exitCode === 0 && statusResult.stdout) {
     const dirtyNonPlanning = statusResult.stdout.split('\n').filter(line => {
       if (!line.trim()) return false;
-      // The porcelain format has 2 status chars + space + path
-      const filePath = line.slice(3).trim();
+      // Porcelain format: XY PATH or XY PATH -> PATH (for renames)
+      // execGit trims stdout, which can strip leading space from the first line's
+      // status column (e.g., " M .planning/foo" becomes "M .planning/foo").
+      // Use a regex to robustly extract the file path after status chars.
+      const match = line.match(/^[A-Z? ]{1,2}\s+(.+)/);
+      if (!match) return false;
+      const filePath = match[1].trim();
       // Handle renamed files: "R  old -> new"
       const actualPath = filePath.includes(' -> ') ? filePath.split(' -> ')[1] : filePath;
       return !actualPath.startsWith('.planning/') && !actualPath.startsWith('.planning\\');
