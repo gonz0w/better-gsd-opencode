@@ -1,77 +1,59 @@
-# Requirements — v11.4 Housekeeping & Stabilization
+# Requirements — v12.0 SQLite-First Data Layer
 
-## Test Suite Stabilization
+## Foundation & Schema
 
-- [x] **TEST-01**: User can run `npm test` and see all tests pass — Bun runtime banner suppressed in piped mode via `process.stdout.isTTY` guard
-- [x] **TEST-02**: User can run tests without missing profiler module errors — profiler import paths resolved or mocked
-- [x] **TEST-03**: User can run plugin tests in isolation — test setup handles missing plugin context gracefully
-- [x] **TEST-04**: User can trust test assertions — stale infrastructure assertions updated to match current output
-- [x] **TEST-05**: User can run config migration tests — expected migration outputs updated for current schema
-- [x] **TEST-06**: User can run all edge case tests — env and miscellaneous test failures fixed
+- [ ] **FND-01**: User can run any bGSD command on Node 22.5+ and have a project-local SQLite database automatically created at `.planning/.cache.db` with schema versioning
+- [ ] **FND-02**: User can upgrade to a new bGSD version and have schema migrations run automatically on first command, preserving all existing data
+- [ ] **FND-03**: User can run any bGSD command on Node <22.5 and have all features work via Map fallback with no errors
+- [ ] **FND-04**: User can run bGSD commands with WAL mode and busy timeout enabled, preventing database locking under concurrent invocations
 
-## CLI Command Routing
+## Planning Tables
 
-- [ ] **CMD-01**: User can call `verify:handoff` without silent failure — route either implemented or workflow references removed
-- [ ] **CMD-02**: User can call `verify:agents` without silent failure — route either implemented or workflow references removed
-- [ ] **CMD-03**: User can run builds without bundling dead code — orphaned `src/commands/ci.js` removed
-- [ ] **CMD-04**: User can run `util:validate-commands` and see accurate results — `audit` namespace added to `commandDiscovery.js`, 5 stale subcommand lists corrected
-- [ ] **CMD-05**: User can run `--help` on any routed command — 32 missing COMMAND_HELP entries added for util, verify, and cache routes
-- [ ] **CMD-06**: User sees no duplicate command routes — `runtime` and `measure` deduplicated, `execute:profile` dead route removed
+- [ ] **TBL-01**: User can query phases from SQLite instead of re-parsing ROADMAP.md on cache hit
+- [ ] **TBL-02**: User can query plans (frontmatter, task counts, completion status) from SQLite instead of re-parsing plan markdown
+- [ ] **TBL-03**: User can query requirements from SQLite with REQ-ID lookups and phase mapping
+- [ ] **TBL-04**: User can trust that SQLite planning data stays fresh via git-hash + mtime hybrid invalidation after edits and commits
 
-## Planning Artifact Cleanup
+## Enricher Acceleration
 
-- [ ] **ART-01**: User can read MILESTONES.md with complete history — 6 missing milestone entries added (v8.0, v8.1, v9.1, v11.0, v11.1, v11.2)
-- [ ] **ART-02**: User can read MILESTONES.md with accurate content — v9.2 entry corrected (currently contains v9.0 description)
-- [ ] **ART-03**: User can read MILESTONES.md with consistent formatting — checkmarks, dates, and archive references normalized
-- [ ] **ART-04**: User can read PROJECT.md without broken HTML — orphaned `</details>` tag removed, broken table rows fixed
-- [ ] **ART-05**: User can read PROJECT.md with accurate counts — module count, workflow count, test format, Node.js version updated
-- [ ] **ART-06**: User can see current out-of-scope list — stale items removed, irrelevant exclusions pruned
-- [ ] **ART-07**: User can see current constraints and decisions — resolved items archived, current items verified
+- [ ] **ENR-01**: User can run any `/bgsd-*` command and have the enricher complete without redundant parser calls (zero 3x/2x duplication)
+- [ ] **ENR-02**: User can run commands with warm SQLite cache and have enrichment data served from SQL queries instead of file re-parsing
+- [ ] **ENR-03**: User can observe measurably faster command startup when SQLite cache is warm vs cold
 
-## Intent Archival System
+## Memory Store Migration
 
-- [ ] **INT-01**: User can complete a milestone and have INTENT.md automatically snapshot to `.planning/milestones/{version}-INTENT.md`
-- [ ] **INT-02**: User can complete a milestone and have completed outcomes/criteria stripped from active INTENT.md
-- [ ] **INT-03**: User can add new outcomes after archival without ID collisions — `getNextId()` tracks highest-ever ID, not just current items
-- [ ] **INT-04**: User can complete a milestone and have history section archived alongside outcomes — keeping active INTENT.md lean
+- [ ] **MEM-01**: User can search decisions, lessons, and trajectories via SQL queries without full JSON.parse of entire files
+- [ ] **MEM-02**: User can trust that sacred data (decisions, lessons, trajectories) is migrated to SQLite while JSON backup files are preserved
+- [ ] **MEM-03**: User can add new bookmarks and have them written to both SQLite and JSON (dual-write during transition)
+
+## Decision Rules
+
+- [ ] **DEC-01**: User can have model selection resolved deterministically from config + agent role without subprocess calls
+- [ ] **DEC-02**: User can have verification routing resolved deterministically from config + plan state
+- [ ] **DEC-03**: User can have research gate resolved deterministically from config + file existence
+- [ ] **DEC-04**: User can have phase readiness resolved deterministically from roadmap + plan + blocker state
+- [ ] **DEC-05**: User can have milestone completion resolved deterministically from roadmap progress data
+- [ ] **DEC-06**: User can have commit strategy resolved deterministically from config + change state
+
+## Session State
+
+- [ ] **SES-01**: User can have current position, last activity, and performance metrics persisted in SQLite across invocations
+- [ ] **SES-02**: User can have STATE.md regenerated from SQLite state, ensuring markdown and SQL are always consistent
+- [ ] **SES-03**: User can view accumulated context (decisions, todos, blockers) from SQLite without parsing STATE.md
 
 ## Future Requirements
 
-- Intent archival rollback (restore archived outcomes to active)
-- Automated INTENT.md health check in `/bgsd-health`
-- Intent drift validation against archived milestones
+_None deferred — all 6 categories selected for v12.0._
 
 ## Out of Scope
 
-- Test behavior changes — only infrastructure fixes (Bun banner, imports, assertions)
-- New CLI commands — only fixing existing routing
-- New features or capabilities — this is purely cleanup
-- ROADMAP.md format changes — existing format works
+- **ORM layer** — Zero-dependency constraint; raw SQL with prepared statements is sufficient
+- **Async SQLite (node:sqlite/promises)** — CLI is synchronous by design; async adds complexity without benefit
+- **Full-text search (FTS5)** — Overkill for planning data volumes; simple LIKE queries sufficient
+- **SQLite as only format** — Markdown files must remain human-readable and git-trackable
+- **Migration file system** — Incompatible with single-file deploy; inline migration functions only
+- **better-sqlite3** — Duplicates built-in node:sqlite; adds native dependency
 
 ## Traceability
 
-| REQ-ID | Phase | Plan |
-|--------|-------|------|
-| TEST-01 | Phase 114 | 0114-01 |
-| TEST-02 | Phase 114 | 0114-01 |
-| TEST-03 | Phase 114 | 0114-02 |
-| TEST-04 | Phase 114 | 0114-02 |
-| TEST-05 | Phase 114 | 0114-02 |
-| TEST-06 | Phase 114 | 0114-02 |
-| CMD-01 | Phase 115 | — |
-| CMD-02 | Phase 115 | — |
-| CMD-03 | Phase 115 | — |
-| CMD-04 | Phase 115 | — |
-| CMD-05 | Phase 115 | — |
-| CMD-06 | Phase 115 | — |
-| ART-01 | Phase 116 | — |
-| ART-02 | Phase 116 | — |
-| ART-03 | Phase 116 | — |
-| ART-04 | Phase 116 | — |
-| ART-05 | Phase 116 | — |
-| ART-06 | Phase 116 | — |
-| ART-07 | Phase 116 | — |
-| INT-01 | Phase 117 | — |
-| INT-02 | Phase 117 | — |
-| INT-03 | Phase 117 | — |
-| INT-04 | Phase 117 | — |
+_Populated by roadmap — maps REQ-IDs to phases._
