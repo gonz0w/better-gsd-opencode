@@ -11,3 +11,6 @@ paths-ignore:
 queries:
   - excludes:
       js/file-system-race: "Single-user CLI tool - race conditions are acceptable"
+      js/path-injection: "Input is validated - intentional design"
+      js/request-smuggling: "Not an HTTP server"
+      js/weak-cryptography: "Intentionally using Node crypto for compatibility"
