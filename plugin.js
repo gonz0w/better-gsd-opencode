@@ -95,9 +95,497 @@ var init_state = __esm({
   }
 });
 
+// src/plugin/lib/db-cache.js
+import * as nodeFs from "node:fs";
+import * as nodePath from "node:path";
+function getDb(cwd) {
+  cwd = cwd || process.cwd();
+  const resolvedCwd = nodePath.resolve(cwd);
+  if (_instances.has(resolvedCwd)) return _instances.get(resolvedCwd);
+  let db;
+  const planningDir = nodePath.join(resolvedCwd, ".planning");
+  const planningExists = nodeFs.existsSync(planningDir);
+  if (planningExists && _DatabaseSync) {
+    const dbPath = nodePath.join(planningDir, ".cache.db");
+    try {
+      const instance = new SQLiteBackend(dbPath);
+      db = instance._degraded ? new MapBackend() : instance;
+    } catch {
+      db = new MapBackend();
+    }
+  } else {
+    db = new MapBackend();
+  }
+  _instances.set(resolvedCwd, db);
+  return db;
+}
+function _extractRequirementsFromPhases(phases) {
+  const requirements = [];
+  for (const phase of phases) {
+    const section = phase.section || "";
+    if (!section) continue;
+    const inlineMatch = section.match(/\*\*Requirements?\*\*:\s*([^\n]+)/i);
+    if (inlineMatch) {
+      const ids = inlineMatch[1].split(/[,\s]+/).filter((id) => /^[A-Z]+-\d+/.test(id));
+      for (const id of ids) {
+        requirements.push({ req_id: id, phase_number: phase.number || "", description: null });
+      }
+    }
+    const checkboxPattern = /- \[[ x]\] \*\*([A-Z]+-\d+)\*\*:?\s*([^\n]*)/g;
+    let match;
+    while ((match = checkboxPattern.exec(section)) !== null) {
+      requirements.push({ req_id: match[1], phase_number: phase.number || "", description: match[2].trim() || null });
+    }
+  }
+  return requirements;
+}
+var _DatabaseSync, MapBackend, SCHEMA_V2_SQL, SQLiteBackend, _instances, PlanningCache;
+var init_db_cache = __esm({
+  async "src/plugin/lib/db-cache.js"() {
+    _DatabaseSync = null;
+    try {
+      const m = await import("node:sqlite");
+      if (m && m.DatabaseSync) {
+        _DatabaseSync = m.DatabaseSync;
+      }
+    } catch {
+    }
+    MapBackend = class {
+      get backend() {
+        return "map";
+      }
+      exec() {
+      }
+      prepare() {
+        return { get: () => void 0, all: () => [], run: () => ({ changes: 0 }) };
+      }
+      close() {
+      }
+    };
+    SCHEMA_V2_SQL = `
+  CREATE TABLE IF NOT EXISTS _meta (key TEXT PRIMARY KEY, value TEXT);
+  CREATE TABLE IF NOT EXISTS file_cache (
+    file_path TEXT PRIMARY KEY,
+    mtime_ms  INTEGER NOT NULL,
+    parsed_at TEXT NOT NULL
+  );
+  CREATE TABLE IF NOT EXISTS milestones (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    cwd         TEXT NOT NULL,
+    name        TEXT NOT NULL,
+    version     TEXT,
+    status      TEXT NOT NULL DEFAULT 'pending',
+    phase_start INTEGER,
+    phase_end   INTEGER
+  );
+  CREATE TABLE IF NOT EXISTS phases (
+    number       TEXT NOT NULL,
+    cwd          TEXT NOT NULL,
+    name         TEXT NOT NULL,
+    status       TEXT NOT NULL DEFAULT 'incomplete',
+    plan_count   INTEGER NOT NULL DEFAULT 0,
+    goal         TEXT,
+    depends_on   TEXT,
+    requirements TEXT,
+    section      TEXT,
+    PRIMARY KEY (number, cwd)
+  );
+  CREATE TABLE IF NOT EXISTS progress (
+    phase          TEXT NOT NULL,
+    cwd            TEXT NOT NULL,
+    plans_complete INTEGER NOT NULL DEFAULT 0,
+    plans_total    INTEGER NOT NULL DEFAULT 0,
+    status         TEXT,
+    completed_date TEXT,
+    PRIMARY KEY (phase, cwd)
+  );
+  CREATE TABLE IF NOT EXISTS plans (
+    path           TEXT PRIMARY KEY,
+    cwd            TEXT NOT NULL,
+    phase_number   TEXT,
+    plan_number    TEXT,
+    wave           INTEGER,
+    autonomous     INTEGER,
+    objective      TEXT,
+    task_count     INTEGER NOT NULL DEFAULT 0,
+    frontmatter_json TEXT,
+    raw            TEXT
+  );
+  CREATE TABLE IF NOT EXISTS tasks (
+    plan_path TEXT NOT NULL,
+    idx       INTEGER NOT NULL,
+    type      TEXT NOT NULL DEFAULT 'auto',
+    name      TEXT,
+    files_json TEXT,
+    action    TEXT,
+    verify    TEXT,
+    done      TEXT,
+    PRIMARY KEY (plan_path, idx),
+    FOREIGN KEY (plan_path) REFERENCES plans(path) ON DELETE CASCADE
+  );
+  CREATE TABLE IF NOT EXISTS requirements (
+    req_id       TEXT NOT NULL,
+    cwd          TEXT NOT NULL,
+    phase_number TEXT,
+    description  TEXT,
+    PRIMARY KEY (req_id, cwd)
+  );
+  CREATE INDEX IF NOT EXISTS idx_phases_cwd ON phases(cwd);
+  CREATE INDEX IF NOT EXISTS idx_plans_cwd ON plans(cwd);
+  CREATE INDEX IF NOT EXISTS idx_plans_phase ON plans(phase_number);
+  CREATE INDEX IF NOT EXISTS idx_tasks_plan ON tasks(plan_path);
+  CREATE INDEX IF NOT EXISTS idx_requirements_cwd ON requirements(cwd);
+  CREATE INDEX IF NOT EXISTS idx_file_cache_mtime ON file_cache(mtime_ms);
+`;
+    SQLiteBackend = class {
+      constructor(dbPath) {
+        this._dbPath = dbPath;
+        this._degraded = false;
+        this._db = null;
+        try {
+          try {
+            this._db = new _DatabaseSync(dbPath, { timeout: 5e3, defensive: false });
+          } catch {
+            try {
+              this._db = new _DatabaseSync(dbPath, { timeout: 5e3 });
+            } catch {
+              this._db = new _DatabaseSync(dbPath);
+            }
+          }
+          try {
+            this._db.exec("PRAGMA busy_timeout = 5000");
+          } catch {
+          }
+          this._db.exec("PRAGMA journal_mode = WAL");
+          this._ensureSchema();
+        } catch {
+          this._degraded = true;
+        }
+      }
+      _ensureSchema() {
+        let version = 0;
+        try {
+          const row = this._db.prepare("PRAGMA user_version").get();
+          version = row ? row.user_version : 0;
+        } catch {
+        }
+        if (version >= 2) return;
+        try {
+          this._db.exec("BEGIN");
+          this._db.exec(SCHEMA_V2_SQL);
+          this._db.exec("INSERT OR REPLACE INTO _meta (key, value) VALUES ('created_at', '" + (/* @__PURE__ */ new Date()).toISOString() + "')");
+          this._db.exec("PRAGMA user_version = 2");
+          this._db.exec("COMMIT");
+        } catch {
+          try {
+            this._db.exec("ROLLBACK");
+          } catch {
+          }
+          try {
+            this._db.close();
+            for (const suffix of ["", "-wal", "-shm"]) {
+              const fp = this._dbPath + suffix;
+              if (nodeFs.existsSync(fp)) try {
+                nodeFs.unlinkSync(fp);
+              } catch {
+              }
+            }
+            this._db = new _DatabaseSync(this._dbPath);
+            this._db.exec("PRAGMA journal_mode = WAL");
+            this._db.exec("BEGIN");
+            this._db.exec(SCHEMA_V2_SQL);
+            this._db.exec("INSERT OR REPLACE INTO _meta (key, value) VALUES ('created_at', '" + (/* @__PURE__ */ new Date()).toISOString() + "')");
+            this._db.exec("PRAGMA user_version = 2");
+            this._db.exec("COMMIT");
+          } catch {
+            this._degraded = true;
+          }
+        }
+      }
+      get backend() {
+        return "sqlite";
+      }
+      exec(sql) {
+        this._db.exec(sql);
+      }
+      prepare(sql) {
+        return this._db.prepare(sql);
+      }
+      close() {
+        try {
+          this._db.close();
+        } catch {
+        }
+      }
+    };
+    _instances = /* @__PURE__ */ new Map();
+    PlanningCache = class {
+      constructor(db) {
+        this._db = db;
+        this._stmts = {};
+      }
+      _isMap() {
+        return this._db.backend === "map";
+      }
+      _stmt(key, sql) {
+        if (!this._stmts[key]) this._stmts[key] = this._db.prepare(sql);
+        return this._stmts[key];
+      }
+      checkFreshness(filePath) {
+        if (this._isMap()) return "missing";
+        try {
+          const row = this._stmt("fc_get", "SELECT mtime_ms FROM file_cache WHERE file_path = ?").get(filePath);
+          if (!row) return "missing";
+          const currentMtime = nodeFs.statSync(filePath).mtimeMs;
+          return currentMtime === row.mtime_ms ? "fresh" : "stale";
+        } catch {
+          return "missing";
+        }
+      }
+      checkAllFreshness(filePaths) {
+        const result = { fresh: [], stale: [], missing: [] };
+        for (const fp of filePaths) result[this.checkFreshness(fp)].push(fp);
+        return result;
+      }
+      invalidateFile(filePath) {
+        if (this._isMap()) return;
+        try {
+          this._db.exec("BEGIN");
+          this._stmt("fc_del", "DELETE FROM file_cache WHERE file_path = ?").run(filePath);
+          this._stmt("plans_del_path", "DELETE FROM plans WHERE path = ?").run(filePath);
+          this._db.exec("COMMIT");
+        } catch {
+          try {
+            this._db.exec("ROLLBACK");
+          } catch {
+          }
+        }
+      }
+      clearForCwd(cwd) {
+        if (this._isMap()) return;
+        try {
+          this._db.exec("BEGIN");
+          this._stmt("ph_del_cwd", "DELETE FROM phases WHERE cwd = ?").run(cwd);
+          this._stmt("ms_del_cwd", "DELETE FROM milestones WHERE cwd = ?").run(cwd);
+          this._stmt("pr_del_cwd", "DELETE FROM progress WHERE cwd = ?").run(cwd);
+          this._stmt("rq_del_cwd", "DELETE FROM requirements WHERE cwd = ?").run(cwd);
+          this._stmt("pl_del_cwd", "DELETE FROM plans WHERE cwd = ?").run(cwd);
+          this._stmt("fc_del_cwd", "DELETE FROM file_cache WHERE file_path LIKE ?").run(cwd + "%");
+          this._db.exec("COMMIT");
+        } catch {
+          try {
+            this._db.exec("ROLLBACK");
+          } catch {
+          }
+        }
+      }
+      _updateMtimeInTx(filePath) {
+        try {
+          const mtime_ms = nodeFs.statSync(filePath).mtimeMs;
+          this._stmt("fc_upsert", "INSERT OR REPLACE INTO file_cache (file_path, mtime_ms, parsed_at) VALUES (?, ?, ?)").run(filePath, mtime_ms, (/* @__PURE__ */ new Date()).toISOString());
+        } catch {
+        }
+      }
+      storeRoadmap(cwd, roadmapPath, parsed) {
+        if (this._isMap()) return;
+        try {
+          this._db.exec("BEGIN");
+          this._stmt("ph_del_cwd2", "DELETE FROM phases WHERE cwd = ?").run(cwd);
+          this._stmt("ms_del_cwd2", "DELETE FROM milestones WHERE cwd = ?").run(cwd);
+          this._stmt("pr_del_cwd2", "DELETE FROM progress WHERE cwd = ?").run(cwd);
+          this._stmt("rq_del_cwd2", "DELETE FROM requirements WHERE cwd = ?").run(cwd);
+          const phIns = this._stmt("ph_ins", `INSERT OR REPLACE INTO phases (number, cwd, name, status, plan_count, goal, depends_on, requirements, section) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+          for (const p of parsed.phases || []) {
+            phIns.run(
+              p.number || "",
+              cwd,
+              p.name || "",
+              p.status || "incomplete",
+              p.plan_count != null ? p.plan_count : 0,
+              p.goal || null,
+              p.depends_on ? JSON.stringify(p.depends_on) : null,
+              p.requirements ? JSON.stringify(p.requirements) : null,
+              p.section || null
+            );
+          }
+          const msIns = this._stmt("ms_ins", `INSERT INTO milestones (cwd, name, version, status, phase_start, phase_end) VALUES (?, ?, ?, ?, ?, ?)`);
+          for (const m of parsed.milestones || []) {
+            msIns.run(
+              cwd,
+              m.name || "",
+              m.version || null,
+              m.status || "pending",
+              m.phase_start != null ? m.phase_start : null,
+              m.phase_end != null ? m.phase_end : null
+            );
+          }
+          const prIns = this._stmt("pr_ins", `INSERT OR REPLACE INTO progress (phase, cwd, plans_complete, plans_total, status, completed_date) VALUES (?, ?, ?, ?, ?, ?)`);
+          for (const p of parsed.progress || []) {
+            prIns.run(
+              p.phase || "",
+              cwd,
+              p.plans_complete != null ? p.plans_complete : 0,
+              p.plans_total != null ? p.plans_total : 0,
+              p.status || null,
+              p.completed_date || null
+            );
+          }
+          const rqIns = this._stmt("rq_ins", `INSERT OR REPLACE INTO requirements (req_id, cwd, phase_number, description) VALUES (?, ?, ?, ?)`);
+          const reqs = parsed.requirements || _extractRequirementsFromPhases(parsed.phases || []);
+          for (const r of reqs) {
+            rqIns.run(r.req_id || r.id || "", cwd, r.phase_number || r.phase || null, r.description || null);
+          }
+          if (roadmapPath) this._updateMtimeInTx(roadmapPath);
+          this._db.exec("COMMIT");
+        } catch {
+          try {
+            this._db.exec("ROLLBACK");
+          } catch {
+          }
+        }
+      }
+      storePlan(planPath, cwd, parsed) {
+        if (this._isMap()) return;
+        try {
+          this._db.exec("BEGIN");
+          this._stmt("pl_del_path", "DELETE FROM plans WHERE path = ?").run(planPath);
+          const fm = parsed.frontmatter || {};
+          this._stmt(
+            "pl_ins",
+            `INSERT OR REPLACE INTO plans (path, cwd, phase_number, plan_number, wave, autonomous, objective, task_count, frontmatter_json, raw) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+          ).run(
+            planPath,
+            cwd,
+            fm.phase ? String(fm.phase).split("-")[0] : null,
+            fm.plan != null ? String(fm.plan) : null,
+            fm.wave != null ? fm.wave : null,
+            fm.autonomous != null ? fm.autonomous ? 1 : 0 : null,
+            parsed.objective || null,
+            (parsed.tasks || []).length,
+            JSON.stringify(fm),
+            parsed.raw || null
+          );
+          const tkIns = this._stmt("tk_ins", `INSERT OR REPLACE INTO tasks (plan_path, idx, type, name, files_json, action, verify, done) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`);
+          for (let i = 0; i < (parsed.tasks || []).length; i++) {
+            const t = parsed.tasks[i];
+            tkIns.run(
+              planPath,
+              i,
+              t.type || "auto",
+              t.name || null,
+              t.files ? JSON.stringify(t.files) : null,
+              t.action || null,
+              t.verify || null,
+              t.done || null
+            );
+          }
+          this._updateMtimeInTx(planPath);
+          this._db.exec("COMMIT");
+        } catch {
+          try {
+            this._db.exec("ROLLBACK");
+          } catch {
+          }
+        }
+      }
+      getPhases(cwd) {
+        if (this._isMap()) return null;
+        try {
+          const rows = this._stmt("ph_all", "SELECT * FROM phases WHERE cwd = ? ORDER BY number").all(cwd);
+          return rows.length > 0 ? rows : null;
+        } catch {
+          return null;
+        }
+      }
+      getPhase(number, cwd) {
+        if (this._isMap()) return null;
+        try {
+          const row = this._stmt("ph_one", "SELECT * FROM phases WHERE number = ? AND cwd = ?").get(number, cwd);
+          return row || null;
+        } catch {
+          return null;
+        }
+      }
+      getPlans(cwd) {
+        if (this._isMap()) return null;
+        try {
+          const rows = this._stmt("pl_all", "SELECT * FROM plans WHERE cwd = ? ORDER BY phase_number, plan_number").all(cwd);
+          return rows.length > 0 ? rows : null;
+        } catch {
+          return null;
+        }
+      }
+      getPlan(planPath) {
+        if (this._isMap()) return null;
+        try {
+          const plan = this._stmt("pl_one", "SELECT * FROM plans WHERE path = ?").get(planPath);
+          if (!plan) return null;
+          const tasks = this._stmt("tk_for_plan", "SELECT * FROM tasks WHERE plan_path = ? ORDER BY idx").all(planPath);
+          return { ...plan, tasks };
+        } catch {
+          return null;
+        }
+      }
+      getPlansForPhase(phaseNumber, cwd) {
+        if (this._isMap()) return null;
+        try {
+          const rows = this._stmt("pl_phase", "SELECT * FROM plans WHERE phase_number = ? AND cwd = ? ORDER BY plan_number").all(phaseNumber, cwd);
+          return rows.length > 0 ? rows : null;
+        } catch {
+          return null;
+        }
+      }
+      getRequirements(cwd) {
+        if (this._isMap()) return null;
+        try {
+          const rows = this._stmt("rq_all", "SELECT * FROM requirements WHERE cwd = ? ORDER BY req_id").all(cwd);
+          return rows.length > 0 ? rows : null;
+        } catch {
+          return null;
+        }
+      }
+      getRequirement(reqId, cwd) {
+        if (this._isMap()) return null;
+        try {
+          const row = this._stmt("rq_one", "SELECT * FROM requirements WHERE req_id = ? AND cwd = ?").get(reqId, cwd);
+          return row || null;
+        } catch {
+          return null;
+        }
+      }
+      getMilestones(cwd) {
+        if (this._isMap()) return null;
+        try {
+          const rows = this._stmt("ms_all", "SELECT * FROM milestones WHERE cwd = ? ORDER BY id").all(cwd);
+          return rows.length > 0 ? rows : null;
+        } catch {
+          return null;
+        }
+      }
+      getProgress(cwd) {
+        if (this._isMap()) return null;
+        try {
+          const rows = this._stmt("pr_all", "SELECT * FROM progress WHERE cwd = ? ORDER BY phase").all(cwd);
+          return rows.length > 0 ? rows : null;
+        } catch {
+          return null;
+        }
+      }
+    };
+  }
+});
+
 // src/plugin/parsers/roadmap.js
 import { readFileSync as readFileSync2 } from "fs";
-import { join as join4 } from "path";
+import { join as join5 } from "path";
+function _getPlanningCache(cwd) {
+  try {
+    const db = getDb(cwd);
+    return new PlanningCache(db);
+  } catch {
+    return null;
+  }
+}
 function parseMilestones(content) {
   const milestones = [];
   const pattern = /[-*]\s*(?:✅|🔵|🔲)\s*\*\*v(\d+(?:\.\d+)*)\s+([^*]+)\*\*([^\n]*)/g;
@@ -167,12 +655,91 @@ function parseProgressTable(content) {
   }
   return progress;
 }
+function buildRoadmapFromCache(phaseRows, milestoneRows, progressRows, resolvedCwd) {
+  const milestones = (milestoneRows || []).map((row) => Object.freeze({
+    name: row.name || "",
+    version: row.version || null,
+    status: row.status || "pending",
+    phases: row.phase_start != null && row.phase_end != null ? { start: row.phase_start, end: row.phase_end } : null
+  }));
+  const phases = (phaseRows || []).map((row) => Object.freeze({
+    number: row.number || "",
+    name: row.name || "",
+    status: row.status || "incomplete",
+    planCount: row.plan_count != null ? row.plan_count : 0,
+    goal: row.goal || null,
+    section: row.section || ""
+  }));
+  const progress = (progressRows || []).map((row) => Object.freeze({
+    phase: row.phase || "",
+    milestone: null,
+    plansComplete: row.plans_complete != null ? row.plans_complete : 0,
+    plansTotal: row.plans_total != null ? row.plans_total : 0,
+    status: row.status || "",
+    completed: row.completed_date || null
+  }));
+  return Object.freeze({
+    raw: null,
+    // not stored in cache — consumers needing raw markdown should parse fresh
+    milestones,
+    phases,
+    progress,
+    getPhase(num) {
+      const numStr = String(num);
+      const found = phases.find((p) => p.number === numStr);
+      if (!found) return null;
+      const section = found.section || "";
+      const dependsMatch = section.match(/\*\*Depends on:?\*\*:?\s*([^\n]+)/i);
+      const dependsOn = dependsMatch ? dependsMatch[1].trim() : null;
+      const reqMatch = section.match(/\*\*Requirements:?\*\*:?\s*([^\n]+)/i);
+      const requirements = reqMatch ? reqMatch[1].trim() : null;
+      const criteriaMatch = section.match(/\*\*Success Criteria\*\*[^\n]*:\s*\n((?:\s*\d+\.\s*[^\n]+\n?)+)/i);
+      const successCriteria = criteriaMatch ? criteriaMatch[1].trim().split("\n").map((l) => l.replace(/^\s*\d+\.\s*/, "").trim()).filter(Boolean) : [];
+      const plansMatch = section.match(/\*\*Plans:?\*\*:?\s*(?:(\d+)\/)?(\d+)\s*plan/i);
+      const plans = plansMatch ? {
+        completed: plansMatch[1] ? parseInt(plansMatch[1], 10) : 0,
+        total: parseInt(plansMatch[2], 10)
+      } : null;
+      return Object.freeze({
+        number: found.number,
+        name: found.name,
+        goal: found.goal,
+        dependsOn,
+        requirements,
+        successCriteria,
+        plans
+      });
+    },
+    getMilestone(name) {
+      return milestones.find(
+        (m) => m.name.toLowerCase().includes(name.toLowerCase()) || m.version && m.version.toLowerCase() === name.toLowerCase()
+      ) || null;
+    },
+    get currentMilestone() {
+      return milestones.find((m) => m.status === "active") || null;
+    }
+  });
+}
 function parseRoadmap(cwd) {
   const resolvedCwd = cwd || process.cwd();
   if (_cache2.has(resolvedCwd)) {
     return _cache2.get(resolvedCwd);
   }
-  const roadmapPath = join4(resolvedCwd, ".planning", "ROADMAP.md");
+  const roadmapPath = join5(resolvedCwd, ".planning", "ROADMAP.md");
+  const planningCache = _getPlanningCache(resolvedCwd);
+  if (planningCache) {
+    const freshness = planningCache.checkFreshness(roadmapPath);
+    if (freshness === "fresh") {
+      const phaseRows = planningCache.getPhases(resolvedCwd);
+      if (phaseRows && phaseRows.length > 0) {
+        const milestoneRows = planningCache.getMilestones(resolvedCwd);
+        const progressRows = planningCache.getProgress(resolvedCwd);
+        const result2 = buildRoadmapFromCache(phaseRows, milestoneRows || [], progressRows || [], resolvedCwd);
+        _cache2.set(resolvedCwd, result2);
+        return result2;
+      }
+    }
+  }
   let raw;
   try {
     raw = readFileSync2(roadmapPath, "utf-8");
@@ -225,26 +792,64 @@ function parseRoadmap(cwd) {
       return milestones.find((m) => m.status === "active") || null;
     }
   });
+  if (planningCache) {
+    const storedPhases = phases.map((p) => ({
+      number: p.number,
+      name: p.name,
+      status: p.status,
+      plan_count: p.planCount,
+      goal: p.goal,
+      section: p.section
+    }));
+    const storedMilestones = milestones.map((m) => ({
+      name: m.name,
+      version: m.version,
+      status: m.status,
+      phase_start: m.phases ? m.phases.start : null,
+      phase_end: m.phases ? m.phases.end : null
+    }));
+    const storedProgress = progress.map((p) => ({
+      phase: p.phase,
+      plans_complete: p.plansComplete,
+      plans_total: p.plansTotal,
+      status: p.status,
+      completed_date: p.completed
+    }));
+    planningCache.storeRoadmap(resolvedCwd, roadmapPath, {
+      phases: storedPhases,
+      milestones: storedMilestones,
+      progress: storedProgress
+    });
+  }
   _cache2.set(resolvedCwd, result);
   return result;
 }
 function invalidateRoadmap(cwd) {
   if (cwd) {
     _cache2.delete(cwd);
+    try {
+      const planningCache = _getPlanningCache(cwd);
+      if (planningCache) {
+        const roadmapPath = join5(cwd, ".planning", "ROADMAP.md");
+        planningCache.invalidateFile(roadmapPath);
+      }
+    } catch {
+    }
   } else {
     _cache2.clear();
   }
 }
 var _cache2;
 var init_roadmap = __esm({
-  "src/plugin/parsers/roadmap.js"() {
+  async "src/plugin/parsers/roadmap.js"() {
+    await init_db_cache();
     _cache2 = /* @__PURE__ */ new Map();
   }
 });
 
 // src/plugin/parsers/plan.js
 import { readFileSync as readFileSync3, readdirSync } from "fs";
-import { join as join5 } from "path";
+import { join as join6 } from "path";
 function extractFrontmatter(content) {
   if (!content || typeof content !== "string") return {};
   if (!content.startsWith("---\n")) return {};
@@ -365,13 +970,13 @@ function parsePlans(phaseNum, cwd) {
     return _plansCache.get(cacheKey);
   }
   const numStr = String(phaseNum).padStart(2, "0");
-  const phasesDir = join5(resolvedCwd, ".planning", "phases");
+  const phasesDir = join6(resolvedCwd, ".planning", "phases");
   let phaseDir = null;
   try {
     const entries = readdirSync(phasesDir);
     const dirName = entries.find((d) => d.startsWith(numStr + "-") || d === numStr);
     if (dirName) {
-      phaseDir = join5(phasesDir, dirName);
+      phaseDir = join6(phasesDir, dirName);
     }
   } catch {
     return Object.freeze([]);
@@ -386,7 +991,7 @@ function parsePlans(phaseNum, cwd) {
   } catch {
     return Object.freeze([]);
   }
-  const plans = planFiles.map((f) => parsePlan(join5(phaseDir, f))).filter(Boolean);
+  const plans = planFiles.map((f) => parsePlan(join6(phaseDir, f))).filter(Boolean);
   const frozen = Object.freeze(plans);
   _plansCache.set(cacheKey, frozen);
   return frozen;
@@ -420,13 +1025,13 @@ var init_plan = __esm({
 
 // src/plugin/parsers/config.js
 import { readFileSync as readFileSync4 } from "fs";
-import { join as join6 } from "path";
+import { join as join7 } from "path";
 function parseConfig(cwd) {
   const resolvedCwd = cwd || process.cwd();
   if (_cache3.has(resolvedCwd)) {
     return _cache3.get(resolvedCwd);
   }
-  const configPath = join6(resolvedCwd, ".planning", "config.json");
+  const configPath = join7(resolvedCwd, ".planning", "config.json");
   let parsed = {};
   try {
     const raw = readFileSync4(configPath, "utf-8");
@@ -541,13 +1146,13 @@ var init_config = __esm({
 
 // src/plugin/parsers/project.js
 import { readFileSync as readFileSync5 } from "fs";
-import { join as join7 } from "path";
+import { join as join8 } from "path";
 function parseProject(cwd) {
   const resolvedCwd = cwd || process.cwd();
   if (_cache4.has(resolvedCwd)) {
     return _cache4.get(resolvedCwd);
   }
-  const projectPath = join7(resolvedCwd, ".planning", "PROJECT.md");
+  const projectPath = join8(resolvedCwd, ".planning", "PROJECT.md");
   let raw;
   try {
     raw = readFileSync5(projectPath, "utf-8");
@@ -588,13 +1193,13 @@ var init_project = __esm({
 
 // src/plugin/parsers/intent.js
 import { readFileSync as readFileSync6 } from "fs";
-import { join as join8 } from "path";
+import { join as join9 } from "path";
 function parseIntent(cwd) {
   const resolvedCwd = cwd || process.cwd();
   if (_cache5.has(resolvedCwd)) {
     return _cache5.get(resolvedCwd);
   }
-  const intentPath = join8(resolvedCwd, ".planning", "INTENT.md");
+  const intentPath = join9(resolvedCwd, ".planning", "INTENT.md");
   let raw;
   try {
     raw = readFileSync6(intentPath, "utf-8");
@@ -668,15 +1273,15 @@ function invalidateAll(cwd) {
   invalidateIntent(cwd);
 }
 var init_parsers = __esm({
-  "src/plugin/parsers/index.js"() {
+  async "src/plugin/parsers/index.js"() {
     init_state();
-    init_roadmap();
+    await init_roadmap();
     init_plan();
     init_config();
     init_project();
     init_intent();
     init_state();
-    init_roadmap();
+    await init_roadmap();
     init_plan();
     init_config();
     init_project();
@@ -1045,7 +1650,7 @@ var require_decision_rules = __commonJS({
 });
 
 // src/plugin/index.js
-import { join as join16 } from "path";
+import { join as join17 } from "path";
 import { homedir as homedir7 } from "os";
 
 // src/plugin/safe-hook.js
@@ -1142,13 +1747,13 @@ function safeHook(name, fn, options = {}) {
     return randomBytes2(4).toString("hex");
   }
   function withTimeout(promise, ms) {
-    return new Promise((resolve2, reject) => {
+    return new Promise((resolve3, reject) => {
       const timer = setTimeout(() => {
         reject(new Error(`Hook "${name}" timed out after ${ms}ms`));
       }, ms);
       promise.then((result) => {
         clearTimeout(timer);
-        resolve2(result);
+        resolve3(result);
       }).catch((err) => {
         clearTimeout(timer);
         reject(err);
@@ -1236,7 +1841,7 @@ function createToolRegistry(safeHookFn) {
 
 // src/plugin/project-state.js
 init_state();
-init_roadmap();
+await init_roadmap();
 init_plan();
 init_config();
 init_project();
@@ -1552,10 +2157,10 @@ ${parts.join("\n")}
 }
 
 // src/plugin/command-enricher.js
-init_parsers();
+await init_parsers();
 var import_decision_rules = __toESM(require_decision_rules());
-import { readdirSync as readdirSync2, existsSync as existsSync2, readFileSync as readFileSync7 } from "fs";
-import { join as join9 } from "path";
+import { readdirSync as readdirSync2, existsSync as existsSync3, readFileSync as readFileSync7 } from "fs";
+import { join as join10 } from "path";
 function enrichCommand(input, output, cwd) {
   if (!input || !output) return;
   const command = input.command || input.parts && input.parts[0] || "";
@@ -1619,7 +2224,7 @@ function enrichCommand(input, output, cwd) {
         const plans = parsePlans(phaseNum, resolvedCwd);
         if (plans && plans.length > 0) {
           enrichment.plans = plans.map((p) => p.path ? p.path.split("/").pop() : null).filter(Boolean);
-          const phaseDirFull = join9(resolvedCwd, phaseDir);
+          const phaseDirFull = join10(resolvedCwd, phaseDir);
           const summaryFiles = listSummaryFiles(phaseDirFull);
           enrichment.incomplete_plans = enrichment.plans.filter((planFile) => {
             const summaryFile = planFile.replace("-PLAN.md", "-SUMMARY.md");
@@ -1646,7 +2251,7 @@ function enrichCommand(input, output, cwd) {
   }
   try {
     if (enrichment.phase_dir) {
-      const phaseDirFull = join9(resolvedCwd, enrichment.phase_dir);
+      const phaseDirFull = join10(resolvedCwd, enrichment.phase_dir);
       if (!enrichment.plans) {
         const plans = parsePlans(effectivePhaseNum, resolvedCwd);
         if (plans && plans.length > 0) {
@@ -1667,7 +2272,7 @@ function enrichCommand(input, output, cwd) {
         let uatGapCount = 0;
         for (const uf of uatFiles) {
           try {
-            const content = readFileSync7(join9(phaseDirFull, uf), "utf-8");
+            const content = readFileSync7(join10(phaseDirFull, uf), "utf-8");
             if (content.includes("status: diagnosed")) uatGapCount++;
           } catch {
           }
@@ -1682,8 +2287,8 @@ function enrichCommand(input, output, cwd) {
   try {
     if (enrichment.phase_dir && effectivePhaseNum) {
       const paddedPhase = String(effectivePhaseNum).padStart(4, "0");
-      enrichment.has_research = existsSync2(join9(resolvedCwd, enrichment.phase_dir, paddedPhase + "-RESEARCH.md"));
-      enrichment.has_context = existsSync2(join9(resolvedCwd, enrichment.phase_dir, paddedPhase + "-CONTEXT.md"));
+      enrichment.has_research = existsSync3(join10(resolvedCwd, enrichment.phase_dir, paddedPhase + "-RESEARCH.md"));
+      enrichment.has_context = existsSync3(join10(resolvedCwd, enrichment.phase_dir, paddedPhase + "-CONTEXT.md"));
     }
   } catch {
   }
@@ -1701,9 +2306,9 @@ function enrichCommand(input, output, cwd) {
   } catch {
   }
   try {
-    enrichment.state_exists = existsSync2(join9(resolvedCwd, ".planning/STATE.md"));
-    enrichment.project_exists = existsSync2(join9(resolvedCwd, ".planning/PROJECT.md"));
-    enrichment.roadmap_exists = existsSync2(join9(resolvedCwd, ".planning/ROADMAP.md"));
+    enrichment.state_exists = existsSync3(join10(resolvedCwd, ".planning/STATE.md"));
+    enrichment.project_exists = existsSync3(join10(resolvedCwd, ".planning/PROJECT.md"));
+    enrichment.roadmap_exists = existsSync3(join10(resolvedCwd, ".planning/ROADMAP.md"));
   } catch {
   }
   try {
@@ -1720,12 +2325,12 @@ function enrichCommand(input, output, cwd) {
   }
   try {
     if (enrichment.phase_dir) {
-      const phaseDirFull = join9(resolvedCwd, enrichment.phase_dir);
+      const phaseDirFull = join10(resolvedCwd, enrichment.phase_dir);
       const summaryFiles = listSummaryFiles(phaseDirFull);
       enrichment.has_previous_summary = summaryFiles.length > 0;
       if (summaryFiles.length > 0) {
         const lastSummary = summaryFiles.sort().pop();
-        const content = readFileSync7(join9(phaseDirFull, lastSummary), "utf-8");
+        const content = readFileSync7(join10(phaseDirFull, lastSummary), "utf-8");
         enrichment.has_unresolved_issues = content.includes("unresolved") || content.includes("Unresolved");
         enrichment.has_blockers = content.includes("blocker") || content.includes("Blocker");
       } else {
@@ -1771,7 +2376,7 @@ function detectPhaseArg(parts) {
 }
 function resolvePhaseDir(phaseNum, cwd) {
   const numStr = String(phaseNum).padStart(2, "0");
-  const phasesDir = join9(cwd, ".planning", "phases");
+  const phasesDir = join10(cwd, ".planning", "phases");
   try {
     const entries = readdirSync2(phasesDir);
     const dirName = entries.find((d) => d.startsWith(numStr + "-") || d === numStr);
@@ -1784,7 +2389,7 @@ function resolvePhaseDir(phaseNum, cwd) {
 }
 function listSummaryFiles(phaseDir) {
   try {
-    if (!existsSync2(phaseDir)) return [];
+    if (!existsSync3(phaseDir)) return [];
     const files = readdirSync2(phaseDir);
     return files.filter((f) => f.endsWith("-SUMMARY.md"));
   } catch {
@@ -1862,7 +2467,7 @@ var bgsd_status = {
 
 // src/plugin/tools/bgsd-plan.js
 import { z } from "zod";
-init_roadmap();
+await init_roadmap();
 init_plan();
 var bgsd_plan = {
   description: "Get roadmap overview or detailed phase information.\n\nTwo modes:\n- No args: returns all phases with status, goal, and plan count (roadmap summary)\n- With phase number: returns detailed phase info (goal, requirements, success criteria, dependencies) plus plan contents (tasks, objectives) if plans exist\n\nUse no-args mode to understand project structure. Use phase mode to dive into specific phase details.",
@@ -2177,8 +2782,8 @@ var bgsd_validate = {
 import { z as z3 } from "zod";
 init_state();
 init_plan();
-import { readFileSync as readFileSync8, writeFileSync as writeFileSync2, mkdirSync as mkdirSync2, rmdirSync, existsSync as existsSync3, statSync as statSync2 } from "fs";
-import { join as join10 } from "path";
+import { readFileSync as readFileSync8, writeFileSync as writeFileSync2, mkdirSync as mkdirSync2, rmdirSync, existsSync as existsSync4, statSync as statSync3 } from "fs";
+import { join as join11 } from "path";
 var LOCK_STALE_MS = 1e4;
 var VALID_ACTIONS = ["complete-task", "uncomplete-task", "add-blocker", "remove-blocker", "record-decision", "advance"];
 var bgsd_progress = {
@@ -2189,7 +2794,7 @@ var bgsd_progress = {
   },
   async execute(args, context) {
     const projectDir = context?.directory || process.cwd();
-    const lockDir = join10(projectDir, ".planning", ".lock");
+    const lockDir = join11(projectDir, ".planning", ".lock");
     try {
       if (!args.action || !VALID_ACTIONS.includes(args.action)) {
         return JSON.stringify({
@@ -2221,7 +2826,7 @@ var bgsd_progress = {
       } catch (lockErr) {
         if (lockErr.code === "EEXIST") {
           try {
-            const lockStat = statSync2(lockDir);
+            const lockStat = statSync3(lockDir);
             const age = Date.now() - lockStat.mtimeMs;
             if (age > LOCK_STALE_MS) {
               rmdirSync(lockDir);
@@ -2243,7 +2848,7 @@ var bgsd_progress = {
         }
       }
       try {
-        const statePath = join10(projectDir, ".planning", "STATE.md");
+        const statePath = join11(projectDir, ".planning", "STATE.md");
         let content = readFileSync8(statePath, "utf-8");
         const { state } = projectState;
         let actionResult = null;
@@ -2432,7 +3037,7 @@ function getTools(registry) {
 
 // src/plugin/notification.js
 import { homedir as homedir2 } from "os";
-import { join as join11 } from "path";
+import { join as join12 } from "path";
 function createNotifier($, directory) {
   const MAX_HISTORY = 20;
   const DEFAULT_RATE_LIMIT = 5;
@@ -2447,7 +3052,7 @@ function createNotifier($, directory) {
   let logger = null;
   function getLogger() {
     if (!logger) {
-      const logDir = join11(homedir2(), ".config", "opencode");
+      const logDir = join12(homedir2(), ".config", "opencode");
       logger = createLogger(logDir);
     }
     return logger;
@@ -2557,14 +3162,14 @@ function createNotifier($, directory) {
 }
 
 // src/plugin/file-watcher.js
-init_parsers();
+await init_parsers();
 import { watch } from "fs";
-import { existsSync as existsSync4 } from "fs";
-import { join as join12 } from "path";
+import { existsSync as existsSync5 } from "fs";
+import { join as join13 } from "path";
 import { homedir as homedir3 } from "os";
 function createFileWatcher(cwd, options = {}) {
   const { debounceMs = 200, maxWatchedPaths = 500 } = options;
-  const planningDir = join12(cwd, ".planning");
+  const planningDir = join13(cwd, ".planning");
   let controller = null;
   let watching = false;
   let debounceTimer = null;
@@ -2576,7 +3181,7 @@ function createFileWatcher(cwd, options = {}) {
   let logger = null;
   function getLogger() {
     if (!logger) {
-      const logDir = join12(homedir3(), ".config", "opencode");
+      const logDir = join13(homedir3(), ".config", "opencode");
       logger = createLogger(logDir);
     }
     return logger;
@@ -2592,7 +3197,7 @@ function createFileWatcher(cwd, options = {}) {
   }
   function onWatchEvent(eventType, filename) {
     if (!filename) return;
-    const fullPath = join12(planningDir, filename);
+    const fullPath = join13(planningDir, filename);
     eventCount++;
     if (!capWarned && eventCount > maxWatchedPaths) {
       capWarned = true;
@@ -2609,7 +3214,7 @@ function createFileWatcher(cwd, options = {}) {
   }
   function start() {
     if (watching) return;
-    if (!existsSync4(planningDir)) {
+    if (!existsSync5(planningDir)) {
       getLogger().write("INFO", `File watcher: .planning/ not found at ${cwd}, skipping watch`);
       return;
     }
@@ -2669,15 +3274,15 @@ function createFileWatcher(cwd, options = {}) {
 }
 
 // src/plugin/idle-validator.js
-import { existsSync as existsSync5, readFileSync as readFileSync9, writeFileSync as writeFileSync3 } from "fs";
-import { join as join13 } from "path";
+import { existsSync as existsSync6, readFileSync as readFileSync9, writeFileSync as writeFileSync3 } from "fs";
+import { join as join14 } from "path";
 import { execSync } from "child_process";
 import { homedir as homedir4 } from "os";
 init_state();
-init_roadmap();
+await init_roadmap();
 init_config();
 function createIdleValidator(cwd, notifier, fileWatcher, config) {
-  const planningDir = join13(cwd, ".planning");
+  const planningDir = join14(cwd, ".planning");
   let lastValidation = 0;
   let lastAutoFix = 0;
   let validating = false;
@@ -2687,21 +3292,21 @@ function createIdleValidator(cwd, notifier, fileWatcher, config) {
   let logger = null;
   function getLogger() {
     if (!logger) {
-      const logDir = join13(homedir4(), ".config", "opencode");
+      const logDir = join14(homedir4(), ".config", "opencode");
       logger = createLogger(logDir);
     }
     return logger;
   }
   function readStateMd() {
     try {
-      return readFileSync9(join13(planningDir, "STATE.md"), "utf-8");
+      return readFileSync9(join14(planningDir, "STATE.md"), "utf-8");
     } catch {
       return null;
     }
   }
   function readRoadmapMd() {
     try {
-      return readFileSync9(join13(planningDir, "ROADMAP.md"), "utf-8");
+      return readFileSync9(join14(planningDir, "ROADMAP.md"), "utf-8");
     } catch {
       return null;
     }
@@ -2737,7 +3342,7 @@ function createIdleValidator(cwd, notifier, fileWatcher, config) {
   async function onIdle() {
     try {
       if (!enabled) return;
-      if (!existsSync5(planningDir)) return;
+      if (!existsSync6(planningDir)) return;
       if (Date.now() - lastValidation < cooldownMs) return;
       if (lastAutoFix > lastValidation) return;
       if (validating) return;
@@ -2788,7 +3393,7 @@ function createIdleValidator(cwd, notifier, fileWatcher, config) {
         if (state.progress !== null) {
           const fixed = fixProgressBar(stateRaw, state.progress);
           if (fixed) {
-            const statePath = join13(planningDir, "STATE.md");
+            const statePath = join14(planningDir, "STATE.md");
             writeTracked(statePath, fixed);
             invalidateState(cwd);
             anyFix = true;
@@ -2799,8 +3404,8 @@ function createIdleValidator(cwd, notifier, fileWatcher, config) {
       invalidateConfig(cwd);
       const freshConfig = parseConfig(cwd);
       if (freshConfig) {
-        const configPath = join13(planningDir, "config.json");
-        if (existsSync5(configPath)) {
+        const configPath = join14(planningDir, "config.json");
+        if (existsSync6(configPath)) {
           try {
             const raw = readFileSync9(configPath, "utf-8");
             JSON.parse(raw);
@@ -2825,7 +3430,7 @@ function createIdleValidator(cwd, notifier, fileWatcher, config) {
           if (lastGit) {
             const hoursAgo = (Date.now() / 1e3 - lastGit) / 3600;
             if (hoursAgo >= stalenessHours) {
-              const statePath = join13(planningDir, "STATE.md");
+              const statePath = join14(planningDir, "STATE.md");
               const updatedRaw = stateRaw.replace(
                 /\*\*Status:\*\*\s*.+/i,
                 "**Status:** Paused (auto-detected stale)"
@@ -2867,7 +3472,7 @@ function createIdleValidator(cwd, notifier, fileWatcher, config) {
 
 // src/plugin/stuck-detector.js
 import { homedir as homedir5 } from "os";
-import { join as join14 } from "path";
+import { join as join15 } from "path";
 function createStuckDetector(notifier, config) {
   const errorThreshold = config.stuck_detection?.error_threshold || 3;
   const spinningThreshold = config.stuck_detection?.spinning_threshold || 5;
@@ -2878,7 +3483,7 @@ function createStuckDetector(notifier, config) {
   let logger = null;
   function getLogger() {
     if (!logger) {
-      const logDir = join14(homedir5(), ".config", "opencode");
+      const logDir = join15(homedir5(), ".config", "opencode");
       logger = createLogger(logDir);
     }
     return logger;
@@ -2973,7 +3578,7 @@ function createStuckDetector(notifier, config) {
 
 // src/plugin/advisory-guardrails.js
 import { readFileSync as readFileSync10 } from "fs";
-import { join as join15, basename, extname, isAbsolute, resolve } from "path";
+import { join as join16, basename, extname, isAbsolute, resolve as resolve2 } from "path";
 import { homedir as homedir6 } from "os";
 var NAMING_PATTERNS = {
   camelCase: /^[a-z][a-z0-9]*[A-Z][a-zA-Z0-9]*$/,
@@ -3028,7 +3633,7 @@ function isTestFile(filePath) {
 }
 function loadConventionRules(cwd, confidenceThreshold) {
   try {
-    const agentsPath = join15(cwd, "AGENTS.md");
+    const agentsPath = join16(cwd, "AGENTS.md");
     const content = readFileSync10(agentsPath, "utf-8");
     const conventionNames = ["kebab-case", "camelCase", "PascalCase", "snake_case", "UPPER_SNAKE_CASE"];
     for (const conv of conventionNames) {
@@ -3039,7 +3644,7 @@ function loadConventionRules(cwd, confidenceThreshold) {
   } catch {
   }
   try {
-    const intelPath = join15(cwd, ".planning", "codebase", "codebase-intel.json");
+    const intelPath = join16(cwd, ".planning", "codebase", "codebase-intel.json");
     const intel = JSON.parse(readFileSync10(intelPath, "utf-8"));
     if (intel.conventions?.naming?.dominant && (intel.conventions.naming.confidence || 0) >= confidenceThreshold) {
       return {
@@ -3054,7 +3659,7 @@ function loadConventionRules(cwd, confidenceThreshold) {
 function detectTestConfig(cwd) {
   const result = { command: null, sourceExts: /* @__PURE__ */ new Set() };
   try {
-    const pkgPath = join15(cwd, "package.json");
+    const pkgPath = join16(cwd, "package.json");
     const pkg = JSON.parse(readFileSync10(pkgPath, "utf-8"));
     if (pkg.scripts?.test) {
       result.command = `npm test`;
@@ -3066,7 +3671,7 @@ function detectTestConfig(cwd) {
   }
   if (!result.command) {
     try {
-      const pyProject = join15(cwd, "pyproject.toml");
+      const pyProject = join16(cwd, "pyproject.toml");
       readFileSync10(pyProject, "utf-8");
       result.command = "pytest";
       result.sourceExts = /* @__PURE__ */ new Set([".py"]);
@@ -3087,7 +3692,7 @@ function createAdvisoryGuardrails(cwd, notifier, config) {
   let logger = null;
   function getLogger() {
     if (!logger) {
-      const logDir = join15(homedir6(), ".config", "opencode");
+      const logDir = join16(homedir6(), ".config", "opencode");
       logger = createLogger(logDir);
     }
     return logger;
@@ -3127,7 +3732,7 @@ function createAdvisoryGuardrails(cwd, notifier, config) {
       if (!toolName || !WRITE_TOOLS.has(toolName)) return;
       const filePath = input?.args?.filePath;
       if (!filePath) return;
-      const absPath = isAbsolute(filePath) ? filePath : resolve(cwd, filePath);
+      const absPath = isAbsolute(filePath) ? filePath : resolve2(cwd, filePath);
       if (absPath.includes("node_modules") || !absPath.startsWith(cwd)) {
         return;
       }
@@ -3217,14 +3822,14 @@ function createAdvisoryGuardrails(cwd, notifier, config) {
 // src/plugin/index.js
 init_config();
 init_state();
-init_roadmap();
+await init_roadmap();
 init_plan();
 init_config();
 init_project();
 init_intent();
-init_parsers();
+await init_parsers();
 var BgsdPlugin = async ({ directory, $ }) => {
-  const bgsdHome = join16(homedir7(), ".config", "opencode", "bgsd-oc");
+  const bgsdHome = join17(homedir7(), ".config", "opencode", "bgsd-oc");
   const registry = createToolRegistry(safeHook);
   const projectDir = directory || process.cwd();
   const config = parseConfig(projectDir);
@@ -3275,7 +3880,7 @@ var BgsdPlugin = async ({ directory, $ }) => {
       guardrails.clearBgsdCommandActive();
     }
     if (event.type === "file.watcher.updated") {
-      const { invalidateAll: invalidateAll2 } = await Promise.resolve().then(() => (init_parsers(), parsers_exports));
+      const { invalidateAll: invalidateAll2 } = await init_parsers().then(() => parsers_exports);
       invalidateAll2(projectDir);
     }
   });

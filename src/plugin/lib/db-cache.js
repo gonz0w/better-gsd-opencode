@@ -1,0 +1,474 @@
+/**
+ * ESM-native database and cache adapter for plugin parsers.
+ *
+ * Provides the same interface as src/lib/db.js + src/lib/planning-cache.js
+ * but using ESM `import` syntax so it can be bundled into plugin.js without
+ * the CJS `__require` wrapper that fails in native ESM context.
+ *
+ * Design:
+ *   - Tries `import { DatabaseSync } from 'node:sqlite'` via dynamic import (async)
+ *   - On Node <22.5 or if node:sqlite unavailable: all operations no-op (MapBackend)
+ *   - All cache operations are non-fatal — parsers fall through to markdown on any error
+ *   - Singleton per cwd (same pattern as CJS getDb)
+ *   - Top-level await used to initialize SQLite availability once at module load time
+ */
+
+import * as nodeFs from 'node:fs';
+import * as nodePath from 'node:path';
+
+// ---------------------------------------------------------------------------
+// SQLite availability — initialized at module load via top-level await
+// ---------------------------------------------------------------------------
+
+let _DatabaseSync = null;
+
+// Top-level await: try to load node:sqlite dynamically.
+// node:sqlite is external in the plugin build — Node.js resolves at runtime.
+// Gracefully degrades on Bun, old Node, or any runtime without node:sqlite.
+try {
+  // eslint-disable-next-line no-undef
+  const m = await import('node:sqlite');
+  if (m && m.DatabaseSync) {
+    _DatabaseSync = m.DatabaseSync;
+  }
+} catch {
+  // node:sqlite unavailable — _DatabaseSync stays null, MapBackend will be used
+}
+
+// ---------------------------------------------------------------------------
+// MapBackend — no-op fallback
+// ---------------------------------------------------------------------------
+
+class MapBackend {
+  get backend() { return 'map'; }
+  exec() {}
+  prepare() {
+    return { get: () => undefined, all: () => [], run: () => ({ changes: 0 }) };
+  }
+  close() {}
+}
+
+// ---------------------------------------------------------------------------
+// Schema SQL (version 2 — planning tables)
+// ---------------------------------------------------------------------------
+
+const SCHEMA_V2_SQL = `
+  CREATE TABLE IF NOT EXISTS _meta (key TEXT PRIMARY KEY, value TEXT);
+  CREATE TABLE IF NOT EXISTS file_cache (
+    file_path TEXT PRIMARY KEY,
+    mtime_ms  INTEGER NOT NULL,
+    parsed_at TEXT NOT NULL
+  );
+  CREATE TABLE IF NOT EXISTS milestones (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    cwd         TEXT NOT NULL,
+    name        TEXT NOT NULL,
+    version     TEXT,
+    status      TEXT NOT NULL DEFAULT 'pending',
+    phase_start INTEGER,
+    phase_end   INTEGER
+  );
+  CREATE TABLE IF NOT EXISTS phases (
+    number       TEXT NOT NULL,
+    cwd          TEXT NOT NULL,
+    name         TEXT NOT NULL,
+    status       TEXT NOT NULL DEFAULT 'incomplete',
+    plan_count   INTEGER NOT NULL DEFAULT 0,
+    goal         TEXT,
+    depends_on   TEXT,
+    requirements TEXT,
+    section      TEXT,
+    PRIMARY KEY (number, cwd)
+  );
+  CREATE TABLE IF NOT EXISTS progress (
+    phase          TEXT NOT NULL,
+    cwd            TEXT NOT NULL,
+    plans_complete INTEGER NOT NULL DEFAULT 0,
+    plans_total    INTEGER NOT NULL DEFAULT 0,
+    status         TEXT,
+    completed_date TEXT,
+    PRIMARY KEY (phase, cwd)
+  );
+  CREATE TABLE IF NOT EXISTS plans (
+    path           TEXT PRIMARY KEY,
+    cwd            TEXT NOT NULL,
+    phase_number   TEXT,
+    plan_number    TEXT,
+    wave           INTEGER,
+    autonomous     INTEGER,
+    objective      TEXT,
+    task_count     INTEGER NOT NULL DEFAULT 0,
+    frontmatter_json TEXT,
+    raw            TEXT
+  );
+  CREATE TABLE IF NOT EXISTS tasks (
+    plan_path TEXT NOT NULL,
+    idx       INTEGER NOT NULL,
+    type      TEXT NOT NULL DEFAULT 'auto',
+    name      TEXT,
+    files_json TEXT,
+    action    TEXT,
+    verify    TEXT,
+    done      TEXT,
+    PRIMARY KEY (plan_path, idx),
+    FOREIGN KEY (plan_path) REFERENCES plans(path) ON DELETE CASCADE
+  );
+  CREATE TABLE IF NOT EXISTS requirements (
+    req_id       TEXT NOT NULL,
+    cwd          TEXT NOT NULL,
+    phase_number TEXT,
+    description  TEXT,
+    PRIMARY KEY (req_id, cwd)
+  );
+  CREATE INDEX IF NOT EXISTS idx_phases_cwd ON phases(cwd);
+  CREATE INDEX IF NOT EXISTS idx_plans_cwd ON plans(cwd);
+  CREATE INDEX IF NOT EXISTS idx_plans_phase ON plans(phase_number);
+  CREATE INDEX IF NOT EXISTS idx_tasks_plan ON tasks(plan_path);
+  CREATE INDEX IF NOT EXISTS idx_requirements_cwd ON requirements(cwd);
+  CREATE INDEX IF NOT EXISTS idx_file_cache_mtime ON file_cache(mtime_ms);
+`;
+
+// ---------------------------------------------------------------------------
+// SQLiteBackend
+// ---------------------------------------------------------------------------
+
+class SQLiteBackend {
+  constructor(dbPath) {
+    this._dbPath = dbPath;
+    this._degraded = false;
+    this._db = null;
+
+    try {
+      // Try with defensive: false for Node ≥25.5
+      try {
+        this._db = new _DatabaseSync(dbPath, { timeout: 5000, defensive: false });
+      } catch {
+        try {
+          this._db = new _DatabaseSync(dbPath, { timeout: 5000 });
+        } catch {
+          this._db = new _DatabaseSync(dbPath);
+        }
+      }
+      try { this._db.exec('PRAGMA busy_timeout = 5000'); } catch {}
+      this._db.exec('PRAGMA journal_mode = WAL');
+      this._ensureSchema();
+    } catch {
+      this._degraded = true;
+    }
+  }
+
+  _ensureSchema() {
+    let version = 0;
+    try {
+      const row = this._db.prepare('PRAGMA user_version').get();
+      version = row ? row.user_version : 0;
+    } catch {}
+
+    if (version >= 2) return;
+
+    try {
+      this._db.exec('BEGIN');
+      this._db.exec(SCHEMA_V2_SQL);
+      this._db.exec("INSERT OR REPLACE INTO _meta (key, value) VALUES ('created_at', '" + new Date().toISOString() + "')");
+      this._db.exec('PRAGMA user_version = 2');
+      this._db.exec('COMMIT');
+    } catch {
+      try { this._db.exec('ROLLBACK'); } catch {}
+      // Try delete-and-rebuild
+      try {
+        this._db.close();
+        for (const suffix of ['', '-wal', '-shm']) {
+          const fp = this._dbPath + suffix;
+          if (nodeFs.existsSync(fp)) try { nodeFs.unlinkSync(fp); } catch {}
+        }
+        this._db = new _DatabaseSync(this._dbPath);
+        this._db.exec('PRAGMA journal_mode = WAL');
+        this._db.exec('BEGIN');
+        this._db.exec(SCHEMA_V2_SQL);
+        this._db.exec("INSERT OR REPLACE INTO _meta (key, value) VALUES ('created_at', '" + new Date().toISOString() + "')");
+        this._db.exec('PRAGMA user_version = 2');
+        this._db.exec('COMMIT');
+      } catch {
+        this._degraded = true;
+      }
+    }
+  }
+
+  get backend() { return 'sqlite'; }
+  exec(sql) { this._db.exec(sql); }
+  prepare(sql) { return this._db.prepare(sql); }
+  close() { try { this._db.close(); } catch {} }
+}
+
+// ---------------------------------------------------------------------------
+// Singleton instance cache
+// ---------------------------------------------------------------------------
+
+const _instances = new Map();
+
+/**
+ * Get (or create) a backend instance for the given cwd.
+ * Returns SQLiteBackend on Node 22.5+, MapBackend otherwise.
+ *
+ * @param {string} cwd
+ * @returns {SQLiteBackend|MapBackend}
+ */
+export function getDb(cwd) {
+  cwd = cwd || process.cwd();
+  const resolvedCwd = nodePath.resolve(cwd);
+
+  if (_instances.has(resolvedCwd)) return _instances.get(resolvedCwd);
+
+  let db;
+  const planningDir = nodePath.join(resolvedCwd, '.planning');
+  const planningExists = nodeFs.existsSync(planningDir);
+
+  if (planningExists && _DatabaseSync) {
+    const dbPath = nodePath.join(planningDir, '.cache.db');
+    try {
+      const instance = new SQLiteBackend(dbPath);
+      db = instance._degraded ? new MapBackend() : instance;
+    } catch {
+      db = new MapBackend();
+    }
+  } else {
+    db = new MapBackend();
+  }
+
+  _instances.set(resolvedCwd, db);
+  return db;
+}
+
+// ---------------------------------------------------------------------------
+// PlanningCache — ESM-native (same interface as CJS src/lib/planning-cache.js)
+// ---------------------------------------------------------------------------
+
+export class PlanningCache {
+  constructor(db) {
+    this._db = db;
+    this._stmts = {};
+  }
+
+  _isMap() { return this._db.backend === 'map'; }
+
+  _stmt(key, sql) {
+    if (!this._stmts[key]) this._stmts[key] = this._db.prepare(sql);
+    return this._stmts[key];
+  }
+
+  checkFreshness(filePath) {
+    if (this._isMap()) return 'missing';
+    try {
+      const row = this._stmt('fc_get', 'SELECT mtime_ms FROM file_cache WHERE file_path = ?').get(filePath);
+      if (!row) return 'missing';
+      const currentMtime = nodeFs.statSync(filePath).mtimeMs;
+      return currentMtime === row.mtime_ms ? 'fresh' : 'stale';
+    } catch { return 'missing'; }
+  }
+
+  checkAllFreshness(filePaths) {
+    const result = { fresh: [], stale: [], missing: [] };
+    for (const fp of filePaths) result[this.checkFreshness(fp)].push(fp);
+    return result;
+  }
+
+  invalidateFile(filePath) {
+    if (this._isMap()) return;
+    try {
+      this._db.exec('BEGIN');
+      this._stmt('fc_del', 'DELETE FROM file_cache WHERE file_path = ?').run(filePath);
+      this._stmt('plans_del_path', 'DELETE FROM plans WHERE path = ?').run(filePath);
+      this._db.exec('COMMIT');
+    } catch { try { this._db.exec('ROLLBACK'); } catch {} }
+  }
+
+  clearForCwd(cwd) {
+    if (this._isMap()) return;
+    try {
+      this._db.exec('BEGIN');
+      this._stmt('ph_del_cwd', 'DELETE FROM phases WHERE cwd = ?').run(cwd);
+      this._stmt('ms_del_cwd', 'DELETE FROM milestones WHERE cwd = ?').run(cwd);
+      this._stmt('pr_del_cwd', 'DELETE FROM progress WHERE cwd = ?').run(cwd);
+      this._stmt('rq_del_cwd', 'DELETE FROM requirements WHERE cwd = ?').run(cwd);
+      this._stmt('pl_del_cwd', 'DELETE FROM plans WHERE cwd = ?').run(cwd);
+      this._stmt('fc_del_cwd', "DELETE FROM file_cache WHERE file_path LIKE ?").run(cwd + '%');
+      this._db.exec('COMMIT');
+    } catch { try { this._db.exec('ROLLBACK'); } catch {} }
+  }
+
+  _updateMtimeInTx(filePath) {
+    try {
+      const mtime_ms = nodeFs.statSync(filePath).mtimeMs;
+      this._stmt('fc_upsert', "INSERT OR REPLACE INTO file_cache (file_path, mtime_ms, parsed_at) VALUES (?, ?, ?)").run(filePath, mtime_ms, new Date().toISOString());
+    } catch {}
+  }
+
+  storeRoadmap(cwd, roadmapPath, parsed) {
+    if (this._isMap()) return;
+    try {
+      this._db.exec('BEGIN');
+      this._stmt('ph_del_cwd2', 'DELETE FROM phases WHERE cwd = ?').run(cwd);
+      this._stmt('ms_del_cwd2', 'DELETE FROM milestones WHERE cwd = ?').run(cwd);
+      this._stmt('pr_del_cwd2', 'DELETE FROM progress WHERE cwd = ?').run(cwd);
+      this._stmt('rq_del_cwd2', 'DELETE FROM requirements WHERE cwd = ?').run(cwd);
+
+      const phIns = this._stmt('ph_ins', `INSERT OR REPLACE INTO phases (number, cwd, name, status, plan_count, goal, depends_on, requirements, section) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+      for (const p of (parsed.phases || [])) {
+        phIns.run(p.number || '', cwd, p.name || '', p.status || 'incomplete',
+          p.plan_count != null ? p.plan_count : 0, p.goal || null,
+          p.depends_on ? JSON.stringify(p.depends_on) : null,
+          p.requirements ? JSON.stringify(p.requirements) : null,
+          p.section || null);
+      }
+
+      const msIns = this._stmt('ms_ins', `INSERT INTO milestones (cwd, name, version, status, phase_start, phase_end) VALUES (?, ?, ?, ?, ?, ?)`);
+      for (const m of (parsed.milestones || [])) {
+        msIns.run(cwd, m.name || '', m.version || null, m.status || 'pending',
+          m.phase_start != null ? m.phase_start : null, m.phase_end != null ? m.phase_end : null);
+      }
+
+      const prIns = this._stmt('pr_ins', `INSERT OR REPLACE INTO progress (phase, cwd, plans_complete, plans_total, status, completed_date) VALUES (?, ?, ?, ?, ?, ?)`);
+      for (const p of (parsed.progress || [])) {
+        prIns.run(p.phase || '', cwd, p.plans_complete != null ? p.plans_complete : 0,
+          p.plans_total != null ? p.plans_total : 0, p.status || null, p.completed_date || null);
+      }
+
+      const rqIns = this._stmt('rq_ins', `INSERT OR REPLACE INTO requirements (req_id, cwd, phase_number, description) VALUES (?, ?, ?, ?)`);
+      const reqs = parsed.requirements || _extractRequirementsFromPhases(parsed.phases || []);
+      for (const r of reqs) {
+        rqIns.run(r.req_id || r.id || '', cwd, r.phase_number || r.phase || null, r.description || null);
+      }
+
+      if (roadmapPath) this._updateMtimeInTx(roadmapPath);
+      this._db.exec('COMMIT');
+    } catch { try { this._db.exec('ROLLBACK'); } catch {} }
+  }
+
+  storePlan(planPath, cwd, parsed) {
+    if (this._isMap()) return;
+    try {
+      this._db.exec('BEGIN');
+      this._stmt('pl_del_path', 'DELETE FROM plans WHERE path = ?').run(planPath);
+      const fm = parsed.frontmatter || {};
+      this._stmt('pl_ins', `INSERT OR REPLACE INTO plans (path, cwd, phase_number, plan_number, wave, autonomous, objective, task_count, frontmatter_json, raw) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      ).run(planPath, cwd,
+        fm.phase ? String(fm.phase).split('-')[0] : null,
+        fm.plan != null ? String(fm.plan) : null,
+        fm.wave != null ? fm.wave : null,
+        fm.autonomous != null ? (fm.autonomous ? 1 : 0) : null,
+        parsed.objective || null,
+        (parsed.tasks || []).length,
+        JSON.stringify(fm),
+        parsed.raw || null);
+
+      const tkIns = this._stmt('tk_ins', `INSERT OR REPLACE INTO tasks (plan_path, idx, type, name, files_json, action, verify, done) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`);
+      for (let i = 0; i < (parsed.tasks || []).length; i++) {
+        const t = parsed.tasks[i];
+        tkIns.run(planPath, i, t.type || 'auto', t.name || null,
+          t.files ? JSON.stringify(t.files) : null, t.action || null, t.verify || null, t.done || null);
+      }
+
+      this._updateMtimeInTx(planPath);
+      this._db.exec('COMMIT');
+    } catch { try { this._db.exec('ROLLBACK'); } catch {} }
+  }
+
+  getPhases(cwd) {
+    if (this._isMap()) return null;
+    try {
+      const rows = this._stmt('ph_all', 'SELECT * FROM phases WHERE cwd = ? ORDER BY number').all(cwd);
+      return rows.length > 0 ? rows : null;
+    } catch { return null; }
+  }
+
+  getPhase(number, cwd) {
+    if (this._isMap()) return null;
+    try {
+      const row = this._stmt('ph_one', 'SELECT * FROM phases WHERE number = ? AND cwd = ?').get(number, cwd);
+      return row || null;
+    } catch { return null; }
+  }
+
+  getPlans(cwd) {
+    if (this._isMap()) return null;
+    try {
+      const rows = this._stmt('pl_all', 'SELECT * FROM plans WHERE cwd = ? ORDER BY phase_number, plan_number').all(cwd);
+      return rows.length > 0 ? rows : null;
+    } catch { return null; }
+  }
+
+  getPlan(planPath) {
+    if (this._isMap()) return null;
+    try {
+      const plan = this._stmt('pl_one', 'SELECT * FROM plans WHERE path = ?').get(planPath);
+      if (!plan) return null;
+      const tasks = this._stmt('tk_for_plan', 'SELECT * FROM tasks WHERE plan_path = ? ORDER BY idx').all(planPath);
+      return { ...plan, tasks };
+    } catch { return null; }
+  }
+
+  getPlansForPhase(phaseNumber, cwd) {
+    if (this._isMap()) return null;
+    try {
+      const rows = this._stmt('pl_phase', 'SELECT * FROM plans WHERE phase_number = ? AND cwd = ? ORDER BY plan_number').all(phaseNumber, cwd);
+      return rows.length > 0 ? rows : null;
+    } catch { return null; }
+  }
+
+  getRequirements(cwd) {
+    if (this._isMap()) return null;
+    try {
+      const rows = this._stmt('rq_all', 'SELECT * FROM requirements WHERE cwd = ? ORDER BY req_id').all(cwd);
+      return rows.length > 0 ? rows : null;
+    } catch { return null; }
+  }
+
+  getRequirement(reqId, cwd) {
+    if (this._isMap()) return null;
+    try {
+      const row = this._stmt('rq_one', 'SELECT * FROM requirements WHERE req_id = ? AND cwd = ?').get(reqId, cwd);
+      return row || null;
+    } catch { return null; }
+  }
+
+  getMilestones(cwd) {
+    if (this._isMap()) return null;
+    try {
+      const rows = this._stmt('ms_all', 'SELECT * FROM milestones WHERE cwd = ? ORDER BY id').all(cwd);
+      return rows.length > 0 ? rows : null;
+    } catch { return null; }
+  }
+
+  getProgress(cwd) {
+    if (this._isMap()) return null;
+    try {
+      const rows = this._stmt('pr_all', 'SELECT * FROM progress WHERE cwd = ? ORDER BY phase').all(cwd);
+      return rows.length > 0 ? rows : null;
+    } catch { return null; }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Requirements extraction helper
+// ---------------------------------------------------------------------------
+
+function _extractRequirementsFromPhases(phases) {
+  const requirements = [];
+  for (const phase of phases) {
+    const section = phase.section || '';
+    if (!section) continue;
+    const inlineMatch = section.match(/\*\*Requirements?\*\*:\s*([^\n]+)/i);
+    if (inlineMatch) {
+      const ids = inlineMatch[1].split(/[,\s]+/).filter(id => /^[A-Z]+-\d+/.test(id));
+      for (const id of ids) {
+        requirements.push({ req_id: id, phase_number: phase.number || '', description: null });
+      }
+    }
+    const checkboxPattern = /- \[[ x]\] \*\*([A-Z]+-\d+)\*\*:?\s*([^\n]*)/g;
+    let match;
+    while ((match = checkboxPattern.exec(section)) !== null) {
+      requirements.push({ req_id: match[1], phase_number: phase.number || '', description: match[2].trim() || null });
+    }
+  }
+  return requirements;
+}
