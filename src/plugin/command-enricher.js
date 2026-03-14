@@ -35,6 +35,11 @@ export function enrichCommand(input, output, cwd) {
   // Only intercept /bgsd-* commands
   if (!command.startsWith('bgsd-')) return;
 
+  // ENR-03: Record start time for enrichment duration measurement
+  const _t0 = (typeof performance !== 'undefined' && performance.now)
+    ? performance.now()
+    : Date.now();
+
   const resolvedCwd = cwd || process.cwd();
 
   let projectState;
@@ -335,6 +340,18 @@ export function enrichCommand(input, output, cwd) {
       enrichment.decisions = decisions;
     }
   } catch { /* decision evaluation failure is non-fatal */ }
+
+  // ENR-03: Record elapsed enrichment time (underscore prefix = internal/debug field)
+  const _elapsed = (typeof performance !== 'undefined' && performance.now)
+    ? performance.now() - _t0
+    : Date.now() - _t0;
+  enrichment._enrichment_ms = parseFloat(_elapsed.toFixed(3));
+
+  // Debug logging when BGSD_DEBUG is set or NODE_ENV === 'development'
+  if (process.env.BGSD_DEBUG || process.env.NODE_ENV === 'development') {
+    // eslint-disable-next-line no-console
+    console.error(`[bgsd-enricher] ${command} enriched in ${_elapsed.toFixed(1)}ms`);
+  }
 
   // Prepend enrichment as <bgsd-context> XML block
   if (output.parts) {

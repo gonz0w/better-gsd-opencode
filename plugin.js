@@ -2398,6 +2398,7 @@ function enrichCommand(input, output, cwd) {
   if (!input || !output) return;
   const command = input.command || input.parts && input.parts[0] || "";
   if (!command.startsWith("bgsd-")) return;
+  const _t0 = typeof performance !== "undefined" && performance.now ? performance.now() : Date.now();
   const resolvedCwd = cwd || process.cwd();
   let projectState;
   try {
@@ -2625,6 +2626,11 @@ function enrichCommand(input, output, cwd) {
       enrichment.decisions = decisions;
     }
   } catch {
+  }
+  const _elapsed = typeof performance !== "undefined" && performance.now ? performance.now() - _t0 : Date.now() - _t0;
+  enrichment._enrichment_ms = parseFloat(_elapsed.toFixed(3));
+  if (process.env.BGSD_DEBUG || process.env.NODE_ENV === "development") {
+    console.error(`[bgsd-enricher] ${command} enriched in ${_elapsed.toFixed(1)}ms`);
   }
   if (output.parts) {
     output.parts.unshift({
@@ -4134,6 +4140,15 @@ var BgsdPlugin = async ({ directory, $ }) => {
   const stuckDetector = createStuckDetector(notifier, config);
   const guardrails = createAdvisoryGuardrails(projectDir, notifier, config);
   fileWatcher.start();
+  setTimeout(() => {
+    try {
+      getProjectState(projectDir);
+    } catch {
+      if (process.env.BGSD_DEBUG) {
+        console.error("[bgsd-plugin] background warm-up failed (non-fatal)");
+      }
+    }
+  }, 0);
   const shellEnv = safeHook("shell.env", async (input, output) => {
     if (!output || !output.env) return;
     output.env.BGSD_HOME = bgsdHome;
