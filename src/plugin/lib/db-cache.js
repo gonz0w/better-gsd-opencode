@@ -415,6 +415,56 @@ export class PlanningCache {
     } catch { return null; }
   }
 
+  /**
+   * Get summary count for a phase by checking which plan paths have matching SUMMARY files on disk.
+   * Returns { planCount, summaryCount, summaryFiles } or null on Map backend / error.
+   *
+   * @param {number|string} phaseNumber - Phase number
+   * @param {string} cwd - Working directory
+   * @returns {{ planCount: number, summaryCount: number, summaryFiles: string[] } | null}
+   */
+  getSummaryCount(phaseNumber, cwd) {
+    if (this._isMap()) return null;
+    try {
+      const rows = this._stmt('pl_phase2', 'SELECT path FROM plans WHERE phase_number = ? AND cwd = ? ORDER BY plan_number').all(String(phaseNumber), cwd);
+      if (!rows || rows.length === 0) return null;
+      const summaryFiles = [];
+      for (const row of rows) {
+        // Derive summary path from plan path
+        const summaryPath = row.path.replace(/-PLAN\.md$/, '-SUMMARY.md');
+        const summaryName = summaryPath.split('/').pop();
+        if (nodeFs.existsSync(summaryPath)) {
+          summaryFiles.push(summaryName);
+        }
+      }
+      return { planCount: rows.length, summaryCount: summaryFiles.length, summaryFiles };
+    } catch { return null; }
+  }
+
+  /**
+   * Get incomplete plan filenames (those without a matching SUMMARY file) for a phase.
+   * Returns array of incomplete plan filenames or null on Map backend / error.
+   *
+   * @param {number|string} phaseNumber - Phase number
+   * @param {string} cwd - Working directory
+   * @returns {string[] | null}
+   */
+  getIncompletePlans(phaseNumber, cwd) {
+    if (this._isMap()) return null;
+    try {
+      const rows = this._stmt('pl_phase3', 'SELECT path FROM plans WHERE phase_number = ? AND cwd = ? ORDER BY plan_number').all(String(phaseNumber), cwd);
+      if (!rows || rows.length === 0) return null;
+      const incomplete = [];
+      for (const row of rows) {
+        const summaryPath = row.path.replace(/-PLAN\.md$/, '-SUMMARY.md');
+        if (!nodeFs.existsSync(summaryPath)) {
+          incomplete.push(row.path.split('/').pop());
+        }
+      }
+      return incomplete;
+    } catch { return null; }
+  }
+
   getRequirements(cwd) {
     if (this._isMap()) return null;
     try {

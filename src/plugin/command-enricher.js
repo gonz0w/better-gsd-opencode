@@ -1,6 +1,7 @@
 import { getProjectState } from './project-state.js';
 import { parsePlans } from './parsers/index.js';
 import { evaluateDecisions } from '../lib/decision-rules.js';
+import { getDb, PlanningCache } from './lib/db-cache.js';
 import { readdirSync, existsSync, readFileSync } from 'fs';
 import { join } from 'path';
 
@@ -63,7 +64,7 @@ export function enrichCommand(input, output, cwd) {
     return;
   }
 
-  const { state, config, roadmap, currentPhase, currentMilestone } = projectState;
+  const { state, config, roadmap, currentPhase, currentMilestone, plans: statePlans } = projectState;
 
   // Build enrichment object (init-equivalent JSON)
   const enrichment = {
@@ -90,6 +91,38 @@ export function enrichCommand(input, output, cwd) {
   // Resolve effective phase number (explicit arg or current from STATE.md)
   let effectivePhaseNum = phaseNum;
 
+  // ── Single parsePlans / listSummaryFiles allocation ────────────────────────
+  // `plans` is populated at most once per invocation. All downstream logic
+  // references this cached result — no second parsePlans call anywhere.
+  // `summaryFiles` is populated at most once — all three former call sites
+  // now reference this cached result.
+  let plans = null;          // parsed plan objects for the effective phase
+  let summaryFiles = null;   // SUMMARY filenames in the phase dir
+
+  /**
+   * Ensure plans are loaded exactly once for the given phase number.
+   * Reuses the `plans` variable via closure — call this instead of
+   * calling parsePlans directly.
+   */
+  const ensurePlans = (num) => {
+    if (!plans && num) {
+      plans = parsePlans(num, resolvedCwd);
+    }
+    return plans;
+  };
+
+  /**
+   * Ensure summaryFiles are loaded exactly once for the phase dir.
+   * Reuses the `summaryFiles` variable via closure — call this instead of
+   * calling listSummaryFiles directly.
+   */
+  const ensureSummaryFiles = (phaseDirFull) => {
+    if (summaryFiles === null) {
+      summaryFiles = listSummaryFiles(phaseDirFull);
+    }
+    return summaryFiles;
+  };
+
   if (phaseNum) {
     // Phase-specific enrichment
     const phaseDir = resolvePhaseDir(phaseNum, resolvedCwd);
@@ -107,21 +140,41 @@ export function enrichCommand(input, output, cwd) {
         }
       }
 
-      // Get plans for this phase
+      // Try SQLite-first path for plan/summary data
+      let sqlUsedInPhaseArg = false;
       try {
-        const plans = parsePlans(phaseNum, resolvedCwd);
-        if (plans && plans.length > 0) {
-          enrichment.plans = plans.map(p => p.path ? p.path.split('/').pop() : null).filter(Boolean);
+        const db = getDb(resolvedCwd);
+        const cache = new PlanningCache(db);
+        const sqlResult = cache.getSummaryCount(phaseNum, resolvedCwd);
+        const incompleteSql = cache.getIncompletePlans(phaseNum, resolvedCwd);
 
-          // Find incomplete plans (no matching SUMMARY)
-          const phaseDirFull = join(resolvedCwd, phaseDir);
-          const summaryFiles = listSummaryFiles(phaseDirFull);
-          enrichment.incomplete_plans = enrichment.plans.filter(planFile => {
-            const summaryFile = planFile.replace('-PLAN.md', '-SUMMARY.md');
-            return !summaryFiles.includes(summaryFile);
-          });
+        if (sqlResult !== null && incompleteSql !== null) {
+          // Warm SQLite cache — use SQL results directly, skip parsePlans + listSummaryFiles
+          const planRows = cache.getPlansForPhase(String(phaseNum), resolvedCwd);
+          if (planRows && planRows.length > 0) {
+            enrichment.plans = planRows.map(p => p.path ? p.path.split('/').pop() : null).filter(Boolean);
+          }
+          enrichment.incomplete_plans = incompleteSql;
+          summaryFiles = sqlResult.summaryFiles;
+          sqlUsedInPhaseArg = true;
         }
-      } catch { /* skip plan enumeration on failure */ }
+      } catch { /* fall through to parsePlans */ }
+
+      if (!sqlUsedInPhaseArg) {
+        // Cold cache / Map backend — use parsePlans (single call via ensurePlans)
+        try {
+          const p = ensurePlans(phaseNum);
+          if (p && p.length > 0) {
+            enrichment.plans = p.map(pl => pl.path ? pl.path.split('/').pop() : null).filter(Boolean);
+            const phaseDirFull = join(resolvedCwd, phaseDir);
+            const sf = ensureSummaryFiles(phaseDirFull);
+            enrichment.incomplete_plans = enrichment.plans.filter(planFile => {
+              const summaryFile = planFile.replace('-PLAN.md', '-SUMMARY.md');
+              return !sf.includes(summaryFile);
+            });
+          }
+        } catch { /* skip plan enumeration on failure */ }
+      }
     }
   } else if (state && state.phase) {
     // No explicit phase arg — use current phase from STATE.md
@@ -139,6 +192,12 @@ export function enrichCommand(input, output, cwd) {
       if (phaseDir) {
         enrichment.phase_dir = phaseDir;
       }
+
+      // Reuse plans from projectState (already parsed in getProjectState)
+      // This avoids a redundant parsePlans call for the current phase.
+      if (statePlans && statePlans.length > 0) {
+        plans = statePlans;
+      }
     }
   }
 
@@ -149,21 +208,47 @@ export function enrichCommand(input, output, cwd) {
   try {
     if (enrichment.phase_dir) {
       const phaseDirFull = join(resolvedCwd, enrichment.phase_dir);
+
       if (!enrichment.plans) {
-        // Plan enumeration may not have run in the else-if branch
-        const plans = parsePlans(effectivePhaseNum, resolvedCwd);
-        if (plans && plans.length > 0) {
-          enrichment.plans = plans.map(p => p.path ? p.path.split('/').pop() : null).filter(Boolean);
-          const summaryFiles = listSummaryFiles(phaseDirFull);
-          enrichment.incomplete_plans = enrichment.plans.filter(planFile => {
-            const summaryFile = planFile.replace('-PLAN.md', '-SUMMARY.md');
-            return !summaryFiles.includes(summaryFile);
-          });
+        // Plan enumeration may not have run yet (else-if / current phase branch)
+        // Try SQLite-first, then fall back to ensurePlans (at most one parsePlans call)
+        let sqlUsed = false;
+        try {
+          const db = getDb(resolvedCwd);
+          const cache = new PlanningCache(db);
+          const sqlResult = cache.getSummaryCount(effectivePhaseNum, resolvedCwd);
+          const incompleteSql = cache.getIncompletePlans(effectivePhaseNum, resolvedCwd);
+
+          if (sqlResult !== null && incompleteSql !== null) {
+            const planRows = cache.getPlansForPhase(String(effectivePhaseNum), resolvedCwd);
+            if (planRows && planRows.length > 0) {
+              enrichment.plans = planRows.map(p => p.path ? p.path.split('/').pop() : null).filter(Boolean);
+            }
+            enrichment.incomplete_plans = incompleteSql;
+            summaryFiles = sqlResult.summaryFiles;
+            sqlUsed = true;
+          }
+        } catch { /* fall through */ }
+
+        if (!sqlUsed) {
+          // Cold cache — use plans from projectState or parse once via ensurePlans
+          const p = ensurePlans(effectivePhaseNum);
+          if (p && p.length > 0) {
+            enrichment.plans = p.map(pl => pl.path ? pl.path.split('/').pop() : null).filter(Boolean);
+            const sf = ensureSummaryFiles(phaseDirFull);
+            enrichment.incomplete_plans = enrichment.plans.filter(planFile => {
+              const summaryFile = planFile.replace('-PLAN.md', '-SUMMARY.md');
+              return !sf.includes(summaryFile);
+            });
+          }
         }
       }
+
       enrichment.plan_count = enrichment.plans ? enrichment.plans.length : 0;
-      const summaryFiles = listSummaryFiles(phaseDirFull);
-      enrichment.summary_count = summaryFiles.length;
+
+      // Ensure summaryFiles are loaded (no-op if already populated above)
+      const sf = ensureSummaryFiles(phaseDirFull);
+      enrichment.summary_count = sf.length;
 
       // UAT gap count: scan for *-UAT.md with "status: diagnosed"
       try {
@@ -191,13 +276,14 @@ export function enrichCommand(input, output, cwd) {
   } catch { /* file existence check failed */ }
 
   // Task types for execution-pattern rule (from first incomplete plan)
+  // Reuses already-loaded `plans` variable via ensurePlans — no additional
+  // parsePlans call (ensurePlans is a no-op if plans already set).
   try {
     if (enrichment.incomplete_plans && enrichment.incomplete_plans.length > 0 && effectivePhaseNum) {
-      const plans = parsePlans(effectivePhaseNum, resolvedCwd);
-      if (plans && plans.length > 0) {
-        // Find the first incomplete plan by matching filenames
+      const p = ensurePlans(effectivePhaseNum);
+      if (p && p.length > 0) {
         const firstIncompleteName = enrichment.incomplete_plans[0];
-        const incompletePlan = plans.find(p => p.path && p.path.endsWith(firstIncompleteName));
+        const incompletePlan = p.find(pl => pl.path && pl.path.endsWith(firstIncompleteName));
         if (incompletePlan && incompletePlan.tasks) {
           enrichment.task_types = incompletePlan.tasks.map(t => t.type).filter(Boolean);
         }
@@ -225,13 +311,15 @@ export function enrichCommand(input, output, cwd) {
   } catch { enrichment.highest_phase = null; }
 
   // Previous summary checks (for previous-check-gate rule)
+  // Reuses cached summaryFiles via ensureSummaryFiles — no additional
+  // listSummaryFiles call (ensureSummaryFiles is a no-op if already loaded).
   try {
     if (enrichment.phase_dir) {
       const phaseDirFull = join(resolvedCwd, enrichment.phase_dir);
-      const summaryFiles = listSummaryFiles(phaseDirFull);
-      enrichment.has_previous_summary = summaryFiles.length > 0;
-      if (summaryFiles.length > 0) {
-        const lastSummary = summaryFiles.sort().pop();
+      const sf = ensureSummaryFiles(phaseDirFull);
+      enrichment.has_previous_summary = sf.length > 0;
+      if (sf.length > 0) {
+        const lastSummary = [...sf].sort().pop();
         const content = readFileSync(join(phaseDirFull, lastSummary), 'utf-8');
         enrichment.has_unresolved_issues = content.includes('unresolved') || content.includes('Unresolved');
         enrichment.has_blockers = content.includes('blocker') || content.includes('Blocker');

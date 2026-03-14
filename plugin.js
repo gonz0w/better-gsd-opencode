@@ -535,6 +535,57 @@ var init_db_cache = __esm({
           return null;
         }
       }
+      /**
+       * Get summary count for a phase by checking which plan paths have matching SUMMARY files on disk.
+       * Returns { planCount, summaryCount, summaryFiles } or null on Map backend / error.
+       *
+       * @param {number|string} phaseNumber - Phase number
+       * @param {string} cwd - Working directory
+       * @returns {{ planCount: number, summaryCount: number, summaryFiles: string[] } | null}
+       */
+      getSummaryCount(phaseNumber, cwd) {
+        if (this._isMap()) return null;
+        try {
+          const rows = this._stmt("pl_phase2", "SELECT path FROM plans WHERE phase_number = ? AND cwd = ? ORDER BY plan_number").all(String(phaseNumber), cwd);
+          if (!rows || rows.length === 0) return null;
+          const summaryFiles = [];
+          for (const row of rows) {
+            const summaryPath = row.path.replace(/-PLAN\.md$/, "-SUMMARY.md");
+            const summaryName = summaryPath.split("/").pop();
+            if (nodeFs.existsSync(summaryPath)) {
+              summaryFiles.push(summaryName);
+            }
+          }
+          return { planCount: rows.length, summaryCount: summaryFiles.length, summaryFiles };
+        } catch {
+          return null;
+        }
+      }
+      /**
+       * Get incomplete plan filenames (those without a matching SUMMARY file) for a phase.
+       * Returns array of incomplete plan filenames or null on Map backend / error.
+       *
+       * @param {number|string} phaseNumber - Phase number
+       * @param {string} cwd - Working directory
+       * @returns {string[] | null}
+       */
+      getIncompletePlans(phaseNumber, cwd) {
+        if (this._isMap()) return null;
+        try {
+          const rows = this._stmt("pl_phase3", "SELECT path FROM plans WHERE phase_number = ? AND cwd = ? ORDER BY plan_number").all(String(phaseNumber), cwd);
+          if (!rows || rows.length === 0) return null;
+          const incomplete = [];
+          for (const row of rows) {
+            const summaryPath = row.path.replace(/-PLAN\.md$/, "-SUMMARY.md");
+            if (!nodeFs.existsSync(summaryPath)) {
+              incomplete.push(row.path.split("/").pop());
+            }
+          }
+          return incomplete;
+        } catch {
+          return null;
+        }
+      }
       getRequirements(cwd) {
         if (this._isMap()) return null;
         try {
@@ -2328,6 +2379,7 @@ ${parts.join("\n")}
 // src/plugin/command-enricher.js
 await init_parsers();
 var import_decision_rules = __toESM(require_decision_rules());
+await init_db_cache();
 import { readdirSync as readdirSync3, existsSync as existsSync3, readFileSync as readFileSync7 } from "fs";
 import { join as join11 } from "path";
 function enrichCommand(input, output, cwd) {
@@ -2358,7 +2410,7 @@ function enrichCommand(input, output, cwd) {
     }
     return;
   }
-  const { state, config, roadmap, currentPhase, currentMilestone } = projectState;
+  const { state, config, roadmap, currentPhase, currentMilestone, plans: statePlans } = projectState;
   const enrichment = {
     // Paths
     planning_dir: ".planning",
@@ -2376,6 +2428,20 @@ function enrichCommand(input, output, cwd) {
   };
   const phaseNum = detectPhaseArg(input.parts);
   let effectivePhaseNum = phaseNum;
+  let plans = null;
+  let summaryFiles = null;
+  const ensurePlans = (num) => {
+    if (!plans && num) {
+      plans = parsePlans(num, resolvedCwd);
+    }
+    return plans;
+  };
+  const ensureSummaryFiles = (phaseDirFull) => {
+    if (summaryFiles === null) {
+      summaryFiles = listSummaryFiles(phaseDirFull);
+    }
+    return summaryFiles;
+  };
   if (phaseNum) {
     const phaseDir = resolvePhaseDir(phaseNum, resolvedCwd);
     if (phaseDir) {
@@ -2389,18 +2455,37 @@ function enrichCommand(input, output, cwd) {
           if (phase.goal) enrichment.phase_goal = phase.goal;
         }
       }
+      let sqlUsedInPhaseArg = false;
       try {
-        const plans = parsePlans(phaseNum, resolvedCwd);
-        if (plans && plans.length > 0) {
-          enrichment.plans = plans.map((p) => p.path ? p.path.split("/").pop() : null).filter(Boolean);
-          const phaseDirFull = join11(resolvedCwd, phaseDir);
-          const summaryFiles = listSummaryFiles(phaseDirFull);
-          enrichment.incomplete_plans = enrichment.plans.filter((planFile) => {
-            const summaryFile = planFile.replace("-PLAN.md", "-SUMMARY.md");
-            return !summaryFiles.includes(summaryFile);
-          });
+        const db = getDb(resolvedCwd);
+        const cache = new PlanningCache(db);
+        const sqlResult = cache.getSummaryCount(phaseNum, resolvedCwd);
+        const incompleteSql = cache.getIncompletePlans(phaseNum, resolvedCwd);
+        if (sqlResult !== null && incompleteSql !== null) {
+          const planRows = cache.getPlansForPhase(String(phaseNum), resolvedCwd);
+          if (planRows && planRows.length > 0) {
+            enrichment.plans = planRows.map((p) => p.path ? p.path.split("/").pop() : null).filter(Boolean);
+          }
+          enrichment.incomplete_plans = incompleteSql;
+          summaryFiles = sqlResult.summaryFiles;
+          sqlUsedInPhaseArg = true;
         }
       } catch {
+      }
+      if (!sqlUsedInPhaseArg) {
+        try {
+          const p = ensurePlans(phaseNum);
+          if (p && p.length > 0) {
+            enrichment.plans = p.map((pl) => pl.path ? pl.path.split("/").pop() : null).filter(Boolean);
+            const phaseDirFull = join11(resolvedCwd, phaseDir);
+            const sf = ensureSummaryFiles(phaseDirFull);
+            enrichment.incomplete_plans = enrichment.plans.filter((planFile) => {
+              const summaryFile = planFile.replace("-PLAN.md", "-SUMMARY.md");
+              return !sf.includes(summaryFile);
+            });
+          }
+        } catch {
+        }
       }
     }
   } else if (state && state.phase) {
@@ -2416,25 +2501,47 @@ function enrichCommand(input, output, cwd) {
       if (phaseDir) {
         enrichment.phase_dir = phaseDir;
       }
+      if (statePlans && statePlans.length > 0) {
+        plans = statePlans;
+      }
     }
   }
   try {
     if (enrichment.phase_dir) {
       const phaseDirFull = join11(resolvedCwd, enrichment.phase_dir);
       if (!enrichment.plans) {
-        const plans = parsePlans(effectivePhaseNum, resolvedCwd);
-        if (plans && plans.length > 0) {
-          enrichment.plans = plans.map((p) => p.path ? p.path.split("/").pop() : null).filter(Boolean);
-          const summaryFiles2 = listSummaryFiles(phaseDirFull);
-          enrichment.incomplete_plans = enrichment.plans.filter((planFile) => {
-            const summaryFile = planFile.replace("-PLAN.md", "-SUMMARY.md");
-            return !summaryFiles2.includes(summaryFile);
-          });
+        let sqlUsed = false;
+        try {
+          const db = getDb(resolvedCwd);
+          const cache = new PlanningCache(db);
+          const sqlResult = cache.getSummaryCount(effectivePhaseNum, resolvedCwd);
+          const incompleteSql = cache.getIncompletePlans(effectivePhaseNum, resolvedCwd);
+          if (sqlResult !== null && incompleteSql !== null) {
+            const planRows = cache.getPlansForPhase(String(effectivePhaseNum), resolvedCwd);
+            if (planRows && planRows.length > 0) {
+              enrichment.plans = planRows.map((p) => p.path ? p.path.split("/").pop() : null).filter(Boolean);
+            }
+            enrichment.incomplete_plans = incompleteSql;
+            summaryFiles = sqlResult.summaryFiles;
+            sqlUsed = true;
+          }
+        } catch {
+        }
+        if (!sqlUsed) {
+          const p = ensurePlans(effectivePhaseNum);
+          if (p && p.length > 0) {
+            enrichment.plans = p.map((pl) => pl.path ? pl.path.split("/").pop() : null).filter(Boolean);
+            const sf2 = ensureSummaryFiles(phaseDirFull);
+            enrichment.incomplete_plans = enrichment.plans.filter((planFile) => {
+              const summaryFile = planFile.replace("-PLAN.md", "-SUMMARY.md");
+              return !sf2.includes(summaryFile);
+            });
+          }
         }
       }
       enrichment.plan_count = enrichment.plans ? enrichment.plans.length : 0;
-      const summaryFiles = listSummaryFiles(phaseDirFull);
-      enrichment.summary_count = summaryFiles.length;
+      const sf = ensureSummaryFiles(phaseDirFull);
+      enrichment.summary_count = sf.length;
       try {
         const allFiles = readdirSync3(phaseDirFull);
         const uatFiles = allFiles.filter((f) => f.endsWith("-UAT.md"));
@@ -2463,10 +2570,10 @@ function enrichCommand(input, output, cwd) {
   }
   try {
     if (enrichment.incomplete_plans && enrichment.incomplete_plans.length > 0 && effectivePhaseNum) {
-      const plans = parsePlans(effectivePhaseNum, resolvedCwd);
-      if (plans && plans.length > 0) {
+      const p = ensurePlans(effectivePhaseNum);
+      if (p && p.length > 0) {
         const firstIncompleteName = enrichment.incomplete_plans[0];
-        const incompletePlan = plans.find((p) => p.path && p.path.endsWith(firstIncompleteName));
+        const incompletePlan = p.find((pl) => pl.path && pl.path.endsWith(firstIncompleteName));
         if (incompletePlan && incompletePlan.tasks) {
           enrichment.task_types = incompletePlan.tasks.map((t) => t.type).filter(Boolean);
         }
@@ -2495,10 +2602,10 @@ function enrichCommand(input, output, cwd) {
   try {
     if (enrichment.phase_dir) {
       const phaseDirFull = join11(resolvedCwd, enrichment.phase_dir);
-      const summaryFiles = listSummaryFiles(phaseDirFull);
-      enrichment.has_previous_summary = summaryFiles.length > 0;
-      if (summaryFiles.length > 0) {
-        const lastSummary = summaryFiles.sort().pop();
+      const sf = ensureSummaryFiles(phaseDirFull);
+      enrichment.has_previous_summary = sf.length > 0;
+      if (sf.length > 0) {
+        const lastSummary = [...sf].sort().pop();
         const content = readFileSync7(join11(phaseDirFull, lastSummary), "utf-8");
         enrichment.has_unresolved_issues = content.includes("unresolved") || content.includes("Unresolved");
         enrichment.has_blockers = content.includes("blocker") || content.includes("Blocker");
