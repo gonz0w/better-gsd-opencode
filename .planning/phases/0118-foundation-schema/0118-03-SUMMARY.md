@@ -75,7 +75,7 @@ Each task was committed atomically:
 1. **Task 1: Create tests for getDb() factory and SQLiteDatabase backend** - `8bbce52` (test)
 2. **Task 2: Create tests for migrations, failure recovery, and Map fallback** - `8bbce52` (test, same commit — both tasks implemented as one cohesive file)
 
-**Plan metadata:** _(to be added after final docs commit)_
+**Plan metadata:** `d2166ec` (docs: complete plan)
 
 ## Files Created/Modified
 - `tests/db.test.cjs` — 552-line comprehensive test suite: 10 describe groups, 52 tests, isolated temp dirs, closeAll() cleanup between groups
@@ -108,7 +108,8 @@ None - no external service configuration required.
 ## Self-Check: PASSED
 
 - `tests/db.test.cjs` exists: ✅
-- Commit `8bbce52` exists: ✅
+- Commit `8bbce52` (task) exists: ✅
+- Commit `d2166ec` (docs) exists: ✅
 - 52 tests pass in isolation: ✅
 - 1040 tests pass in full suite: ✅
 
