@@ -5,16 +5,16 @@
 See: `.planning/PROJECT.md` (updated 2026-03-14)
 
 **Core value:** Manage and deliver high-quality software with high-quality documentation, while continuously reducing token usage and improving performance
-**Current focus:** Phase 120 — Enricher Acceleration
+**Current focus:** Phase 121 — Memory Store Migration
 
 ## Current Position
 
-**Phase:** 120 of 123 (Enricher Acceleration)
-**Current Plan:** Not started
-**Status:** Ready to plan
+**Phase:** 121 of 123 (Memory Store Migration)
+**Current Plan:** Plan 01 complete
+**Status:** Ready for Plan 02
 **Last Activity:** 2026-03-14
 
-Progress: [████████░░] 81%
+Progress: [████████░░] 83%
 
 ## Performance Metrics
 
@@ -29,6 +29,7 @@ Progress: [████████░░] 81%
 - v12.0 Phase 119 Plan 03: 16 min, 2 tasks, 2 files (71 tests)
 - v12.0 Phase 120 Plan 01: 20 min, 2 tasks, 4 files (1108 tests)
 - v12.0 Phase 120 Plan 02: 7 min, 2 tasks, 4 files (1160 tests)
+- v12.0 Phase 121 Plan 01: 5 min, 2 tasks, 6 files (1160 tests)
 - Trend: Stable
 
 *Updated after each plan completion*
@@ -56,6 +57,9 @@ Progress: [████████░░] 81%
 - [Phase 0120]: PlanningCache.getSummaryCount and getIncompletePlans: SQLite-first enrichment data for plan/summary counts — warm cache serves from SQL, cold falls back to parsers — ENR-02: SQL-backed enrichment eliminates redundant fs operations on warm cache hits
 - [Phase 0120]: ProjectState.phaseDir added to frozen facade — enricher uses statePhaseDir to skip redundant resolvePhaseDir call for current phase — Avoids extra readdirSync on the phases directory when current phase is already resolved in getProjectState
 - [Phase 0120]: performance.now() + Date.now() fallback for _enrichment_ms timing; setTimeout(0) for background warm-up — Sub-millisecond precision needed for ENR-03 measurement; setTimeout(0) is clear fire-and-forget pattern
+- [Phase 0121-01]: Schema advanced from v2 to v3 — MIGRATIONS[2] creates 4 memory_* tables; db-cache.js SCHEMA_V2_SQL renamed to SCHEMA_V3_SQL with same memory tables; version guard bumped to >= 3
+- [Phase 0121-01]: data_json stores full JSON entry in memory tables for lossless round-tripping; searchable columns (summary, text, phase, category) extracted for LIKE queries — no FTS5 per REQUIREMENTS.md
+- [Phase 0121-01]: migrateMemoryStores() idempotency check: COUNT(*) on memory_decisions for cwd — if any exist, skip entire migration
 
 ### Roadmap Evolution
 
@@ -72,6 +76,6 @@ None.
 
 ## Session Continuity
 
-**Last session:** 2026-03-14T18:51:58.179Z
-**Stopped at:** Phase 121 context gathered
-**Next step:** Phase 120 complete — proceed to Phase 121 (Memory Store) or next planned phase
+**Last session:** 2026-03-14T19:09:33Z
+**Stopped at:** Completed 0121-01-PLAN.md
+**Next step:** Phase 121 Plan 02 — dual-write for memory stores
