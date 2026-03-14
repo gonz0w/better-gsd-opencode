@@ -99,5 +99,5 @@ Phases execute in numeric order: 118 → 119 → 120 → 121 → 122 → 123
 | 119. Parser Integration & Planning Tables | 2/3 | Complete    | 2026-03-14 |
 | 120. Enricher Acceleration | 2/2 | Complete    | 2026-03-14 |
 | 121. Memory Store Migration | 0/3 | Complete    | 2026-03-14 |
-| 122. Decision Rules | 2/2 | Complete   | 2026-03-14 |
+| 122. Decision Rules | 2/2 | Complete    | 2026-03-14 |
 | 123. Session State | 0/0 | Not started | - |
