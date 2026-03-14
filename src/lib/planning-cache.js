@@ -611,7 +611,7 @@ class PlanningCache {
         }
       } catch { result.skipped.push('trajectories'); }
 
-      // bookmarks.json
+      // bookmarks.json — insert in REVERSE order so newest bookmark (index 0) gets highest id
       try {
         const raw = require('fs').readFileSync(require('path').join(memoryDir, 'bookmarks.json'), 'utf8');
         const entries = JSON.parse(raw);
@@ -621,7 +621,8 @@ class PlanningCache {
             'INSERT INTO memory_bookmarks (cwd, phase, plan, task, total_tasks, git_head, timestamp, data_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
           );
           this._db.exec('BEGIN');
-          for (const entry of entries) {
+          for (let i = entries.length - 1; i >= 0; i--) {
+            const entry = entries[i];
             ins.run(
               cwd,
               entry.phase || null,
@@ -660,7 +661,6 @@ class PlanningCache {
     const opts = options || {};
     const limit = opts.limit != null ? opts.limit : 50;
     const offset = opts.offset != null ? opts.offset : 0;
-    const likePattern = '%' + query + '%';
 
     try {
       let table, searchCols, orderBy;
@@ -689,8 +689,16 @@ class PlanningCache {
           return null;
       }
 
-      const params = [cwd, likePattern, likePattern];
-      let whereClauses = `cwd = ? AND ${searchCols}`;
+      // When query is null/empty, match all rows (no search filter)
+      let params, whereClauses;
+      if (query) {
+        const likePattern = '%' + query + '%';
+        params = [cwd, likePattern, likePattern];
+        whereClauses = `cwd = ? AND ${searchCols}`;
+      } else {
+        params = [cwd];
+        whereClauses = 'cwd = ?';
+      }
 
       if (opts.phase) {
         whereClauses += ' AND phase = ?';
