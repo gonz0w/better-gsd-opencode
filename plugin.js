@@ -1351,6 +1351,7 @@ __export(parsers_exports, {
   invalidateAll: () => invalidateAll,
   invalidateConfig: () => invalidateConfig,
   invalidateIntent: () => invalidateIntent,
+  invalidatePlanningCache: () => invalidatePlanningCache,
   invalidatePlans: () => invalidatePlans,
   invalidateProject: () => invalidateProject,
   invalidateRoadmap: () => invalidateRoadmap,
@@ -1370,6 +1371,23 @@ function invalidateAll(cwd) {
   invalidateConfig(cwd);
   invalidateProject(cwd);
   invalidateIntent(cwd);
+  if (cwd) {
+    try {
+      const db = getDb(cwd);
+      const cache = new PlanningCache(db);
+      cache.clearForCwd(cwd);
+    } catch {
+    }
+  }
+}
+function invalidatePlanningCache(cwd) {
+  if (!cwd) return;
+  try {
+    const db = getDb(cwd);
+    const cache = new PlanningCache(db);
+    cache.clearForCwd(cwd);
+  } catch {
+  }
 }
 var init_parsers = __esm({
   async "src/plugin/parsers/index.js"() {
@@ -1385,6 +1403,7 @@ var init_parsers = __esm({
     init_config();
     init_project();
     init_intent();
+    await init_db_cache();
   }
 });
 
@@ -1749,7 +1768,7 @@ var require_decision_rules = __commonJS({
 });
 
 // src/plugin/index.js
-import { join as join17 } from "path";
+import { join as join18 } from "path";
 import { homedir as homedir7 } from "os";
 
 // src/plugin/safe-hook.js
@@ -1945,12 +1964,63 @@ await init_plan();
 init_config();
 init_project();
 init_intent();
+init_state();
+await init_roadmap();
+await init_plan();
+await init_db_cache();
+import { join as join10 } from "path";
+import { readdirSync as readdirSync2 } from "fs";
+function _eagerMtimeCheck(resolvedCwd, phaseNum) {
+  try {
+    const db = getDb(resolvedCwd);
+    const cache = new PlanningCache(db);
+    const filesToCheck = [
+      join10(resolvedCwd, ".planning", "ROADMAP.md"),
+      join10(resolvedCwd, ".planning", "STATE.md")
+    ];
+    if (phaseNum) {
+      const numStr = String(phaseNum).padStart(2, "0");
+      const phasesDir = join10(resolvedCwd, ".planning", "phases");
+      try {
+        const entries = readdirSync2(phasesDir);
+        const dirName = entries.find((d) => d.startsWith(numStr + "-") || d === numStr);
+        if (dirName) {
+          const phaseDir = join10(phasesDir, dirName);
+          const files = readdirSync2(phaseDir);
+          const planFiles = files.filter((f) => f.endsWith("-PLAN.md") || f === "PLAN.md").map((f) => join10(phaseDir, f));
+          filesToCheck.push(...planFiles);
+        }
+      } catch {
+      }
+    }
+    const freshnessResult = cache.checkAllFreshness(filesToCheck);
+    for (const staleFile of freshnessResult.stale) {
+      cache.invalidateFile(staleFile);
+      if (staleFile.endsWith("ROADMAP.md")) {
+        invalidateRoadmap(resolvedCwd);
+      } else if (staleFile.endsWith("STATE.md")) {
+        invalidateState(resolvedCwd);
+      } else if (staleFile.endsWith("-PLAN.md") || staleFile.endsWith("PLAN.md")) {
+        invalidatePlans(resolvedCwd);
+      }
+    }
+  } catch {
+  }
+}
 function getProjectState(cwd) {
   const resolvedCwd = cwd || process.cwd();
   const state = parseState(resolvedCwd);
   if (!state) {
     return null;
   }
+  let phaseNumForCheck = null;
+  if (state.phase) {
+    const phaseMatch = state.phase.match(/^(\d+)/);
+    if (phaseMatch) {
+      phaseNumForCheck = parseInt(phaseMatch[1], 10);
+    }
+  }
+  _eagerMtimeCheck(resolvedCwd, phaseNumForCheck);
   const roadmap = parseRoadmap(resolvedCwd);
   const config = parseConfig(resolvedCwd);
   const project = parseProject(resolvedCwd);
@@ -2258,8 +2328,8 @@ ${parts.join("\n")}
 // src/plugin/command-enricher.js
 await init_parsers();
 var import_decision_rules = __toESM(require_decision_rules());
-import { readdirSync as readdirSync2, existsSync as existsSync3, readFileSync as readFileSync7 } from "fs";
-import { join as join10 } from "path";
+import { readdirSync as readdirSync3, existsSync as existsSync3, readFileSync as readFileSync7 } from "fs";
+import { join as join11 } from "path";
 function enrichCommand(input, output, cwd) {
   if (!input || !output) return;
   const command = input.command || input.parts && input.parts[0] || "";
@@ -2323,7 +2393,7 @@ function enrichCommand(input, output, cwd) {
         const plans = parsePlans(phaseNum, resolvedCwd);
         if (plans && plans.length > 0) {
           enrichment.plans = plans.map((p) => p.path ? p.path.split("/").pop() : null).filter(Boolean);
-          const phaseDirFull = join10(resolvedCwd, phaseDir);
+          const phaseDirFull = join11(resolvedCwd, phaseDir);
           const summaryFiles = listSummaryFiles(phaseDirFull);
           enrichment.incomplete_plans = enrichment.plans.filter((planFile) => {
             const summaryFile = planFile.replace("-PLAN.md", "-SUMMARY.md");
@@ -2350,7 +2420,7 @@ function enrichCommand(input, output, cwd) {
   }
   try {
     if (enrichment.phase_dir) {
-      const phaseDirFull = join10(resolvedCwd, enrichment.phase_dir);
+      const phaseDirFull = join11(resolvedCwd, enrichment.phase_dir);
       if (!enrichment.plans) {
         const plans = parsePlans(effectivePhaseNum, resolvedCwd);
         if (plans && plans.length > 0) {
@@ -2366,12 +2436,12 @@ function enrichCommand(input, output, cwd) {
       const summaryFiles = listSummaryFiles(phaseDirFull);
       enrichment.summary_count = summaryFiles.length;
       try {
-        const allFiles = readdirSync2(phaseDirFull);
+        const allFiles = readdirSync3(phaseDirFull);
         const uatFiles = allFiles.filter((f) => f.endsWith("-UAT.md"));
         let uatGapCount = 0;
         for (const uf of uatFiles) {
           try {
-            const content = readFileSync7(join10(phaseDirFull, uf), "utf-8");
+            const content = readFileSync7(join11(phaseDirFull, uf), "utf-8");
             if (content.includes("status: diagnosed")) uatGapCount++;
           } catch {
           }
@@ -2386,8 +2456,8 @@ function enrichCommand(input, output, cwd) {
   try {
     if (enrichment.phase_dir && effectivePhaseNum) {
       const paddedPhase = String(effectivePhaseNum).padStart(4, "0");
-      enrichment.has_research = existsSync3(join10(resolvedCwd, enrichment.phase_dir, paddedPhase + "-RESEARCH.md"));
-      enrichment.has_context = existsSync3(join10(resolvedCwd, enrichment.phase_dir, paddedPhase + "-CONTEXT.md"));
+      enrichment.has_research = existsSync3(join11(resolvedCwd, enrichment.phase_dir, paddedPhase + "-RESEARCH.md"));
+      enrichment.has_context = existsSync3(join11(resolvedCwd, enrichment.phase_dir, paddedPhase + "-CONTEXT.md"));
     }
   } catch {
   }
@@ -2405,9 +2475,9 @@ function enrichCommand(input, output, cwd) {
   } catch {
   }
   try {
-    enrichment.state_exists = existsSync3(join10(resolvedCwd, ".planning/STATE.md"));
-    enrichment.project_exists = existsSync3(join10(resolvedCwd, ".planning/PROJECT.md"));
-    enrichment.roadmap_exists = existsSync3(join10(resolvedCwd, ".planning/ROADMAP.md"));
+    enrichment.state_exists = existsSync3(join11(resolvedCwd, ".planning/STATE.md"));
+    enrichment.project_exists = existsSync3(join11(resolvedCwd, ".planning/PROJECT.md"));
+    enrichment.roadmap_exists = existsSync3(join11(resolvedCwd, ".planning/ROADMAP.md"));
   } catch {
   }
   try {
@@ -2424,12 +2494,12 @@ function enrichCommand(input, output, cwd) {
   }
   try {
     if (enrichment.phase_dir) {
-      const phaseDirFull = join10(resolvedCwd, enrichment.phase_dir);
+      const phaseDirFull = join11(resolvedCwd, enrichment.phase_dir);
       const summaryFiles = listSummaryFiles(phaseDirFull);
       enrichment.has_previous_summary = summaryFiles.length > 0;
       if (summaryFiles.length > 0) {
         const lastSummary = summaryFiles.sort().pop();
-        const content = readFileSync7(join10(phaseDirFull, lastSummary), "utf-8");
+        const content = readFileSync7(join11(phaseDirFull, lastSummary), "utf-8");
         enrichment.has_unresolved_issues = content.includes("unresolved") || content.includes("Unresolved");
         enrichment.has_blockers = content.includes("blocker") || content.includes("Blocker");
       } else {
@@ -2475,9 +2545,9 @@ function detectPhaseArg(parts) {
 }
 function resolvePhaseDir(phaseNum, cwd) {
   const numStr = String(phaseNum).padStart(2, "0");
-  const phasesDir = join10(cwd, ".planning", "phases");
+  const phasesDir = join11(cwd, ".planning", "phases");
   try {
-    const entries = readdirSync2(phasesDir);
+    const entries = readdirSync3(phasesDir);
     const dirName = entries.find((d) => d.startsWith(numStr + "-") || d === numStr);
     if (dirName) {
       return `.planning/phases/${dirName}`;
@@ -2489,7 +2559,7 @@ function resolvePhaseDir(phaseNum, cwd) {
 function listSummaryFiles(phaseDir) {
   try {
     if (!existsSync3(phaseDir)) return [];
-    const files = readdirSync2(phaseDir);
+    const files = readdirSync3(phaseDir);
     return files.filter((f) => f.endsWith("-SUMMARY.md"));
   } catch {
     return [];
@@ -2882,7 +2952,7 @@ import { z as z3 } from "zod";
 init_state();
 await init_plan();
 import { readFileSync as readFileSync8, writeFileSync as writeFileSync2, mkdirSync as mkdirSync2, rmdirSync, existsSync as existsSync4, statSync as statSync3 } from "fs";
-import { join as join11 } from "path";
+import { join as join12 } from "path";
 var LOCK_STALE_MS = 1e4;
 var VALID_ACTIONS = ["complete-task", "uncomplete-task", "add-blocker", "remove-blocker", "record-decision", "advance"];
 var bgsd_progress = {
@@ -2893,7 +2963,7 @@ var bgsd_progress = {
   },
   async execute(args, context) {
     const projectDir = context?.directory || process.cwd();
-    const lockDir = join11(projectDir, ".planning", ".lock");
+    const lockDir = join12(projectDir, ".planning", ".lock");
     try {
       if (!args.action || !VALID_ACTIONS.includes(args.action)) {
         return JSON.stringify({
@@ -2947,7 +3017,7 @@ var bgsd_progress = {
         }
       }
       try {
-        const statePath = join11(projectDir, ".planning", "STATE.md");
+        const statePath = join12(projectDir, ".planning", "STATE.md");
         let content = readFileSync8(statePath, "utf-8");
         const { state } = projectState;
         let actionResult = null;
@@ -3136,7 +3206,7 @@ function getTools(registry) {
 
 // src/plugin/notification.js
 import { homedir as homedir2 } from "os";
-import { join as join12 } from "path";
+import { join as join13 } from "path";
 function createNotifier($, directory) {
   const MAX_HISTORY = 20;
   const DEFAULT_RATE_LIMIT = 5;
@@ -3151,7 +3221,7 @@ function createNotifier($, directory) {
   let logger = null;
   function getLogger() {
     if (!logger) {
-      const logDir = join12(homedir2(), ".config", "opencode");
+      const logDir = join13(homedir2(), ".config", "opencode");
       logger = createLogger(logDir);
     }
     return logger;
@@ -3264,11 +3334,11 @@ function createNotifier($, directory) {
 await init_parsers();
 import { watch } from "fs";
 import { existsSync as existsSync5 } from "fs";
-import { join as join13 } from "path";
+import { join as join14 } from "path";
 import { homedir as homedir3 } from "os";
 function createFileWatcher(cwd, options = {}) {
   const { debounceMs = 200, maxWatchedPaths = 500 } = options;
-  const planningDir = join13(cwd, ".planning");
+  const planningDir = join14(cwd, ".planning");
   let controller = null;
   let watching = false;
   let debounceTimer = null;
@@ -3280,7 +3350,7 @@ function createFileWatcher(cwd, options = {}) {
   let logger = null;
   function getLogger() {
     if (!logger) {
-      const logDir = join13(homedir3(), ".config", "opencode");
+      const logDir = join14(homedir3(), ".config", "opencode");
       logger = createLogger(logDir);
     }
     return logger;
@@ -3296,7 +3366,7 @@ function createFileWatcher(cwd, options = {}) {
   }
   function onWatchEvent(eventType, filename) {
     if (!filename) return;
-    const fullPath = join13(planningDir, filename);
+    const fullPath = join14(planningDir, filename);
     eventCount++;
     if (!capWarned && eventCount > maxWatchedPaths) {
       capWarned = true;
@@ -3374,14 +3444,14 @@ function createFileWatcher(cwd, options = {}) {
 
 // src/plugin/idle-validator.js
 import { existsSync as existsSync6, readFileSync as readFileSync9, writeFileSync as writeFileSync3 } from "fs";
-import { join as join14 } from "path";
+import { join as join15 } from "path";
 import { execSync } from "child_process";
 import { homedir as homedir4 } from "os";
 init_state();
 await init_roadmap();
 init_config();
 function createIdleValidator(cwd, notifier, fileWatcher, config) {
-  const planningDir = join14(cwd, ".planning");
+  const planningDir = join15(cwd, ".planning");
   let lastValidation = 0;
   let lastAutoFix = 0;
   let validating = false;
@@ -3391,21 +3461,21 @@ function createIdleValidator(cwd, notifier, fileWatcher, config) {
   let logger = null;
   function getLogger() {
     if (!logger) {
-      const logDir = join14(homedir4(), ".config", "opencode");
+      const logDir = join15(homedir4(), ".config", "opencode");
       logger = createLogger(logDir);
     }
     return logger;
   }
   function readStateMd() {
     try {
-      return readFileSync9(join14(planningDir, "STATE.md"), "utf-8");
+      return readFileSync9(join15(planningDir, "STATE.md"), "utf-8");
     } catch {
       return null;
     }
   }
   function readRoadmapMd() {
     try {
-      return readFileSync9(join14(planningDir, "ROADMAP.md"), "utf-8");
+      return readFileSync9(join15(planningDir, "ROADMAP.md"), "utf-8");
     } catch {
       return null;
     }
@@ -3492,7 +3562,7 @@ function createIdleValidator(cwd, notifier, fileWatcher, config) {
         if (state.progress !== null) {
           const fixed = fixProgressBar(stateRaw, state.progress);
           if (fixed) {
-            const statePath = join14(planningDir, "STATE.md");
+            const statePath = join15(planningDir, "STATE.md");
             writeTracked(statePath, fixed);
             invalidateState(cwd);
             anyFix = true;
@@ -3503,7 +3573,7 @@ function createIdleValidator(cwd, notifier, fileWatcher, config) {
       invalidateConfig(cwd);
       const freshConfig = parseConfig(cwd);
       if (freshConfig) {
-        const configPath = join14(planningDir, "config.json");
+        const configPath = join15(planningDir, "config.json");
         if (existsSync6(configPath)) {
           try {
             const raw = readFileSync9(configPath, "utf-8");
@@ -3529,7 +3599,7 @@ function createIdleValidator(cwd, notifier, fileWatcher, config) {
           if (lastGit) {
             const hoursAgo = (Date.now() / 1e3 - lastGit) / 3600;
             if (hoursAgo >= stalenessHours) {
-              const statePath = join14(planningDir, "STATE.md");
+              const statePath = join15(planningDir, "STATE.md");
               const updatedRaw = stateRaw.replace(
                 /\*\*Status:\*\*\s*.+/i,
                 "**Status:** Paused (auto-detected stale)"
@@ -3571,7 +3641,7 @@ function createIdleValidator(cwd, notifier, fileWatcher, config) {
 
 // src/plugin/stuck-detector.js
 import { homedir as homedir5 } from "os";
-import { join as join15 } from "path";
+import { join as join16 } from "path";
 function createStuckDetector(notifier, config) {
   const errorThreshold = config.stuck_detection?.error_threshold || 3;
   const spinningThreshold = config.stuck_detection?.spinning_threshold || 5;
@@ -3582,7 +3652,7 @@ function createStuckDetector(notifier, config) {
   let logger = null;
   function getLogger() {
     if (!logger) {
-      const logDir = join15(homedir5(), ".config", "opencode");
+      const logDir = join16(homedir5(), ".config", "opencode");
       logger = createLogger(logDir);
     }
     return logger;
@@ -3677,7 +3747,7 @@ function createStuckDetector(notifier, config) {
 
 // src/plugin/advisory-guardrails.js
 import { readFileSync as readFileSync10 } from "fs";
-import { join as join16, basename, extname, isAbsolute, resolve as resolve2 } from "path";
+import { join as join17, basename, extname, isAbsolute, resolve as resolve2 } from "path";
 import { homedir as homedir6 } from "os";
 var NAMING_PATTERNS = {
   camelCase: /^[a-z][a-z0-9]*[A-Z][a-zA-Z0-9]*$/,
@@ -3732,7 +3802,7 @@ function isTestFile(filePath) {
 }
 function loadConventionRules(cwd, confidenceThreshold) {
   try {
-    const agentsPath = join16(cwd, "AGENTS.md");
+    const agentsPath = join17(cwd, "AGENTS.md");
     const content = readFileSync10(agentsPath, "utf-8");
     const conventionNames = ["kebab-case", "camelCase", "PascalCase", "snake_case", "UPPER_SNAKE_CASE"];
     for (const conv of conventionNames) {
@@ -3743,7 +3813,7 @@ function loadConventionRules(cwd, confidenceThreshold) {
   } catch {
   }
   try {
-    const intelPath = join16(cwd, ".planning", "codebase", "codebase-intel.json");
+    const intelPath = join17(cwd, ".planning", "codebase", "codebase-intel.json");
     const intel = JSON.parse(readFileSync10(intelPath, "utf-8"));
     if (intel.conventions?.naming?.dominant && (intel.conventions.naming.confidence || 0) >= confidenceThreshold) {
       return {
@@ -3758,7 +3828,7 @@ function loadConventionRules(cwd, confidenceThreshold) {
 function detectTestConfig(cwd) {
   const result = { command: null, sourceExts: /* @__PURE__ */ new Set() };
   try {
-    const pkgPath = join16(cwd, "package.json");
+    const pkgPath = join17(cwd, "package.json");
     const pkg = JSON.parse(readFileSync10(pkgPath, "utf-8"));
     if (pkg.scripts?.test) {
       result.command = `npm test`;
@@ -3770,7 +3840,7 @@ function detectTestConfig(cwd) {
   }
   if (!result.command) {
     try {
-      const pyProject = join16(cwd, "pyproject.toml");
+      const pyProject = join17(cwd, "pyproject.toml");
       readFileSync10(pyProject, "utf-8");
       result.command = "pytest";
       result.sourceExts = /* @__PURE__ */ new Set([".py"]);
@@ -3791,7 +3861,7 @@ function createAdvisoryGuardrails(cwd, notifier, config) {
   let logger = null;
   function getLogger() {
     if (!logger) {
-      const logDir = join16(homedir6(), ".config", "opencode");
+      const logDir = join17(homedir6(), ".config", "opencode");
       logger = createLogger(logDir);
     }
     return logger;
@@ -3928,7 +3998,7 @@ init_project();
 init_intent();
 await init_parsers();
 var BgsdPlugin = async ({ directory, $ }) => {
-  const bgsdHome = join17(homedir7(), ".config", "opencode", "bgsd-oc");
+  const bgsdHome = join18(homedir7(), ".config", "opencode", "bgsd-oc");
   const registry = createToolRegistry(safeHook);
   const projectDir = directory || process.cwd();
   const config = parseConfig(projectDir);
