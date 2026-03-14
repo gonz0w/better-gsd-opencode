@@ -2318,17 +2318,19 @@ function cmdSummaryGenerate(cwd, phaseArg, planArg, raw) {
     const summaryFileName = `${paddedPhase}-${paddedPlan}-SUMMARY.md`;
     const summaryPath = path.join(phaseDir, summaryFileName);
 
-    if (fs.existsSync(summaryPath)) {
-      const existing = safeReadFile(summaryPath);
+    // 8b. Merge with existing summary if present (no TOCTOU: try read, catch ENOENT)
+    try {
+      const existing = fs.readFileSync(summaryPath, 'utf-8');
       if (existing) {
         fullContent = mergeSummary(existing, fullContent);
       }
+    } catch (e) {
+      if (e.code !== 'ENOENT') throw e;
+      // No existing summary — use fullContent as-is
     }
 
-    // 9. Write file - use open/write/close to avoid TOCTOU race
-    const fd = fs.openSync(summaryPath, 'w');
-    fs.writeSync(fd, fullContent, 'utf-8');
-    fs.closeSync(fd);
+    // 9. Write file
+    fs.writeFileSync(summaryPath, fullContent, 'utf-8');
 
     // 10. Count TODOs remaining
     const todoCount = (fullContent.match(/TODO:/g) || []).length;

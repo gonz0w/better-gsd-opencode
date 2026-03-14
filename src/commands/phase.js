@@ -1307,13 +1307,17 @@ function archiveIntent(cwd, version) {
   const archiveDir = path.join(cwd, '.planning', 'archive');
   
   let content;
+  let intentFd;
   try {
-    content = fs.readFileSync(intentPath, 'utf-8');
+    // Open file exclusively to prevent TOCTOU: read, process, then rewrite through same fd lifecycle
+    intentFd = fs.openSync(intentPath, 'r+');
+    content = fs.readFileSync(intentFd, 'utf-8');
   } catch (e) {
     if (e.code === 'ENOENT') {
       debugLog('archiveIntent', 'INTENT.md not found, skipping');
       return { archived: false, reason: 'INTENT.md not found' };
     }
+    if (intentFd !== undefined) fs.closeSync(intentFd);
     throw e;
   }
   
@@ -1412,10 +1416,11 @@ function archiveIntent(cwd, version) {
   // Add ID tracker and trim trailing whitespace
   newContent = newContent.trim() + idTrackerComment + '\n';
   
-  // Write lean INTENT.md - use open/write/close to avoid TOCTOU race
-  const fd = fs.openSync(intentPath, 'w');
-  fs.writeSync(fd, newContent, 'utf-8');
-  fs.closeSync(fd);
+  // Truncate and rewrite lean INTENT.md using the already-open fd
+  fs.ftruncateSync(intentFd, 0);
+  const buf = Buffer.from(newContent, 'utf-8');
+  fs.writeSync(intentFd, buf, 0, buf.length, 0);
+  fs.closeSync(intentFd);
   invalidateFileCache(intentPath);
   
   return { archived: true, archivePath, highestOutcomeId };
