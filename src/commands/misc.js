@@ -2297,8 +2297,10 @@ function cmdSummaryGenerate(cwd, phaseArg, planArg, raw) {
       }
     }
 
-    // 9. Write file
-    fs.writeFileSync(summaryPath, fullContent, 'utf-8');
+    // 9. Write file - use open/write/close to avoid TOCTOU race
+    const fd = fs.openSync(summaryPath, 'w');
+    fs.writeSync(fd, fullContent, 'utf-8');
+    fs.closeSync(fd);
 
     // 10. Count TODOs remaining
     const todoCount = (fullContent.match(/TODO:/g) || []).length;

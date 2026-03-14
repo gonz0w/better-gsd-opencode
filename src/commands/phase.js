@@ -1358,8 +1358,10 @@ function archiveIntent(cwd, version) {
   // Add ID tracker and trim trailing whitespace
   newContent = newContent.trim() + idTrackerComment + '\n';
   
-  // Write lean INTENT.md
-  fs.writeFileSync(intentPath, newContent, 'utf-8');
+  // Write lean INTENT.md - use open/write/close to avoid TOCTOU race
+  const fd = fs.openSync(intentPath, 'w');
+  fs.writeSync(fd, newContent, 'utf-8');
+  fs.closeSync(fd);
   invalidateFileCache(intentPath);
   
   return { archived: true, archivePath, highestOutcomeId };
