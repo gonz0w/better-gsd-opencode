@@ -9,7 +9,7 @@ This milestone eliminates accumulated technical debt across four areas: a broken
 - [x] **Phase 114: Test Suite Stabilization** - Fix Bun runtime banner and 18 residual test failures to restore green test suite
 - [x] **Phase 115: CLI Command Routing** - Fix missing routes, remove dead code, sync command validator (completed 2026-03-14)
 - [x] **Phase 116: Planning Artifact Cleanup** - Normalize MILESTONES.md, fix PROJECT.md, audit out-of-scope and decisions (completed 2026-03-14)
-- [ ] **Phase 117: Intent Archival System** - Automate INTENT.md outcome archival during milestone completion
+- [x] **Phase 117: Intent Archival System** - Automate INTENT.md outcome archival during milestone completion (completed 2026-03-14)
 
 ## Phase Details
 
@@ -67,7 +67,7 @@ This milestone eliminates accumulated technical debt across four areas: a broken
   2. User can complete a milestone and have completed outcomes stripped from active INTENT.md
   3. User can add new outcomes after archival without ID collisions (IDs continue monotonically)
   4. User can complete a milestone and have the history section archived alongside outcomes — keeping INTENT.md under 100 lines
-**Plans**: 1/1 plan
+**Plans**: 1/1 plans complete
   - Plan 01 (Wave 1): Add intent archival to cmdMilestoneComplete + update workflow + guardrails [INT-01, INT-02, INT-03, INT-04] ✓
 
 ## Progress
@@ -80,4 +80,4 @@ Phases execute in numeric order: 114 → 115 → 116 → 117
 | 114. Test Suite Stabilization | 1/2 | Complete    | 2026-03-14 |
 | 115. CLI Command Routing | 3/4 | Complete    | 2026-03-14 |
 | 116. Planning Artifact Cleanup | 2/3 | Complete    | 2026-03-14 |
-| 117. Intent Archival System | 0/1 | Not started | - |
+| 117. Intent Archival System | 1/1 | Complete   | 2026-03-14 |
