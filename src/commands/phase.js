@@ -1237,7 +1237,132 @@ See \`.planning/milestones/${version}-ROADMAP.md\` and \`.planning/milestones/${
     state_updated: fs.existsSync(statePath),
   };
 
+  // Archive INTENT.md as part of milestone completion
+  const intentArchive = archiveIntent(cwd, version);
+  result.intent = {
+    archived: intentArchive.archived,
+    archive_path: intentArchive.archivePath || null,
+    highest_outcome_id: intentArchive.highestOutcomeId || null,
+  };
+
   output(result, raw);
+}
+
+// Archive INTENT.md at milestone completion
+// - Creates .planning/archive/INTENT-v{version}.md with full content
+// - Strips completed outcomes, keeps only pending ones
+// - Tracks highest outcome ID to prevent future collisions
+function archiveIntent(cwd, version) {
+  const intentPath = path.join(cwd, '.planning', 'INTENT.md');
+  const archiveDir = path.join(cwd, '.planning', 'archive');
+  
+  if (!fs.existsSync(intentPath)) {
+    debugLog('archiveIntent', 'INTENT.md not found, skipping');
+    return { archived: false, reason: 'INTENT.md not found' };
+  }
+
+  const content = cachedReadFile(intentPath);
+  
+  // Create archive directory
+  fs.mkdirSync(archiveDir, { recursive: true });
+  
+  // Write full archive
+  const archivePath = path.join(archiveDir, `INTENT-v${version}.md`);
+  fs.writeFileSync(archivePath, content, 'utf-8');
+  
+  // Parse and keep only pending outcomes
+  const lines = content.split('\n');
+  let inOutcomes = false;
+  let inHistory = false;
+  const keptLines = [];
+  let highestOutcomeId = 0;
+  
+  // Find all outcome IDs to track highest
+  const outcomeIdRegex = /^-\s*\*\*(OUT-\d+)\*\*/;
+  let match;
+  for (const line of lines) {
+    if ((match = outcomeIdRegex.exec(line)) !== null) {
+      const idNum = parseInt(match[1].split('-')[1], 10);
+      if (idNum > highestOutcomeId) highestOutcomeId = idNum;
+    }
+  }
+  
+  // Track if outcome is completed (has [P1] or [P2] but not [PENDING])
+  const completedRegex = /\[P[12]\](?!\s*\[PENDING\])/;
+  const pendingRegex = /\[PENDING\]/;
+  
+  for (const line of lines) {
+    // Track section boundaries
+    if (line.match(/^##?\s*Outcomes/i)) {
+      inOutcomes = true;
+      inHistory = false;
+    } else if (line.match(/^##?\s*History/i)) {
+      inHistory = true;
+      inOutcomes = false;
+    }
+    
+    if (inOutcomes) {
+      // Skip completed outcomes (have [P1] or [P2] but not [PENDING])
+      if (line.startsWith('- **')) {
+        const isCompleted = completedRegex.test(line);
+        const isPending = pendingRegex.test(line);
+        if (isCompleted && !isPending) {
+          continue; // Skip completed outcomes
+        }
+      }
+    }
+    
+    // Skip criteria, constraints, health sections (archived with milestone)
+    if (line.match(/^##?\s*(Criteria|Constraints|Health)/i)) {
+      inOutcomes = false;
+      continue;
+    }
+    
+    // Skip history section (will be archived)
+    if (inHistory) {
+      continue;
+    }
+    
+    keptLines.push(line);
+  }
+  
+  // Add highest outcome ID tracking comment
+  const idTrackerComment = `\n<!-- Highest outcome ID: OUT-${highestOutcomeId} -->`;
+  
+  // Rebuild active INTENT.md with only: revision, created, updated, objective, users, pending outcomes
+  let newContent = '';
+  let inObjectives = false;
+  let inUsers = false;
+  
+  for (const line of keptLines) {
+    if (line.match(/^##?\s*Objective/i)) {
+      inObjectives = true;
+      inUsers = false;
+    } else if (line.match(/^##?\s*(Users|User)/i)) {
+      inUsers = true;
+      inObjectives = false;
+    } else if (line.match(/^##?\s*Outcomes/i)) {
+      inObjectives = false;
+      inUsers = false;
+    }
+    
+    // Skip revision, created, updated fields - keep them but they're typically at top
+    if (line.match(/^(revision:|created:|updated:)/i)) {
+      newContent += line + '\n';
+      continue;
+    }
+    
+    newContent += line + '\n';
+  }
+  
+  // Add ID tracker and trim trailing whitespace
+  newContent = newContent.trim() + idTrackerComment + '\n';
+  
+  // Write lean INTENT.md
+  fs.writeFileSync(intentPath, newContent, 'utf-8');
+  invalidateFileCache(intentPath);
+  
+  return { archived: true, archivePath, highestOutcomeId };
 }
 
 module.exports = {
