@@ -22,9 +22,9 @@
 
 ## Memory Store Migration
 
-- [ ] **MEM-01**: User can search decisions, lessons, and trajectories via SQL queries without full JSON.parse of entire files
+- [x] **MEM-01**: User can search decisions, lessons, and trajectories via SQL queries without full JSON.parse of entire files
 - [x] **MEM-02**: User can trust that sacred data (decisions, lessons, trajectories) is migrated to SQLite while JSON backup files are preserved
-- [ ] **MEM-03**: User can add new bookmarks and have them written to both SQLite and JSON (dual-write during transition)
+- [x] **MEM-03**: User can add new bookmarks and have them written to both SQLite and JSON (dual-write during transition)
 
 ## Decision Rules
 
@@ -69,9 +69,9 @@ _None deferred — all 6 categories selected for v12.0._
 | ENR-01 | Phase 120 | Complete |
 | ENR-02 | Phase 120 | Complete |
 | ENR-03 | Phase 120 | Complete |
-| MEM-01 | Phase 121 | Pending |
+| MEM-01 | Phase 121 | Complete |
 | MEM-02 | Phase 121 | Complete |
-| MEM-03 | Phase 121 | Pending |
+| MEM-03 | Phase 121 | Complete |
 | DEC-01 | Phase 122 | Pending |
 | DEC-02 | Phase 122 | Pending |
 | DEC-03 | Phase 122 | Pending |

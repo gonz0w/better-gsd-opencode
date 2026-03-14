@@ -10,26 +10,26 @@ See: `.planning/PROJECT.md` (updated 2026-03-14)
 ## Current Position
 
 **Phase:** 121 of 123 (Memory Store Migration)
-**Current Plan:** Plan 01 complete
-**Status:** Ready for Plan 02
+**Current Plan:** Plan 02 complete
+**Status:** Phase 121 complete — ready for Phase 122
 **Last Activity:** 2026-03-14
 
-Progress: [████████░░] 83%
+Progress: [████████░░] 85%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 217 (v1.0-v12.0 Phase 120 Plan 02)
+- Total plans completed: 218 (v1.0-v12.0 Phase 121 Plan 02)
 - Average duration: ~15 min/plan
 - Total execution time: ~38 hours
 
 **Recent Trend:**
-- v12.0 Phase 119 Plan 01: 4 min, 2 tasks, 4 files
 - v12.0 Phase 119 Plan 02: 24 min, 3 tasks, 6 files
 - v12.0 Phase 119 Plan 03: 16 min, 2 tasks, 2 files (71 tests)
 - v12.0 Phase 120 Plan 01: 20 min, 2 tasks, 4 files (1108 tests)
 - v12.0 Phase 120 Plan 02: 7 min, 2 tasks, 4 files (1160 tests)
 - v12.0 Phase 121 Plan 01: 5 min, 2 tasks, 6 files (1160 tests)
+- v12.0 Phase 121 Plan 02: 27 min, 3 tasks, 5 files (1160 tests)
 - Trend: Stable
 
 *Updated after each plan completion*
@@ -60,6 +60,8 @@ Progress: [████████░░] 83%
 - [Phase 0121-01]: Schema advanced from v2 to v3 — MIGRATIONS[2] creates 4 memory_* tables; db-cache.js SCHEMA_V2_SQL renamed to SCHEMA_V3_SQL with same memory tables; version guard bumped to >= 3
 - [Phase 0121-01]: data_json stores full JSON entry in memory tables for lossless round-tripping; searchable columns (summary, text, phase, category) extracted for LIKE queries — no FTS5 per REQUIREMENTS.md
 - [Phase 0121-01]: migrateMemoryStores() idempotency check: COUNT(*) on memory_decisions for cwd — if any exist, skip entire migration
+- [Phase 0121]: JSON canonical, SQLite best-effort dual-write — failures log but never roll back JSON — Sacred data integrity requires JSON as source of truth; SQLite is an acceleration layer
+- [Phase 0121]: searchMemory extended to support null query (fetch all for cwd) for init.js reads without search term — cmdInitMemory needs to fetch recent decisions/lessons without a search query
 
 ### Roadmap Evolution
 
@@ -76,6 +78,6 @@ None.
 
 ## Session Continuity
 
-**Last session:** 2026-03-14T19:09:33Z
-**Stopped at:** Completed 0121-01-PLAN.md
+**Last session:** 2026-03-14T19:40:27.638Z
+**Stopped at:** Completed 0121-02-PLAN.md
 **Next step:** Phase 121 Plan 02 — dual-write for memory stores
