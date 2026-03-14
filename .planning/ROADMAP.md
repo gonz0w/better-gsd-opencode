@@ -6,7 +6,7 @@ This milestone eliminates accumulated technical debt across four areas: a broken
 
 ## Phases
 
-- [ ] **Phase 114: Test Suite Stabilization** - Fix Bun runtime banner and 18 residual test failures to restore green test suite
+- [x] **Phase 114: Test Suite Stabilization** - Fix Bun runtime banner and 18 residual test failures to restore green test suite
 - [ ] **Phase 115: CLI Command Routing** - Fix missing routes, remove dead code, sync command validator
 - [ ] **Phase 116: Planning Artifact Cleanup** - Normalize MILESTONES.md, fix PROJECT.md, audit out-of-scope and decisions
 - [ ] **Phase 117: Intent Archival System** - Automate INTENT.md outcome archival during milestone completion
@@ -23,9 +23,9 @@ This milestone eliminates accumulated technical debt across four areas: a broken
   3. User can run plugin tests in isolation without errors from missing project context
   4. User can trust that test assertions match current CLI output (no stale expected values)
   5. User can run the full test suite without missing module import errors
-**Plans**: 1/2 plans executed
-  - Plan 01 (Wave 1): Suppress Bun banner + fix profiler tests + rebuild CLI [TEST-01, TEST-02]
-  - Plan 02 (Wave 2): Fix all residual test failures — stale assertions, plugin isolation, config migration, env edge cases [TEST-03, TEST-04, TEST-05, TEST-06]
+**Plans**: 2/2 plans executed
+  - Plan 01 (Wave 1): Suppress Bun banner + fix profiler tests + rebuild CLI [TEST-01, TEST-02] ✓
+  - Plan 02 (Wave 2): Fix all residual test failures — stale assertions, plugin isolation, config migration, env edge cases [TEST-03, TEST-04, TEST-05, TEST-06] ✓
 
 ### Phase 115: CLI Command Routing
 **Goal**: Every registered CLI command resolves correctly — no missing routes, no orphaned modules, no stale validator data
