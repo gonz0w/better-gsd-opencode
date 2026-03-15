@@ -10,12 +10,12 @@ See: `.planning/PROJECT.md` (updated 2026-03-15)
 ## Current Position
 
 **Milestone:** v13.0 Closed-Loop Agent Evolution
-**Phase:** Phase 130 of 133 (Lesson Schema & Analysis Pipeline)
-**Current Plan:** Not started
-**Status:** Ready to plan
+**Phase:** Phase 131 of 133 (Skill Discovery & Security)
+**Current Plan:** Plan 01 complete
+**Status:** Plans 02–04 remaining
 **Last Activity:** 2026-03-15
 
-Progress: [██████████] 100%
+Progress: [██████████] 98%
 
 ## Performance Metrics
 
@@ -58,6 +58,7 @@ Progress: [██████████] 100%
 | 131 | Skill Discovery & Security | Security-first skill lifecycle + agentskills.io discovery | SKILL-01 through SKILL-09 |
 | 132 | Deviation Recovery Auto-Capture | Rule-1-only auto-capture in execute-phase | DEVCAP-01 through DEVCAP-04 |
 | 133 | Enhanced Research Workflow | Structured quality profile + conflict detection | RESEARCH-01 through RESEARCH-04 |
+
 ### Key Decisions
 
 - [v13.0 roadmap]: Phase 129 first — OC path correction (`.opencode/agents/` not `.planning/agents/`) and YAML validation must precede any automation writing agent files
@@ -78,10 +79,13 @@ Progress: [██████████] 100%
 - [Phase 130 Plan 02]: lessons:suggest excludes type:environment per LESSON-02 sentinel — migrated free-form lessons lack structured data, filtering prevents noisy suggestions
 - [Phase 130 Plan 02]: lessons:compact normalizes root_cause by lowercase+trim before grouping — ensures case/whitespace variants merge correctly
 - [Phase 130 Plan 02]: workflow hooks use 2>/dev/null || true — lessons command failures must never block verification or milestone completion
+- [Phase 131 Plan 01]: 41 patterns exactly in SECURITY_PATTERNS — trimmed from 45 by removing fs.appendFile, dgram, encodeURIComponent+http, </system> (redundant with <system>)
+- [Phase 131 Plan 01]: scanSkillFiles returns structured { verdict, findings, summary } — clean contract for install gatekeeper, validate, and list consumers
+- [Phase 131 Plan 01]: formatScanResults(scanResult, verbose) is pure — callers control when/how to print, no side effects
 
 ### Pending Work
 
-Phase 130 complete. Phases 131 (Skill Discovery & Security), 132 (Deviation Auto-Capture), and 133 (Enhanced Research) remain. Phase 131 and 133 are independent; Phase 132 now unblocked (lessons:capture dependency satisfied).
+Phase 130 complete. Phase 131 Plan 01 complete (security scanner + skills:list + skills:validate). Phase 131 Plans 02–04 remain (skills:install, router wiring, bgsd-context). Phases 132 (Deviation Auto-Capture) and 133 (Enhanced Research) also remain.
 
 ### Blockers/Concerns
 
@@ -89,7 +93,8 @@ None.
 
 ## Session Continuity
 
-**Last session:** 2026-03-15T20:01:48.225Z
-**This session:** 2026-03-15 — Completed Phase 130 Plan 02 (analysis pipeline: analyze + suggest + compact + workflow hooks)
+**Last session:** 2026-03-15T20:37:55.878Z
+**This session:** 2026-03-15 — Completed Phase 131 Plan 01 (security scanner + skills:list + skills:validate in src/commands/skills.js)
 **Next steps:**
-1. Execute Phase 131 (Skill Discovery & Security) or Phase 132 (Deviation Auto-Capture) or Phase 133 (Enhanced Research)
+1. Execute Phase 131 Plan 02 (skills:install command with GitHub fetch + confirmation gate)
+2. Execute Phase 131 Plan 03 (router wiring) and Plan 04 (bgsd-context installed_skills)

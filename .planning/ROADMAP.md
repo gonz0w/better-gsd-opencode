@@ -57,7 +57,13 @@
   3. All install attempts (including blocked/rejected) appear in `.agents/skill-audit.json` with timestamp, source, scan verdict, and outcome
   4. User can run `skills:validate <name>` to re-scan an installed skill; user can run `skills:remove <name>` to delete it
   5. `new-milestone.md` Step 8.5 prompts optional skill discovery; bgsd-context `installed_skills` field lists installed skill names
-**Plans**: 0/3 plans created
+**Plans**: 3/3 plans created
+
+| Plan | Wave | Objective | Tasks |
+|------|------|-----------|-------|
+| 0131-01 | 1 | Security scanner (41 patterns) + skills:list + skills:validate | 2 |
+| 0131-02 | 2 | skills:install (GitHub fetch + scan + confirm) + skills:remove + audit | 2 |
+| 0131-03 | 3 | Router/help wiring + enricher installed_skills + new-milestone Step 8.5 | 2 |
 
 ### Phase 132: Deviation Recovery Auto-Capture
 **Goal**: Winning recovery patterns from Rule-1 (code bug) failures are automatically captured as structured lesson entries in execute-phase — capped at 3 per milestone, non-blocking, never triggered by environmental failures
