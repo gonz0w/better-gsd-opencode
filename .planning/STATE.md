@@ -10,12 +10,12 @@ See: `.planning/PROJECT.md` (updated 2026-03-15)
 ## Current Position
 
 **Milestone:** v12.1 Tool Integration & Agent Enhancement
-**Phase:** 124 (not yet started — planning phase)
-**Current Plan:** None (in roadmap phase)
-**Status:** Roadmap complete — 5 phases defined, 11/11 requirements mapped
-**Last Activity:** 2026-03-15 17:30 UTC — v12.1 ROADMAP.md created
+**Phase:** 124 (Plan 01 complete, Plan 02 pending)
+**Current Plan:** Plan 02
+**Status:** Phase 124 execution in progress
+**Last Activity:** 2026-03-15 03:13 UTC — Plan 01 complete
 
-Progress: [█████     ] 20% (roadmap complete, plans pending)
+Progress: [█████░░░░░] 28% (Plan 01 of 124 complete)
 
 ## Performance Metrics
 
@@ -35,7 +35,8 @@ Progress: [█████     ] 20% (roadmap complete, plans pending)
 - v12.0 Phase 123 Plan 01: 10 min, 2 tasks, 4 files (1200 tests)
 - v12.0 Phase 123 Plan 02: 30 min, 2 tasks, 3 files (1250 tests)
 - v12.0 Phase 123 Plan 03: 9 min, 2 tasks, 4 files (1283 tests)
-- Trend: Stable
+- v12.1 Phase 124 Plan 01: 3 min, 2 tasks, 3 files (1241 tests - all pass)
+- Trend: Stable, improving velocity with infrastructure improvements
 
 *Updated after each plan completion*
 
@@ -66,9 +67,17 @@ Progress: [█████     ] 20% (roadmap complete, plans pending)
 - [v12.1]: Agent routing (Phase 127) before collaboration (Phase 128) for natural ordering
 - [v12.1]: 25%+ context reduction target via capability-aware filtering
 
+### Completed Work
+
+- [✓] Phase 124 Plan 01: Tool Detection Infrastructure (TOOL-DET-01)
+  - File-based caching with 5-minute TTL
+  - Cross-platform PATH resolution (Windows/macOS/Linux)
+  - Semver version comparison
+  - detect:tools JSON command
+
 ### Pending Work
 
-- Phase 124 planning (tool detection infrastructure)
+- Phase 124 Plan 02 (tool detection verification/testing)
 - Phase 125 planning (core tool integrations)
 - Phase 126 planning (extended tool integrations)
 - Phase 127 planning (agent routing decision functions)
@@ -76,13 +85,13 @@ Progress: [█████     ] 20% (roadmap complete, plans pending)
 
 ### Blockers/Concerns
 
-None — roadmap ready for planning phase.
+None — Phase 124 Plan 01 complete, infrastructure ready for dependent phases.
 
 ## Session Continuity
 
 **Last session:** 2026-03-15T03:02:20.937Z
-**This session:** 2026-03-15 (v12.1 roadmap creation)
+**This session:** 2026-03-15 (Phase 124 Plan 01 execution)
 **Next steps:** 
-1. `/bgsd-plan-phase 124` — Plan tool detection infrastructure
+1. Execute Phase 124 Plan 02
 2. Phases 125–127 planning (parallel)
-3. `/bgsd-execute-phase 124` — Implement tool detection
+3. Execute Phase 125 (core tool integrations with ripgrep, fd, jq)
