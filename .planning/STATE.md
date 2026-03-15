@@ -1,20 +1,21 @@
-# Project State
+# v12.1 Project State: Tool Integration & Agent Enhancement
 
 ## Project Reference
 
 See: `.planning/PROJECT.md` (updated 2026-03-15)
 
 **Core value:** Manage and deliver high-quality software with high-quality documentation, while continuously reducing token usage and improving performance
-**Current focus:** Between milestones — v12.0 complete
+**Current focus:** v12.1 Tool Integration & Agent Enhancement — roadmap created
 
 ## Current Position
 
-**Phase:** Not started (defining requirements)
-**Current Plan:** None
-**Status:** v12.1 Milestone started — gathering requirements
-**Last Activity:** 2026-03-15 — Milestone v12.1 planning initiated
+**Milestone:** v12.1 Tool Integration & Agent Enhancement
+**Phase:** 124 (not yet started — planning phase)
+**Current Plan:** None (in roadmap phase)
+**Status:** Roadmap complete — 5 phases defined, 11/11 requirements mapped
+**Last Activity:** 2026-03-15 17:30 UTC — v12.1 ROADMAP.md created
 
-Progress: [          ] 0%
+Progress: [█████     ] 20% (roadmap complete, plans pending)
 
 ## Performance Metrics
 
@@ -40,29 +41,48 @@ Progress: [          ] 0%
 
 ## Accumulated Context
 
-### Decisions
+### v12.1 Roadmap Summary
 
-- [v12.0]: Schema versioning via PRAGMA user_version with inline MIGRATIONS array — zero-dependency, single-file compatible
-- [v12.0]: Two-layer cache (Map L1 + SQLite L2) with PlanningCache — transparent fallback on Node <22.5
-- [v12.0]: Git-hash + mtime hybrid invalidation for SQLite cache freshness
-- [v12.0]: SQL-first dual-write for state mutations — backward-compatible with existing format
-- [v12.0]: JSON canonical, SQLite best-effort for sacred data — failures never roll back JSON
-- [v12.0]: ESM-native db-cache.js alongside CJS db.js for plugin compatibility
+- **Phases:** 124–128 (5 phases)
+- **Requirements:** 11 total (TOOL-* and AGENT-* categories)
+- **Coverage:** 100% — every requirement maps to exactly one phase
+- **Dependencies:** Phase 124 is foundation; phases 125–127 can parallelize; phase 128 aggregates
 
-### Roadmap Evolution
+### Phase Descriptions
 
-_No active roadmap — v12.0 complete, awaiting next milestone._
+| Phase | Name | Goal | Requirements |
+|-------|------|------|--------------|
+| 124 | Tool Detection & Infrastructure | Unified tool capability detection with caching | TOOL-DET-01 |
+| 125 | Core Tools Integration | ripgrep, fd, jq with graceful degradation | TOOL-01, TOOL-02, TOOL-03, TOOL-DEGR-01 |
+| 126 | Extended Tools | yq, bat, GitHub CLI integration | TOOL-04, TOOL-05, TOOL-06 |
+| 127 | Agent Routing Enhancement | Tool-aware routing with decision functions | AGENT-01 |
+| 128 | Agent Collaboration | Inter-agent handoffs & multi-phase sequencing | AGENT-02, AGENT-03 |
 
-### Pending Todos
+### Key Decisions
 
-None.
+- [v12.1]: Tool detection centralized in Phase 124 to avoid duplication across 6 tools
+- [v12.1]: Core tools (ripgrep, fd, jq) in Phase 125 due to performance criticality
+- [v12.1]: Extended tools (yq, bat, gh) in Phase 126 for secondary operations
+- [v12.1]: Agent routing (Phase 127) before collaboration (Phase 128) for natural ordering
+- [v12.1]: 25%+ context reduction target via capability-aware filtering
+
+### Pending Work
+
+- Phase 124 planning (tool detection infrastructure)
+- Phase 125 planning (core tool integrations)
+- Phase 126 planning (extended tool integrations)
+- Phase 127 planning (agent routing decision functions)
+- Phase 128 planning (inter-agent collaboration patterns)
 
 ### Blockers/Concerns
 
-None.
+None — roadmap ready for planning phase.
 
 ## Session Continuity
 
-**Last session:** 2026-03-15
-**Stopped at:** Completed v12.0 milestone archival
-**Next step:** `/bgsd-new-milestone` to start next milestone
+**Last session:** 2026-03-15T03:02:20.937Z
+**This session:** 2026-03-15 (v12.1 roadmap creation)
+**Next steps:** 
+1. `/bgsd-plan-phase 124` — Plan tool detection infrastructure
+2. Phases 125–127 planning (parallel)
+3. `/bgsd-execute-phase 124` — Implement tool detection
