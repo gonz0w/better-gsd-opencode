@@ -18,7 +18,7 @@ v12.1 focuses on integrating modern CLI tools (ripgrep, fd, jq, yq, bat, gh) int
 - [✓] **Phase 124: Tool Detection & Infrastructure** (2/2 plans complete) - Unified tool capability detection with caching and cross-platform support
 - [x] **Phase 125: Core Tools Integration** - ripgrep, fd, jq integration with graceful degradation (completed 2026-03-15)
 - [x] **Phase 126: Extended Tools** - yq, bat, GitHub CLI integration for enhanced workflows (completed 2026-03-15)
-- [ ] **Phase 127: Agent Routing Enhancement** - Tool-aware agent routing with decision functions
+- [x] **Phase 127: Agent Routing Enhancement** - Tool-aware agent routing with decision functions (completed 2026-03-15)
 - [ ] **Phase 128: Agent Collaboration** - Enhanced handoffs, multi-phase sequencing, shared patterns
 - [ ] **Phase 124: Tool Detection & Infrastructure**
 
@@ -107,7 +107,7 @@ v12.1 focuses on integrating modern CLI tools (ripgrep, fd, jq, yq, bat, gh) int
   5. Plan decomposition heuristics account for tool availability (e.g., tasks are smaller when tools available, larger when fallback required)
 
 **Plans:**
-  - Plan 01 (Wave 1): tool_availability enrichment + 3 resolve functions (resolveFileDiscoveryMode, resolveSearchMode, resolveJsonTransformMode) + workflow guidance
+  2/2 plans complete
   - Plan 02 (Wave 2): Contract tests for decision functions + enricher integration tests
 
 ---
@@ -138,7 +138,7 @@ v12.1 focuses on integrating modern CLI tools (ripgrep, fd, jq, yq, bat, gh) int
 | 124. Tool Detection & Infrastructure | 2/2 | ✅ Complete | 2026-03-15 |
 | 125. Core Tools Integration | 0/3 | Complete    | 2026-03-15 |
 | 126. Extended Tools | 1/3 | Complete    | 2026-03-15 |
-| 127. Agent Routing Enhancement | 0/2 | Planned | — |
+| 127. Agent Routing Enhancement | 0/2 | Complete    | 2026-03-15 |
 | 128. Agent Collaboration | 0/2 | Planned | — |
 
 **Total:** 2/12 plans complete · 17% progress

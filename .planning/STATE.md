@@ -10,24 +10,21 @@ See: `.planning/PROJECT.md` (updated 2026-03-15)
 ## Current Position
 
 **Milestone:** v12.1 Tool Integration & Agent Enhancement
-**Phase:** 126 (All 3 plans complete)
+**Phase:** 127 (All 2 plans complete)
 **Current Plan:** Not started
 **Status:** Ready to plan
 **Last Activity:** 2026-03-15
 
-Progress: [██████████] 100% (Phase 126 complete, 3 of 3 plans)
+Progress: [██████████] 100% (Phase 127 complete, 2 of 2 plans)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 239 (v12.1 Phase 124 Plan 02)
+- Total plans completed: 241 (v12.1 Phase 127 Plan 02)
 - Average duration: ~14 min/plan (improving with better tooling)
 - Total execution time: ~41.5 hours
 
 **Recent Trend:**
-- v12.0 Phase 121 Plan 01: 5 min, 2 tasks, 6 files (1160 tests)
-- v12.0 Phase 121 Plan 02: 27 min, 3 tasks, 5 files (1160 tests)
-- v12.0 Phase 121 Plan 03: 17 min, 2 tasks, 2 files (1179 tests)
 - v12.0 Phase 122 Plan 01: 14 min, 2 tasks, 9 files (1189 tests)
 - v12.0 Phase 122 Plan 02: 17 min, 2 tasks, 7 files (202 decision tests)
 - v12.0 Phase 123 Plan 01: 10 min, 2 tasks, 4 files (1200 tests)
@@ -38,6 +35,8 @@ Progress: [██████████] 100% (Phase 126 complete, 3 of 3 plan
 - v12.1 Phase 126 Plan 01: 15 min, 2 tasks, 9 files (1398 tests - all pass)
 - v12.1 Phase 126 Plan 02: 19 min, 2 tasks, 4 files (1398 tests - all pass)
 - v12.1 Phase 126 Plan 03: 4 min, 2 tasks, 1 file (1427 tests - all pass, 48 new)
+- v12.1 Phase 127 Plan 01: ~15 min, 2 tasks, 2 files (1446 tests - all pass)
+- v12.1 Phase 127 Plan 02: ~10 min, 2 tasks, 2 files (1501 tests - all pass, 55 new)
 - Trend: Stable, improving velocity with infrastructure improvements
 
 *Updated after each plan completion*
@@ -73,6 +72,9 @@ Progress: [██████████] 100% (Phase 126 complete, 3 of 3 plan
 - [0126-02]: detect:gh-preflight kept internal (no COMMAND_HELP) — workflow-facing tool for GitHub CI pre-flight validation
 - [0126-03]: withToolFallback catches gh fallback throws — tests verify success:false result, not thrown exceptions (error-and-stop behavior preserved)
 - [0126-03]: Version blocklist logic tested by extracting parseVersion + BLOCKED_VERSIONS criteria (no gh binary needed — machine-independent)
+- [0127-01]: tool_availability uses file cache (.planning/.cache/tools.json) not direct getToolStatus() — avoids child_process in ESM plugin
+- [0127-01]: All 6 tools default to false when cache absent/stale (conservative fallback)
+- [0127-01]: Plan decomposition heuristics live in plan-phase.md workflow — tool choice is executor concern, not planner concern
 
 ### Completed Work
 
@@ -111,19 +113,30 @@ Progress: [██████████] 100% (Phase 126 complete, 3 of 3 plan
   - Error-and-stop behavior confirmed
   - All 1427 tests passing (96 integration tests)
 
+- [✓] Phase 127 Plan 01: Tool Availability + Tool Routing Decision Functions (AGENT-01)
+  - resolveFileDiscoveryMode, resolveSearchMode, resolveJsonTransformMode in decision-rules.js
+  - All three registered in DECISION_REGISTRY under 'tool-routing' category
+  - tool_availability added to bgsd-context (reads .planning/.cache/tools.json, ESM-safe)
+  - Tool-Aware Planning Guidance added to plan-phase.md workflow
+  - All 1446 tests passing
+
+- [✓] Phase 127 Plan 02: Contract Tests for Tool Routing Decision Functions (AGENT-01 verification)
+  - ~38 contract tests for all three resolve functions (all input/output combinations)
+  - DECISION_REGISTRY integration tests (all three rules registered, evaluateDecisions fires correctly)
+  - ~12 enricher integration tests (tool_availability shape, boolean-only, 6 keys, no version/path)
+  - All 1501 tests passing (55 new tests)
+
 ### Pending Work
 
-- Phase 127 planning (agent routing decision functions)
 - Phase 128 planning (inter-agent collaboration patterns)
 
 ### Blockers/Concerns
 
-None — Phase 126 complete, yq/bat/gh integration fully done.
+None — Phase 127 complete, all three tool routing decision functions implemented and tested.
 
 ## Session Continuity
 
 **Last session:** 2026-03-15T13:59:50.085Z
-**This session:** 2026-03-15 (Phase 126 Plan 03 execution complete, 4 min total — Phase 126 fully complete)
+**This session:** 2026-03-15 (Phase 127 execution complete — 2 plans, ~25 min total, 55 new tests, 1501 total)
 **Next steps:** 
-1. Plan and execute Phase 127 (agent routing decision functions)
-2. Plan and execute Phase 128 (agent collaboration patterns)
+1. Plan and execute Phase 128 (inter-agent collaboration patterns — AGENT-02, AGENT-03)
