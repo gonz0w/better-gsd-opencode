@@ -677,6 +677,28 @@ const DECISION_REGISTRY = [
     confidence_range: ['HIGH'],
     resolve: resolveJsonTransformMode,
   },
+
+  // Phase 128: Agent collaboration decision functions
+  {
+    id: 'agent-capability-level',
+    name: 'Agent Capability Level',
+    category: 'state-assessment',
+    description: 'Scores agent capability based on available tool count',
+    inputs: ['tool_availability'],
+    outputs: ['HIGH|MEDIUM|LOW'],
+    confidence_range: ['HIGH'],
+    resolve: resolveAgentCapabilityLevel,
+  },
+  {
+    id: 'phase-dependencies',
+    name: 'Phase Dependency Sequencing',
+    category: 'workflow-routing',
+    description: 'Sequences phases accounting for dependencies and tool capabilities',
+    inputs: ['phases', 'tool_availability'],
+    outputs: ['{ ordered_phases, warnings }'],
+    confidence_range: ['HIGH', 'MEDIUM'],
+    resolve: resolvePhaseDependencies,
+  },
 ];
 
 // ─── Phase 127: Tool routing decision functions ───────────────────────────────
@@ -755,6 +777,157 @@ function resolveJsonTransformMode(state) {
   return { value: 'javascript', confidence: 'HIGH', rule_id: 'json-transform-mode' };
 }
 
+
+// ─── Phase 128: Agent Collaboration decision functions ────────────────────────
+
+/**
+ * Agent capability level scoring.
+ * Scores agent capability based on available tool count (out of 6 standard tools).
+ *
+ * @param {object} state - { tool_availability: {ripgrep, fd, jq, yq, bat, gh} }
+ * @returns {{ value: string, confidence: string, rule_id: string, metadata?: object }}
+ */
+function resolveAgentCapabilityLevel(state) {
+  const { tool_availability = {} } = state || {};
+
+  const tools = ['ripgrep', 'fd', 'jq', 'yq', 'bat', 'gh'];
+  const count = tools.filter(t => tool_availability[t] === true).length;
+
+  if (count >= 5) {
+    return { value: 'HIGH', confidence: 'HIGH', rule_id: 'agent-capability-level' };
+  }
+
+  if (count >= 2) {
+    return { value: 'MEDIUM', confidence: 'HIGH', rule_id: 'agent-capability-level' };
+  }
+
+  // 0-1 tools: LOW with internal warning
+  return {
+    value: 'LOW',
+    confidence: 'HIGH',
+    rule_id: 'agent-capability-level',
+    metadata: { warning: 'Low tool availability — agent proceeding with limited capabilities' },
+  };
+}
+
+/**
+ * Phase dependency sequencing.
+ * Sequences phases accounting for declared dependencies (which always win)
+ * and uses tool availability as a tiebreaker for independent phases.
+ *
+ * @param {object} state - { phases: [{ number, depends_on, tool_requirements, status }], tool_availability: {} }
+ * @returns {{ value: { ordered_phases: number[], warnings: string[] }, confidence: string, rule_id: string }}
+ */
+function resolvePhaseDependencies(state) {
+  const rawPhases = (state || {}).phases;
+  const phases = Array.isArray(rawPhases) ? rawPhases : [];
+  const { tool_availability = {} } = state || {};
+
+  if (!phases.length) {
+    return { value: { ordered_phases: [], warnings: [] }, confidence: 'HIGH', rule_id: 'phase-dependencies' };
+  }
+
+  const warnings = [];
+
+  // Build adjacency: number -> depends_on numbers
+  const depMap = {};
+  const allNumbers = [];
+  for (const phase of phases) {
+    const num = phase.number;
+    allNumbers.push(num);
+    depMap[num] = Array.isArray(phase.depends_on) ? phase.depends_on : [];
+  }
+
+  // Topological sort (Kahn's algorithm) — declared dependencies ALWAYS WIN
+  const inDegree = {};
+  const adjList = {};  // num -> list of nums that depend on it
+  for (const num of allNumbers) {
+    inDegree[num] = inDegree[num] || 0;
+    adjList[num] = adjList[num] || [];
+  }
+  for (const num of allNumbers) {
+    for (const dep of depMap[num]) {
+      inDegree[num] = (inDegree[num] || 0) + 1;
+      if (!adjList[dep]) adjList[dep] = [];
+      adjList[dep].push(num);
+    }
+  }
+
+  // Find all phases with no dependencies (roots)
+  const queue = allNumbers.filter(n => inDegree[n] === 0);
+
+  // Sort queue using tool availability as tiebreaker for independent phases
+  function sortByToolReadiness(nums) {
+    return [...nums].sort((a, b) => {
+      const phaseA = phases.find(p => p.number === a) || {};
+      const phaseB = phases.find(p => p.number === b) || {};
+      const reqA = Array.isArray(phaseA.tool_requirements) ? phaseA.tool_requirements : [];
+      const reqB = Array.isArray(phaseB.tool_requirements) ? phaseB.tool_requirements : [];
+
+      // Check discovery/analysis heuristic first
+      const nameA = String(phaseA.name || phaseA.number || '').toLowerCase();
+      const nameB = String(phaseB.name || phaseB.number || '').toLowerCase();
+      const isDiscoveryA = /discovery|detect|scan/.test(nameA);
+      const isDiscoveryB = /discovery|detect|scan/.test(nameB);
+      const isAnalysisA = /analysis|transform|complex/.test(nameA);
+      const isAnalysisB = /analysis|transform|complex/.test(nameB);
+
+      if (isDiscoveryA && isAnalysisB) return -1;
+      if (isDiscoveryB && isAnalysisA) return 1;
+
+      // Tool availability tiebreaker: count available required tools
+      const readyA = reqA.filter(t => tool_availability[t] === true).length;
+      const readyB = reqB.filter(t => tool_availability[t] === true).length;
+      if (readyA !== readyB) return readyB - readyA; // higher readiness first
+
+      return 0;
+    });
+  }
+
+  const sorted = sortByToolReadiness(queue);
+  const result = [];
+  const visited = new Set();
+
+  // Process in topological order
+  while (sorted.length > 0) {
+    const num = sorted.shift();
+    if (visited.has(num)) continue;
+    visited.add(num);
+    result.push(num);
+
+    // Check tool readiness warning for this phase
+    const phase = phases.find(p => p.number === num) || {};
+    const reqs = Array.isArray(phase.tool_requirements) ? phase.tool_requirements : [];
+    const missingTools = reqs.filter(t => tool_availability[t] !== true);
+    if (missingTools.length > 0) {
+      warnings.push('Phase ' + num + ' has suboptimal tool readiness (missing: ' + missingTools.join(', ') + ')');
+    }
+
+    // Unlock dependents
+    const readyNext = [];
+    for (const dependent of (adjList[num] || [])) {
+      inDegree[dependent]--;
+      if (inDegree[dependent] === 0) {
+        readyNext.push(dependent);
+      }
+    }
+    const sortedNext = sortByToolReadiness(readyNext);
+    // Insert at front so we process ready dependents before remaining roots
+    sorted.unshift(...sortedNext);
+  }
+
+  // Any unvisited phases indicate a cycle — append in original order with warning
+  for (const num of allNumbers) {
+    if (!visited.has(num)) {
+      result.push(num);
+      warnings.push('Phase ' + num + ' may be part of a dependency cycle');
+    }
+  }
+
+  const confidence = warnings.length > 0 ? 'MEDIUM' : 'HIGH';
+  return { value: { ordered_phases: result, warnings }, confidence, rule_id: 'phase-dependencies' };
+}
+
 // ─── Aggregator ──────────────────────────────────────────────────────────────
 
 /**
@@ -814,6 +987,9 @@ module.exports = {
   resolveFileDiscoveryMode,
   resolveSearchMode,
   resolveJsonTransformMode,
+  // Phase 128: Agent collaboration decision functions
+  resolveAgentCapabilityLevel,
+  resolvePhaseDependencies,
   // Registry and aggregator
   DECISION_REGISTRY,
   evaluateDecisions,
