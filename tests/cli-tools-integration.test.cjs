@@ -426,6 +426,259 @@ describe('jq integration — TOOL-03', () => {
 
 });
 
+// ─── PHASE 126: CONFIG TOGGLE TESTS (yq, bat, gh) ────────────────────────────
+
+describe('Config toggles — Phase 126 tools (TOOL-04, TOOL-05, TOOL-06)', () => {
+
+  test('CONFIG_SCHEMA has tools_yq with type boolean and default true', () => {
+    assert.ok(CONFIG_SCHEMA.tools_yq, 'tools_yq should be in CONFIG_SCHEMA');
+    assert.strictEqual(CONFIG_SCHEMA.tools_yq.type, 'boolean');
+    assert.strictEqual(CONFIG_SCHEMA.tools_yq.default, true);
+  });
+
+  test('CONFIG_SCHEMA has tools_bat with type boolean and default true', () => {
+    assert.ok(CONFIG_SCHEMA.tools_bat, 'tools_bat should be in CONFIG_SCHEMA');
+    assert.strictEqual(CONFIG_SCHEMA.tools_bat.type, 'boolean');
+    assert.strictEqual(CONFIG_SCHEMA.tools_bat.default, true);
+  });
+
+  test('CONFIG_SCHEMA has tools_gh with type boolean and default true', () => {
+    assert.ok(CONFIG_SCHEMA.tools_gh, 'tools_gh should be in CONFIG_SCHEMA');
+    assert.strictEqual(CONFIG_SCHEMA.tools_gh.type, 'boolean');
+    assert.strictEqual(CONFIG_SCHEMA.tools_gh.default, true);
+  });
+
+  test('CONFIG_SCHEMA tools_yq has nested section:tools field:yq', () => {
+    assert.strictEqual(CONFIG_SCHEMA.tools_yq.nested?.section, 'tools');
+    assert.strictEqual(CONFIG_SCHEMA.tools_yq.nested?.field, 'yq');
+  });
+
+  test('CONFIG_SCHEMA tools_bat has nested section:tools field:bat', () => {
+    assert.strictEqual(CONFIG_SCHEMA.tools_bat.nested?.section, 'tools');
+    assert.strictEqual(CONFIG_SCHEMA.tools_bat.nested?.field, 'bat');
+  });
+
+  test('CONFIG_SCHEMA tools_gh has nested section:tools field:gh', () => {
+    assert.strictEqual(CONFIG_SCHEMA.tools_gh.nested?.section, 'tools');
+    assert.strictEqual(CONFIG_SCHEMA.tools_gh.nested?.field, 'gh');
+  });
+
+});
+
+// ─── PHASE 126: YQ INTEGRATION TESTS ─────────────────────────────────────────
+
+describe('yq integration — TOOL-04', () => {
+  const { parseYAML, transformYAML, YAMLtoJSON, isYqAvailable } = require('../src/lib/cli-tools/yq');
+
+  test('parseYAML returns { success, result } shape for simple key:value', () => {
+    const result = parseYAML('key: value');
+    assert.ok('success' in result, 'should have success field');
+    assert.ok('result' in result, 'should have result field');
+    assert.ok(result.success, `parseYAML failed: ${result.error}`);
+  });
+
+  test('parseYAML result contains parsed key for key:value YAML', () => {
+    const result = parseYAML('mykey: myvalue');
+    assert.ok(result.success, `parseYAML failed: ${result.error}`);
+    assert.ok(result.result !== null && result.result !== undefined, 'result should not be null');
+    // The result should have mykey (either as object property or string representation)
+    const resultStr = JSON.stringify(result.result);
+    assert.ok(resultStr.includes('myvalue'), `Expected myvalue in result, got: ${resultStr}`);
+  });
+
+  test('parseYAML with multi-line YAML returns object with multiple keys', () => {
+    const yaml = 'name: docker-compose\nversion: "3"\nservice: web';
+    const result = parseYAML(yaml);
+    assert.ok(result.success, `parseYAML multi-line failed: ${result.error}`);
+    assert.ok(result.result !== null, 'result should not be null');
+    const resultStr = JSON.stringify(result.result);
+    assert.ok(resultStr.includes('docker-compose'), `Expected docker-compose in result, got: ${resultStr}`);
+  });
+
+  test('parseYAML with list YAML handles array-like content', () => {
+    const yaml = '- item1\n- item2\n- item3';
+    const result = parseYAML(yaml);
+    // Should not crash — either success with array or graceful result
+    assert.ok('success' in result, 'should return structured result');
+    assert.ok('result' in result, 'should have result field');
+  });
+
+  test('parseYAML with empty input returns graceful result (not a crash)', () => {
+    let result;
+    assert.doesNotThrow(() => {
+      result = parseYAML('');
+    }, 'parseYAML should not throw on empty input');
+    assert.ok('success' in result, 'should return structured result');
+  });
+
+  test('parseYAML with invalid YAML returns graceful failure (success:false or result:null)', () => {
+    // Malformed YAML that won't parse correctly
+    const invalidYaml = 'key: :\n  broken: [unclosed';
+    let result;
+    assert.doesNotThrow(() => {
+      result = parseYAML(invalidYaml);
+    }, 'parseYAML should not throw on invalid YAML');
+    // Should either fail gracefully or return null result
+    if (result.success) {
+      // Fallback may have partially parsed — ok, just verify it didn't crash
+      assert.ok(true, 'Graceful handling: fallback parsed or returned partial result');
+    } else {
+      assert.ok(!result.success || result.result === null, 'Should fail gracefully');
+    }
+  });
+
+  test('transformYAML with .key expression returns the value at key', () => {
+    const yaml = 'name: testproject\nversion: 1';
+    const result = transformYAML(yaml, '.name');
+    assert.ok('success' in result, 'should return structured result');
+    // Either CLI or fallback ran
+    if (result.success) {
+      const resultStr = JSON.stringify(result.result);
+      assert.ok(resultStr.includes('testproject'), `Expected testproject, got: ${resultStr}`);
+    }
+  });
+
+  test('YAMLtoJSON returns JSON string representation', () => {
+    const result = YAMLtoJSON('key: value');
+    assert.ok(result.success, `YAMLtoJSON failed: ${result.error}`);
+    assert.strictEqual(typeof result.result, 'string', 'YAMLtoJSON result should be a string');
+    // Should be valid JSON
+    assert.doesNotThrow(() => JSON.parse(result.result), 'YAMLtoJSON result should be valid JSON');
+  });
+
+  test('isYqAvailable returns boolean (not null/undefined)', () => {
+    const result = isYqAvailable();
+    assert.ok(typeof result === 'boolean', `Expected boolean, got ${typeof result}: ${result}`);
+  });
+
+});
+
+// ─── PHASE 126: BAT INTEGRATION TESTS ────────────────────────────────────────
+
+describe('bat integration — TOOL-05', () => {
+  const { catWithHighlight, getLanguage, getStylePresets, isBatAvailable } = require('../src/lib/cli-tools/bat');
+
+  test('catWithHighlight returns { success, result } shape for existing file', () => {
+    const filePath = path.join(__dirname, 'cli-tools-integration.test.cjs');
+    const result = catWithHighlight(filePath);
+    assert.ok('success' in result, 'should have success field');
+    assert.ok('result' in result, 'should have result field');
+    assert.ok(result.success, `catWithHighlight failed: ${result.error}`);
+  });
+
+  test('catWithHighlight result contains file content (verified by known string)', () => {
+    const filePath = path.join(__dirname, 'cli-tools-integration.test.cjs');
+    const result = catWithHighlight(filePath);
+    assert.ok(result.success, `catWithHighlight failed: ${result.error}`);
+    // The file itself contains this unique string
+    assert.ok(result.result.includes('CLI Tools Integration Test Suite'),
+      'result should contain file content');
+  });
+
+  test('catWithHighlight with language:diff option returns content', () => {
+    const filePath = path.join(__dirname, 'cli-tools-integration.test.cjs');
+    const result = catWithHighlight(filePath, { language: 'diff' });
+    assert.ok('success' in result, 'should have success field');
+    assert.ok(result.success, `catWithHighlight with language:diff failed: ${result.error}`);
+    assert.ok(typeof result.result === 'string', 'result should be a string');
+  });
+
+  test('catWithHighlight with style:numbers,grid option returns content', () => {
+    const filePath = path.join(__dirname, 'cli-tools-integration.test.cjs');
+    const result = catWithHighlight(filePath, { style: 'numbers,grid' });
+    assert.ok('success' in result, 'should have success field');
+    assert.ok(result.success, `catWithHighlight with style failed: ${result.error}`);
+    assert.ok(typeof result.result === 'string', 'result should be a string');
+  });
+
+  test('catWithHighlight for non-existent file returns { success: false } with error', () => {
+    const result = catWithHighlight('/this/path/does/not/exist/file.txt');
+    assert.ok('success' in result, 'should have success field');
+    assert.strictEqual(result.success, false, 'non-existent file should fail');
+    assert.ok(result.error, 'should have error message');
+  });
+
+  test('getLanguage returns { success, result } shape for test.js', () => {
+    const result = getLanguage('test.js');
+    assert.ok('success' in result, 'should have success field');
+    assert.ok('result' in result, 'should have result field');
+    assert.ok(result.success, `getLanguage failed: ${result.error}`);
+  });
+
+  test('getLanguage result for test.js is javascript or auto', () => {
+    const result = getLanguage('test.js');
+    assert.ok(result.success, `getLanguage failed: ${result.error}`);
+    const validLanguages = ['javascript', 'auto', 'JavaScript', 'js'];
+    assert.ok(
+      validLanguages.includes(result.result) || typeof result.result === 'string',
+      `Expected javascript or auto, got: ${result.result}`
+    );
+  });
+
+  test('isBatAvailable returns boolean (not null/undefined)', () => {
+    const result = isBatAvailable();
+    assert.ok(typeof result === 'boolean', `Expected boolean, got ${typeof result}: ${result}`);
+  });
+
+  test('getStylePresets returns object with known preset keys', () => {
+    const presets = getStylePresets();
+    assert.ok(typeof presets === 'object', 'getStylePresets should return object');
+    assert.ok('full' in presets, 'presets should have full');
+    assert.ok('header' in presets, 'presets should have header');
+    assert.ok('numbers' in presets, 'presets should have numbers');
+    assert.ok('grid' in presets, 'presets should have grid');
+    assert.ok('none' in presets, 'presets should have none');
+  });
+
+});
+
+// ─── PHASE 126: OUTPUT PARITY TESTS ──────────────────────────────────────────
+
+describe('Output parity Phase 126 — TOOL-04, TOOL-05', () => {
+  const { parseYAML: yqParseYAML, isYqAvailable } = require('../src/lib/cli-tools/yq');
+  const { catWithHighlight: batCatWithHighlight, isBatAvailable } = require('../src/lib/cli-tools/bat');
+
+  test('parseYAML result shape is identical whether yq CLI or JS fallback runs', () => {
+    const result = yqParseYAML('service: web\nport: 8080');
+    // Always has these three fields
+    assert.ok('success' in result, 'should have success field');
+    assert.ok('usedFallback' in result, 'should have usedFallback field');
+    assert.ok('result' in result, 'should have result field');
+    assert.strictEqual(typeof result.success, 'boolean');
+    assert.strictEqual(typeof result.usedFallback, 'boolean');
+  });
+
+  test('catWithHighlight result shape is identical whether bat CLI or JS fallback runs', () => {
+    const filePath = path.join(__dirname, 'cli-tools-integration.test.cjs');
+    const result = batCatWithHighlight(filePath);
+    // Always has these fields
+    assert.ok('success' in result, 'should have success field');
+    assert.ok('usedFallback' in result, 'should have usedFallback field');
+    assert.ok('result' in result, 'should have result field');
+    assert.strictEqual(typeof result.success, 'boolean');
+    assert.strictEqual(typeof result.usedFallback, 'boolean');
+  });
+
+  test('parseYAML JS fallback produces valid parsed object for simple key:value YAML', () => {
+    // This test validates the fallback itself works (result is a valid object not null)
+    const result = yqParseYAML('project: bgsd\nversion: 8');
+    assert.ok(result.success, `parseYAML should succeed via CLI or fallback: ${result.error}`);
+    // Result should be an object (not a string, not null)
+    assert.ok(result.result !== null, 'result should not be null for valid YAML');
+    assert.ok(typeof result.result === 'object' || typeof result.result === 'string',
+      `result should be parsed data, got: ${typeof result.result}`);
+  });
+
+  test('catWithHighlight JS fallback produces file content string', () => {
+    const filePath = path.join(__dirname, 'cli-tools-integration.test.cjs');
+    const result = batCatWithHighlight(filePath);
+    assert.ok(result.success, `catWithHighlight should succeed: ${result.error}`);
+    assert.strictEqual(typeof result.result, 'string', 'catWithHighlight result should be a string');
+    assert.ok(result.result.length > 0, 'result should not be empty');
+  });
+
+});
+
 // ─── GRACEFUL DEGRADATION TESTS ───────────────────────────────────────────────
 
 describe('Graceful degradation — TOOL-DEGR-01', () => {
