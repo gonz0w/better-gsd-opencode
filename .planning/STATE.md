@@ -10,12 +10,12 @@ See: `.planning/PROJECT.md` (updated 2026-03-15)
 ## Current Position
 
 **Milestone:** v12.1 Tool Integration & Agent Enhancement
-**Phase:** 124 (Plan 01 & Plan 02 complete)
-**Current Plan:** Not started
-**Status:** Ready to plan
+**Phase:** 126 (Plan 01 complete)
+**Current Plan:** Plan 01 complete — ready for Plan 02 or next phase
+**Status:** Plan 01 complete
 **Last Activity:** 2026-03-15
 
-Progress: [██████████] 100% (Phase 124 complete, 2 of 2 plans)
+Progress: [██████████] 97% (Phase 126 Plan 01 complete)
 
 ## Performance Metrics
 
@@ -25,8 +25,6 @@ Progress: [██████████] 100% (Phase 124 complete, 2 of 2 plan
 - Total execution time: ~41.5 hours
 
 **Recent Trend:**
-- v12.0 Phase 120 Plan 01: 20 min, 2 tasks, 4 files (1108 tests)
-- v12.0 Phase 120 Plan 02: 7 min, 2 tasks, 4 files (1160 tests)
 - v12.0 Phase 121 Plan 01: 5 min, 2 tasks, 6 files (1160 tests)
 - v12.0 Phase 121 Plan 02: 27 min, 3 tasks, 5 files (1160 tests)
 - v12.0 Phase 121 Plan 03: 17 min, 2 tasks, 2 files (1179 tests)
@@ -37,6 +35,7 @@ Progress: [██████████] 100% (Phase 124 complete, 2 of 2 plan
 - v12.0 Phase 123 Plan 03: 9 min, 2 tasks, 4 files (1283 tests)
 - v12.1 Phase 124 Plan 01: 3 min, 2 tasks, 3 files (1241 tests - all pass)
 - v12.1 Phase 124 Plan 02: 7 min, 2 tasks, 1 file (67 tests added - 1350 total)
+- v12.1 Phase 126 Plan 01: 15 min, 2 tasks, 9 files (1398 tests - all pass)
 - Trend: Stable, improving velocity with infrastructure improvements
 
 *Updated after each plan completion*
@@ -67,6 +66,8 @@ Progress: [██████████] 100% (Phase 124 complete, 2 of 2 plan
 - [v12.1]: Extended tools (yq, bat, gh) in Phase 126 for secondary operations
 - [v12.1]: Agent routing (Phase 127) before collaboration (Phase 128) for natural ordering
 - [v12.1]: 25%+ context reduction target via capability-aware filtering
+- [0126-01]: cmdRollbackInfo lives in features.js not misc.js — plan description had wrong file, implementation correct
+- [0126-01]: bat enhancement pattern: isToolEnabled check → temp file → catWithHighlight → finally cleanup → additive result field
 
 ### Completed Work
 
@@ -83,22 +84,26 @@ Progress: [██████████] 100% (Phase 124 complete, 2 of 2 plan
   - CLI output format validation
   - All 1350 tests passing (1283 baseline + 67 new)
 
+- [✓] Phase 126 Plan 01: Extended Tools Config Toggles and Integration (TOOL-04, TOOL-05)
+  - tools_yq, tools_bat, tools_gh config toggles in CONFIG_SCHEMA
+  - yq-backed YAML parsing in detectInfraServices and detectMonorepo (with regex fallback)
+  - bat-enhanced diff display in cmdSessionDiff and cmdRollbackInfo (silent fallback, additive diff_highlighted)
+  - All 1398 tests passing
+
 ### Pending Work
 
-- Phase 125 planning (core tool integrations with ripgrep, fd, jq)
-- Phase 126 planning (extended tool integrations)
 - Phase 127 planning (agent routing decision functions)
 - Phase 128 planning (inter-agent collaboration patterns)
 
 ### Blockers/Concerns
 
-None — Phase 124 complete, infrastructure fully tested and ready for phases 125–127.
+None — Phase 126 Plan 01 complete, yq/bat/gh integration done.
 
 ## Session Continuity
 
-**Last session:** 2026-03-15T12:59:30.749Z
-**This session:** 2026-03-15 (Phase 124 execution complete, 10 min total)
+**Last session:** 2026-03-15T13:33:22.865Z
+**This session:** 2026-03-15 (Phase 126 Plan 01 execution complete, 15 min total)
 **Next steps:** 
-1. Phases 125–127 planning (parallel)
-2. Execute Phase 125 (core tool integrations with ripgrep, fd, jq)
-3. Execute Phase 126 (extended tools: yq, bat, gh)
+1. Continue Phase 126 Plan 02+ if any planned
+2. Plan and execute Phase 127 (agent routing decision functions)
+3. Plan and execute Phase 128 (agent collaboration patterns)

@@ -85,7 +85,7 @@ v12.1 focuses on integrating modern CLI tools (ripgrep, fd, jq, yq, bat, gh) int
   5. gh CLI version constraint enforced (2.88.1+, avoiding 2.88.0 regression)
 
 **Plans:**
-  - Plan 01 (Wave 1): Config toggles (tools_yq, tools_bat, tools_gh) + yq into YAML parsing + bat into diff display
+  1/3 plans executed
   - Plan 02 (Wave 1): gh version blocklist (isGhUsable) + detect:gh-preflight CLI command
   - Plan 03 (Wave 2): Integration test suite (46+ tests) for yq, bat, gh
 
@@ -135,7 +135,7 @@ v12.1 focuses on integrating modern CLI tools (ripgrep, fd, jq, yq, bat, gh) int
 |-------|----------------|--------|-----------|
 | 124. Tool Detection & Infrastructure | 2/2 | ✅ Complete | 2026-03-15 |
 | 125. Core Tools Integration | 0/3 | Complete    | 2026-03-15 |
-| 126. Extended Tools | 0/3 | Planned | — |
+| 126. Extended Tools | 1/3 | In Progress|  |
 | 127. Agent Routing Enhancement | 0/2 | Planned | — |
 | 128. Agent Collaboration | 0/2 | Planned | — |
 
