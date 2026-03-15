@@ -12,7 +12,7 @@ const { PlanningCache } = require('../lib/planning-cache');
 const LESSON_SCHEMA = {
   required: ['title', 'severity', 'type', 'root_cause', 'prevention_rule', 'affected_agents'],
   severity_values: ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'],
-  type_values: ['workflow', 'agent-behavior', 'tooling', 'environment'],
+  type_values: ['workflow', 'agent-behavior', 'tooling', 'environment', 'deviation-recovery'],
 };
 
 // ─── Validation ───────────────────────────────────────────────────────────────
@@ -150,6 +150,97 @@ function cmdLessonsCapture(cwd, options, raw) {
     type: normalized.type,
     entry_count: entries.length,
   });
+}
+
+// ─── Deviation Capture ────────────────────────────────────────────────────────
+
+/**
+ * Auto-capture Rule-1 deviation recovery patterns as structured lesson entries.
+ * Rule filter: only captures rule === 1 (code bugs). Rules 2, 3, 4 are silently skipped.
+ * Cap: stops silently after 3 deviation-recovery entries per milestone.
+ * Options: rule, failureCount, behavioralChange, agent
+ */
+function cmdDeviationCapture(cwd, options, raw) {
+  try {
+    // Rule-1 filter: only capture code bugs (Rule 1)
+    const rule = parseInt(options.rule, 10);
+    if (rule !== 1) {
+      output({ captured: false, reason: 'rule_filtered', rule: options.rule });
+      return;
+    }
+
+    // Validate required fields
+    const behavioralChange = options.behavioralChange;
+    const agent = options.agent;
+    if (!behavioralChange || typeof behavioralChange !== 'string' || !behavioralChange.trim()) {
+      output({ captured: false, reason: 'missing_fields' });
+      return;
+    }
+    if (!agent || typeof agent !== 'string' || !agent.trim()) {
+      output({ captured: false, reason: 'missing_fields' });
+      return;
+    }
+
+    // Cap check: stop after 3 deviation-recovery entries
+    const entries = readLessonsStore(cwd);
+    const deviationEntries = entries.filter(e => e.type === 'deviation-recovery');
+    if (deviationEntries.length >= 3) {
+      output({ captured: false, reason: 'cap_reached', count: deviationEntries.length });
+      return;
+    }
+
+    // Build lesson entry
+    const failureCount = parseInt(options.failureCount, 10) || 0;
+    const entry = {
+      id: crypto.randomUUID(),
+      date: new Date().toISOString(),
+      title: `Deviation recovery: ${behavioralChange}`.substring(0, 200),
+      severity: 'MEDIUM',
+      type: 'deviation-recovery',
+      root_cause: `Rule ${rule} deviation recovered after ${options.failureCount || 'unknown'} failures`,
+      prevention_rule: behavioralChange,
+      affected_agents: agent,
+      deviation_rule: rule,
+      failure_count: failureCount,
+      behavioral_change: behavioralChange,
+    };
+
+    // Validate
+    const validation = validateLesson(entry);
+    if (!validation.valid) {
+      output({ captured: false, reason: 'validation_failed' });
+      return;
+    }
+
+    const normalized = validation.normalized;
+
+    // Store
+    entries.push(normalized);
+    writeLessonsStore(cwd, entries);
+
+    // Dual-write to SQLite (best-effort)
+    try {
+      const db = getDb(cwd);
+      const cache = new PlanningCache(db);
+      cache.writeMemoryEntry(cwd, 'lessons', normalized);
+    } catch (e) {
+      debugLog('lessons.deviation-capture', 'SQLite dual-write failed', e);
+    }
+
+    output({
+      captured: true,
+      id: normalized.id,
+      title: normalized.title,
+      type: 'deviation-recovery',
+      entry_count: entries.length,
+      deviation_rule: rule,
+      failure_count: failureCount,
+      agent: normalized.affected_agents,
+    });
+  } catch (e) {
+    // Non-blocking: swallow all errors
+    debugLog('lessons.deviation-capture', 'Error swallowed (non-blocking)', e);
+  }
 }
 
 // ─── Migrate ──────────────────────────────────────────────────────────────────
@@ -626,6 +717,7 @@ module.exports = {
   LESSON_SCHEMA,
   validateLesson,
   cmdLessonsCapture,
+  cmdDeviationCapture,
   cmdLessonsMigrate,
   cmdLessonsList,
   cmdLessonsAnalyze,

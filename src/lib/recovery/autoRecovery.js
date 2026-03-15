@@ -185,7 +185,7 @@ class AutoRecovery {
     // Check if can auto-fix
     if (strategy.canAutoFix) {
       if (attempts <= strategy.maxAttempts) {
-        this.metrics.autonomousRecoverles++;
+        this.metrics.autonomousRecoveries++;
         return {
           success: true,
           action: 'auto_fix',
