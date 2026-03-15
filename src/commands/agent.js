@@ -884,12 +884,6 @@ function cmdAgentOverride(cwd, raw, args) {
   const localDir = path.join(cwd, '.opencode', 'agents');
   const localPath = path.join(localDir, agentName + '.md');
   
-  // Check if already overridden
-  if (fs.existsSync(localPath)) {
-    error(`Agent "${agentName}" already has a local override at ${localPath}. Use "agent diff ${agentName}" to view changes or "agent sync ${agentName}" to update.`);
-    process.exit(1);
-  }
-  
   // Read global agent content
   let content = safeReadFile(globalAgentPath);
   if (!content) {
@@ -914,8 +908,17 @@ function cmdAgentOverride(cwd, raw, args) {
   // Create local agents directory silently if it doesn't exist
   fs.mkdirSync(localDir, { recursive: true });
   
-  // Write the local override (exclusive write — existsSync guard is above)
-  const fd = fs.openSync(localPath, 'wx');
+  // Exclusive write — fails atomically if already overridden (no TOCTOU)
+  let fd;
+  try {
+    fd = fs.openSync(localPath, 'wx');
+  } catch (e) {
+    if (e.code === 'EEXIST') {
+      error(`Agent "${agentName}" already has a local override at ${localPath}. Use "agent diff ${agentName}" to view changes or "agent sync ${agentName}" to update.`);
+      process.exit(1);
+    }
+    throw e;
+  }
   try { fs.writeSync(fd, content, 0, 'utf8'); } finally { fs.closeSync(fd); }
   
   // Output: just the file path created
@@ -946,21 +949,26 @@ function cmdAgentSync(cwd, raw, args) {
   const localDir = path.join(cwd, '.opencode', 'agents');
   const localPath = path.join(localDir, agentName + '.md');
 
-  // Check local override exists
-  if (!fs.existsSync(localPath)) {
-    error(`No local override for "${agentName}". Create one with: agent override ${agentName}`);
-    process.exit(1);
+  // Read both files (throws ENOENT if not found — no existence pre-check needed)
+  let globalContent, localContent;
+  try {
+    localContent = fs.readFileSync(localPath, 'utf8');
+  } catch (e) {
+    if (e.code === 'ENOENT') {
+      error(`No local override for "${agentName}". Create one with: agent override ${agentName}`);
+      process.exit(1);
+    }
+    throw e;
   }
-
-  // Check global agent exists
-  if (!fs.existsSync(globalAgentPath)) {
-    error(`Global agent "${agentName}" not found`);
-    process.exit(1);
+  try {
+    globalContent = fs.readFileSync(globalAgentPath, 'utf8');
+  } catch (e) {
+    if (e.code === 'ENOENT') {
+      error(`Global agent "${agentName}" not found`);
+      process.exit(1);
+    }
+    throw e;
   }
-
-  // Read both files
-  const globalContent = fs.readFileSync(globalAgentPath, 'utf8');
-  const localContent = fs.readFileSync(localPath, 'utf8');
 
   // Silent exit when identical
   if (globalContent === localContent) {
@@ -1003,15 +1011,8 @@ function cmdAgentSync(cwd, raw, args) {
     // Apply content sanitization before writing
     contentToWrite = sanitizeAgentContent(contentToWrite);
 
-    // Overwrite the local override with synced content (not TOCTOU — read above confirms existence)
-    const buf = Buffer.from(contentToWrite, 'utf8');
-    const fdSync = fs.openSync(localPath, 'r+');
-    try {
-      fs.ftruncateSync(fdSync, 0);
-      fs.writeSync(fdSync, buf, 0, buf.length, 0);
-    } finally {
-      fs.closeSync(fdSync);
-    }
+    // Write synced content — 'w' flag truncates and writes atomically
+    fs.writeFileSync(localPath, contentToWrite, 'utf8');
 
     if (raw) {
       output({ agent: agentName, action: 'accepted', path: localPath }, raw);
