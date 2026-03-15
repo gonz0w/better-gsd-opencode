@@ -18,7 +18,7 @@
 - [x] **Phase 129: Foundation & Agent Overrides** - Local agent override lifecycle with YAML validation and content sanitization (completed 2026-03-15)
 - [x] **Phase 130: Lesson Schema & Analysis Pipeline** - Structured lesson format, analysis engine, and workflow improvement hooks (completed 2026-03-15)
 - [x] **Phase 131: Skill Discovery & Security** - Security-first skill install/manage lifecycle with 41-pattern scanner and agentskills.io discovery (completed 2026-03-15)
-- [ ] **Phase 132: Deviation Recovery Auto-Capture** - Rule-1-only auto-capture hook wired into execute-phase with typo fix
+- [x] **Phase 132: Deviation Recovery Auto-Capture** - Rule-1-only auto-capture hook wired into execute-phase with typo fix (completed 2026-03-15)
 - [ ] **Phase 133: Enhanced Research Workflow** - Structured research quality profile and gap surfacing
 
 ## Phase Details
@@ -73,7 +73,7 @@
   1. `autoRecovery.js` typo `autonomousRecoverles` is fixed to `autonomousRecoveries` and deviation telemetry increments correctly
   2. After a Rule-1 deviation recovery succeeds in execute-phase, a structured lesson entry is auto-captured non-blocking (`2>/dev/null || true`) — Rule-3 environmental failures never trigger capture
   3. Auto-capture stops silently after 3 entries per milestone; captured entries include deviation rule type, failure count before success, behavioral change that succeeded, and affected agent
-**Plans**: TBD
+**Plans**: 2/2 plans complete
 
 ### Phase 133: Enhanced Research Workflow
 **Goal**: `research:score` returns a structured quality profile instead of a single grade, new-milestone.md surfaces it with LOW-confidence flags, `research:gaps` extracts gap lists, and multi-source conflicts are explicitly surfaced
@@ -96,7 +96,7 @@ Phases execute in order: 129 → 130 → 131 (parallel with 130) → 132 (after 
 | 129. Foundation & Agent Overrides | 3/3 | Complete    | 2026-03-15 | - |
 | 130. Lesson Schema & Analysis Pipeline | 2/2 | Complete    | 2026-03-15 | - |
 | 131. Skill Discovery & Security | 2/3 | Complete    | 2026-03-15 | - |
-| 132. Deviation Recovery Auto-Capture | v13.0 | 0/TBD | Not started | - |
+| 132. Deviation Recovery Auto-Capture | 2/2 | Complete   | 2026-03-15 | - |
 | 133. Enhanced Research Workflow | v13.0 | 0/TBD | Not started | - |
 
 ---

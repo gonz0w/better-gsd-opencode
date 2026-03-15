@@ -11,11 +11,11 @@ See: `.planning/PROJECT.md` (updated 2026-03-15)
 
 **Milestone:** v13.0 Closed-Loop Agent Evolution
 **Phase:** Phase 132 of 133 (Deviation Recovery Auto-Capture)
-**Current Plan:** Plan 01 complete
-**Status:** Plan 01 complete, ready for Plan 02 or next phase
+**Current Plan:** Plan 02 complete (Phase 132 complete)
+**Status:** Phase 132 complete — all plans done, ready for Phase 133 (Enhanced Research Workflow)
 **Last Activity:** 2026-03-15
 
-Progress: [██████████] 99%
+Progress: [██████████] 100%
 
 ## Performance Metrics
 
@@ -40,6 +40,7 @@ Progress: [██████████] 99%
 - v13.0 Phase 131 Plan 02: 12 min, 2 tasks, 1 file (skills:install + skills:remove + audit logging)
 - v13.0 Phase 131 Plan 03: 6 min, 2 tasks, 6 files (router wiring + enricher installed_skills + new-milestone Step 8.5)
 - v13.0 Phase 132 Plan 01: 8 min, 2 tasks, 9 files (autonomousRecoveries typo fix + lessons:deviation-capture with Rule-1 filter + 3-cap)
+- v13.0 Phase 132 Plan 02: 5 min, 2 tasks, 4 files (deviation_auto_capture hook in execute-plan.md + help/discovery metadata)
 - Trend: Stable, improving velocity with infrastructure improvements
 
 *Updated after each plan completion*
@@ -94,10 +95,11 @@ Progress: [██████████] 99%
 - [Phase 132 Plan 01]: deviation-recovery added as 5th type in LESSON_SCHEMA.type_values — reuses existing validateLesson() pipeline without schema changes
 - [Phase 132 Plan 01]: lessons:deviation-capture uses Rule-1-only parseInt filter — silently skips Rules 2, 3, 4 per DEVCAP-01
 - [Phase 132 Plan 01]: cmdDeviationCapture wrapped in try/catch — all errors swallowed and debugLogged, never blocks execution per DEVCAP-04
+- [Phase 132 Plan 02]: Rule-3 explicitly excluded in workflow text AND command filters internally — dual-layer prevents accidental invocation for environmental failures
 
 ### Pending Work
 
-Phase 130 complete. Phase 131 Plans 01–03 complete (security scanner + full skills CLI + router wiring + enricher installed_skills + new-milestone Step 8.5). Phase 131 Plan 04 remains. Phase 132 Plan 01 complete (autonomousRecoveries typo fix + lessons:deviation-capture CLI). Phase 132 Plan 02 (if any) and Phase 133 (Enhanced Research) remain.
+Phase 130 complete. Phase 131 Plans 01–03 complete (security scanner + full skills CLI + router wiring + enricher installed_skills + new-milestone Step 8.5). Phase 131 Plan 04 remains. Phase 132 complete (Plans 01 + 02): autonomousRecoveries typo fix + lessons:deviation-capture CLI + deviation_auto_capture hook in execute-plan.md + help/discovery metadata. Phase 133 (Enhanced Research) remains.
 
 ### Blockers/Concerns
 
@@ -105,8 +107,8 @@ None.
 
 ## Session Continuity
 
-**Last session:** 2026-03-15T22:21:39.693Z
-**This session:** 2026-03-15 — Completed Phase 132 Plan 01 (autonomousRecoveries typo fix + lessons:deviation-capture CLI with Rule-1 filter and 3-per-milestone cap)
+**Last session:** 2026-03-15T22:29:47.451Z
+**This session:** 2026-03-15 — Completed Phase 132 Plan 02 (deviation_auto_capture hook in execute-plan.md + complete help/discovery metadata for lessons:deviation-capture)
 **Next steps:**
-1. Execute Phase 132 Plan 02 if it exists, or proceed to Phase 133 (Enhanced Research Workflow)
-2. Phase 131 Plan 04 (final verification) may also be executed
+1. Execute Phase 133 (Enhanced Research Workflow — structured quality profile + conflict detection)
+2. Phase 131 Plan 04 (final verification) may also be executed if it remains
