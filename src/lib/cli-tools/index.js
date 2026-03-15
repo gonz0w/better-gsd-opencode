@@ -10,7 +10,7 @@ const { findFiles, findDirectories, findByExtension, isFdAvailable } = require('
 const { transformJson, transformWithPreset, getFilterPresets, FILTER_PRESETS, isJqAvailable } = require('./jq.js');
 const { parseYAML, transformYAML, YAMLtoJSON, transformWithPreset: transformYAMLWithPreset, getFilterPresets: getYqFilterPresets, FILTER_PRESETS: YQ_FILTER_PRESETS, isYqAvailable } = require('./yq.js');
 const { catWithHighlight, getFileTheme, listThemes, getLanguage, getStylePresets, STYLE_PRESETS, isBatAvailable } = require('./bat.js');
-const { listPRs, getPR, listIssues, getIssue, getRepoInfo, isGhAvailable, checkAuth } = require('./gh.js');
+const { listPRs, getPR, listIssues, getIssue, getRepoInfo, isGhAvailable, checkAuth, isGhUsable } = require('./gh.js');
 const { detectTool, getToolStatus, clearCache, TOOLS } = require('./detector.js');
 const { withToolFallback, isToolAvailable, isToolEnabled, getToolGuidance } = require('./fallback.js');
 const { getInstallGuidance } = require('./install-guidance.js');
@@ -161,6 +161,7 @@ module.exports = {
   getRepoInfo,
   isGhAvailable,
   checkAuth,
+  isGhUsable,
   
   // detector exports
   detectTool,

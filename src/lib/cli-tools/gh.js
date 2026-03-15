@@ -6,9 +6,71 @@
  */
 
 const { execFileSync } = require('child_process');
-const { isToolAvailable, withToolFallback } = require('./fallback.js');
+const { isToolAvailable, withToolFallback, isToolEnabled } = require('./fallback.js');
+const { detectTool, parseVersion } = require('./detector.js');
 
 const DEFAULT_TIMEOUT_MS = 30000; // 30 seconds
+
+/**
+ * Versions of gh CLI with known regressions that should be blocked.
+ * Uses exact match on major.minor.patch.
+ */
+const BLOCKED_VERSIONS = [
+  { major: 2, minor: 88, patch: 0, reason: 'PR commands fail with read:project scope error (reverted in 2.88.1)' }
+];
+
+/**
+ * Check if gh CLI is usable (installed, not a blocked version, not disabled in config).
+ * Per CONTEXT.md: gh errors are clear error-and-stop — no partial completion, no JS fallback.
+ * 
+ * @returns {object} - { usable: boolean, reason?: string, version?: string, message?: string }
+ */
+function isGhUsable() {
+  // Check config — if gh is disabled, report as such
+  if (!isToolEnabled('gh')) {
+    return {
+      usable: false,
+      reason: 'disabled',
+      message: 'gh disabled in config'
+    };
+  }
+
+  // Check availability
+  const detection = detectTool('gh');
+  if (!detection.available) {
+    return {
+      usable: false,
+      reason: 'not_installed',
+      message: 'GitHub CLI (gh) not found. Install from https://cli.github.com/'
+    };
+  }
+
+  // Check for blocked versions (exact match on major.minor.patch)
+  if (detection.version) {
+    const parsed = parseVersion(detection.version);
+    if (parsed) {
+      for (const blocked of BLOCKED_VERSIONS) {
+        if (
+          parsed.major === blocked.major &&
+          parsed.minor === blocked.minor &&
+          parsed.patch === blocked.patch
+        ) {
+          return {
+            usable: false,
+            reason: 'blocked_version',
+            version: detection.version,
+            message: `gh ${detection.version} has a known regression: ${blocked.reason}. Update: gh upgrade`
+          };
+        }
+      }
+    }
+  }
+
+  return {
+    usable: true,
+    version: detection.version
+  };
+}
 
 /**
  * List pull requests
@@ -232,5 +294,6 @@ module.exports = {
   getIssue,
   getRepoInfo,
   isGhAvailable,
-  checkAuth
+  checkAuth,
+  isGhUsable
 };
