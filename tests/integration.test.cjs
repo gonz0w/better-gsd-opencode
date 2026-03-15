@@ -297,6 +297,14 @@ describe('integration: config migration', () => {
         discovery: 'optimized',
         compile_cache: false,
         sqlite_cache: true
+      },
+      tools: {
+        ripgrep: true,
+        fd: true,
+        jq: true,
+        yq: true,
+        bat: true,
+        gh: true
       }
     };
     fs.writeFileSync(

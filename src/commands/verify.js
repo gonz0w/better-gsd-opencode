@@ -7,6 +7,7 @@ const { safeReadFile, cachedReadFile, findPhaseInternal, normalizePhaseName, par
 const { extractFrontmatter } = require('../lib/frontmatter');
 const { execGit } = require('../lib/git');
 const { banner, sectionHeader, formatTable, summaryLine, color, SYMBOLS, colorByPercent, progressBar, box } = require('../lib/format');
+const { getToolStatus } = require('../lib/cli-tools');
 
 function cmdVerifyPlanStructure(cwd, filePath, raw) {
   if (!filePath) { error('file path required'); }
@@ -661,6 +662,32 @@ function cmdValidateHealth(cwd, options, raw) {
   const repairableCount = errors.filter(e => e.repairable).length +
                          warnings.filter(w => w.repairable).length;
 
+  // Tool availability section
+  const toolAvailability = [];
+  try {
+    const toolStatus = getToolStatus();
+    const TOOL_PROJECT_URLS = {
+      ripgrep: 'https://github.com/BurntSushi/ripgrep',
+      fd: 'https://github.com/sharkdp/fd',
+      jq: 'https://jqlang.github.io/jq/',
+      yq: 'https://github.com/mikefarah/yq',
+      bat: 'https://github.com/sharkdp/bat',
+      gh: 'https://cli.github.com/'
+    };
+    for (const [name, info] of Object.entries(toolStatus)) {
+      const entry = { name, available: info.available };
+      if (info.available) {
+        if (info.version) entry.version = info.version.split('\n')[0];
+        if (info.path) entry.path = info.path;
+      } else {
+        entry.project_url = TOOL_PROJECT_URLS[name] || null;
+      }
+      toolAvailability.push(entry);
+    }
+  } catch {
+    // Tool status is advisory — never block health check
+  }
+
   output({
     status,
     errors,
@@ -668,6 +695,7 @@ function cmdValidateHealth(cwd, options, raw) {
     info,
     repairable_count: repairableCount,
     repairs_performed: repairActions.length > 0 ? repairActions : undefined,
+    tool_availability: toolAvailability.length > 0 ? toolAvailability : undefined,
   }, raw);
 }
 
@@ -2414,6 +2442,7 @@ function cmdVerifyHandoff(cwd, options, raw) {
     
     // Define known agent handoff contexts
     const handoffContexts = {
+      // Critical pairs — rich tool context (full available_tools list)
       'planner→executor': {
         from: 'planner',
         to: 'executor',
@@ -2422,13 +2451,70 @@ function cmdVerifyHandoff(cwd, options, raw) {
           'Task breakdown and priorities',
           'Verification criteria',
           'Dependencies and constraints',
-          'Execution strategy notes'
+          'Execution strategy notes',
+          'available_tools (array of tool name strings)',
+          'capability_level (HIGH/MEDIUM/LOW)'
         ],
         preconditions: [
           'All tasks have clear verification criteria',
           'Dependencies are resolved',
           'No blocking issues in STATE.md'
-        ]
+        ],
+        tool_context_type: 'rich'
+      },
+      'researcher→planner': {
+        from: 'researcher',
+        to: 'planner',
+        context: [
+          'Research findings and recommendations',
+          'Constraints identified during research',
+          'Source quality and confidence levels',
+          'Applicability notes for current environment',
+          'available_tools (array of tool name strings)',
+          'capability_level (HIGH/MEDIUM/LOW)',
+          'Tool-specific research notes'
+        ],
+        preconditions: [
+          'Research task is complete',
+          'Findings are documented',
+          'Sources are cited'
+        ],
+        tool_context_type: 'rich'
+      },
+      // Minimal pairs — tool count + capability level only
+      'executor→verifier': {
+        from: 'executor',
+        to: 'verifier',
+        context: [
+          'Execution summary and outcomes',
+          'Test results and pass/fail status',
+          'Files created and modified',
+          'tool_count (integer)',
+          'capability_level (HIGH/MEDIUM/LOW)'
+        ],
+        preconditions: [
+          'All tasks committed',
+          'SUMMARY.md created',
+          'No uncommitted changes'
+        ],
+        tool_context_type: 'minimal'
+      },
+      'executor→planner': {
+        from: 'executor',
+        to: 'planner',
+        context: [
+          'Execution issues and blockers encountered',
+          'Partial completion status',
+          'Deviation log from planned tasks',
+          'tool_count (integer)',
+          'capability_level (HIGH/MEDIUM/LOW)'
+        ],
+        preconditions: [
+          'Execution attempt was made',
+          'Blockers are documented',
+          'Partial work is committed or reverted'
+        ],
+        tool_context_type: 'minimal'
       },
       'planner→debugger': {
         from: 'planner',
@@ -2437,13 +2523,84 @@ function cmdVerifyHandoff(cwd, options, raw) {
           'Error details from logs',
           'Reproduction steps',
           'Affected files and components',
-          'Attempted fixes and results'
+          'Attempted fixes and results',
+          'tool_count (integer)',
+          'capability_level (HIGH/MEDIUM/LOW)'
         ],
         preconditions: [
           'Error has been observed',
           'Reproduction steps exist',
           'Affected code identified'
-        ]
+        ],
+        tool_context_type: 'minimal'
+      },
+      'verifier→planner': {
+        from: 'verifier',
+        to: 'planner',
+        context: [
+          'Verification results (pass/fail per criterion)',
+          'Failed criteria with details',
+          'Gap list for remediation',
+          'tool_count (integer)',
+          'capability_level (HIGH/MEDIUM/LOW)'
+        ],
+        preconditions: [
+          'Verification was run against completed work',
+          'Gaps are documented',
+          'Success criteria are clearly stated'
+        ],
+        tool_context_type: 'minimal'
+      },
+      'planner→researcher': {
+        from: 'planner',
+        to: 'researcher',
+        context: [
+          'Phase requirements and goals',
+          'Research questions to answer',
+          'Scope boundaries and constraints',
+          'tool_count (integer)',
+          'capability_level (HIGH/MEDIUM/LOW)'
+        ],
+        preconditions: [
+          'Phase goals are defined',
+          'Research scope is bounded',
+          'Questions are specific and answerable'
+        ],
+        tool_context_type: 'minimal'
+      },
+      'executor→debugger': {
+        from: 'executor',
+        to: 'debugger',
+        context: [
+          'Error logs and stack traces',
+          'Failing tests with output',
+          'Reproduction steps from execution',
+          'tool_count (integer)',
+          'capability_level (HIGH/MEDIUM/LOW)'
+        ],
+        preconditions: [
+          'Error is reproducible',
+          'Stack trace or error output captured',
+          'Failing test or assertion identified'
+        ],
+        tool_context_type: 'minimal'
+      },
+      'debugger→executor': {
+        from: 'debugger',
+        to: 'executor',
+        context: [
+          'Fix instructions with specific changes',
+          'Root cause analysis',
+          'Affected files and line ranges',
+          'tool_count (integer)',
+          'capability_level (HIGH/MEDIUM/LOW)'
+        ],
+        preconditions: [
+          'Root cause identified',
+          'Fix is verified in isolation',
+          'No regression risks identified'
+        ],
+        tool_context_type: 'minimal'
       }
     };
     
@@ -2451,12 +2608,20 @@ function cmdVerifyHandoff(cwd, options, raw) {
     const handoff = handoffContexts[key];
     
     if (handoff) {
-      output({
+      const previewResult = {
         handoff: key,
         context: handoff.context,
         preconditions: handoff.preconditions,
+        tool_context_type: handoff.tool_context_type,
         note: 'This is a preview of what context would transfer'
-      }, raw, 'handoff-preview');
+      };
+      if (handoff.tool_context_type === 'rich') {
+        previewResult.tool_names_available = options.tools ? options.tools.split(',').map(t => t.trim()) : [];
+        previewResult.tool_context_note = 'Rich: full tool name list available at runtime via enrichment.handoff_tool_context.available_tools';
+      } else if (handoff.tool_context_type === 'minimal') {
+        previewResult.tool_context_note = 'Minimal: tool_count and capability_level available at runtime via enrichment.handoff_tool_context';
+      }
+      output(previewResult, raw, 'handoff-preview');
     } else {
       output({
         handoff: key,

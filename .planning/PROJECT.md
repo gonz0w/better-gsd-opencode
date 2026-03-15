@@ -10,6 +10,19 @@ Manage and deliver high-quality software with high-quality documentation, while 
 
 ## Current State
 
+**Current milestone:** v12.1 Tool Integration & Agent Enhancement (2026-03-15 → TBD)
+
+**Goal:** Integrate modern CLI tools (ripgrep, fd, jq, yq, bat, gh) into core workflows with smarter agent routing, better inter-agent collaboration, and enhanced decision functions for multi-phase coordination.
+
+**Target features:**
+- Unified tool capability detection and graceful degradation
+- ripgrep, fd, jq integration for fast search/discovery/transformation
+- Enhanced agent routing based on task complexity and skill availability
+- Better agent handoff patterns and shared context
+- New decision functions for multi-phase sequencing and tool selection
+
+---
+
 **Last shipped:** v12.0 SQLite-First Data Layer (2026-03-15)
 
 <details>
@@ -215,7 +228,11 @@ See `.planning/MILESTONES.md` for full history of v1.0 through v8.2.
 
 ### Active
 
-_No active milestone. Run `/bgsd-new-milestone` to start next._
+**v12.1 (in progress):**
+- Tool integration with modern CLI tools (ripgrep, fd, jq, etc.)
+- Enhanced agent routing and decision functions
+- Better inter-agent collaboration patterns
+- See REQUIREMENTS.md for full list (coming)
 
 ### Out of Scope
 

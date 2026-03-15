@@ -3498,7 +3498,14 @@ var require_constants = __commonJS({
       optimization_valibot: { type: "boolean", default: true, description: "Use valibot for schema validation", aliases: [], nested: { section: "optimization", field: "valibot" }, env: "BGSD_DEP_VALIBOT" },
       optimization_discovery: { type: "string", default: "optimized", description: "File discovery mode", aliases: [], nested: { section: "optimization", field: "discovery" }, env: "BGSD_DISCOVERY_MODE", values: ["optimized", "legacy"] },
       optimization_compile_cache: { type: "boolean", default: false, description: "Enable Node.js compile-cache", aliases: [], nested: { section: "optimization", field: "compile_cache" }, env: "BGSD_COMPILE_CACHE" },
-      optimization_sqlite_cache: { type: "boolean", default: true, description: "SQLite statement caching", aliases: [], nested: { section: "optimization", field: "sqlite_cache" }, env: "BGSD_SQLITE_STATEMENT_CACHE" }
+      optimization_sqlite_cache: { type: "boolean", default: true, description: "SQLite statement caching", aliases: [], nested: { section: "optimization", field: "sqlite_cache" }, env: "BGSD_SQLITE_STATEMENT_CACHE" },
+      // ─── CLI Tool Toggles ───
+      tools_ripgrep: { type: "boolean", default: true, description: "Enable ripgrep for content search", aliases: [], nested: { section: "tools", field: "ripgrep" } },
+      tools_fd: { type: "boolean", default: true, description: "Enable fd for file discovery", aliases: [], nested: { section: "tools", field: "fd" } },
+      tools_jq: { type: "boolean", default: true, description: "Enable jq for JSON transformation", aliases: [], nested: { section: "tools", field: "jq" } },
+      tools_yq: { type: "boolean", default: true, description: "Enable yq for YAML transformation", aliases: [], nested: { section: "tools", field: "yq" } },
+      tools_bat: { type: "boolean", default: true, description: "Enable bat for syntax highlighting", aliases: [], nested: { section: "tools", field: "bat" } },
+      tools_gh: { type: "boolean", default: true, description: "Enable gh for GitHub operations", aliases: [], nested: { section: "tools", field: "gh" } }
     };
     var COMMAND_HELP = {
       "util:codebase context": `Usage: bgsd-tools codebase context --files <file1> [file2] ... [--plan <path>]
@@ -5377,8 +5384,189 @@ var require_decision_rules = __commonJS({
         outputs: ["{ granularity, prefix }"],
         confidence_range: ["HIGH", "MEDIUM"],
         resolve: resolveCommitStrategy
+      },
+      // Phase 127: Tool routing decision functions
+      {
+        id: "file-discovery-mode",
+        name: "File Discovery Mode",
+        category: "tool-routing",
+        description: "Recommends file discovery tool (fd vs node) based on tool availability and task scope",
+        inputs: ["tool_availability", "scope"],
+        outputs: ["fd|node"],
+        confidence_range: ["HIGH"],
+        resolve: resolveFileDiscoveryMode
+      },
+      {
+        id: "search-mode",
+        name: "Search Mode",
+        category: "tool-routing",
+        description: "Recommends search tool (ripgrep vs fd vs node) based on tool availability and .gitignore requirements",
+        inputs: ["tool_availability", "needs_gitignore_respect"],
+        outputs: ["ripgrep|fd|node"],
+        confidence_range: ["HIGH"],
+        resolve: resolveSearchMode
+      },
+      {
+        id: "json-transform-mode",
+        name: "JSON Transform Mode",
+        category: "tool-routing",
+        description: "Recommends JSON transformation tool (jq vs javascript) based on complexity and tool availability",
+        inputs: ["tool_availability", "json_complexity"],
+        outputs: ["jq|javascript"],
+        confidence_range: ["HIGH"],
+        resolve: resolveJsonTransformMode
+      },
+      // Phase 128: Agent collaboration decision functions
+      {
+        id: "agent-capability-level",
+        name: "Agent Capability Level",
+        category: "state-assessment",
+        description: "Scores agent capability based on available tool count",
+        inputs: ["tool_availability"],
+        outputs: ["HIGH|MEDIUM|LOW"],
+        confidence_range: ["HIGH"],
+        resolve: resolveAgentCapabilityLevel
+      },
+      {
+        id: "phase-dependencies",
+        name: "Phase Dependency Sequencing",
+        category: "workflow-routing",
+        description: "Sequences phases accounting for dependencies and tool capabilities",
+        inputs: ["phases", "tool_availability"],
+        outputs: ["{ ordered_phases, warnings }"],
+        confidence_range: ["HIGH", "MEDIUM"],
+        resolve: resolvePhaseDependencies
       }
     ];
+    function resolveFileDiscoveryMode(state) {
+      const { tool_availability = {}, scope } = state || {};
+      if (!scope || scope === "single-file") {
+        return { value: "node", confidence: "HIGH", rule_id: "file-discovery-mode" };
+      }
+      if ((scope === "directory" || scope === "project-wide") && tool_availability.fd === true) {
+        return { value: "fd", confidence: "HIGH", rule_id: "file-discovery-mode" };
+      }
+      return { value: "node", confidence: "HIGH", rule_id: "file-discovery-mode" };
+    }
+    function resolveSearchMode(state) {
+      const { tool_availability = {}, needs_gitignore_respect = true } = state || {};
+      if (tool_availability.ripgrep === true) {
+        return { value: "ripgrep", confidence: "HIGH", rule_id: "search-mode" };
+      }
+      if (tool_availability.fd === true && needs_gitignore_respect) {
+        return { value: "fd", confidence: "HIGH", rule_id: "search-mode" };
+      }
+      return { value: "node", confidence: "HIGH", rule_id: "search-mode" };
+    }
+    function resolveJsonTransformMode(state) {
+      const { tool_availability = {}, json_complexity } = state || {};
+      if (!json_complexity || json_complexity === "simple") {
+        return { value: "javascript", confidence: "HIGH", rule_id: "json-transform-mode" };
+      }
+      if (json_complexity === "complex" && tool_availability.jq === true) {
+        return { value: "jq", confidence: "HIGH", rule_id: "json-transform-mode" };
+      }
+      return { value: "javascript", confidence: "HIGH", rule_id: "json-transform-mode" };
+    }
+    function resolveAgentCapabilityLevel(state) {
+      const { tool_availability = {} } = state || {};
+      const tools = ["ripgrep", "fd", "jq", "yq", "bat", "gh"];
+      const count = tools.filter((t) => tool_availability[t] === true).length;
+      if (count >= 5) {
+        return { value: "HIGH", confidence: "HIGH", rule_id: "agent-capability-level" };
+      }
+      if (count >= 2) {
+        return { value: "MEDIUM", confidence: "HIGH", rule_id: "agent-capability-level" };
+      }
+      return {
+        value: "LOW",
+        confidence: "HIGH",
+        rule_id: "agent-capability-level",
+        metadata: { warning: "Low tool availability \u2014 agent proceeding with limited capabilities" }
+      };
+    }
+    function resolvePhaseDependencies(state) {
+      const rawPhases = (state || {}).phases;
+      const phases = Array.isArray(rawPhases) ? rawPhases : [];
+      const { tool_availability = {} } = state || {};
+      if (!phases.length) {
+        return { value: { ordered_phases: [], warnings: [] }, confidence: "HIGH", rule_id: "phase-dependencies" };
+      }
+      const warnings = [];
+      const depMap = {};
+      const allNumbers = [];
+      for (const phase of phases) {
+        const num = phase.number;
+        allNumbers.push(num);
+        depMap[num] = Array.isArray(phase.depends_on) ? phase.depends_on : [];
+      }
+      const inDegree = {};
+      const adjList = {};
+      for (const num of allNumbers) {
+        inDegree[num] = inDegree[num] || 0;
+        adjList[num] = adjList[num] || [];
+      }
+      for (const num of allNumbers) {
+        for (const dep of depMap[num]) {
+          inDegree[num] = (inDegree[num] || 0) + 1;
+          if (!adjList[dep]) adjList[dep] = [];
+          adjList[dep].push(num);
+        }
+      }
+      const queue = allNumbers.filter((n) => inDegree[n] === 0);
+      function sortByToolReadiness(nums) {
+        return [...nums].sort((a, b) => {
+          const phaseA = phases.find((p) => p.number === a) || {};
+          const phaseB = phases.find((p) => p.number === b) || {};
+          const reqA = Array.isArray(phaseA.tool_requirements) ? phaseA.tool_requirements : [];
+          const reqB = Array.isArray(phaseB.tool_requirements) ? phaseB.tool_requirements : [];
+          const nameA = String(phaseA.name || phaseA.number || "").toLowerCase();
+          const nameB = String(phaseB.name || phaseB.number || "").toLowerCase();
+          const isDiscoveryA = /discovery|detect|scan/.test(nameA);
+          const isDiscoveryB = /discovery|detect|scan/.test(nameB);
+          const isAnalysisA = /analysis|transform|complex/.test(nameA);
+          const isAnalysisB = /analysis|transform|complex/.test(nameB);
+          if (isDiscoveryA && isAnalysisB) return -1;
+          if (isDiscoveryB && isAnalysisA) return 1;
+          const readyA = reqA.filter((t) => tool_availability[t] === true).length;
+          const readyB = reqB.filter((t) => tool_availability[t] === true).length;
+          if (readyA !== readyB) return readyB - readyA;
+          return 0;
+        });
+      }
+      const sorted = sortByToolReadiness(queue);
+      const result = [];
+      const visited = /* @__PURE__ */ new Set();
+      while (sorted.length > 0) {
+        const num = sorted.shift();
+        if (visited.has(num)) continue;
+        visited.add(num);
+        result.push(num);
+        const phase = phases.find((p) => p.number === num) || {};
+        const reqs = Array.isArray(phase.tool_requirements) ? phase.tool_requirements : [];
+        const missingTools = reqs.filter((t) => tool_availability[t] !== true);
+        if (missingTools.length > 0) {
+          warnings.push("Phase " + num + " has suboptimal tool readiness (missing: " + missingTools.join(", ") + ")");
+        }
+        const readyNext = [];
+        for (const dependent of adjList[num] || []) {
+          inDegree[dependent]--;
+          if (inDegree[dependent] === 0) {
+            readyNext.push(dependent);
+          }
+        }
+        const sortedNext = sortByToolReadiness(readyNext);
+        sorted.unshift(...sortedNext);
+      }
+      for (const num of allNumbers) {
+        if (!visited.has(num)) {
+          result.push(num);
+          warnings.push("Phase " + num + " may be part of a dependency cycle");
+        }
+      }
+      const confidence = warnings.length > 0 ? "MEDIUM" : "HIGH";
+      return { value: { ordered_phases: result, warnings }, confidence, rule_id: "phase-dependencies" };
+    }
     function evaluateDecisions2(command, state) {
       if (!state || typeof state !== "object") return {};
       const results = {};
@@ -5415,6 +5603,13 @@ var require_decision_rules = __commonJS({
       resolveResearchGate,
       resolveMilestoneCompletion,
       resolveCommitStrategy,
+      // Phase 127: Tool routing decision functions
+      resolveFileDiscoveryMode,
+      resolveSearchMode,
+      resolveJsonTransformMode,
+      // Phase 128: Agent collaboration decision functions
+      resolveAgentCapabilityLevel,
+      resolvePhaseDependencies,
       // Registry and aggregator
       DECISION_REGISTRY,
       evaluateDecisions: evaluateDecisions2
@@ -6330,6 +6525,41 @@ function enrichCommand(input, output, cwd) {
       }
     }
   } catch {
+  }
+  try {
+    const CACHE_TTL_MS = 5 * 60 * 1e3;
+    const cacheFilePath = join11(resolvedCwd, ".planning", ".cache", "tools.json");
+    let toolAvailability = { ripgrep: false, fd: false, jq: false, yq: false, bat: false, gh: false };
+    if (existsSync3(cacheFilePath)) {
+      try {
+        const cacheData = JSON.parse(readFileSync7(cacheFilePath, "utf-8"));
+        if (cacheData && cacheData.timestamp && Date.now() - cacheData.timestamp < CACHE_TTL_MS && cacheData.results) {
+          for (const toolName of ["ripgrep", "fd", "jq", "yq", "bat", "gh"]) {
+            toolAvailability[toolName] = Boolean(cacheData.results[toolName] && cacheData.results[toolName].available);
+          }
+        }
+      } catch {
+      }
+    }
+    enrichment.tool_availability = toolAvailability;
+  } catch {
+    enrichment.tool_availability = { ripgrep: false, fd: false, jq: false, yq: false, bat: false, gh: false };
+  }
+  try {
+    const ta = enrichment.tool_availability || {};
+    const availableTools = Object.entries(ta).filter(([, available]) => available === true).map(([name]) => name);
+    const toolCount = availableTools.length;
+    let capabilityLevel = "MEDIUM";
+    if (toolCount >= 5) capabilityLevel = "HIGH";
+    else if (toolCount <= 1) capabilityLevel = "LOW";
+    enrichment.handoff_tool_context = {
+      available_tools: availableTools,
+      // tool names only — no descriptions/schemas per CONTEXT.md
+      tool_count: toolCount,
+      capability_level: capabilityLevel
+    };
+  } catch {
+    enrichment.handoff_tool_context = { available_tools: [], tool_count: 0, capability_level: "LOW" };
   }
   try {
     const decisions = (0, import_decision_rules.evaluateDecisions)(command, enrichment);

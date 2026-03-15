@@ -3,13 +3,20 @@
  * 
  * Detects availability of CLI tools (ripgrep, fd, jq, yq, bat, gh) with 5-minute caching.
  * Uses execFileSync with array args to prevent shell injection.
+ * Supports file-based cache (cross-invocation persistence), cross-platform PATH resolution,
+ * and version comparison for feature flagging.
  */
 
 const { execFileSync } = require('child_process');
+const fs = require('fs');
+const path = require('path');
 
-// Cache for tool detection results
+// Cache for tool detection results (in-memory)
 const toolCache = new Map();
 const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
+// File cache path override (for testing)
+let cachePath = null;
 
 /**
  * Supported tools configuration
@@ -48,6 +55,71 @@ const TOOLS = {
 };
 
 /**
+ * Get the default cache path
+ * @returns {string} - Path to cache file
+ */
+function getDefaultCachePath() {
+  return path.join(process.cwd(), '.planning', '.cache', 'tools.json');
+}
+
+/**
+ * Set custom cache path (for testing)
+ * @param {string} newPath - Custom path to use
+ */
+function setCachePath(newPath) {
+  cachePath = newPath;
+}
+
+/**
+ * Load file cache if it exists and is valid
+ * @returns {object|null} - Cached results or null if invalid/missing
+ */
+function loadFileCache() {
+  try {
+    const filePath = cachePath || getDefaultCachePath();
+    if (!fs.existsSync(filePath)) {
+      return null;
+    }
+    
+    const contents = fs.readFileSync(filePath, 'utf8');
+    const data = JSON.parse(contents);
+    
+    // Check if cache is still valid (< 5 minutes old)
+    if (!data.timestamp || (Date.now() - data.timestamp) >= CACHE_TTL_MS) {
+      return null;
+    }
+    
+    return data.results || null;
+  } catch {
+    // Silent failure - file I/O errors just fall back to detection
+    return null;
+  }
+}
+
+/**
+ * Save results to file cache
+ * @param {object} results - Detection results to cache
+ */
+function saveFileCache(results) {
+  try {
+    const filePath = cachePath || getDefaultCachePath();
+    const dir = path.dirname(filePath);
+    
+    // Create cache directory if needed
+    fs.mkdirSync(dir, { recursive: true });
+    
+    const data = {
+      timestamp: Date.now(),
+      results
+    };
+    
+    fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf8');
+  } catch {
+    // Silent failure - file I/O errors don't break detection
+  }
+}
+
+/**
  * Check if a cached result is still valid
  * @param {object} cached - Cached result object
  * @returns {boolean} - True if cache is valid
@@ -55,6 +127,139 @@ const TOOLS = {
 function isCacheValid(cached) {
   if (!cached || !cached.timestamp) return false;
   return (Date.now() - cached.timestamp) < CACHE_TTL_MS;
+}
+
+/**
+ * Resolve tool path using platform-aware command
+ * @param {string} binaryName - Binary name to locate
+ * @returns {string|null} - Full path to binary or null if not found
+ */
+function resolveToolPath(binaryName) {
+  try {
+    const command = process.platform === 'win32' ? 'where.exe' : 'which';
+    const result = execFileSync(command, [binaryName], {
+      encoding: 'utf8',
+      stdio: ['pipe', 'pipe', 'pipe']
+    }).trim();
+    
+    // For where.exe, take first line if multiple results
+    if (process.platform === 'win32' && result) {
+      return result.split('\n')[0];
+    }
+    
+    return result || null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Parse version string to extract semver
+ * @param {string} versionString - Version string from --version output
+ * @returns {object|null} - { major, minor, patch } or null if no version found
+ */
+function parseVersion(versionString) {
+  if (!versionString) return null;
+  
+  // Try full semver first: X.Y.Z
+  let match = versionString.match(/(\d+)\.(\d+)\.(\d+)/);
+  if (match) {
+    return {
+      major: parseInt(match[1], 10),
+      minor: parseInt(match[2], 10),
+      patch: parseInt(match[3], 10)
+    };
+  }
+  
+  // Try X.Y format
+  match = versionString.match(/(\d+)\.(\d+)/);
+  if (match) {
+    return {
+      major: parseInt(match[1], 10),
+      minor: parseInt(match[2], 10),
+      patch: 0
+    };
+  }
+  
+  // Try X format
+  match = versionString.match(/(\d+)/);
+  if (match) {
+    return {
+      major: parseInt(match[1], 10),
+      minor: 0,
+      patch: 0
+    };
+  }
+  
+  return null;
+}
+
+/**
+ * Check if current version meets minimum requirement
+ * @param {string} toolName - Tool name to check
+ * @param {string} minVersionStr - Minimum version required (e.g., "1.7.0")
+ * @returns {object} - { meets: boolean, current: string|null, required: string }
+ */
+function meetsMinVersion(toolName, minVersionStr) {
+  const toolInfo = detectTool(toolName);
+  const requiredVersion = parseVersion(minVersionStr);
+  
+  if (!requiredVersion) {
+    return {
+      meets: false,
+      current: toolInfo.version || null,
+      required: minVersionStr
+    };
+  }
+  
+  if (!toolInfo.available || !toolInfo.version) {
+    return {
+      meets: false,
+      current: toolInfo.version || null,
+      required: minVersionStr
+    };
+  }
+  
+  const currentVersion = parseVersion(toolInfo.version);
+  if (!currentVersion) {
+    return {
+      meets: false,
+      current: toolInfo.version || null,
+      required: minVersionStr
+    };
+  }
+  
+  // Compare versions: major.minor.patch
+  if (currentVersion.major > requiredVersion.major) return {
+    meets: true,
+    current: toolInfo.version,
+    required: minVersionStr
+  };
+  if (currentVersion.major < requiredVersion.major) return {
+    meets: false,
+    current: toolInfo.version,
+    required: minVersionStr
+  };
+  
+  // Major equal, compare minor
+  if (currentVersion.minor > requiredVersion.minor) return {
+    meets: true,
+    current: toolInfo.version,
+    required: minVersionStr
+  };
+  if (currentVersion.minor < requiredVersion.minor) return {
+    meets: false,
+    current: toolInfo.version,
+    required: minVersionStr
+  };
+  
+  // Major and minor equal, compare patch
+  const meets = currentVersion.patch >= requiredVersion.patch;
+  return {
+    meets,
+    current: toolInfo.version,
+    required: minVersionStr
+  };
 }
 
 /**
@@ -66,7 +271,7 @@ function detectTool(toolName) {
   // Normalize tool name
   const normalizedName = toolName.toLowerCase();
   
-  // Check cache first
+  // Check in-memory cache first
   const cacheKey = normalizedName;
   if (toolCache.has(cacheKey)) {
     const cached = toolCache.get(cacheKey);
@@ -105,38 +310,29 @@ function detectTool(toolName) {
   };
 
   for (const binaryName of namesToTry) {
-    try {
-      // Use execFileSync with array args to prevent shell injection
-      const path = execFileSync('which', [binaryName], {
-        encoding: 'utf8',
-        stdio: ['pipe', 'pipe', 'pipe']
-      }).trim();
-
-      if (path) {
-        result.available = true;
-        result.path = path;
-        
-        // Try to get version
-        try {
-          const version = execFileSync(binaryName, ['--version'], {
-            encoding: 'utf8',
-            stdio: ['pipe', 'pipe', 'pipe'],
-            timeout: 3000
-          }).trim().split('\n')[0];
-          result.version = version;
-        } catch {
-          // Version detection failed, that's okay
-        }
-        
-        break;
+    const toolPath = resolveToolPath(binaryName);
+    
+    if (toolPath) {
+      result.available = true;
+      result.path = toolPath;
+      
+      // Try to get version
+      try {
+        const version = execFileSync(binaryName, ['--version'], {
+          encoding: 'utf8',
+          stdio: ['pipe', 'pipe', 'pipe'],
+          timeout: 3000
+        }).trim().split('\n')[0];
+        result.version = version;
+      } catch {
+        // Version detection failed, that's okay
       }
-    } catch {
-      // Tool not found, try next name
-      continue;
+      
+      break;
     }
   }
 
-  // Cache the result
+  // Cache the result in memory
   toolCache.set(cacheKey, {
     result,
     timestamp: Date.now()
@@ -150,6 +346,21 @@ function detectTool(toolName) {
  * @returns {object} - { toolName: { available, path, name, description, version? } }
  */
 function getToolStatus() {
+  // Try loading from file cache first
+  const fileCached = loadFileCache();
+  
+  if (fileCached) {
+    // Use file cache and populate in-memory cache
+    for (const [toolName, toolInfo] of Object.entries(fileCached)) {
+      toolCache.set(toolName.toLowerCase(), {
+        result: toolInfo,
+        timestamp: Date.now()
+      });
+    }
+    return fileCached;
+  }
+  
+  // Perform fresh detection
   const status = {};
   
   for (const toolName of Object.keys(TOOLS)) {
@@ -163,20 +374,37 @@ function getToolStatus() {
     };
   }
   
+  // Save to file cache for next invocation
+  saveFileCache(status);
+  
   return status;
 }
 
 /**
- * Clear the tool detection cache
+ * Clear the tool detection cache (both in-memory and file)
  * Useful for testing or forcing re-detection
  */
 function clearCache() {
   toolCache.clear();
+  
+  try {
+    const filePath = cachePath || getDefaultCachePath();
+    if (fs.existsSync(filePath)) {
+      fs.unlinkSync(filePath);
+    }
+  } catch {
+    // Silent failure - deletion errors don't break normal operation
+  }
 }
 
 module.exports = {
   TOOLS,
   detectTool,
   getToolStatus,
-  clearCache
+  clearCache,
+  parseVersion,
+  meetsMinVersion,
+  resolveToolPath,
+  setCachePath,
+  CACHE_TTL_MS
 };

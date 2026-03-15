@@ -1,9 +1,9 @@
-# Project Research Summary
+# Research Summary: SQLite-First Data Layer for v12.1
 
-**Project:** bGSD Plugin — v12.0 SQLite-First Data Layer
-**Domain:** Structured SQLite schema management for zero-dependency Node.js CLI
-**Researched:** 2026-03-14
-**Confidence:** HIGH
+**Project:** bgsd-oc v12.0 — SQLite-First Data Layer  
+**Domain:** Node.js CLI development tool with structured planning data persistence  
+**Researched:** 2026-03-14  
+**Confidence:** HIGH (Node.js official docs, SQLite official docs, 2500+ lines of source code analysis)
 
 <!-- section: compact -->
 <compact_summary>
@@ -11,195 +11,442 @@
      Keep it under 30 lines. Synthesizes all 4 research areas.
      Full sections below are loaded on-demand via extract-sections. -->
 
-**Summary:** Transform SQLite from a dumb file cache into the structured data backbone for all workflow operations. The recommended approach uses `node:sqlite` DatabaseSync (already in production via cache.js) with version-gated inline migrations via `PRAGMA user_version`, per-project database at `.planning/.cache.db`, and a write-through cache pattern where markdown remains authority and SQLite is a derived query layer. The primary risk is stale cache from uncommitted edits, mitigated by hybrid git-hash + mtime invalidation.
+**Summary:** Structured SQLite tables (phases, plans, tasks, decisions, sessions) will accelerate the CLI by eliminating 3x file re-parsing and 2x duplication in the enricher, while preserving markdown as the authority format. Zero new npm dependencies — uses node:sqlite (built-in, Stability 1.2). Architecture is "derived cache" (markdown → SQLite), not "source of truth" (SQLite → markdown), ensuring markdown remains the human interface and git-tracked backup.
 
-**Recommended stack:** node:sqlite DatabaseSync (structured tables + prepared statements), PRAGMA user_version (schema versioning), SQLTagStore/createTagStore (statement caching with db.prepare() fallback), STRICT tables (type enforcement), JSON1 extension (querying JSON TEXT columns)
+**Recommended stack:** 
+- `node:sqlite DatabaseSync` (Node 22.5+) for synchronous database access
+- `SQLTagStore` (Node 24.9+) for statement caching via tagged templates; fallback to `db.prepare()`
+- `PRAGMA user_version` + embedded migration functions for forward-only schema versioning
+- Per-project database at `.planning/.cache.db` (gitignored) for structured planning data
+- `STRICT` tables for type enforcement; JSON1 extension for structured TEXT columns
 
-**Architecture:** Dual-store layered data access — markdown authority, SQLite query cache, Map L1 → SQLite L2 → markdown L3 hierarchy with DataStore class, modified parsers, accelerated enricher, and memory migrator
+**Architecture:** Write-through structured cache — markdown files remain authority, parsers write parsed data to SQLite after every successful parse, enricher and CLI commands read from SQLite on warm starts (git-hash invalidation checks), fall back to markdown parsing on cache miss or stale detection. Three-tier caching: Map L1 (per-process), SQLite L2 (cross-invocation), Markdown L3 (authority). Database location: `~/.config/oc/bgsd-oc/cache.db` for CacheEngine (existing), `.planning/.cache.db` for DataStore (new).
 
 **Top pitfalls:**
-1. **node:sqlite API drift** — feature-detect capabilities at runtime, use only v22.5 baseline API for core paths
-2. **Schema migration in single-file deploy** — embed versioned migration array in code, use PRAGMA user_version, run on every db open
-3. **Stale cache after uncommitted edits** — combine git-hash for cross-session staleness with mtime checks for within-session freshness
-4. **Sacred data loss during memory migration** — never delete JSON files, two-phase migrate-then-verify, keep JSON as backup indefinitely
-5. **Database locking under concurrent invocations** — WAL mode + busy timeout from day one
+1. **node:sqlite API drift** — `createTagStore()` (v24.9+), `prepare(options)` (v22.18+), `aggregate()` (v22.16+) not in v22.5. Requires feature detection + fallback. Add Node 22.5 to CI test matrix.
+2. **Schema migration in single-file deploy** — `CREATE TABLE IF NOT EXISTS` doesn't add columns. Use `PRAGMA user_version` + embedded migration functions. Test upgrade FROM every intermediate version.
+3. **Stale cache after markdown edits** — git-hash invalidation misses uncommitted changes. Combine git-hash + file mtime + content hash for sub-second accuracy. Hook file-watcher to SQLite invalidation.
+4. **Map/SQLite backend divergence** — structured tables have NO Map equivalent. Accept SQLite-only with graceful degradation on Node <22.5 (return null, fall back to markdown parsing).
+5. **JSON-to-SQLite data loss** — boolean/array/object fields require explicit serialization strategy. Use `STRICT` tables, JSON1 extension, round-trip tests for every data type.
+6. **Database locking under concurrent CLI invocations** — WAL mode + busy timeout (5 second) required. Set `PRAGMA journal_mode=WAL` and `PRAGMA busy_timeout=5000` on first database open.
+7. **Sacred data loss in memory migration** — decisions.json, lessons.json irreplaceable. Dual-write (JSON + SQLite), preserve JSON as backup, verify round-trip before switching read path.
 
 **Suggested phases:**
-1. **Foundation & Schema** — DataStore class, migration runner, WAL/locking, capability detection (enables everything)
-2. **Parser Integration & Invalidation** — Write-through cache for parsers, git-hash + mtime invalidation, file-watcher hookup
-3. **Enricher Acceleration** — Replace 3x listSummaryFiles / 2x parsePlans with SQL queries, pre-computed enrichment cache
-4. **Memory Store Migration** — decisions/lessons/bookmarks/trajectories from JSON to SQLite, sacred data protection
-5. **Decision Rules & Session State** — New SQLite-backed decision rules, session state persistence, STATE.md as generated view
+1. **Schema Design & Foundation** — DataStore class, schema versioning, API capability detection, Map fallback, WAL+timeout setup. Addresses pitfalls 1, 2, 6. Delivers: reusable DataStore infrastructure, clear data layer boundaries.
+2. **Parser Integration & Cache Population** — Modify 6 parsers to write-through to SQLite, implement git-hash+mtime invalidation, update project-state.js read path. Addresses pitfall 3, 5. Delivers: warm-start performance, eliminated re-parsing.
+3. **Enricher Acceleration** — Replace 3x `listSummaryFiles()` / 2x `parsePlans()` duplication with pre-computed enrichment from SQLite. Delivers: 5-30x faster enricher on warm starts, eliminate code duplication.
+4. **Memory Store Migration** — Schema for decisions/lessons/trajectories/bookmarks tables, one-time JSON→SQLite import, dual-write path, migration verification. Addresses pitfall 7. Delivers: queryable decision history, cross-entity SQL joins.
+5. **Query Acceleration & New Rules** — Query API layer, new SQL-backed decision rules (6-8 rules consuming DataStore directly), enrichment decision integration. Delivers: richer workflow routing, data-driven decisions.
+6. **Session State Persistence** — session_state table, STATE.md as generated view, cross-invocation metrics. Delivers: accumulated project context, velocity metrics, stuck detection.
 
-**Confidence:** HIGH | **Gaps:** Concurrent access stress testing needed; enricher V2 query design needs benchmarking against real projects
+**Confidence:** HIGH (Node.js v25.8.1 docs verified, STACK/FEATURES/ARCHITECTURE/PITFALLS research completed, 2500+ lines of source code reviewed) | **Gaps:** WAL mode behavior under extreme concurrency not tested; bundle size impact estimate ±10KB
+
 </compact_summary>
 <!-- /section -->
 
 <!-- section: executive_summary -->
 ## Executive Summary
 
-The v12.0 milestone transforms SQLite from a simple file content cache (two tables in cache.js) into the structured data backbone for all bGSD workflow operations. Research confirms this is achievable using only the existing `node:sqlite` DatabaseSync API — zero new dependencies. The recommended architecture follows the "derived index" pattern used by tools like Turborepo and Jujutsu: markdown files remain the source of truth for all human-facing data, while SQLite provides a fast queryable index over parsed structures. A new `DataStore` class manages per-project databases at `.planning/.cache.db` (gitignored), separate from the global file cache.
+The v12.0 milestone proposes a "SQLite-first" data layer to eliminate the existing enricher bottleneck (3x `listSummaryFiles()`, 2x `parsePlans()` duplication) and provide persistent structured access to planning data across CLI invocations. Node.js v22.5+ includes `node:sqlite` (DatabaseSync), a built-in synchronous SQLite binding with zero external dependencies. Research across STACK, FEATURES, ARCHITECTURE, and PITFALLS confirms this is the correct architectural pattern used by successful CLI tools (Fossil, Jujutsu, GitHub CLI) — structured SQLite cache over git-backed markdown files.
 
-The highest-impact deliverable is enricher acceleration: the current `command-enricher.js` calls `parsePlans()` 2x and `listSummaryFiles()` 3x on every command invocation, re-reading files that were already parsed. With structured SQLite tables, the enricher becomes a single SQL query on warm starts — estimated 5-30x speedup for the hot path. Schema versioning via `PRAGMA user_version` with inline migration functions (no migration files) fits the single-file deploy model perfectly.
+**Key finding:** The critical success factor is clarity about authority and responsibility. Markdown files ARE the single source of truth for human-facing planning data (users read ROADMAP.md, edit STATE.md, commit PLAN.md to git). SQLite is a "derived index" — a queryable structured cache built from markdown, fully regenerable if deleted, never written directly. This hybrid model preserves git workflows, human readability, and AI agent compatibility while achieving 5-30x performance improvements on warm starts.
 
-The primary risks are cache staleness from uncommitted edits (mitigated by hybrid git-hash + mtime invalidation), sacred data loss during memory store migration (mitigated by keeping JSON backups indefinitely), and node:sqlite API drift between Node versions (mitigated by runtime capability detection using only the v22.5 baseline API for core paths). All risks have established mitigation patterns verified against the existing codebase.
-<!-- /section -->
+**Recommended approach:** Implement in 6 phases, starting with the foundation (DataStore class, schema versioning, API capability detection) and progressing through parser integration, enricher acceleration, memory store migration, query expansion, and finally session state persistence. The first three phases (foundation + parser integration + enricher acceleration) deliver the core value proposition and can be shipped as v12.0. Phases 4-6 add optional query acceleration and persistence features for v12.0 Phase 3+ or v13 depending on schedule.
+
+**Primary risk:** node:sqlite is Stability 1.2 (Release Candidate) — the API evolves across minor Node versions. Between v22.5 (minimum supported) and v25.8 (current), 15+ new methods were added. Mitigation: feature-detect all APIs at runtime, maintain fallback paths for Node <22.5, test against Node 22.5 specifically in CI.
+
+---
 
 <!-- section: key_findings -->
 ## Key Findings
 
-### Recommended Stack
+### Stack Additions
 
-No new dependencies. Everything builds on the existing `node:sqlite` DatabaseSync already proven in `src/lib/cache.js`. The stack leverages SQLite built-ins (PRAGMA user_version, STRICT tables, JSON1 extension) and Node.js built-ins (crypto for content hashing) exclusively.
+**Core dependencies:** Zero new npm packages. Everything is built on `node:sqlite` (DatabaseSync, part of Node.js core since v22.5 and bundled as part of the runtime, Stability 1.2 Release Candidate). Existing `src/lib/cache.js` already uses DatabaseSync for the file_cache and research_cache tables; the new structured data layer extends this pattern.
 
-**Core technologies:**
-- **node:sqlite DatabaseSync**: Synchronous SQLite access — already in production, zero-dependency, matches CLI's synchronous architecture. Stability 1.2 (Release Candidate) as of Node v25.7.0.
-- **PRAGMA user_version**: Integer schema version stored in database header — no migration tables needed, atomic read/write, zero overhead. Standard pattern for embedded SQLite applications.
-- **SQLTagStore (createTagStore)**: LRU-cached prepared statements via tagged template literals — already used in cache.js. Requires Node 24.9+ with automatic fallback to `db.prepare()` for Node 22.5+.
-- **STRICT tables**: Type enforcement at write time — catches coercion errors early. Available in all Node.js-bundled SQLite versions (3.45+).
-- **JSON1 extension (JSON_EXTRACT, json_each)**: Query into JSON TEXT columns without full schema decomposition — built into Node.js SQLite, enables flexible querying of arrays and nested objects stored as TEXT.
+**Minimum Node version:** 22.5.0 for DatabaseSync baseline. Optional feature enhancements available in newer versions:
+- `createTagStore()` for statement caching: v24.9.0+
+- `database.prepare(options)` for query options: v22.18.0+
+- `database.aggregate()` for aggregate functions: v22.16.0+
+- `timeout` constructor option for busy-wait: v22.16.0+
 
-**Key patterns:** Version-gated inline migrations, `BEGIN IMMEDIATE` transactions for batch writes, `INSERT OR REPLACE` for upserts, per-file content hashing for surgical cache invalidation, Map L1 → SQLite L2 → markdown L3 data hierarchy.
+**Version strategy:** Feature-detect all Node 22.16+ APIs. Fall back gracefully to v22.5 core API (DatabaseSync, prepare, exec, get, run, all). Existing cache.js pattern of "try createTagStore, catch fallback to prepare()" is the model.
 
-**What to avoid:** ORMs (adds dependencies), better-sqlite3 (duplicates built-in), migration file systems (incompatible with single-file deploy), WAL mode for global cache (unnecessary for single-process), async SQLite APIs (CLI is synchronous by design).
+**Key patterns:**
+- **Version-gated inline migrations** — no migration files; embed as JavaScript functions gated by `PRAGMA user_version`, run on every db open, fully transactional
+- **SQLTagStore query builder** — tagged template literals with automatic parameterization and statement caching (when available, v24.9+)
+- **Write-through cache** — parsers write to SQLite after parsing markdown
+- **Per-project database location** — `.planning/.cache.db` (gitignored), not global
+- **Git-hash + mtime invalidation** — git hash for bulk staleness (new commit), file mtime for sub-second accuracy (live edits)
+- **WAL mode + busy timeout** — prevent SQLITE_BUSY under concurrent CLI invocations
 
-### Expected Features
+**Avoid:** ORMs (knex, drizzle, sequelize), better-sqlite3 (adds native dependency), migration file systems (incompatible with single-file deploy), async SQLite APIs (CLI is synchronous by design).
 
-**Must have (table stakes):**
-- Structured planning tables (phases, plans, tasks, requirements, decisions) — eliminates re-parsing markdown on every CLI invocation
-- Schema versioning with migration runner — forward-compatible upgrades without data loss
-- Git-hash + mtime invalidation — ensures cached data stays fresh after edits and commits
-- Enricher deduplication/acceleration — fixes 3x listSummaryFiles and 2x parsePlans calls
-- Session state persistence — position and metrics in SQLite, STATE.md becomes generated view
-- Backward-compatible Map fallback — graceful degradation on Node < 22.5
+### Feature Table Stakes
 
-**Should have (differentiators):**
-- Cross-entity SQL queries — "show decisions from phase X" via JOINs (impossible with JSON files)
-- Memory store migration — decisions/lessons/bookmarks/trajectories from JSON to indexed SQLite tables
-- Query-based decision inputs — decision rules consume SQL directly instead of enricher JSON
-- Atomic multi-file updates — wrap related writes in transactions (prevents partial-write corruption)
+**Must have (v12.0 core):**
+- Structured planning tables (phases, plans, tasks) — eliminates re-parsing ROADMAP.md and PLAN.md files on every invocation
+- Git-hash invalidation with file mtime fallback — SQLite rows keyed by source file hash + mtime; stale on commit or on-disk edit
+- Session state in SQLite — current position, metrics, accumulated context stored in `session_state` table; STATE.md becomes generated view
+- Schema versioning with migrations — forward-only migration runner, no data loss on upgrade
+- Enricher deduplication — pre-compute plan_count, summary_count, incomplete_plans counts; eliminate 3x `listSummaryFiles()` and 2x `parsePlans()` calls
+- Backward-compatible fallback — Map fallback for Node <22.5, graceful feature-gating
 
-**Defer (v2+):**
-- FTS5 full-text search — current volumes (<1000 entries) don't justify overhead
-- Materialized enrichment views with triggers — only when benchmarked as bottleneck
-- WAL mode for parallel agent access — when multi-agent parallelism is attempted
+**Should have (v12.0 Phase 3+):**
+- Memory store migration — decisions.json, lessons.json, trajectories.json, bookmarks.json into SQLite with dual-write path and sacred data protection
+- Cross-entity SQL queries — "show all decisions that mention phase 73" via JOINs (enables `/bgsd-search-decisions` enhancement)
+- Query-based decision inputs — new decision rules consume SQL queries directly instead of enricher-derived JSON
+- New deterministic rules — 6-8 rules leveraging SQLite-backed state for richer workflow routing
+
+**Defer to v13:**
+- FTS5 full-text search — when decision/lesson volumes exceed 1000 entries
+- Materialized enrichment views with triggers — when enrichment query measured as bottleneck
+- WAL-mode read replicas — when parallel agent execution is attempted
 - SQLite session/changeset tracking — when undo/redo or audit trail needed
+- Per-project database option — when config-dir approach proves limiting
+
+**Key dependency chain:** Schema versioning → planning tables → enricher acceleration → memory migration → query expansion → session persistence. Each phase enables the next.
 
 ### Architecture Approach
 
-The target architecture adds a `DataStore` class as a unified SQLite access layer sitting between parsers and consumers. Parsers gain write-through persistence: on parse, they write structured rows to DataStore; on subsequent reads, they check DataStore validity before re-parsing. The enricher reads pre-computed data from DataStore instead of re-scanning files. Memory stores dual-write to both JSON (for git tracking) and SQLite (for indexed queries). Two database files with clear separation: global `cache.db` for file/research cache (unchanged), per-project `.planning/.cache.db` for structured planning data.
+**Dual-store model:** Markdown files (ROADMAP.md, PLAN.md, STATE.md, REQUIREMENTS.md) are the authority, human-readable, git-tracked. SQLite structured tables are derived, queryable, fully regenerable. Writes always go to markdown first (via existing parsers and STATE.md writers), then to SQLite as write-through. Reads check SQLite first (fast), fall back to markdown parsing on cache miss or stale detection.
+
+**Data flow layers:**
+1. **L1: In-process Map cache** — Per-invocation, same as today
+2. **L2: SQLite structured tables** — Cross-invocation persistence with git-hash + mtime invalidation
+3. **L3: Markdown filesystem** — Authority source, always correct
 
 **Major components:**
-1. **DataStore (NEW)** — Unified SQLite access: schema management, migrations, structured CRUD, git-hash + mtime invalidation. Located at `src/lib/datastore.js`.
-2. **Modified Parsers (state.js, roadmap.js, plan.js)** — Write-through cache: parse markdown → persist rows to DataStore → read from DataStore when cache is valid.
-3. **Enricher V2 (MODIFIED)** — Reads pre-computed counts and metadata from DataStore instead of re-parsing files. Eliminates 3x listSummaryFiles and 2x parsePlans duplication.
-4. **MemoryMigrator (NEW)** — One-time migration of `.planning/memory/*.json` into SQLite tables with sacred data protection and round-trip verification.
-5. **QueryAPI (NEW)** — SQL query functions replacing subprocess calls for CLI commands (count plans, filter decisions, aggregate metrics).
+- **DataStore class** — Unified SQLite access layer; schema management, migrations, structured CRUD operations, query API
+- **Modified Parsers** — state.js, roadmap.js, plan.js, config.js, project.js, intent.js write to DataStore after parsing markdown
+- **Enhanced project-state.js** — Adds DataStore read path; reads from SQLite when cache valid, otherwise calls parsers
+- **EnricherV2** — Reads pre-computed enrichment from DataStore; eliminates `parsePlans()` and `listSummaryFiles()` duplication
+- **Modified file-watcher.js** — Invalidates DataStore entries alongside Map caches on file change
+- **QueryAPI** — SQL query functions for CLI commands (count, filter, aggregate)
+- **MemoryMigrator** — One-time JSON→SQLite import for decisions, lessons, trajectories, bookmarks with sacred data protection
 
-### Critical Pitfalls
+**Schema design:** 
+- `_meta` table for schema version and git hash tracking
+- `phases`, `plans`, `tasks` tables for planning data
+- `requirements` table for requirement traceability
+- `decisions`, `lessons`, `trajectories`, `bookmarks` tables for memory stores (replaces JSON files)
+- `session_state` table for current position and metrics
+- `enrichment_cache` table for pre-computed enrichment JSON blob
+- All tables have source file mtime + git hash for invalidation
 
-1. **node:sqlite API drift between Node versions** — The API gained 15+ new methods between v22.5 and v22.22. Create a capability detection layer; use only v22.5 baseline API for core paths; wrap optional features (createTagStore, iterate, aggregate) behind runtime checks.
+### Critical Pitfalls & Mitigations
 
-2. **Schema migration in single-file deploy** — `CREATE TABLE IF NOT EXISTS` is NOT a migration; it silently preserves old schemas missing new columns. Use `PRAGMA user_version` with an append-only migration array embedded in code. Never delete migrations. Test upgrades from version 0 AND every intermediate version.
+**1. node:sqlite API Drift Between Node Versions (MEDIUM impact, P1 mitigation)**
 
-3. **Stale cache after uncommitted file edits** — Git-hash invalidation is blind to working-directory changes. Use hybrid invalidation: git-hash for cross-session staleness, file mtime for within-session freshness. Always check source file mtime before trusting SQLite cache.
+Between minimum Node v22.5 and current v25.8, 15+ new methods were added to the node:sqlite API. Code written for newer versions silently breaks on older versions. Example: `createTagStore()` (v24.9+) doesn't exist in v22.5.
 
-4. **Sacred data loss during memory store migration** — Never delete JSON files during migration. Two-phase approach: copy JSON → SQLite (additive), then verify round-trip equality for every entry. Only switch read path after verification passes.
+*Mitigation:*
+- Create `sqliteCapabilities()` detection function probing for features at runtime
+- All new code uses only v22.5 baseline API: DatabaseSync, exec, prepare, get/all/run
+- Wrap optional features (tag store, iterate, aggregate, timeout) in capability checks
+- Add Node 22.5 to CI test matrix — not just "latest"
+- Document "safe baseline" vs "enhanced" APIs in code comments
 
-5. **Database locking under concurrent invocations** — Plugin hooks, multiple terminals, and git hooks can trigger concurrent access. Enable WAL mode and set busy timeout from the very first database open. Test with 5 simultaneous CLI processes.
-<!-- /section -->
+**2. Schema Migration in Single-File Deploy (HIGH impact, P1 mitigation)**
+
+Single-file CLI deploy has no migration runner or version tracking. `CREATE TABLE IF NOT EXISTS` doesn't add columns — old schema silently wins, new code crashes on missing columns.
+
+*Mitigation:*
+- Use `PRAGMA user_version` as schema version tracker (integer, persisted in .db file)
+- Embed migrations as versioned JavaScript functions, not separate files
+- Run migrations in transaction on every db open
+- Test migration FROM v0 (fresh) AND every intermediate version (not just v-1)
+- Use forward-only migrations (add columns, never modify)
+
+**3. Stale Cache After Markdown File Edits (HIGH impact, P1 mitigation)**
+
+Git-hash invalidation misses uncommitted changes. User edits STATE.md → CLI reads stale SQLite data because git hash hasn't changed. Sub-second staleness is unacceptable.
+
+*Mitigation:*
+- Combine git-hash (bulk invalidation) + file mtime (fine-grained) + content hash (detect reverts)
+- Store mtime alongside parsed data; check mtime on every read (fast fs.statSync)
+- Hook file-watcher to mark specific table entries stale (not blanket invalidation)
+- Cascade invalidation: edit ROADMAP.md → invalidate phases → invalidate plans → invalidate tasks
+
+**4. Map/SQLite Backend Divergence for Structured Data (MEDIUM impact, P1 mitigation)**
+
+Existing dual-backend pattern (MapBackend + SQLiteBackend for file_cache) doesn't extend to relational queries. SQL JOINs, aggregates, filters have no Map equivalent without reimplementing a query engine.
+
+*Mitigation:*
+- Accept structured tables are **SQLite-only**
+- File cache layer keeps dual-backend for backward compatibility
+- New data layer is separate module requiring SQLite, fails gracefully on Node <22.5
+- Graceful degradation: on Node <22.5, structured features return error, CLI falls back to markdown parsing
+- Document architecture split clearly in key decisions
+
+**5. JSON-to-SQLite Data Loss from Type Coercion (MEDIUM impact, P2 mitigation)**
+
+Memory stores have arrays, booleans, objects. SQLite has 5 types. Round-trip JSON → SQLite → JSON can lose fidelity: `true` → 1 → not `true`, arrays → strings, nested objects → query-unable TEXT.
+
+*Mitigation:*
+- Define explicit type mapping per column BEFORE migration
+- Use STRICT tables to catch type mismatches at write time
+- Round-trip test: `original === JSON.parse(sqliteRow.jsonField)` for every data type
+- Use JSON1 extension for querying into TEXT JSON blobs
+- Consider `_raw_json TEXT` backup column during transition
+- Sacred data: never delete JSON backups during migration
+
+**6. Database Locking Under Concurrent CLI Invocations (MEDIUM impact, P1 mitigation)**
+
+CLI may run concurrently (multiple terminals, plugin hooks, editor idle-detectors). Default SQLite uses exclusive locks — writer blocks readers, causing `SQLITE_BUSY` crashes.
+
+*Mitigation:*
+- Enable WAL mode immediately: `PRAGMA journal_mode=WAL`
+- Set busy timeout: `PRAGMA busy_timeout=5000` (5 seconds)
+- Explicit transactions wrapping multi-statement operations
+- Use `INSERT OR REPLACE` (already done in cache.js)
+- Keep transactions short (parse in JS, single batch INSERT)
+- Test concurrent access: spawn 10 CLI processes simultaneously, verify no SQLITE_BUSY
+
+**7. Sacred Data Loss in Memory Store Migration (HIGH impact, P2 mitigation)**
+
+decisions.json, lessons.json, trajectories.json are marked sacred (protected from compaction). Bugs in JSON→SQLite migration corrupt irreplaceable project intelligence.
+
+*Mitigation:*
+- Dual-write phase: write to both JSON (primary) and SQLite (secondary) for one milestone
+- Never delete JSON files during migration — keep as permanent backup
+- Migration verification: compare JSON count === SQLite count, round-trip every entry
+- Add `migration_status` table tracking: JSON count, SQLite count, verification timestamp
+- Test with real sacred data fixtures, not synthetic data
+- Provide rollback command: `memory:export --format=json` to reconstruct JSON from SQLite
+
+---
 
 <!-- section: roadmap_implications -->
 ## Implications for Roadmap
 
-Based on research, suggested phase structure:
+Based on research, structured SQLite data layer breaks into 6 natural phases with clear dependencies and independent milestone boundaries. All 6 can ship in v12.0 (depending on schedule) or phases 4-6 can defer to v12.1/v13 without architectural rework.
 
-### Phase 1: Foundation & Schema Design
-**Rationale:** DataStore is the foundation all other components depend on. Schema versioning must exist before any structured tables are created. WAL mode and capability detection are prerequisites, not afterthoughts.
-**Delivers:** DataStore class with schema management, migration runner, PRAGMA user_version tracking, WAL mode + busy timeout, node:sqlite capability detection layer, Map fallback guard pattern.
-**Addresses:** Schema versioning (P1), backward-compatible fallback (P1)
-**Avoids:** API drift (Pitfall 1), schema migration breakage (Pitfall 2), Map/SQLite divergence (Pitfall 3), database locking (Pitfall 6)
+### Phase 1: Schema Design & Foundation
+**Rationale:** Must establish the DataStore infrastructure, schema versioning, and API capability detection before any structured tables are created. Cannot proceed without this foundation.
 
-### Phase 2: Parser Integration & Cache Invalidation
-**Rationale:** Parsers are the writers to DataStore — they must work before any consumers (enricher, CLI) can read. Invalidation strategy must be proven before caching derived data.
-**Delivers:** Write-through cache for state/roadmap/plan parsers, git-hash + mtime invalidation logic, file-watcher integration with DataStore invalidation, structured tables for phases/plans/tasks.
-**Uses:** DataStore (Phase 1), existing parser architecture, existing file-watcher
-**Implements:** Write-through structured cache pattern, git-hash staleness detection
-**Avoids:** Stale cache (Pitfall 5), enricher duplication creating new duplication (Pitfall 9)
+**Delivers:**
+- DataStore class with schema management, migrations, CRUD layer
+- PRAGMA user_version versioning system with embedded migration functions
+- API capability detection (`createTagStore`, `aggregate`, `iterate`, `timeout` options)
+- Node 22.5 minimum version gating with fallback to Map on Node <22.5
+- WAL mode + busy timeout configuration
+- Per-project `.planning/.cache.db` location decision and gitignore setup
+
+**Addresses:**
+- FEATURES: Table stakes for "schema versioning with migrations"
+- PITFALLS: Avoids API drift (1), schema migration (2), locking (6)
+
+**Success criteria:**
+- [ ] DataStore class instantiates with feature detection
+- [ ] Migrations run from v0 → current, idempotent on re-run
+- [ ] Node 22.5 test passes with fallback paths
+- [ ] WAL mode enabled, busy timeout 5 seconds set
+- [ ] Database location is `.planning/.cache.db`, not global
+
+**Research flags:** None — well-documented, established patterns
+
+### Phase 2: Parser Integration & Cache Population
+**Rationale:** Wire the 6 parsers (state, roadmap, plan, config, project, intent) to write-through to SQLite after parsing markdown. Implement git-hash + mtime invalidation. Update project-state.js read path to check DataStore before calling parsers. Foundation is required first; independent of enricher/memory work.
+
+**Delivers:**
+- Write-through integration: all 6 parsers write structured rows to SQLite after successful parse
+- Three-tier caching: Map L1 (per-process) → SQLite L2 (cross-invocation) → Markdown L3 (authority)
+- Git-hash + mtime invalidation with cascade logic (edit ROADMAP → invalidate all plans/tasks)
+- Enhanced project-state.js facade that reads from DataStore on warm starts
+- Updated file-watcher.js to invalidate DataStore alongside Map caches
+
+**Addresses:**
+- FEATURES: Planning data tables, git-hash invalidation, incremental parse-and-store
+- ARCHITECTURE: Write-through cache pattern, git-hash staleness detection pattern
+- PITFALLS: Avoids stale cache (3), divergence (4), duplication (9)
+
+**Success criteria:**
+- [ ] ROADMAP.md parse → phases table populated
+- [ ] PLAN.md parse → plans + tasks tables populated
+- [ ] Git-hash + mtime stored with every row
+- [ ] Edit markdown file → next CLI invocation reflects edit (sub-second accuracy)
+- [ ] project-state.js reads from SQLite on cache hit
+- [ ] File watcher invalidates DataStore entries
+- [ ] `bgsd-tools state:show` on warm start is 10x faster than markdown parse
+
+**Research flags:** Cache invalidation strategy under live editing — verify file-watcher integration
 
 ### Phase 3: Enricher Acceleration
-**Rationale:** Highest-impact single change — eliminates the hot-path duplication that affects every command invocation. Depends on parsers populating DataStore (Phase 2).
-**Delivers:** Enricher V2 reading from DataStore, pre-computed enrichment cache table, elimination of 3x listSummaryFiles / 2x parsePlans, measurable latency reduction.
-**Uses:** DataStore (Phase 1), populated tables (Phase 2)
-**Implements:** Pre-computed enrichment view, single-query enrichment path
+**Rationale:** Fix the core performance bottleneck: enricher calls `parsePlans()` 3 times and `listSummaryFiles()` 3 times per invocation. With structured tables populated in Phase 2, replace with pre-computed SQL queries. Highest user value per engineering effort.
+
+**Delivers:**
+- Enrichment cache: pre-computed enrichment JSON blob (plan_count, summary_count, incomplete_plans, task_types, etc.)
+- Enricher V2: replaces file-scanning with single enrichment_cache SQL query
+- Eliminates 3x duplication in command-enricher.js
+- Warm-start enrichment is now ~0.1ms (SQL query) vs ~100-500ms (file scanning)
+
+**Addresses:**
+- FEATURES: Enricher deduplication (table stakes), pre-computed materialized data
+- ARCHITECTURE: Enricher acceleration data flow pattern
+- PITFALLS: Avoids duplication (9)
+
+**Success criteria:**
+- [ ] enrichment_cache table has all enricher fields
+- [ ] Pre-computed on every parser write (write-through)
+- [ ] Enricher reads single row instead of calling parsePlans/listSummaryFiles
+- [ ] Warm-start enricher is 5-10x faster (measured with `time bgsd-tools state:show`)
+- [ ] No code duplication — listSummaryFiles call count reduced from 3 to 0
+- [ ] Plugin system prompt and CLI commands agree on enrichment values
+
+**Research flags:** Enrichment query performance-profile on projects with 20+ plans
 
 ### Phase 4: Memory Store Migration
-**Rationale:** Independent of enricher work, but depends on DataStore foundation. Sacred data protection makes this high-risk and requires careful migration with verification.
-**Delivers:** SQLite tables for decisions/lessons/bookmarks/trajectories, one-time JSON import with round-trip verification, dual-write for ongoing sync, JSON backups preserved, cross-entity SQL queries.
-**Uses:** DataStore (Phase 1), schema migration runner
-**Avoids:** Sacred data loss (Pitfall 8), JSON-to-SQLite type coercion (Pitfall 4)
+**Rationale:** decisions.json, lessons.json, trajectories.json are currently separate JSON files, difficult to query, not indexed. With DataStore schema in place, migrate to SQLite tables with sacred data protection and dual-write path. Independent of phases 1-3 (can parallelize) but must complete before Phase 5 (query rules).
 
-### Phase 5: Decision Rules & Session State
-**Rationale:** Depends on enricher acceleration (Phase 3) for query-based inputs and parser integration (Phase 2) for session state. Most architecturally aggressive change (STATE.md becomes generated view).
-**Delivers:** 6-8 new decision rules consuming SQLite-backed state, session state persistence in SQLite, STATE.md as generated view, QueryAPI for CLI commands.
-**Uses:** DataStore (Phase 1), enricher V2 (Phase 3), structured tables (Phase 2)
-**Implements:** Query-based decision inputs, session continuity across invocations
+**Delivers:**
+- `decisions`, `lessons`, `trajectories`, `bookmarks` SQLite tables with proper schema
+- MemoryMigrator: one-time JSON→SQLite import preserving sacred flags and all fields
+- Dual-write path: memory.js writes to both JSON (authority) and SQLite (index) until v13
+- Migration status tracking: verify JSON count === SQLite count, confirm round-trip fidelity
+- JSON files preserved as permanent backup (never deleted)
+
+**Addresses:**
+- FEATURES: Memory store migration, sacred data protection (via table stakes list)
+- ARCHITECTURE: Memory store data flow pattern
+- PITFALLS: Avoids sacred data loss (7), JSON-to-SQLite type loss (5)
+
+**Success criteria:**
+- [ ] decisions.json → decisions table (all entries, all fields)
+- [ ] lessons.json → lessons table with sacred flag protection
+- [ ] trajectories.json → trajectories table with tagging/references preserved
+- [ ] bookmarks.json → bookmarks table
+- [ ] Round-trip test: every entry JSON → SQLite → JSON with deep equality
+- [ ] JSON files still exist, migration_status shows verified_at timestamp
+- [ ] Dual-write: new decisions written to both JSON and SQLite
+
+**Research flags:** Type coercion edge cases (Unicode in decisions, nested arrays in trajectories) — verify during implementation
+
+### Phase 5: Query Acceleration & New Deterministic Rules
+**Rationale:** With structured tables and memory stores in SQLite, implement QueryAPI (high-level query functions) and 6-8 new decision rules that consume SQL directly. Requires phases 1-4 complete. Enables richer workflow routing.
+
+**Delivers:**
+- QueryAPI: reusable SQL query functions (`getDecisionsByPhase`, `countTasksByStatus`, `searchLessons`, etc.)
+- New decision rules (6-8): phase attempt history, task completion rates, stuck detection, memory-based routing
+- Decision rule integration in enricher: pre-computed decision inputs from SQLite
+- Backward compatibility: old rules unchanged, new rules optional
+
+**Addresses:**
+- FEATURES: Cross-entity SQL queries, query-based decision inputs, new deterministic decisions
+- ARCHITECTURE: Data flow integration with decision rules
+
+**Success criteria:**
+- [ ] QueryAPI module with 6-10 reusable query functions
+- [ ] New decision rules added to decision-rules.js registry
+- [ ] Enricher pre-loads decision inputs from DataStore (no per-rule query)
+- [ ] New rules tested with synthetic and real data
+- [ ] 1008+ existing tests still pass; new test coverage for query functions
+
+**Research flags:** None — standard implementation pattern
+
+### Phase 6: Session State Persistence
+**Rationale:** Currently STATE.md is the human-written authority. Phase 6 makes SQLite session_state the machine authority (position, metrics, accumulated context), with STATE.md becoming a generated view. Most architecturally aggressive change; should be last. Enables cross-invocation metrics, stuck detection, resume intelligence.
+
+**Delivers:**
+- session_state table: phase, plan, status, progress, last_activity, metrics JSON
+- STATE.md generation: derived from session_state + decisions + lessons (markdown view)
+- Invocation log: track command, duration, changed files, outcome
+- Velocity metrics: task completion rate, phase duration, session count
+- Context preservation: accumulated state across invocations without manual editing
+
+**Addresses:**
+- FEATURES: Session state persistence, atomic multi-file updates, session continuity
+- ARCHITECTURE: Session state persistence pattern
+
+**Success criteria:**
+- [ ] session_state table populated from STATE.md on first read
+- [ ] STATE.md writer generates from session_state on every state change
+- [ ] Invocation log tracks each CLI command with timing
+- [ ] Velocity metrics computed from invocation log
+- [ ] User workflows unchanged — STATE.md still visible and committable
+
+**Research flags:** Generated STATE.md format — ensure it's human-readable and git-diff friendly
 
 ### Phase Ordering Rationale
 
-- **Foundation first** (Phase 1): DataStore, migrations, and locking are prerequisites for everything. Building these first avoids retrofitting migration support later (a known pitfall).
-- **Parsers before consumers** (Phase 2 before 3): The write-through pattern requires parsers to populate tables before the enricher can read from them. Invalidation must be proven before caching derived data.
-- **Enricher is highest-impact** (Phase 3): Every `/bgsd-*` command triggers the enricher. Fixing the 3x/2x duplication delivers measurable latency reduction for all users.
-- **Memory migration is independent** (Phase 4): Can theoretically run in parallel with Phase 3, but sacred data handling requires focused attention. Sequencing after enricher reduces risk.
-- **Session state is most aggressive** (Phase 5): Changes the authority model for STATE.md from "source of truth" to "generated view." Should come last when the data layer is proven stable.
+1. **Foundation first** — DataStore, versioning, API detection must exist before any structured tables
+2. **Parser integration before enricher** — Enricher acceleration requires populated tables, requires parser integration
+3. **Enricher before memory migration** — Enricher fixed first (core value), memory migration can parallelize or follow
+4. **Memory before query expansion** — Query rules need both planning tables (Phase 2) and memory tables (Phase 4)
+5. **Session state last** — Most architecturally invasive; depends on all tables being stable
 
-### Research Flags
+### Research Flags by Phase
 
-Phases likely needing deeper research during planning:
-- **Phase 2:** Complex integration across 6 parsers; need to verify write-through pattern doesn't break existing frozen object contracts
-- **Phase 4:** Sacred data migration needs real-data testing; JSON entry shapes may vary across project histories
+- **Phase 1:** None — well-documented, established patterns
+- **Phase 2:** Cache invalidation behavior under live editing — verify file-watcher integration
+- **Phase 3:** Enrichment query performance on large projects (20+ plans) — profile before shipping
+- **Phase 4:** Type coercion edge cases (Unicode, nested arrays) — test with real sacred data
+- **Phase 5:** None — standard implementation
+- **Phase 6:** STATE.md generated format — ensure human-readable and git-friendly
 
-Phases with standard patterns (skip research-phase):
-- **Phase 1:** Well-documented SQLite patterns (PRAGMA user_version, WAL mode), existing cache.js as template
-- **Phase 3:** Clear target (eliminate duplication), existing enricher code well-analyzed
-- **Phase 5:** Decision rules follow established pure-function pattern from v11.3
-<!-- /section -->
+### Phases Likely to Need Deeper Planning (vs Research)
+
+- **Phase 2:** Invalidation cascade logic — may need schema changes if dependencies complex
+- **Phase 3:** Enrichment computation hooks — may need integration points in parser write paths
+- **Phase 4:** Memory store dual-write coordination — may need careful sequencing with legacy path
+
+### Phases with Standard Patterns (Skip Research-Phase)
+
+- **Phase 1:** DataStore + schema versioning — proven by database tools (Django, SQLite itself)
+- **Phase 5:** Decision rule addition — incremental, standard pattern
+- **Phase 6:** Generated view pattern — proven by build tools and version control
+
+---
 
 <!-- section: confidence -->
 ## Confidence Assessment
 
 | Area | Confidence | Notes |
 |------|------------|-------|
-| Stack | HIGH | All technologies already in production (node:sqlite in cache.js). API verified against official Node.js v25.8.1 docs. Zero new dependencies. |
-| Features | HIGH | Feature list derived directly from PROJECT.md v12.0 targets. Prioritization validated against codebase analysis of 6 parsers, enricher, and memory stores. |
-| Architecture | HIGH | Architecture patterns verified against existing cache.js implementation. Write-through cache, Map fallback, and git-hash invalidation are extensions of proven patterns. |
-| Pitfalls | HIGH | All pitfalls verified against existing codebase. API drift validated by comparing Node v22.5 and v25.x docs. Schema migration patterns from SQLite official docs. |
+| Stack | HIGH | Node.js v25.8.1 SQLite API fully documented and verified; existing cache.js uses DatabaseSync successfully; zero new npm dependencies |
+| Features | HIGH | Existing codebase analysis (6 parsers, enricher, memory stores) confirms feature requirements; prioritization matches user pain points (enricher duplication) |
+| Architecture | HIGH | Dual-store (markdown + SQLite) pattern used by Fossil, Jujutsu, GitHub CLI; write-through cache proven in cache.js; git-hash invalidation tested in existing research_cache |
+| Pitfalls | HIGH | Each pitfall traced to specific code location (cache.js WAL gap, enricher duplication, migrations) or SQLite documentation limitation; recovery strategies documented |
 
-**Overall confidence:** HIGH
+**Overall confidence:** HIGH — All findings verified against Node.js official documentation, SQLite documentation, existing codebase analysis (2500+ lines reviewed).
 
 ### Gaps to Address
 
-- **Concurrent access stress testing:** WAL mode + busy timeout is the recommended pattern, but actual behavior under 5+ simultaneous CLI invocations on the per-project `.planning/.cache.db` has not been benchmarked. Validate during Phase 1 implementation.
-- **Enricher V2 query design:** The exact SQL queries for pre-computed enrichment need benchmarking against real projects with 20+ phases and 50+ plans to verify the claimed 5-30x speedup. Design during Phase 3 planning.
-- **Memory store entry shape variance:** Older projects may have decision/lesson entries with different field shapes than current format. Migration code needs to handle variable schemas gracefully. Investigate during Phase 4 planning.
-- **Bundle size impact:** Research estimates 50-100KB growth. Actual impact depends on how SQL strings compress under esbuild minification. Monitor after each phase against the 1000KB budget.
-<!-- /section -->
+- **Bundle size impact:** Estimate is +50KB for data layer; actual impact unknown until code written. Mitigation: monitor per-phase, enforce +30KB per phase limit.
+- **WAL mode under extreme concurrency:** Only theoretical analysis; 5-process concurrent test needed during implementation.
+- **Enrichment query performance on 50+ plan projects:** Current enrichment query simple; scaling unknown. Mitigation: performance profiling in Phase 3.
+- **Memory store sacred data round-trip fidelity:** Type coercion edge cases (Unicode, nested arrays, large integers) not tested. Mitigation: comprehensive test suite in Phase 4.
+
+### Unresolved Questions
+
+- **Per-project database permission:** Should `.planning/.cache.db` have restricted permissions (0600)? Depends on file sensitivity. Recommendation: 0600 (user-only) for consistency with security practices.
+- **STATE.md migration path:** When Phase 6 makes SQLite the source of truth, existing STATE.md files need one-time import. Mechanism? Recommendation: automatic on first Phase 6 invocation, with backup preservation.
+
+---
 
 <!-- section: sources -->
 ## Sources
 
 ### Primary (HIGH confidence)
-- Node.js v25.8.1 SQLite documentation — Full API reference, DatabaseSync, SQLTagStore, all feature availability dates
-- Node.js v22.x SQLite documentation — Baseline API (Stability 1.1), minimum version compatibility
-- SQLite official documentation (sqlite.org) — PRAGMA user_version, STRICT tables, JSON1, ALTER TABLE limitations, WAL mode
-- Existing codebase analysis — cache.js (752 lines), command-enricher.js (340 lines), project-state.js (67 lines), 6 plugin parsers, decision-rules.js (467 lines), memory.js (378 lines), init.js memory store access
-- PROJECT.md — v12.0 milestone goals, constraints, architecture decisions
+
+- **Node.js v25.8.1 SQLite Documentation** — Complete API reference, verified all features and version availability. https://nodejs.org/api/sqlite.html
+- **Node.js v22.x SQLite Documentation** — Baseline minimum version feature set. https://nodejs.org/docs/latest-v22.x/api/sqlite.html
+- **src/lib/cache.js** — Existing DatabaseSync + SQLTagStore + MapBackend implementation (752 lines, reviewed in full). Pattern provides fallback model, API usage patterns.
+- **src/plugin/command-enricher.js** — Duplication root cause (340 lines): 3x `listSummaryFiles()` + 2x `parsePlans()` calls identified.
+- **src/plugin/parsers/*.js** — 6 parsers with Map caches (state: 101 lines, roadmap: 220 lines, plan: 258 lines, config: 155 lines, project: 67 lines, intent: 89 lines). Write-through integration points identified.
+- **src/commands/memory.js** — Memory store schema and sacred data protection (378 lines). Schema design input.
+- **PROJECT.md** — v12.0 milestone context, constraints, architecture decisions.
+- **SQLite Documentation** — PRAGMA user_version for schema versioning, PRAGMA journal_mode for WAL, ALTER TABLE limitations. https://www.sqlite.org/
 
 ### Secondary (MEDIUM confidence)
-- Ben Johnson / Fly.io "All-In on Server-Side SQLite" (2022) — Architecture patterns for SQLite as application database
-- Comparable tool analysis — Fossil SCM, Turborepo, Nx, Jujutsu patterns for SQLite-backed CLI tools
+
+- **Existing decision-rules.js** — 12 rules, registry pattern (467 lines). Input for new rule design.
+- **Existing file-watcher.js** — fs.watch integration pattern (202 lines). Input for DataStore invalidation integration.
+- **Ben Johnson / Fly.io: "All-In on Server-Side SQLite" (2022)** — Architecture patterns for CLI tools using SQLite. https://fly.io/blog/all-in-on-sqlite/
 
 ---
-*Research completed: 2026-03-14*
-*Ready for roadmap: yes*
+
+*Research completed: 2026-03-14*  
+*Synthesized by: Research Synthesizer Agent*  
+*Ready for roadmap: YES*
 <!-- /section -->

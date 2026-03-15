@@ -452,6 +452,51 @@ export function enrichCommand(input, output, cwd) {
     }
   } catch { /* commit-strategy inputs failed */ }
 
+  // Phase 127: tool_availability for agent routing
+  // Read from the file cache written by bgsd-tools.cjs detect:tools — avoids child_process in ESM plugin.
+  // Falls back to all-false if cache is absent or stale (conservative default).
+  try {
+    const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes (matches detector.js)
+    const cacheFilePath = join(resolvedCwd, '.planning', '.cache', 'tools.json');
+    let toolAvailability = { ripgrep: false, fd: false, jq: false, yq: false, bat: false, gh: false };
+    if (existsSync(cacheFilePath)) {
+      try {
+        const cacheData = JSON.parse(readFileSync(cacheFilePath, 'utf-8'));
+        if (cacheData && cacheData.timestamp && (Date.now() - cacheData.timestamp) < CACHE_TTL_MS && cacheData.results) {
+          for (const toolName of ['ripgrep', 'fd', 'jq', 'yq', 'bat', 'gh']) {
+            toolAvailability[toolName] = Boolean(cacheData.results[toolName] && cacheData.results[toolName].available);
+          }
+        }
+      } catch { /* ignore malformed cache */ }
+    }
+    enrichment.tool_availability = toolAvailability;
+  } catch {
+    // Non-fatal: default all false if cache read fails
+    enrichment.tool_availability = { ripgrep: false, fd: false, jq: false, yq: false, bat: false, gh: false };
+  }
+
+  // Phase 128: Handoff tool context (derived from tool_availability)
+  try {
+    const ta = enrichment.tool_availability || {};
+    const availableTools = Object.entries(ta)
+      .filter(([, available]) => available === true)
+      .map(([name]) => name);
+    const toolCount = availableTools.length;
+
+    // Capability level (mirrors resolveAgentCapabilityLevel logic but avoids circular dep)
+    let capabilityLevel = 'MEDIUM';
+    if (toolCount >= 5) capabilityLevel = 'HIGH';
+    else if (toolCount <= 1) capabilityLevel = 'LOW';
+
+    enrichment.handoff_tool_context = {
+      available_tools: availableTools,  // tool names only — no descriptions/schemas per CONTEXT.md
+      tool_count: toolCount,
+      capability_level: capabilityLevel,
+    };
+  } catch {
+    enrichment.handoff_tool_context = { available_tools: [], tool_count: 0, capability_level: 'LOW' };
+  }
+
   // In-process decision evaluation (ENGINE-02: no subprocess overhead)
   try {
     const decisions = evaluateDecisions(command, enrichment);

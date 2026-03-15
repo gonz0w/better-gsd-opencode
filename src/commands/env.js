@@ -4,6 +4,7 @@ const fs = require('fs');
 const path = require('path');
 const { execFileSync } = require('child_process');
 const { output, error, debugLog } = require('../lib/output');
+const { searchRipgrep, transformJson, parseYAML } = require('../lib/cli-tools');
 
 // --- Language Manifest Patterns -----------------------------------------------
 
@@ -542,15 +543,35 @@ function detectInfraServices(rootDir) {
     try {
       if (fs.existsSync(filePath)) {
         const content = fs.readFileSync(filePath, 'utf-8');
-        // Simple YAML parsing: find services: section and extract top-level keys
-        const servicesMatch = content.match(/^services:\s*\n((?:[ \t]+\S.*\n?)*)/m);
-        if (servicesMatch) {
-          // Each service is an indented key followed by colon
-          const serviceLines = servicesMatch[1].split('\n');
-          for (const line of serviceLines) {
-            const match = line.match(/^[ \t]{2}(\w[\w-]*):/);
-            if (match) {
-              dockerServices.push(match[1]);
+
+        // Ripgrep pre-filter: if no image/build lines, skip this file entirely
+        const rgResult = searchRipgrep('image:|build:', { paths: [filePath] });
+        const hasServices = !rgResult.success || rgResult.usedFallback ||
+          (Array.isArray(rgResult.result) && rgResult.result.length > 0);
+        if (!hasServices) continue;
+
+        // Try yq-backed structured parse first
+        let foundViaYq = false;
+        const parsed = parseYAML(content);
+        if (parsed.success && parsed.result && parsed.result.services &&
+            typeof parsed.result.services === 'object') {
+          const names = Object.keys(parsed.result.services);
+          if (names.length > 0) {
+            dockerServices.push(...names);
+            foundViaYq = true;
+          }
+        }
+
+        // Regex fallback if yq parse failed or returned no services
+        if (!foundViaYq) {
+          const servicesMatch = content.match(/^services:\s*\n((?:[ \t]+\S.*\n?)*)/m);
+          if (servicesMatch) {
+            const serviceLines = servicesMatch[1].split('\n');
+            for (const line of serviceLines) {
+              const match = line.match(/^[ \t]{2}(\w[\w-]*):/);
+              if (match) {
+                dockerServices.push(match[1]);
+              }
             }
           }
         }
@@ -572,10 +593,31 @@ function detectMcpServers(rootDir) {
   try {
     const mcpPath = path.join(rootDir, '.mcp.json');
     if (fs.existsSync(mcpPath)) {
-      const content = JSON.parse(fs.readFileSync(mcpPath, 'utf-8'));
-      if (content.mcpServers && typeof content.mcpServers === 'object') {
-        for (const name of Object.keys(content.mcpServers)) {
-          servers.push(name);
+      const rawContent = fs.readFileSync(mcpPath, 'utf-8');
+      // Use jq for server name extraction (with JS fallback)
+      const jqResult = transformJson(rawContent, '.mcpServers | keys', { compact: true });
+      if (jqResult.success && jqResult.result) {
+        try {
+          const names = JSON.parse(jqResult.result);
+          if (Array.isArray(names)) {
+            servers.push(...names);
+          }
+        } catch {
+          // jq returned unparseable — fall through to manual parse
+          const content = JSON.parse(rawContent);
+          if (content.mcpServers && typeof content.mcpServers === 'object') {
+            for (const name of Object.keys(content.mcpServers)) {
+              servers.push(name);
+            }
+          }
+        }
+      } else {
+        // jq not available — use manual parse
+        const content = JSON.parse(rawContent);
+        if (content.mcpServers && typeof content.mcpServers === 'object') {
+          for (const name of Object.keys(content.mcpServers)) {
+            servers.push(name);
+          }
         }
       }
     }
@@ -611,14 +653,23 @@ function detectMonorepo(rootDir) {
     const pnpmWsPath = path.join(rootDir, 'pnpm-workspace.yaml');
     if (fs.existsSync(pnpmWsPath)) {
       const content = fs.readFileSync(pnpmWsPath, 'utf-8');
-      const members = [];
-      const packagesMatch = content.match(/packages:\s*\n((?:\s*-\s*.+\n?)*)/);
-      if (packagesMatch) {
-        for (const line of packagesMatch[1].split('\n')) {
-          const m = line.match(/^\s*-\s*['"]?(.+?)['"]?\s*$/);
-          if (m) members.push(m[1]);
+      let members = [];
+
+      // Try yq-backed structured parse first
+      const parsed = parseYAML(content);
+      if (parsed.success && parsed.result && Array.isArray(parsed.result.packages)) {
+        members = parsed.result.packages;
+      } else {
+        // Regex fallback if yq parse failed or returned no packages
+        const packagesMatch = content.match(/packages:\s*\n((?:\s*-\s*.+\n?)*)/);
+        if (packagesMatch) {
+          for (const line of packagesMatch[1].split('\n')) {
+            const m = line.match(/^\s*-\s*['"]?(.+?)['"]?\s*$/);
+            if (m) members.push(m[1]);
+          }
         }
       }
+
       return { type: 'pnpm-workspaces', members };
     }
   } catch {
