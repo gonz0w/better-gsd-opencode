@@ -1,21 +1,21 @@
-# Project State: Post-v12.1
+# Project State: v13.0 Closed-Loop Agent Evolution
 
 ## Project Reference
 
 See: `.planning/PROJECT.md` (updated 2026-03-15)
 
 **Core value:** Manage and deliver high-quality software with high-quality documentation, while continuously reducing token usage and improving performance
-**Current focus:** v12.1 complete — ready for next milestone
+**Current focus:** v13.0 — closed-loop agent evolution: local overrides, lesson-driven improvement, skill discovery, research enhancement
 
 ## Current Position
 
-**Milestone:** TBD (v12.1 archived 2026-03-15)
-**Phase:** —
+**Milestone:** v13.0 Closed-Loop Agent Evolution
+**Phase:** Not started (defining requirements)
 **Current Plan:** —
-**Status:** Ready for new milestone
-**Last Activity:** 2026-03-15
+**Status:** Defining requirements
+**Last Activity:** 2026-03-15 — Milestone v13.0 started
 
-Progress: [██████████] 100% (Phase 128 complete, 3 of 3 plans)
+Progress: [░░░░░░░░░░] 0%
 
 ## Performance Metrics
 

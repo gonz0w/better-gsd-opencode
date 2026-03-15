@@ -8,9 +8,21 @@ A single-file Node.js CLI built from 52 organized `src/` modules via esbuild, pr
 
 Manage and deliver high-quality software with high-quality documentation, while continuously reducing token usage and improving performance.
 
+## Current Milestone: v13.0 Closed-Loop Agent Evolution
+
+**Goal:** Enable agents and skills to improve continuously from project experience — local agent overrides, lesson-driven improvement suggestions, agentskills.io discovery, and enhanced research workflows.
+
+**Target features:**
+- Project-local agent overrides (`.planning/agents/` silently replaces global agents per-project)
+- Lesson-driven agent improvement (lessons.md patterns → structured agent update suggestions)
+- Workflow hooks for improvement (verify-work + complete-milestone surface agent improvement opportunities)
+- Deviation recovery auto-capture (winning patterns after 3-failure recovery → lesson entry)
+- Skill discovery from agentskills.io (query user to install relevant skills during milestone workflows)
+- Enhanced research workflow (better multi-source synthesis, research quality scoring)
+
 ## Current State
 
-**Current milestone:** TBD (v12.1 complete as of 2026-03-15)
+**Current milestone:** v13.0 Closed-Loop Agent Evolution (in progress)
 
 **Last shipped:** v12.1 Tool Integration & Agent Enhancement (2026-03-15)
 
@@ -235,7 +247,7 @@ See `.planning/MILESTONES.md` for full history of v1.0 through v8.2.
 
 ### Active
 
-(No active requirements — v12.1 complete. Define v13.0 requirements in next milestone.)
+(v13.0 requirements defined in .planning/REQUIREMENTS.md)
 
 ### Out of Scope
 
@@ -331,4 +343,4 @@ Known tech debt: `node:sqlite` is Stability 1.2 (Release Candidate).
 - ~~Node.js 18+ minimum~~ — Raised to 22.5+ in v11.x for node:sqlite support
 
 ---
-*Last updated: 2026-03-15 after v12.1 milestone completion*
+*Last updated: 2026-03-15 after v13.0 milestone started*
