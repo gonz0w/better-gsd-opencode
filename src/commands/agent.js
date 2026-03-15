@@ -791,6 +791,141 @@ function generateUnifiedDiff(textA, textB, labelA, labelB) {
 }
 
 /**
+ * Find the closest agent name match via substring or prefix matching
+ * Returns the closest name or null if no match found
+ */
+function findClosestAgent(name, agentNames) {
+  if (!name || !agentNames || agentNames.length === 0) return null;
+  
+  const lower = name.toLowerCase();
+  const matches = [];
+  
+  for (const agent of agentNames) {
+    const agentLower = agent.toLowerCase();
+    // Check substring containment
+    if (agentLower.includes(lower) || lower.includes(agentLower)) {
+      matches.push({ agent, score: 1000 + agentLower.length });
+      continue;
+    }
+    // Check common prefix of length >= 4
+    let prefixLen = 0;
+    const minLen = Math.min(lower.length, agentLower.length);
+    for (let i = 0; i < minLen; i++) {
+      if (lower[i] === agentLower[i]) prefixLen++;
+      else break;
+    }
+    if (prefixLen >= 4) {
+      // Score by prefix length (longer prefix = better match)
+      matches.push({ agent, score: prefixLen });
+    }
+  }
+  
+  if (matches.length === 0) return null;
+  // Return the match with highest score (longest prefix or substring match)
+  // Tie-break: shorter agent name is more specific
+  matches.sort((a, b) => {
+    if (b.score !== a.score) return b.score - a.score;
+    return a.agent.length - b.agent.length;
+  });
+  return matches[0].agent;
+}
+
+/**
+ * Inject `name: <agentName>` into YAML frontmatter if the name field is missing
+ * Returns the modified content string
+ */
+function injectNameField(content, agentName) {
+  if (!content || !content.startsWith('---\n')) return content;
+  const closingIdx = content.indexOf('\n---', 4);
+  if (closingIdx === -1) return content;
+  
+  const frontmatterBody = content.slice(4, closingIdx);
+  const rest = content.slice(closingIdx);
+  
+  // Insert name as first field in frontmatter
+  return '---\nname: ' + agentName + '\n' + frontmatterBody + rest;
+}
+
+/**
+ * Create a project-local override of a global agent file
+ */
+function cmdAgentOverride(cwd, raw, args) {
+  const name = args && args[0];
+  if (!name) {
+    error('Usage: agent override <name>');
+    process.exit(1);
+  }
+  
+  // Normalize: strip .md extension if provided
+  const agentName = name.endsWith('.md') ? name.slice(0, -3) : name;
+  
+  const { agentsDir } = resolveBgsdPaths();
+  const globalAgentPath = path.join(agentsDir, agentName + '.md');
+  
+  // Check global agent exists; if not, suggest closest match
+  if (!fs.existsSync(globalAgentPath)) {
+    // Scan available agent names
+    let agentNames = [];
+    if (fs.existsSync(agentsDir)) {
+      agentNames = fs.readdirSync(agentsDir)
+        .filter(f => f.endsWith('.md') && f !== 'RACI.md')
+        .map(f => f.replace('.md', ''));
+    }
+    const closest = findClosestAgent(agentName, agentNames);
+    if (closest) {
+      error(`Agent "${agentName}" not found. Did you mean "${closest}"?`);
+    } else {
+      error(`Agent "${agentName}" not found. Run "agent list" to see available agents.`);
+    }
+    process.exit(1);
+  }
+  
+  // Resolve local agents dir and path
+  const localDir = path.join(cwd, '.opencode', 'agents');
+  const localPath = path.join(localDir, agentName + '.md');
+  
+  // Check if already overridden
+  if (fs.existsSync(localPath)) {
+    error(`Agent "${agentName}" already has a local override at ${localPath}. Use "agent diff ${agentName}" to view changes or "agent sync ${agentName}" to update.`);
+    process.exit(1);
+  }
+  
+  // Read global agent content
+  let content = safeReadFile(globalAgentPath);
+  if (!content) {
+    error(`Failed to read global agent file: ${globalAgentPath}`);
+    process.exit(1);
+  }
+  
+  // Validate frontmatter — if name: field missing, inject it first
+  let validation = validateAgentFrontmatter(content);
+  if (!validation.valid && validation.error && validation.error.includes('"name" field')) {
+    // Inject name field into frontmatter
+    content = injectNameField(content, agentName);
+    // Re-validate
+    validation = validateAgentFrontmatter(content);
+  }
+  
+  if (!validation.valid) {
+    error(`Agent "${agentName}" has invalid frontmatter: ${validation.error}`);
+    process.exit(1);
+  }
+  
+  // Create local agents directory silently if it doesn't exist
+  fs.mkdirSync(localDir, { recursive: true });
+  
+  // Write the local override
+  fs.writeFileSync(localPath, content, 'utf8');
+  
+  // Output: just the file path created
+  if (raw) {
+    output({ created: localPath, agent: agentName }, raw);
+  } else {
+    console.log(localPath);
+  }
+}
+
+/**
  * List all agents
  */
 function cmdAgentList(cwd, raw) {
@@ -877,8 +1012,11 @@ module.exports = {
   cmdAgentList,
   cmdAgentListLocal,
   cmdAgentValidateContracts,
+  cmdAgentOverride,
   // Exported for testing
   parseRaciMatrix,
+  findClosestAgent,
+  injectNameField,
   // Phase 129: Foundation utilities
   validateAgentFrontmatter,
   sanitizeAgentContent,
