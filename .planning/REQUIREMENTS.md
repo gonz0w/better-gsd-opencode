@@ -174,9 +174,9 @@ These are candidates for future milestones based on research findings:
 |---------|----------------|--------|
 | DO-86: Support ripgrep, fd, jq, yq, bat, gh with graceful degradation | TOOL-01, TOOL-02, TOOL-03, TOOL-04, TOOL-05, TOOL-06, TOOL-DEGR-01, TOOL-DET-01 | Pending |
 | DO-87: Smarter agent routing based on task complexity and capabilities | AGENT-01, AGENT-03 | Pending |
-| DO-88: Better inter-agent collaboration patterns | AGENT-02, AGENT-03 | Pending |
-| DO-89: Decision functions for tool selection and multi-phase sequencing | AGENT-01, AGENT-03 | Pending |
-| DO-90: Improved agent context efficiency through capability-aware filtering | AGENT-01, AGENT-02 | Pending |
+| DO-88: Better inter-agent collaboration patterns | AGENT-02, AGENT-03 | Complete |
+| DO-89: Decision functions for tool selection and multi-phase sequencing | AGENT-01, AGENT-03 | Complete |
+| DO-90: Improved agent context efficiency through capability-aware filtering | AGENT-01, AGENT-02 | Complete |
 
 ### v12.1 Success Criteria
 

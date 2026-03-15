@@ -10,17 +10,17 @@ See: `.planning/PROJECT.md` (updated 2026-03-15)
 ## Current Position
 
 **Milestone:** v12.1 Tool Integration & Agent Enhancement
-**Phase:** 127 (All 2 plans complete)
-**Current Plan:** Not started
-**Status:** Ready to plan
+**Phase:** 128 (Plan 01 of ? complete)
+**Current Plan:** 01 (complete)
+**Status:** In progress
 **Last Activity:** 2026-03-15
 
-Progress: [██████████] 100% (Phase 127 complete, 2 of 2 plans)
+Progress: [██████████] 97% (Phase 127 complete, 2 of 2 plans)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 241 (v12.1 Phase 127 Plan 02)
+- Total plans completed: 242 (v12.1 Phase 128 Plan 01)
 - Average duration: ~14 min/plan (improving with better tooling)
 - Total execution time: ~41.5 hours
 
@@ -37,6 +37,7 @@ Progress: [██████████] 100% (Phase 127 complete, 2 of 2 plan
 - v12.1 Phase 126 Plan 03: 4 min, 2 tasks, 1 file (1427 tests - all pass, 48 new)
 - v12.1 Phase 127 Plan 01: ~15 min, 2 tasks, 2 files (1446 tests - all pass)
 - v12.1 Phase 127 Plan 02: ~10 min, 2 tasks, 2 files (1501 tests - all pass, 55 new)
+- v12.1 Phase 128 Plan 01: 12 min, 2 tasks, 4 files (1503 tests - all pass)
 - Trend: Stable, improving velocity with infrastructure improvements
 
 *Updated after each plan completion*
@@ -59,6 +60,7 @@ Progress: [██████████] 100% (Phase 127 complete, 2 of 2 plan
 | 126 | Extended Tools | yq, bat, GitHub CLI integration | TOOL-04, TOOL-05, TOOL-06 |
 | 127 | Agent Routing Enhancement | Tool-aware routing with decision functions | AGENT-01 |
 | 128 | Agent Collaboration | Inter-agent handoffs & multi-phase sequencing | AGENT-02, AGENT-03 |
+
 ### Key Decisions
 
 - [v12.1]: Tool detection centralized in Phase 124 to avoid duplication across 6 tools
@@ -75,6 +77,9 @@ Progress: [██████████] 100% (Phase 127 complete, 2 of 2 plan
 - [0127-01]: tool_availability uses file cache (.planning/.cache/tools.json) not direct getToolStatus() — avoids child_process in ESM plugin
 - [0127-01]: All 6 tools default to false when cache absent/stale (conservative fallback)
 - [0127-01]: Plan decomposition heuristics live in plan-phase.md workflow — tool choice is executor concern, not planner concern
+- [0128-01]: resolveAgentCapabilityLevel: 5-6 tools=HIGH, 2-4=MEDIUM, 0-1=LOW — only LOW triggers warning metadata
+- [0128-01]: resolvePhaseDependencies uses Kahn topological sort; declared depends_on always wins, tool availability breaks ties
+- [0128-01]: Silent capability filtering in scopeContextForAgent — tool_dependency_level drives context stripping, agents don't know what was removed
 
 ### Completed Work
 
@@ -126,17 +131,25 @@ Progress: [██████████] 100% (Phase 127 complete, 2 of 2 plan
   - ~12 enricher integration tests (tool_availability shape, boolean-only, 6 keys, no version/path)
   - All 1501 tests passing (55 new tests)
 
+- [✓] Phase 128 Plan 01: Agent Collaboration Decision Functions (AGENT-02, AGENT-03)
+  - resolveAgentCapabilityLevel (HIGH/MEDIUM/LOW) and resolvePhaseDependencies (topological sort) in decision-rules.js
+  - Both registered in DECISION_REGISTRY (state-assessment and workflow-routing categories)
+  - AGENT_MANIFESTS enhanced to cover 10 agent types with tool_dependency_level
+  - scopeContextForAgent: silent capability filtering (strips tool context for low-dependency agents)
+  - All 1503 tests passing
+
 ### Pending Work
 
-- Phase 128 planning (inter-agent collaboration patterns)
+- Phase 128 Plan 02 (if planned) or Phase 128 complete
 
 ### Blockers/Concerns
 
-None — Phase 127 complete, all three tool routing decision functions implemented and tested.
+None — Phase 128 Plan 01 complete, decision functions and capability filtering implemented.
 
 ## Session Continuity
 
-**Last session:** 2026-03-15T14:59:29.436Z
-**This session:** 2026-03-15 (Phase 127 execution complete — 2 plans, ~25 min total, 55 new tests, 1501 total)
+**Last session:** 2026-03-15T15:36:18.719Z
+**This session:** 2026-03-15 (Phase 128 Plan 01 execution complete — 2 tasks, 12 min, 1503 tests passing)
 **Next steps:** 
-1. Plan and execute Phase 128 (inter-agent collaboration patterns — AGENT-02, AGENT-03)
+1. Check if Phase 128 has additional plans to execute
+2. Run verify-work if Phase 128 is complete
