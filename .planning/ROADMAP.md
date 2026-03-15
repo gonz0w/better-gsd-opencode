@@ -9,13 +9,13 @@
 
 v12.1 focuses on integrating modern CLI tools (ripgrep, fd, jq, yq, bat, gh) into core workflows and improving agent routing & collaboration. This milestone delivers "smarter tools, smarter agents" — enabling faster code operations and better inter-agent coordination.
 
-**Progress:** Phase 124 Plan 01 complete (3 min, file caching + detect:tools command).
+**Progress:** Phase 124 complete! (10 min total: Plan 01 3 min + Plan 02 7 min; file caching, detect:tools command, 67 comprehensive tests).
 
 ---
 
 ## Phases
 
-- [✓] **Phase 124: Tool Detection & Infrastructure** (1/2 plans) - Unified tool capability detection with caching and cross-platform support
+- [✓] **Phase 124: Tool Detection & Infrastructure** (2/2 plans complete) - Unified tool capability detection with caching and cross-platform support
 - [ ] **Phase 125: Core Tools Integration** - ripgrep, fd, jq integration with graceful degradation
 - [ ] **Phase 126: Extended Tools** - yq, bat, GitHub CLI integration for enhanced workflows
 - [ ] **Phase 127: Agent Routing Enhancement** - Tool-aware agent routing with decision functions
@@ -126,13 +126,13 @@ v12.1 focuses on integrating modern CLI tools (ripgrep, fd, jq, yq, bat, gh) int
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 124. Tool Detection & Infrastructure | 1/2 | In Progress | 2026-03-15 |
+| 124. Tool Detection & Infrastructure | 2/2 | ✅ Complete | 2026-03-15 |
 | 125. Core Tools Integration | 0/3 | Planned | — |
 | 126. Extended Tools | 0/2 | Planned | — |
 | 127. Agent Routing Enhancement | 0/2 | Planned | — |
 | 128. Agent Collaboration | 0/2 | Planned | — |
 
-**Total:** 1/11 plans complete · 9% progress
+**Total:** 2/11 plans complete · 18% progress
 
 ---
 
