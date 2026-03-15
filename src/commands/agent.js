@@ -800,9 +800,82 @@ function cmdAgentList(cwd, raw) {
   output({ agents }, raw);
 }
 
+/**
+ * List all global agents with scope (global / local-override) and drift annotations
+ * Local overrides are read from .opencode/agents/ relative to cwd
+ */
+function cmdAgentListLocal(cwd, raw) {
+  const { agentsDir } = resolveBgsdPaths();
+  const localAgentsDir = path.join(cwd, '.opencode', 'agents');
+  
+  // Scan global agents
+  const globalAgents = scanAgents(agentsDir);
+  
+  // Build map of local override files (by agent name, without .md extension)
+  const localOverrides = new Map();
+  if (fs.existsSync(localAgentsDir)) {
+    const localFiles = fs.readdirSync(localAgentsDir).filter(f => f.endsWith('.md'));
+    for (const file of localFiles) {
+      const name = file.replace('.md', '');
+      const filePath = path.join(localAgentsDir, file);
+      const content = safeReadFile(filePath);
+      localOverrides.set(name, content || '');
+    }
+  }
+  
+  // Build result array — one entry per global agent
+  const agents = globalAgents.map(agent => {
+    const hasLocal = localOverrides.has(agent.name);
+    let scope = 'global';
+    let drift = null;
+    
+    if (hasLocal) {
+      scope = 'local-override';
+      // Compare global vs local content for drift detection
+      const globalFilePath = path.join(agentsDir, agent.name + '.md');
+      const globalContent = safeReadFile(globalFilePath) || '';
+      const localContent = localOverrides.get(agent.name);
+      
+      if (globalContent === localContent) {
+        drift = 'in-sync';
+      } else {
+        drift = 'drifted';
+      }
+    }
+    
+    return {
+      name: agent.name,
+      scope,
+      drift,
+    };
+  });
+  
+  if (raw) {
+    output({ agents }, raw);
+    return;
+  }
+  
+  // Human-readable columnar table output
+  const nameWidth = Math.max(4, ...agents.map(a => a.name.length)) + 2;
+  const scopeWidth = Math.max(5, 'local-override'.length) + 2;
+  
+  const header = 'Name'.padEnd(nameWidth) + 'Scope'.padEnd(scopeWidth) + 'Drift';
+  
+  const rows = agents.map(a => {
+    const driftDisplay = a.drift === 'in-sync' ? '✓' : a.drift === 'drifted' ? 'Δ' : '';
+    return a.name.padEnd(nameWidth) + a.scope.padEnd(scopeWidth) + driftDisplay;
+  });
+  
+  console.log(header);
+  for (const row of rows) {
+    console.log(row);
+  }
+}
+
 module.exports = {
   cmdAgentAudit,
   cmdAgentList,
+  cmdAgentListLocal,
   cmdAgentValidateContracts,
   // Exported for testing
   parseRaciMatrix,
