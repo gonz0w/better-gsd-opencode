@@ -17,7 +17,7 @@
 
 - [x] **Phase 129: Foundation & Agent Overrides** - Local agent override lifecycle with YAML validation and content sanitization (completed 2026-03-15)
 - [x] **Phase 130: Lesson Schema & Analysis Pipeline** - Structured lesson format, analysis engine, and workflow improvement hooks (completed 2026-03-15)
-- [ ] **Phase 131: Skill Discovery & Security** - Security-first skill install/manage lifecycle with 41-pattern scanner and agentskills.io discovery
+- [x] **Phase 131: Skill Discovery & Security** - Security-first skill install/manage lifecycle with 41-pattern scanner and agentskills.io discovery (completed 2026-03-15)
 - [ ] **Phase 132: Deviation Recovery Auto-Capture** - Rule-1-only auto-capture hook wired into execute-phase with typo fix
 - [ ] **Phase 133: Enhanced Research Workflow** - Structured research quality profile and gap surfacing
 
@@ -57,7 +57,7 @@
   3. All install attempts (including blocked/rejected) appear in `.agents/skill-audit.json` with timestamp, source, scan verdict, and outcome
   4. User can run `skills:validate <name>` to re-scan an installed skill; user can run `skills:remove <name>` to delete it
   5. `new-milestone.md` Step 8.5 prompts optional skill discovery; bgsd-context `installed_skills` field lists installed skill names
-**Plans**: 2/3 plans executed
+**Plans**: 3/3 plans complete
 
 | Plan | Wave | Objective | Tasks |
 |------|------|-----------|-------|
@@ -95,7 +95,7 @@ Phases execute in order: 129 → 130 → 131 (parallel with 130) → 132 (after 
 |-------|-----------|----------------|--------|-----------|
 | 129. Foundation & Agent Overrides | 3/3 | Complete    | 2026-03-15 | - |
 | 130. Lesson Schema & Analysis Pipeline | 2/2 | Complete    | 2026-03-15 | - |
-| 131. Skill Discovery & Security | 2/3 | In Progress|  | - |
+| 131. Skill Discovery & Security | 2/3 | Complete    | 2026-03-15 | - |
 | 132. Deviation Recovery Auto-Capture | v13.0 | 0/TBD | Not started | - |
 | 133. Enhanced Research Workflow | v13.0 | 0/TBD | Not started | - |
 
