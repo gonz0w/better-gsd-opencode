@@ -68,6 +68,7 @@ Progress: [█████████░] 91%
 - [Phase 0122-01]: resolvePlanExistenceRoute backward compat: plan_count > 0 without has_context returns 'has-plans'; with has_context=true returns 'ready' — Old callers unaffected; new behavior only triggered with explicit new inputs
 - [Phase 0122-02]: COMMAND_TO_AGENT static map in enricher for agent_type derivation — simpler than dynamic lookup, covers all known bgsd-* commands
 - [Phase 0122-02]: routeTask cwd parameter added as optional third arg — backward compatible, enables model-selection rule lookup without breaking existing callers
+- [Phase 0123-01]: Schema v5: MIGRATIONS[4] adds 6 session_* tables; SCHEMA_V4_SQL renamed V5_SQL; version guard bumped to >= 5 — Foundation for STATE.md persistence into SQLite — session position, metrics, decisions, todos, blockers, continuity
 
 ### Roadmap Evolution
 
@@ -84,6 +85,6 @@ None.
 
 ## Session Continuity
 
-**Last session:** 2026-03-15T00:50:48.143Z
-**Stopped at:** Phase 123 context gathered
+**Last session:** 2026-03-15T01:14:00.382Z
+**Stopped at:** Completed 0123-01-PLAN.md
 **Next step:** Phase 123 (final phase)
