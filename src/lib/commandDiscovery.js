@@ -53,6 +53,10 @@ const COMMAND_CATEGORIES = {
   research: {
     name: 'Research',
     commands: ['research:capabilities', 'research:collect', 'research:yt-search', 'research:nlm-create']
+  },
+  lessons: {
+    name: 'Lessons',
+    commands: ['lessons:capture', 'lessons:list', 'lessons:migrate']
   }
 };
 
@@ -478,6 +482,11 @@ function validateCommandRegistry() {
       'nlm-add-source': null,
       'nlm-ask': null,
       'nlm-report': null
+    },
+    'lessons': {
+      'capture': null,
+      'list': null,
+      'migrate': null
     },
     'audit': {
       'scan': null

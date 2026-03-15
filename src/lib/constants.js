@@ -1497,6 +1497,64 @@ Output: { warmed: N, elapsed_ms: M }
 Examples:
   bgsd-tools cache:warm
   bgsd-tools cache:warm .planning/STATE.md .planning/ROADMAP.md`,
+
+  // lessons namespace (Phase 130)
+  'lessons:capture': `Usage: bgsd-tools lessons:capture --title <text> --severity <level> --type <type> --root-cause <text> --prevention <text> --agents <list>
+
+Capture a structured lesson entry to .planning/memory/lessons.json.
+
+Required options:
+  --title <text>        Short description of the lesson
+  --severity <level>    LOW | MEDIUM | HIGH | CRITICAL
+  --type <type>         workflow | agent-behavior | tooling | environment
+  --root-cause <text>   What caused the issue
+  --prevention <text>   Rule to prevent recurrence
+  --agents <list>       Comma-separated affected agent types
+
+Output: { captured, id, title, severity, type, entry_count }
+
+Examples:
+  bgsd-tools lessons:capture --title "Missing validation" --severity HIGH --type tooling --root-cause "No input checks" --prevention "Add input validation" --agents bgsd-executor
+  bgsd-tools lessons:capture --title "Auth failure" --severity CRITICAL --type agent-behavior --root-cause "Token expired" --prevention "Check expiry before use" --agents "bgsd-executor,bgsd-planner"`,
+
+  'lessons:list': `Usage: bgsd-tools lessons:list [options]
+
+List structured lesson entries with optional filters.
+
+Options:
+  --type <type>         Filter by type (workflow | agent-behavior | tooling | environment)
+  --severity <level>    Filter by severity (LOW | MEDIUM | HIGH | CRITICAL)
+  --since <date>        Filter by date >= ISO date (e.g. 2026-03-01)
+  --limit <N>           Maximum results (default: 20)
+  --query <text>        Substring search on title, root_cause, prevention_rule
+
+Output: { entries, count, filtered_total, total, filters }
+
+Examples:
+  bgsd-tools lessons:list
+  bgsd-tools lessons:list --type agent-behavior --severity HIGH
+  bgsd-tools lessons:list --since 2026-03-01 --limit 5
+  bgsd-tools lessons:list --query "auth"`,
+
+  'lessons:migrate': `Usage: bgsd-tools lessons:migrate
+
+Migrate free-form lessons.md to structured format.
+
+Searches for lessons.md at:
+  - <cwd>/lessons.md
+  - <cwd>/tasks/lessons.md
+  - <cwd>/.planning/lessons.md
+
+Each heading section becomes a structured entry with:
+  - type: environment
+  - severity: MEDIUM (default)
+  - prevention_rule: "Migrated from free-form lessons — review and update"
+  - affected_agents: [] (review and populate)
+
+Output: { migrated, sources, entry_count }
+
+Examples:
+  bgsd-tools lessons:migrate`,
 };
 
 module.exports = { MODEL_PROFILES, CONFIG_SCHEMA, COMMAND_HELP, VALID_TRAJECTORY_SCOPES };

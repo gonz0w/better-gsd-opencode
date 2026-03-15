@@ -109,6 +109,7 @@ function lazyRecovery() { return _modules.recovery || (_modules.recovery = requi
 function lazyAudit() { return _modules.audit || (_modules.audit = require('./commands/audit')); }
 function lazyDecisions() { return _modules.decisions || (_modules.decisions = require('./commands/decisions')); }
 function lazyDb() { return _modules.db || (_modules.db = require('./lib/db')); }
+function lazyLessons() { return _modules.lessons || (_modules.lessons = require('./commands/lessons')); }
 
 
 async function main() {
@@ -251,7 +252,7 @@ async function main() {
   let namespace = null;
   let remainingArgs = args.slice(1);
   
-  const KNOWN_NAMESPACES = ['init', 'plan', 'execute', 'verify', 'util', 'research', 'cache', 'audit', 'decisions', 'detect'];
+  const KNOWN_NAMESPACES = ['init', 'plan', 'execute', 'verify', 'util', 'research', 'cache', 'audit', 'decisions', 'detect', 'lessons'];
   
   if (command && command.includes(':')) {
     const colonIdx = command.indexOf(':');
@@ -820,6 +821,10 @@ Use without --exact for fuzzy matching.`);
             const fromIdx = restArgs.indexOf('--from');
             const toIdx = restArgs.indexOf('--to');
             const ascFlag = restArgs.includes('--asc');
+            // Lessons-specific filters (LESSON-06)
+            const typeIdx = restArgs.indexOf('--type');
+            const sinceIdx = restArgs.indexOf('--since');
+            const severityIdx = restArgs.indexOf('--severity');
             lazyMemory().cmdMemoryRead(cwd, {
               store: storeIdx !== -1 ? restArgs[storeIdx + 1] : null,
               limit: limitIdx !== -1 ? restArgs[limitIdx + 1] : null,
@@ -830,6 +835,9 @@ Use without --exact for fuzzy matching.`);
               from: fromIdx !== -1 ? restArgs[fromIdx + 1] : null,
               to: toIdx !== -1 ? restArgs[toIdx + 1] : null,
               asc: ascFlag,
+              type: typeIdx !== -1 ? restArgs[typeIdx + 1] : null,
+              since: sinceIdx !== -1 ? restArgs[sinceIdx + 1] : null,
+              severity: severityIdx !== -1 ? restArgs[severityIdx + 1] : null,
             }, raw);
           } else if (memSub === 'list') {
             lazyMemory().cmdMemoryList(cwd, {}, raw);
@@ -1340,6 +1348,41 @@ Examples:
         break;
       }
 
+      // lessons namespace
+      case 'lessons': {
+        const subcommand = subCmd;
+
+        // Parse lessons-specific options
+        function parseLessonsOptions(args) {
+          const opts = {};
+          const flagsWithValues = ['--title', '--severity', '--type', '--root-cause', '--prevention', '--agents',
+            '--since', '--limit', '--query'];
+          for (let i = 0; i < args.length; i++) {
+            if (args[i] === '--title' && args[i + 1]) { opts.title = args[++i]; }
+            else if (args[i] === '--severity' && args[i + 1]) { opts.severity = args[++i]; }
+            else if (args[i] === '--type' && args[i + 1]) { opts.type = args[++i]; }
+            else if (args[i] === '--root-cause' && args[i + 1]) { opts.rootCause = args[++i]; }
+            else if (args[i] === '--prevention' && args[i + 1]) { opts.prevention = args[++i]; }
+            else if (args[i] === '--agents' && args[i + 1]) { opts.agents = args[++i]; }
+            else if (args[i] === '--since' && args[i + 1]) { opts.since = args[++i]; }
+            else if (args[i] === '--limit' && args[i + 1]) { opts.limit = args[++i]; }
+            else if (args[i] === '--query' && args[i + 1]) { opts.query = args[++i]; }
+          }
+          return opts;
+        }
+
+        if (subcommand === 'capture') {
+          lazyLessons().cmdLessonsCapture(cwd, parseLessonsOptions(restArgs), raw);
+        } else if (subcommand === 'list') {
+          lazyLessons().cmdLessonsList(cwd, parseLessonsOptions(restArgs), raw);
+        } else if (subcommand === 'migrate') {
+          lazyLessons().cmdLessonsMigrate(cwd, {}, raw);
+        } else {
+          error(`Unknown lessons subcommand: ${subcommand}. Available: capture, list, migrate`);
+        }
+        break;
+      }
+
        // detect namespace
        case 'detect': {
          if (subCmd === 'tools') {
@@ -1354,13 +1397,13 @@ Examples:
 
       // Unknown namespace
       default:
-        error(`Unknown namespace: ${namespace}. Available namespaces: init, plan, execute, verify, util, research, cache, audit, decisions, detect`);
+        error(`Unknown namespace: ${namespace}. Available namespaces: init, plan, execute, verify, util, research, cache, audit, decisions, detect, lessons`);
     }
     return; // Exit after handling namespaced command
   }
 
   // No command matched any namespace — unknown
-  error(`Unknown command: ${command}. Use namespace:command syntax. Available namespaces: init, plan, execute, verify, util, research, cache, audit, decisions`);
+  error(`Unknown command: ${command}. Use namespace:command syntax. Available namespaces: init, plan, execute, verify, util, research, cache, audit, decisions, lessons`);
 }
 
 // Track command execution in history (Phase 97: UX Polish)

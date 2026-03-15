@@ -93,6 +93,14 @@ const COMMAND_CATEGORIES = {
       'util:websearch',
       'util:agent'
     ]
+  },
+  'Lessons': {
+    description: 'Capture, migrate, and list structured lessons',
+    commands: [
+      'lessons:capture',
+      'lessons:list',
+      'lessons:migrate'
+    ]
   }
 };
 
@@ -179,7 +187,11 @@ const COMMAND_BRIEF = {
   
   'agent:list': 'List all agents',
   'agent:audit': 'Audit agent configurations',
-  'agent:validate-contracts': 'Validate agent contracts'
+  'agent:validate-contracts': 'Validate agent contracts',
+
+  'lessons:capture': 'Capture a structured lesson entry with schema validation',
+  'lessons:list': 'List lessons with --type/--severity/--since/--limit/--query filters',
+  'lessons:migrate': 'Migrate free-form lessons.md to structured format'
 };
 
 const COMMAND_RELATED = {
@@ -239,7 +251,11 @@ const COMMAND_RELATED = {
   'cache:status': ['cache:clear', 'cache:warm'],
   
   'agent:list': ['agent:audit', 'agent:validate-contracts'],
-  'agent:audit': ['agent:list', 'agent:validate-contracts']
+  'agent:audit': ['agent:list', 'agent:validate-contracts'],
+
+  'lessons:capture': ['lessons:list', 'util:memory'],
+  'lessons:list': ['lessons:capture', 'lessons:migrate', 'util:memory'],
+  'lessons:migrate': ['lessons:list', 'lessons:capture']
 };
 
 const NATURAL_LANGUAGE_ALIASES = {
