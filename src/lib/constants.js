@@ -57,6 +57,9 @@ const CONFIG_SCHEMA = {
   tools_ripgrep:             { type: 'boolean', default: true,                            description: 'Enable ripgrep for content search',              aliases: [], nested: { section: 'tools', field: 'ripgrep' } },
   tools_fd:                  { type: 'boolean', default: true,                            description: 'Enable fd for file discovery',                   aliases: [], nested: { section: 'tools', field: 'fd' } },
   tools_jq:                  { type: 'boolean', default: true,                            description: 'Enable jq for JSON transformation',              aliases: [], nested: { section: 'tools', field: 'jq' } },
+  tools_yq:                  { type: 'boolean', default: true,                            description: 'Enable yq for YAML transformation',              aliases: [], nested: { section: 'tools', field: 'yq' } },
+  tools_bat:                 { type: 'boolean', default: true,                            description: 'Enable bat for syntax highlighting',             aliases: [], nested: { section: 'tools', field: 'bat' } },
+  tools_gh:                  { type: 'boolean', default: true,                            description: 'Enable gh for GitHub operations',                aliases: [], nested: { section: 'tools', field: 'gh' } },
 };
 
 // ─── Command Help ────────────────────────────────────────────────────────────

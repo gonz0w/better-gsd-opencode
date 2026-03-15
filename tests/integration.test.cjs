@@ -301,7 +301,10 @@ describe('integration: config migration', () => {
       tools: {
         ripgrep: true,
         fd: true,
-        jq: true
+        jq: true,
+        yq: true,
+        bat: true,
+        gh: true
       }
     };
     fs.writeFileSync(
