@@ -13,11 +13,23 @@ A high-performance, data-driven agent orchestration engine that manages and deli
 </users>
 
 <outcomes>
-_No active outcomes — run `/bgsd-new-milestone` to define next milestone._
+### v12.1 — Tool Integration & Agent Enhancement
+
+**DO-86:** Support ripgrep, fd, jq, yq, bat, gh with unified capability detection and graceful degradation
+**DO-87:** Implement smarter agent routing based on task complexity and available agent capabilities
+**DO-88:** Create better inter-agent collaboration patterns with shared context and handoff optimization
+**DO-89:** Add decision functions for tool selection and multi-phase sequencing
+**DO-90:** Improve agent context efficiency through intelligent capability-based filtering
 </outcomes>
 
 <criteria>
-_No active criteria — defined per milestone._
+### v12.1 — Tool Integration & Agent Enhancement
+
+**SC-66:** All major CLI tools (ripgrep, fd, jq, yq, bat, gh) detected and available in workflows
+**SC-67:** Agent routing improved — 25%+ reduction in context overhead via capability-aware dispatch
+**SC-68:** All inter-agent handoffs use shared context patterns — RACI audit validates improvements
+**SC-69:** New decision functions for tool selection and phase sequencing with contract tests
+**SC-70:** Tool absence gracefully handled — workflows complete with degradation or clear guidance
 </criteria>
 
 <constraints>
@@ -42,6 +54,11 @@ The data layer should be invisible to users — workflows feel faster, decisions
 </health>
 
 <history>
+### v12.1 — 2026-03-15
+- **Added** outcomes: DO-86 through DO-90 for tool integration, agent routing, collaboration
+- **Added** criteria: SC-66 through SC-70 for v12.1 verification
+  - Reason: Milestone v12.1 initiated
+
 ### v12.0 — 2026-03-15
 - **Archived** all v12.0 outcomes (DO-79 through DO-85) — all delivered
   - Reason: Milestone v12.0 complete — SQLite-first data layer shipped
@@ -60,4 +77,4 @@ The data layer should be invisible to users — workflows feel faster, decisions
 
 (See `.planning/archive/INTENT-vv12.0.md` for full history)
 </history>
-<!-- Highest outcome ID: DO-85 -->
+<!-- Highest outcome ID: DO-90 -->

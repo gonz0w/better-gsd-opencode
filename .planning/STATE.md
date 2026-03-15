@@ -9,12 +9,12 @@ See: `.planning/PROJECT.md` (updated 2026-03-15)
 
 ## Current Position
 
-**Phase:** None (between milestones)
+**Phase:** Not started (defining requirements)
 **Current Plan:** None
-**Status:** v12.0 milestone complete
-**Last Activity:** 2026-03-15
+**Status:** v12.1 Milestone started — gathering requirements
+**Last Activity:** 2026-03-15 — Milestone v12.1 planning initiated
 
-Progress: [██████████] 100%
+Progress: [          ] 0%
 
 ## Performance Metrics
 
