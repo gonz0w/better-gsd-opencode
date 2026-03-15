@@ -475,6 +475,20 @@ export function enrichCommand(input, output, cwd) {
     enrichment.tool_availability = { ripgrep: false, fd: false, jq: false, yq: false, bat: false, gh: false };
   }
 
+  // LOCAL-07: Expose local agent overrides in bgsd-context
+  try {
+    const localAgentsDir = join(resolvedCwd, '.opencode', 'agents');
+    if (existsSync(localAgentsDir)) {
+      const localAgentFiles = readdirSync(localAgentsDir)
+        .filter(f => f.endsWith('.md'));
+      enrichment.local_agent_overrides = localAgentFiles.map(f => f.replace('.md', ''));
+    } else {
+      enrichment.local_agent_overrides = [];
+    }
+  } catch {
+    enrichment.local_agent_overrides = [];
+  }
+
   // Phase 128: Handoff tool context (derived from tool_availability)
   try {
     const ta = enrichment.tool_availability || {};
