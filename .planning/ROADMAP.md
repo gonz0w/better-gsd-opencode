@@ -15,7 +15,7 @@
 
 ## Phases
 
-- [ ] **Phase 129: Foundation & Agent Overrides** - Local agent override lifecycle with YAML validation and content sanitization
+- [x] **Phase 129: Foundation & Agent Overrides** - Local agent override lifecycle with YAML validation and content sanitization (completed 2026-03-15)
 - [ ] **Phase 130: Lesson Schema & Analysis Pipeline** - Structured lesson format, analysis engine, and workflow improvement hooks
 - [ ] **Phase 131: Skill Discovery & Security** - Security-first skill install/manage lifecycle with 41-pattern scanner and agentskills.io discovery
 - [ ] **Phase 132: Deviation Recovery Auto-Capture** - Rule-1-only auto-capture hook wired into execute-phase with typo fix
@@ -33,7 +33,7 @@
   3. User can run `agent:diff <name>` to view a line-level diff between the local override and its global counterpart
   4. User can run `agent:sync <name>` to see incoming upstream changes and accept or reject them
   5. bgsd-context `local_agent_overrides` field lists which agents have project-local versions, and any generated agent content is sanitized against system-prompt mangling
-**Plans**: 2/3 plans executed
+**Plans**: 3/3 plans complete
 
 ### Phase 130: Lesson Schema & Analysis Pipeline
 **Goal**: Users can capture, list, analyze, and get improvement suggestions from structured lessons — with migration of existing free-form lessons and workflow hooks that surface suggestions after verify-work and milestone completion
@@ -87,7 +87,7 @@ Phases execute in order: 129 → 130 → 131 (parallel with 130) → 132 (after 
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
-| 129. Foundation & Agent Overrides | 2/3 | In Progress|  | - |
+| 129. Foundation & Agent Overrides | 3/3 | Complete   | 2026-03-15 | - |
 | 130. Lesson Schema & Analysis Pipeline | v13.0 | 0/TBD | Not started | - |
 | 131. Skill Discovery & Security | v13.0 | 0/TBD | Not started | - |
 | 132. Deviation Recovery Auto-Capture | v13.0 | 0/TBD | Not started | - |

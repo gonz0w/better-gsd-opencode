@@ -85,11 +85,11 @@
 |-------------|-------|--------|
 | LOCAL-01 | Phase 129 | Complete |
 | LOCAL-02 | Phase 129 | Complete |
-| LOCAL-03 | Phase 129 | pending |
+| LOCAL-03 | Phase 129 | Complete |
 | LOCAL-04 | Phase 129 | Complete |
 | LOCAL-05 | Phase 129 | Complete |
 | LOCAL-06 | Phase 129 | Complete |
-| LOCAL-07 | Phase 129 | pending |
+| LOCAL-07 | Phase 129 | Complete |
 | LESSON-01 | Phase 130 | pending |
 | LESSON-02 | Phase 130 | pending |
 | LESSON-03 | Phase 130 | pending |
