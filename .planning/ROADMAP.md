@@ -84,7 +84,12 @@
   2. `new-milestone.md` research completion step displays the quality profile and flags any file with LOW confidence for optional re-research (non-blocking)
   3. `research:gaps <file>` returns the `flagged_gaps[]` array as a formatted list
   4. `research:score` detects and surfaces multi-source conflicts as `conflicts: [{claim, source_a, source_b}]` when two or more sources disagree on a fact
-**Plans**: TBD
+**Plans**: 0/2 plans created
+
+| Plan | Wave | Objective | Tasks |
+|------|------|-----------|-------|
+| 0133-01 | 1 | Core commands — cmdResearchScore + cmdResearchGaps + tests | 2 |
+| 0133-02 | 2 | Router/help wiring + new-milestone.md quality profile integration | 2 |
 
 ## Progress
 
@@ -97,7 +102,7 @@ Phases execute in order: 129 → 130 → 131 (parallel with 130) → 132 (after 
 | 130. Lesson Schema & Analysis Pipeline | 2/2 | Complete    | 2026-03-15 | - |
 | 131. Skill Discovery & Security | 2/3 | Complete    | 2026-03-15 | - |
 | 132. Deviation Recovery Auto-Capture | 2/2 | Complete    | 2026-03-15 | - |
-| 133. Enhanced Research Workflow | v13.0 | 0/TBD | Not started | - |
+| 133. Enhanced Research Workflow | v13.0 | 0/2 | Planned | - |
 
 ---
 
