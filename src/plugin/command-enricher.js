@@ -475,6 +475,55 @@ export function enrichCommand(input, output, cwd) {
     enrichment.tool_availability = { ripgrep: false, fd: false, jq: false, yq: false, bat: false, gh: false };
   }
 
+  // LOCAL-07: Expose local agent overrides in bgsd-context
+  try {
+    const localAgentsDir = join(resolvedCwd, '.opencode', 'agents');
+    if (existsSync(localAgentsDir)) {
+      const localAgentFiles = readdirSync(localAgentsDir)
+        .filter(f => f.endsWith('.md'));
+      enrichment.local_agent_overrides = localAgentFiles.map(f => f.replace('.md', ''));
+    } else {
+      enrichment.local_agent_overrides = [];
+    }
+  } catch {
+    enrichment.local_agent_overrides = [];
+  }
+
+  // SKILL-09: Expose installed skills in bgsd-context
+  try {
+    const skillsDir = join(resolvedCwd, '.agents', 'skills');
+    if (existsSync(skillsDir)) {
+      const skillEntries = readdirSync(skillsDir, { withFileTypes: true })
+        .filter(d => d.isDirectory());
+      const skills = [];
+      for (const entry of skillEntries) {
+        const skillMdPath = join(skillsDir, entry.name, 'SKILL.md');
+        if (existsSync(skillMdPath)) {
+          // Extract description from SKILL.md — first ## Purpose section or description frontmatter
+          let description = '';
+          try {
+            const content = readFileSync(skillMdPath, 'utf8');
+            // Try frontmatter description first
+            const descMatch = content.match(/^description:\s*(.+)$/m);
+            if (descMatch) {
+              description = descMatch[1].trim().replace(/^["']|["']$/g, '');
+            } else {
+              // Fall back to first line after ## Purpose
+              const purposeMatch = content.match(/## Purpose\s*\n+(.+)/);
+              if (purposeMatch) description = purposeMatch[1].trim();
+            }
+          } catch { /* ignore read errors */ }
+          skills.push({ name: entry.name, description });
+        }
+      }
+      enrichment.installed_skills = skills;
+    } else {
+      enrichment.installed_skills = [];
+    }
+  } catch {
+    enrichment.installed_skills = [];
+  }
+
   // Phase 128: Handoff tool context (derived from tool_availability)
   try {
     const ta = enrichment.tool_availability || {};

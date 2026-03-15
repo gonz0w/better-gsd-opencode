@@ -57,7 +57,9 @@ const COMMAND_CATEGORIES = {
       'research:collect',
       'research:nlm-create',
       'research:nlm-ask',
-      'research:nlm-report'
+      'research:nlm-report',
+      'research:score',
+      'research:gaps'
     ]
   },
   'Analysis': {
@@ -92,6 +94,24 @@ const COMMAND_CATEGORIES = {
       'util:frontmatter',
       'util:websearch',
       'util:agent'
+    ]
+  },
+  'Lessons': {
+    description: 'Capture, migrate, and list structured lessons',
+    commands: [
+      'lessons:capture',
+      'lessons:list',
+      'lessons:migrate',
+      'lessons:deviation-capture'
+    ]
+  },
+  'Skills': {
+    description: 'Browse, install, and manage project-local skills',
+    commands: [
+      'skills:list',
+      'skills:install',
+      'skills:validate',
+      'skills:remove'
     ]
   }
 };
@@ -152,6 +172,8 @@ const COMMAND_BRIEF = {
   'research:nlm-ask': 'Ask NotebookLM question',
   'research:nlm-report': 'Generate NotebookLM report',
   'research:nlm-add-source': 'Add source to notebook',
+  'research:score': 'Score research quality',
+  'research:gaps': 'List research gaps',
   
   'util:config-get': 'Get configuration value',
   'util:config-set': 'Set configuration value',
@@ -179,7 +201,17 @@ const COMMAND_BRIEF = {
   
   'agent:list': 'List all agents',
   'agent:audit': 'Audit agent configurations',
-  'agent:validate-contracts': 'Validate agent contracts'
+  'agent:validate-contracts': 'Validate agent contracts',
+
+  'lessons:capture': 'Capture a structured lesson entry with schema validation',
+  'lessons:list': 'List lessons with --type/--severity/--since/--limit/--query filters',
+  'lessons:migrate': 'Migrate free-form lessons.md to structured format',
+  'lessons:deviation-capture': 'Auto-capture Rule-1 deviation recovery patterns (non-blocking, 3-per-milestone cap)',
+
+  'skills:list': 'List installed project-local skills with scan status',
+  'skills:install': 'Install a skill from GitHub with security scan and confirmation',
+  'skills:validate': 'Re-scan an installed skill against 41-pattern security scanner',
+  'skills:remove': 'Remove an installed project-local skill'
 };
 
 const COMMAND_RELATED = {
@@ -222,6 +254,8 @@ const COMMAND_RELATED = {
   'research:nlm-create': ['research:nlm-ask', 'research:nlm-report'],
   'research:nlm-ask': ['research:nlm-create', 'research:nlm-report'],
   'research:nlm-report': ['research:nlm-create', 'research:nlm-ask'],
+  'research:score': ['research:gaps', 'research:capabilities'],
+  'research:gaps': ['research:score', 'research:capabilities'],
   
   'util:config-get': ['util:config-set', 'util:env'],
   'util:config-set': ['util:config-get', 'util:env'],
@@ -239,7 +273,17 @@ const COMMAND_RELATED = {
   'cache:status': ['cache:clear', 'cache:warm'],
   
   'agent:list': ['agent:audit', 'agent:validate-contracts'],
-  'agent:audit': ['agent:list', 'agent:validate-contracts']
+  'agent:audit': ['agent:list', 'agent:validate-contracts'],
+
+  'lessons:capture': ['lessons:list', 'util:memory'],
+  'lessons:list': ['lessons:capture', 'lessons:migrate', 'util:memory'],
+  'lessons:migrate': ['lessons:list', 'lessons:capture'],
+  'lessons:deviation-capture': ['lessons:capture', 'lessons:list'],
+
+  'skills:list': ['skills:install', 'skills:validate'],
+  'skills:install': ['skills:list', 'skills:remove', 'skills:validate'],
+  'skills:validate': ['skills:list', 'skills:remove'],
+  'skills:remove': ['skills:list', 'skills:install']
 };
 
 const NATURAL_LANGUAGE_ALIASES = {
@@ -317,8 +361,14 @@ const NATURAL_LANGUAGE_ALIASES = {
   'ask': 'research:nlm-ask',
   'question': 'research:nlm-ask',
   'report': 'research:nlm-report',
+  'score': 'research:score',
+  'gaps': 'research:gaps',
+  'quality': 'research:score',
   'milestone': 'milestone:summary',
-  'summary': 'milestone:summary'
+  'summary': 'milestone:summary',
+  'skills': 'skills:list',
+  'install skill': 'skills:install',
+  'remove skill': 'skills:remove'
 };
 
 function getAllCommandsByCategory() {

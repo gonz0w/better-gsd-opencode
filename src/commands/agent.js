@@ -559,6 +559,540 @@ function escapeRegex(str) {
 }
 
 /**
+ * Validate YAML frontmatter in an agent file content
+ * Returns { valid: true, name } on success or { valid: false, error, line } on failure
+ */
+function validateAgentFrontmatter(content) {
+  if (!content || typeof content !== 'string') {
+    return { valid: false, error: 'No YAML frontmatter found (missing --- delimiters)', line: 1 };
+  }
+  
+  // Check for opening and closing --- delimiters
+  if (!content.startsWith('---\n')) {
+    return { valid: false, error: 'No YAML frontmatter found (missing --- delimiters)', line: 1 };
+  }
+  
+  const closingDelim = content.indexOf('\n---', 4);
+  if (closingDelim === -1) {
+    return { valid: false, error: 'No YAML frontmatter found (missing --- delimiters)', line: 1 };
+  }
+  
+  // Try to parse using extractFrontmatter
+  let parsed;
+  try {
+    parsed = extractFrontmatter(content);
+  } catch (e) {
+    // Find approximate line number from error if available
+    const lineNum = e.mark ? e.mark.line + 1 : null;
+    return { valid: false, error: 'Malformed YAML frontmatter', line: lineNum };
+  }
+  
+  // extractFrontmatter returns {} on parse failure (no throw), check if we got anything
+  if (!parsed || typeof parsed !== 'object') {
+    return { valid: false, error: 'Malformed YAML frontmatter', line: null };
+  }
+  
+  // Check for required name field
+  if (!parsed.name || typeof parsed.name !== 'string' || parsed.name.trim() === '') {
+    return { valid: false, error: 'Missing required "name" field in YAML frontmatter', line: null };
+  }
+  
+  return { valid: true, name: parsed.name };
+}
+
+/**
+ * Sanitize agent file content
+ * - Replaces editor name variants in non-path contexts with generic terms
+ * - Strips structural injection markers
+ * Returns the sanitized content string
+ */
+function sanitizeAgentContent(content) {
+  if (!content || typeof content !== 'string') return content;
+  
+  let result = content;
+  
+  // Strip structural injection markers (full lines containing these markers)
+  // Remove lines with <system>...</system> or standalone <system>/<system> tags
+  result = result.replace(/^.*<\/?system>.*$/gm, '');
+  // Remove lines with [INST] and [/INST] markers
+  result = result.replace(/^.*\[\/?(INST)\].*$/gm, '');
+  // Remove triple-backtick system blocks: ```system ... ```
+  result = result.replace(/^```system\b[\s\S]*?^```/gm, '');
+  
+  // Replace editor name variants in non-path contexts:
+  // Target 'opencode' preceded by space or start-of-line, followed by space or end-of-line
+  // But NOT when preceded by `/` or `.` (path-like contexts)
+  // Pattern: (^|(?<=[^/.]))opencode(?=[^/a-zA-Z0-9_-]|$)
+  // Using a simpler approach: replace \bOpenCode\b and \bopencode\b when not preceded by . or /
+  result = result.replace(/(?<![./])(?<!\w)(opencode)(?![/a-zA-Z0-9_-])/gi, (match) => {
+    return 'OC';
+  });
+  // Also handle "OpenCode" as a product name (e.g. "Use OpenCode")
+  result = result.replace(/(?<![./])(?<!\w)(OpenCode)(?![/a-zA-Z0-9_-])/g, 'OC');
+  
+  // Clean up any empty lines left by marker removal (collapse 3+ newlines to 2)
+  result = result.replace(/\n{3,}/g, '\n\n');
+  
+  return result;
+}
+
+/**
+ * Generate a unified diff between two text strings
+ * Pure JS implementation, zero external dependencies
+ * Returns unified diff string with --- / +++ headers and @@ hunks
+ */
+function generateUnifiedDiff(textA, textB, labelA, labelB) {
+  if (textA === textB) return '';
+  
+  const linesA = textA.split('\n');
+  const linesB = textB.split('\n');
+  
+  // Remove trailing empty element from split if text ends with \n
+  if (linesA[linesA.length - 1] === '') linesA.pop();
+  if (linesB[linesB.length - 1] === '') linesB.pop();
+  
+  const m = linesA.length;
+  const n = linesB.length;
+  
+  // Compute LCS using standard O(mn) DP
+  // dp[i][j] = LCS length for linesA[0..i-1] and linesB[0..j-1]
+  const dp = new Array(m + 1);
+  for (let i = 0; i <= m; i++) {
+    dp[i] = new Array(n + 1).fill(0);
+  }
+  
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      if (linesA[i - 1] === linesB[j - 1]) {
+        dp[i][j] = dp[i - 1][j - 1] + 1;
+      } else {
+        dp[i][j] = Math.max(dp[i - 1][j], dp[i][j - 1]);
+      }
+    }
+  }
+  
+  // Backtrack to produce edit script
+  // Result: array of {type: 'common'|'remove'|'add', lineA, lineB, text}
+  const edits = [];
+  let i = m, j = n;
+  while (i > 0 || j > 0) {
+    if (i > 0 && j > 0 && linesA[i - 1] === linesB[j - 1]) {
+      edits.unshift({ type: 'common', lineA: i, lineB: j, text: linesA[i - 1] });
+      i--; j--;
+    } else if (j > 0 && (i === 0 || dp[i][j - 1] >= dp[i - 1][j])) {
+      edits.unshift({ type: 'add', lineA: i, lineB: j, text: linesB[j - 1] });
+      j--;
+    } else {
+      edits.unshift({ type: 'remove', lineA: i, lineB: j, text: linesA[i - 1] });
+      i--;
+    }
+  }
+  
+  // Group into hunks with 3 lines of context
+  const CONTEXT = 3;
+  const hunks = [];
+  let currentHunk = null;
+  
+  for (let k = 0; k < edits.length; k++) {
+    const edit = edits[k];
+    const isChange = edit.type !== 'common';
+    
+    if (isChange) {
+      // Start a new hunk if needed, or extend current
+      if (!currentHunk) {
+        // Include up to CONTEXT lines before this change
+        const startIdx = Math.max(0, k - CONTEXT);
+        currentHunk = {
+          startA: edits[startIdx] ? edits[startIdx].lineA : 1,
+          startB: edits[startIdx] ? edits[startIdx].lineB : 1,
+          lines: []
+        };
+        // Add context lines before the change
+        for (let c = startIdx; c < k; c++) {
+          currentHunk.lines.push(' ' + edits[c].text);
+        }
+      }
+      currentHunk.lines.push((edit.type === 'add' ? '+' : '-') + edit.text);
+    } else if (currentHunk) {
+      // Common line while in a hunk — add as context
+      currentHunk.lines.push(' ' + edit.text);
+      
+      // Check if next change is within CONTEXT lines
+      let nextChangeIdx = -1;
+      for (let c = k + 1; c < edits.length && c <= k + CONTEXT * 2; c++) {
+        if (edits[c].type !== 'common') {
+          nextChangeIdx = c;
+          break;
+        }
+      }
+      
+      if (nextChangeIdx === -1 || nextChangeIdx > k + CONTEXT) {
+        // No nearby change, close the hunk (trim trailing context to CONTEXT lines)
+        const contextAdded = currentHunk.lines.filter(l => l.startsWith(' ')).length;
+        // Trim to at most CONTEXT trailing context lines
+        let trailingContext = 0;
+        let trimIdx = currentHunk.lines.length - 1;
+        while (trimIdx >= 0 && currentHunk.lines[trimIdx].startsWith(' ')) {
+          trailingContext++;
+          trimIdx--;
+        }
+        if (trailingContext > CONTEXT) {
+          currentHunk.lines.splice(trimIdx + 1 + CONTEXT);
+        }
+        hunks.push(currentHunk);
+        currentHunk = null;
+      }
+    }
+  }
+  if (currentHunk) {
+    // Trim trailing context
+    let trimIdx = currentHunk.lines.length - 1;
+    let trailingContext = 0;
+    while (trimIdx >= 0 && currentHunk.lines[trimIdx].startsWith(' ')) {
+      trailingContext++;
+      trimIdx--;
+    }
+    if (trailingContext > CONTEXT) {
+      currentHunk.lines.splice(trimIdx + 1 + CONTEXT);
+    }
+    hunks.push(currentHunk);
+  }
+  
+  if (hunks.length === 0) return '';
+  
+  // Build the diff output
+  const output = [];
+  output.push('--- ' + labelA);
+  output.push('+++ ' + labelB);
+  
+  for (const hunk of hunks) {
+    // Calculate proper line counts for the hunk header
+    const countA = hunk.lines.filter(l => l.startsWith(' ') || l.startsWith('-')).length;
+    const countB = hunk.lines.filter(l => l.startsWith(' ') || l.startsWith('+')).length;
+    
+    // Calculate startA and startB from the first non-context line
+    let hunkStartA = hunk.startA;
+    let hunkStartB = hunk.startB;
+    
+    // Adjust startA/startB for context lines at beginning of hunk
+    const leadingContext = [];
+    for (const line of hunk.lines) {
+      if (line.startsWith(' ')) leadingContext.push(line);
+      else break;
+    }
+    hunkStartA = Math.max(1, hunk.startA - leadingContext.length);
+    hunkStartB = Math.max(1, hunk.startB - leadingContext.length);
+    
+    output.push(`@@ -${hunkStartA},${countA} +${hunkStartB},${countB} @@`);
+    output.push(...hunk.lines);
+  }
+  
+  return output.join('\n') + '\n';
+}
+
+/**
+ * Find the closest agent name match via substring or prefix matching
+ * Returns the closest name or null if no match found
+ */
+function findClosestAgent(name, agentNames) {
+  if (!name || !agentNames || agentNames.length === 0) return null;
+  
+  const lower = name.toLowerCase();
+  const matches = [];
+  
+  for (const agent of agentNames) {
+    const agentLower = agent.toLowerCase();
+    // Check substring containment
+    if (agentLower.includes(lower) || lower.includes(agentLower)) {
+      matches.push({ agent, score: 1000 + agentLower.length });
+      continue;
+    }
+    // Check common prefix of length >= 4
+    let prefixLen = 0;
+    const minLen = Math.min(lower.length, agentLower.length);
+    for (let i = 0; i < minLen; i++) {
+      if (lower[i] === agentLower[i]) prefixLen++;
+      else break;
+    }
+    if (prefixLen >= 4) {
+      // Score by prefix length (longer prefix = better match)
+      matches.push({ agent, score: prefixLen });
+    }
+  }
+  
+  if (matches.length === 0) return null;
+  // Return the match with highest score (longest prefix or substring match)
+  // Tie-break: shorter agent name is more specific
+  matches.sort((a, b) => {
+    if (b.score !== a.score) return b.score - a.score;
+    return a.agent.length - b.agent.length;
+  });
+  return matches[0].agent;
+}
+
+/**
+ * Inject `name: <agentName>` into YAML frontmatter if the name field is missing
+ * Returns the modified content string
+ */
+function injectNameField(content, agentName) {
+  if (!content || !content.startsWith('---\n')) return content;
+  const closingIdx = content.indexOf('\n---', 4);
+  if (closingIdx === -1) return content;
+  
+  const frontmatterBody = content.slice(4, closingIdx);
+  const rest = content.slice(closingIdx);
+  
+  // Insert name as first field in frontmatter
+  return '---\nname: ' + agentName + '\n' + frontmatterBody + rest;
+}
+
+/**
+ * Create a project-local override of a global agent file
+ */
+function cmdAgentOverride(cwd, raw, args) {
+  const name = args && args[0];
+  if (!name) {
+    error('Usage: agent override <name>');
+    process.exit(1);
+  }
+  
+  // Normalize: strip .md extension if provided
+  const agentName = name.endsWith('.md') ? name.slice(0, -3) : name;
+  
+  const { agentsDir } = resolveBgsdPaths();
+  const globalAgentPath = path.join(agentsDir, agentName + '.md');
+  
+  // Check global agent exists; if not, suggest closest match
+  if (!fs.existsSync(globalAgentPath)) {
+    // Scan available agent names
+    let agentNames = [];
+    if (fs.existsSync(agentsDir)) {
+      agentNames = fs.readdirSync(agentsDir)
+        .filter(f => f.endsWith('.md') && f !== 'RACI.md')
+        .map(f => f.replace('.md', ''));
+    }
+    const closest = findClosestAgent(agentName, agentNames);
+    if (closest) {
+      error(`Agent "${agentName}" not found. Did you mean "${closest}"?`);
+    } else {
+      error(`Agent "${agentName}" not found. Run "agent list" to see available agents.`);
+    }
+    process.exit(1);
+  }
+  
+  // Resolve local agents dir and path
+  const localDir = path.join(cwd, '.opencode', 'agents');
+  const localPath = path.join(localDir, agentName + '.md');
+  
+  // Read global agent content
+  let content = safeReadFile(globalAgentPath);
+  if (!content) {
+    error(`Failed to read global agent file: ${globalAgentPath}`);
+    process.exit(1);
+  }
+  
+  // Validate frontmatter — if name: field missing, inject it first
+  let validation = validateAgentFrontmatter(content);
+  if (!validation.valid && validation.error && validation.error.includes('"name" field')) {
+    // Inject name field into frontmatter
+    content = injectNameField(content, agentName);
+    // Re-validate
+    validation = validateAgentFrontmatter(content);
+  }
+  
+  if (!validation.valid) {
+    error(`Agent "${agentName}" has invalid frontmatter: ${validation.error}`);
+    process.exit(1);
+  }
+  
+  // Create local agents directory silently if it doesn't exist
+  fs.mkdirSync(localDir, { recursive: true });
+  
+  // Exclusive write — fails atomically if already overridden (no TOCTOU)
+  let fd;
+  try {
+    fd = fs.openSync(localPath, 'wx');
+  } catch (e) {
+    if (e.code === 'EEXIST') {
+      error(`Agent "${agentName}" already has a local override at ${localPath}. Use "agent diff ${agentName}" to view changes or "agent sync ${agentName}" to update.`);
+      process.exit(1);
+    }
+    throw e;
+  }
+  try { fs.writeSync(fd, content, 0, 'utf8'); } finally { fs.closeSync(fd); }
+  
+  // Output: just the file path created
+  if (raw) {
+    output({ created: localPath, agent: agentName }, raw);
+  } else {
+    console.log(localPath);
+  }
+}
+
+/**
+ * Synchronize a local override with the upstream global agent
+ * Flags: --accept (apply sync), --reject (exit silently)
+ * Silent exit when identical; error when no local override exists
+ */
+function cmdAgentSync(cwd, raw, args) {
+  const name = args && args[0];
+  if (!name || name.startsWith('--')) {
+    error('Usage: agent sync <name>');
+    process.exit(1);
+  }
+
+  // Normalize: strip .md extension if provided
+  const agentName = name.endsWith('.md') ? name.slice(0, -3) : name;
+
+  const { agentsDir } = resolveBgsdPaths();
+  const globalAgentPath = path.join(agentsDir, agentName + '.md');
+  const localDir = path.join(cwd, '.opencode', 'agents');
+  const localPath = path.join(localDir, agentName + '.md');
+
+  // Read both files (throws ENOENT if not found — no existence pre-check needed)
+  let globalContent, localContent;
+  try {
+    localContent = fs.readFileSync(localPath, 'utf8');
+  } catch (e) {
+    if (e.code === 'ENOENT') {
+      error(`No local override for "${agentName}". Create one with: agent override ${agentName}`);
+      process.exit(1);
+    }
+    throw e;
+  }
+  try {
+    globalContent = fs.readFileSync(globalAgentPath, 'utf8');
+  } catch (e) {
+    if (e.code === 'ENOENT') {
+      error(`Global agent "${agentName}" not found`);
+      process.exit(1);
+    }
+    throw e;
+  }
+
+  // Silent exit when identical
+  if (globalContent === localContent) {
+    if (raw) {
+      output({ agent: agentName, action: 'none', identical: true }, raw);
+    }
+    return;
+  }
+
+  // Generate unified diff
+  const diffStr = generateUnifiedDiff(globalContent, localContent, 'global', 'local');
+
+  // Count hunk sections (@@) in the diff
+  const hunkMatches = diffStr.match(/^@@/gm);
+  const hunkCount = hunkMatches ? hunkMatches.length : 0;
+
+  // Parse flags
+  const hasAccept = args.includes('--accept');
+  const hasReject = args.includes('--reject');
+
+  if (hasReject) {
+    // Silent exit on reject
+    if (raw) {
+      output({ agent: agentName, action: 'rejected' }, raw);
+    }
+    return;
+  }
+
+  if (hasAccept) {
+    // Apply sync: write sanitized global content to local path
+    let contentToWrite = globalContent;
+
+    // Validate and inject name: field if missing (same as override)
+    let validation = validateAgentFrontmatter(contentToWrite);
+    if (!validation.valid && validation.error && validation.error.includes('"name" field')) {
+      contentToWrite = injectNameField(contentToWrite, agentName);
+      validation = validateAgentFrontmatter(contentToWrite);
+    }
+
+    // Apply content sanitization before writing
+    contentToWrite = sanitizeAgentContent(contentToWrite);
+
+    // Write synced content — 'w' flag truncates and writes atomically
+    fs.writeFileSync(localPath, contentToWrite, 'utf8');
+
+    if (raw) {
+      output({ agent: agentName, action: 'accepted', path: localPath }, raw);
+    } else {
+      console.log('Synced: ' + localPath);
+    }
+    return;
+  }
+
+  // Neither --accept nor --reject: show summary and prompt for action
+  if (raw) {
+    output({ agent: agentName, action: 'pending', sections_modified: hunkCount, diff: diffStr }, raw);
+  } else {
+    process.stdout.write(
+      hunkCount + ' section(s) modified in upstream. Diff:\n' + diffStr +
+      '\nAccept upstream changes? (accept/reject)\n' +
+      'Re-run with --accept to apply or --reject to skip.\n'
+    );
+  }
+}
+
+/**
+ * Show unified diff between local override and global counterpart
+ */
+function cmdAgentDiff(cwd, raw, args) {
+  const name = args && args[0];
+  if (!name) {
+    error('Usage: agent diff <name>');
+    process.exit(1);
+  }
+  
+  // Normalize: strip .md extension if provided
+  const agentName = name.endsWith('.md') ? name.slice(0, -3) : name;
+  
+  const { agentsDir } = resolveBgsdPaths();
+  const globalAgentPath = path.join(agentsDir, agentName + '.md');
+  const localDir = path.join(cwd, '.opencode', 'agents');
+  const localPath = path.join(localDir, agentName + '.md');
+  
+  // Check local override exists
+  if (!fs.existsSync(localPath)) {
+    error(`No local override for "${agentName}". Create one with: agent override ${agentName}`);
+    process.exit(1);
+  }
+  
+  // Check global agent exists
+  if (!fs.existsSync(globalAgentPath)) {
+    error(`Global agent "${agentName}" not found — local override exists but has no upstream counterpart`);
+    process.exit(1);
+  }
+  
+  // Read both files
+  const globalContent = safeReadFile(globalAgentPath) || '';
+  const localContent = safeReadFile(localPath) || '';
+  
+  // Generate unified diff
+  const diffStr = generateUnifiedDiff(
+    globalContent,
+    localContent,
+    'global/' + agentName + '.md',
+    'local/' + agentName + '.md'
+  );
+  
+  if (!diffStr) {
+    // Identical files — silent exit
+    if (raw) {
+      output({ agent: agentName, diff: null, identical: true }, raw);
+    }
+    return;
+  }
+  
+  // Output the diff
+  if (raw) {
+    output({ agent: agentName, diff: diffStr, identical: false }, raw);
+  } else {
+    process.stdout.write(diffStr);
+  }
+}
+
+/**
  * List all agents
  */
 function cmdAgentList(cwd, raw) {
@@ -568,10 +1102,92 @@ function cmdAgentList(cwd, raw) {
   output({ agents }, raw);
 }
 
+/**
+ * List all global agents with scope (global / local-override) and drift annotations
+ * Local overrides are read from .opencode/agents/ relative to cwd
+ */
+function cmdAgentListLocal(cwd, raw) {
+  const { agentsDir } = resolveBgsdPaths();
+  const localAgentsDir = path.join(cwd, '.opencode', 'agents');
+  
+  // Scan global agents
+  const globalAgents = scanAgents(agentsDir);
+  
+  // Build map of local override files (by agent name, without .md extension)
+  const localOverrides = new Map();
+  if (fs.existsSync(localAgentsDir)) {
+    const localFiles = fs.readdirSync(localAgentsDir).filter(f => f.endsWith('.md'));
+    for (const file of localFiles) {
+      const name = file.replace('.md', '');
+      const filePath = path.join(localAgentsDir, file);
+      const content = safeReadFile(filePath);
+      localOverrides.set(name, content || '');
+    }
+  }
+  
+  // Build result array — one entry per global agent
+  const agents = globalAgents.map(agent => {
+    const hasLocal = localOverrides.has(agent.name);
+    let scope = 'global';
+    let drift = null;
+    
+    if (hasLocal) {
+      scope = 'local-override';
+      // Compare global vs local content for drift detection
+      const globalFilePath = path.join(agentsDir, agent.name + '.md');
+      const globalContent = safeReadFile(globalFilePath) || '';
+      const localContent = localOverrides.get(agent.name);
+      
+      if (globalContent === localContent) {
+        drift = 'in-sync';
+      } else {
+        drift = 'drifted';
+      }
+    }
+    
+    return {
+      name: agent.name,
+      scope,
+      drift,
+    };
+  });
+  
+  if (raw) {
+    output({ agents }, raw);
+    return;
+  }
+  
+  // Human-readable columnar table output
+  const nameWidth = Math.max(4, ...agents.map(a => a.name.length)) + 2;
+  const scopeWidth = Math.max(5, 'local-override'.length) + 2;
+  
+  const header = 'Name'.padEnd(nameWidth) + 'Scope'.padEnd(scopeWidth) + 'Drift';
+  
+  const rows = agents.map(a => {
+    const driftDisplay = a.drift === 'in-sync' ? '✓' : a.drift === 'drifted' ? 'Δ' : '';
+    return a.name.padEnd(nameWidth) + a.scope.padEnd(scopeWidth) + driftDisplay;
+  });
+  
+  console.log(header);
+  for (const row of rows) {
+    console.log(row);
+  }
+}
+
 module.exports = {
   cmdAgentAudit,
   cmdAgentList,
+  cmdAgentListLocal,
   cmdAgentValidateContracts,
+  cmdAgentOverride,
+  cmdAgentDiff,
+  cmdAgentSync,
   // Exported for testing
   parseRaciMatrix,
+  findClosestAgent,
+  injectNameField,
+  // Phase 129: Foundation utilities
+  validateAgentFrontmatter,
+  sanitizeAgentContent,
+  generateUnifiedDiff,
 };

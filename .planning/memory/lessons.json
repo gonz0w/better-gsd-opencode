@@ -1,0 +1,25 @@
+[
+  {
+    "id": "ee0ca202-c1c6-43f2-b056-629364f24c07",
+    "date": "2026-03-15T19:07:22.410Z",
+    "title": "Test lesson",
+    "severity": "HIGH",
+    "type": "tooling",
+    "root_cause": "Missing validation",
+    "prevention_rule": "Add input checks",
+    "affected_agents": [
+      "bgsd-executor"
+    ]
+  },
+  {
+    "id": "47bc0a0a-273f-47bc-b47d-38f0f88d2ccb",
+    "date": "2026-02-28T00:00:00.000Z",
+    "title": "2026-02-28: Anthropic Auth Plugin System Prompt Mangling",
+    "severity": "MEDIUM",
+    "type": "environment",
+    "root_cause": "**Severity:** Critical — caused days of debugging, directory confusion, broken path references\n**Root Cause:**\nThe auth plugin (v0.0.13) performs a global text replacement on the entire system prompt before sending it to Anthropic's API. This is done because Anthropic's OAuth endpoint blocks requests containing the literal editor name.\nThe replacement logic in the plugin's `index.mjs`:\n```javascript\n// In experimental.chat.system.transform AND in the fetch() interceptor:\ntext.replace(/OpenCode/g",
+    "prevention_rule": "Migrated from free-form lessons — review and update",
+    "affected_agents": [],
+    "migrated_from": "/mnt/raid/DEV/bgsd-oc/lessons.md"
+  }
+]

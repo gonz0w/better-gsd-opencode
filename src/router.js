@@ -109,6 +109,8 @@ function lazyRecovery() { return _modules.recovery || (_modules.recovery = requi
 function lazyAudit() { return _modules.audit || (_modules.audit = require('./commands/audit')); }
 function lazyDecisions() { return _modules.decisions || (_modules.decisions = require('./commands/decisions')); }
 function lazyDb() { return _modules.db || (_modules.db = require('./lib/db')); }
+function lazyLessons() { return _modules.lessons || (_modules.lessons = require('./commands/lessons')); }
+function lazySkills() { return _modules.skills || (_modules.skills = require('./commands/skills')); }
 
 
 async function main() {
@@ -251,7 +253,7 @@ async function main() {
   let namespace = null;
   let remainingArgs = args.slice(1);
   
-  const KNOWN_NAMESPACES = ['init', 'plan', 'execute', 'verify', 'util', 'research', 'cache', 'audit', 'decisions', 'detect'];
+  const KNOWN_NAMESPACES = ['init', 'plan', 'execute', 'verify', 'util', 'research', 'cache', 'audit', 'decisions', 'detect', 'lessons', 'skills'];
   
   if (command && command.includes(':')) {
     const colonIdx = command.indexOf(':');
@@ -267,7 +269,7 @@ async function main() {
   }
 
   if (!command) {
-    error('Usage: bgsd-tools <namespace:command> [args] [--pretty] [--verbose]\nCommands: init:<workflow>, plan:<intent|requirements|roadmap|phases|find-phase|milestone|phase>, execute:<commit|rollback-info|session-diff|session-summary|velocity|worktree|tdd|test-run>, verify:<state|verify|assertions|search-decisions|search-lessons|review|context-budget|token-budget>, util:<config-get|config-set|env|current-timestamp|list-todos|todo|memory|mcp|classify|frontmatter|progress|websearch|history-digest|trace-requirement|codebase|cache|agent>, research:<capabilities|yt-search|yt-transcript|collect|nlm-create|nlm-add-source|nlm-ask|nlm-report>');
+    error('Usage: bgsd-tools <namespace:command> [args] [--pretty] [--verbose]\nCommands: init:<workflow>, plan:<intent|requirements|roadmap|phases|find-phase|milestone|phase>, execute:<commit|rollback-info|session-diff|session-summary|velocity|worktree|tdd|test-run>, verify:<state|verify|assertions|search-decisions|search-lessons|review|context-budget|token-budget>, util:<config-get|config-set|env|current-timestamp|list-todos|todo|memory|mcp|classify|frontmatter|progress|websearch|history-digest|trace-requirement|codebase|cache|agent>, research:<capabilities|yt-search|yt-transcript|collect|nlm-create|nlm-add-source|nlm-ask|nlm-report|score|gaps>');
   }
 
   // --help / -h: print command help to stderr (never contaminates JSON stdout)
@@ -820,6 +822,10 @@ Use without --exact for fuzzy matching.`);
             const fromIdx = restArgs.indexOf('--from');
             const toIdx = restArgs.indexOf('--to');
             const ascFlag = restArgs.includes('--asc');
+            // Lessons-specific filters (LESSON-06)
+            const typeIdx = restArgs.indexOf('--type');
+            const sinceIdx = restArgs.indexOf('--since');
+            const severityIdx = restArgs.indexOf('--severity');
             lazyMemory().cmdMemoryRead(cwd, {
               store: storeIdx !== -1 ? restArgs[storeIdx + 1] : null,
               limit: limitIdx !== -1 ? restArgs[limitIdx + 1] : null,
@@ -830,6 +836,9 @@ Use without --exact for fuzzy matching.`);
               from: fromIdx !== -1 ? restArgs[fromIdx + 1] : null,
               to: toIdx !== -1 ? restArgs[toIdx + 1] : null,
               asc: ascFlag,
+              type: typeIdx !== -1 ? restArgs[typeIdx + 1] : null,
+              since: sinceIdx !== -1 ? restArgs[sinceIdx + 1] : null,
+              severity: severityIdx !== -1 ? restArgs[severityIdx + 1] : null,
             }, raw);
           } else if (memSub === 'list') {
             lazyMemory().cmdMemoryList(cwd, {}, raw);
@@ -962,10 +971,18 @@ Use without --exact for fuzzy matching.`);
             lazyAgent().cmdAgentAudit(cwd, raw);
           } else if (agentSub === 'list') {
             lazyAgent().cmdAgentList(cwd, raw);
+          } else if (agentSub === 'list-local') {
+            lazyAgent().cmdAgentListLocal(cwd, raw);
           } else if (agentSub === 'validate-contracts') {
             lazyAgent().cmdAgentValidateContracts(cwd, raw, restArgs.slice(1));
+          } else if (agentSub === 'override') {
+            lazyAgent().cmdAgentOverride(cwd, raw, restArgs.slice(1));
+          } else if (agentSub === 'diff') {
+            lazyAgent().cmdAgentDiff(cwd, raw, restArgs.slice(1));
+          } else if (agentSub === 'sync') {
+            lazyAgent().cmdAgentSync(cwd, raw, restArgs.slice(1));
           } else {
-            error('Unknown agent subcommand. Available: audit, list, validate-contracts');
+            error('Unknown agent subcommand. Available: audit, list, list-local, validate-contracts, override, diff, sync');
           }
         } else if (subcommand === 'resolve-model') {
           lazyMisc().cmdResolveModel(cwd, restArgs[0], raw);
@@ -1282,12 +1299,16 @@ Examples:
           lazyResearch().cmdResearchNlmAsk(cwd, restArgs, raw);
         } else if (subCmd === 'nlm-report') {
           lazyResearch().cmdResearchNlmReport(cwd, restArgs, raw);
+        } else if (subCmd === 'score') {
+          lazyResearch().cmdResearchScore(cwd, restArgs, raw);
+        } else if (subCmd === 'gaps') {
+          lazyResearch().cmdResearchGaps(cwd, restArgs, raw);
         } else {
-          error('Unknown research subcommand. Available: capabilities, yt-search, yt-transcript, collect, nlm-create, nlm-add-source, nlm-ask, nlm-report');
+          error('Unknown research subcommand. Available: capabilities, yt-search, yt-transcript, collect, nlm-create, nlm-add-source, nlm-ask, nlm-report, score, gaps');
         }
         break;
       }
-
+      
       // cache namespace
       case 'cache': {
         if (subCmd === 'research-stats') {
@@ -1332,6 +1353,97 @@ Examples:
         break;
       }
 
+      // lessons namespace
+      case 'lessons': {
+        const subcommand = subCmd;
+
+        // Parse lessons-specific options
+        function parseLessonsOptions(args) {
+          const opts = {};
+          const flagsWithValues = ['--title', '--severity', '--type', '--root-cause', '--prevention', '--agents',
+            '--since', '--limit', '--query', '--rule', '--failure-count', '--behavioral-change', '--agent'];
+          for (let i = 0; i < args.length; i++) {
+            if (args[i] === '--title' && args[i + 1]) { opts.title = args[++i]; }
+            else if (args[i] === '--severity' && args[i + 1]) { opts.severity = args[++i]; }
+            else if (args[i] === '--type' && args[i + 1]) { opts.type = args[++i]; }
+            else if (args[i] === '--root-cause' && args[i + 1]) { opts.rootCause = args[++i]; }
+            else if (args[i] === '--prevention' && args[i + 1]) { opts.prevention = args[++i]; }
+            else if (args[i] === '--agents' && args[i + 1]) { opts.agents = args[++i]; }
+            else if (args[i] === '--since' && args[i + 1]) { opts.since = args[++i]; }
+            else if (args[i] === '--limit' && args[i + 1]) { opts.limit = args[++i]; }
+            else if (args[i] === '--query' && args[i + 1]) { opts.query = args[++i]; }
+            else if (args[i] === '--rule' && args[i + 1]) { opts.rule = args[++i]; }
+            else if (args[i] === '--failure-count' && args[i + 1]) { opts.failureCount = args[++i]; }
+            else if (args[i] === '--behavioral-change' && args[i + 1]) { opts.behavioralChange = args[++i]; }
+            else if (args[i] === '--agent' && args[i + 1]) { opts.agent = args[++i]; }
+          }
+          return opts;
+        }
+
+        if (subcommand === 'capture') {
+          lazyLessons().cmdLessonsCapture(cwd, parseLessonsOptions(restArgs), raw);
+        } else if (subcommand === 'list') {
+          lazyLessons().cmdLessonsList(cwd, parseLessonsOptions(restArgs), raw);
+        } else if (subcommand === 'migrate') {
+          lazyLessons().cmdLessonsMigrate(cwd, {}, raw);
+        } else if (subcommand === 'analyze') {
+          const agentIdx = restArgs.indexOf('--agent');
+          lazyLessons().cmdLessonsAnalyze(cwd, {
+            agent: agentIdx !== -1 ? restArgs[agentIdx + 1] : null,
+          }, raw);
+        } else if (subcommand === 'suggest') {
+          const agentIdx = restArgs.indexOf('--agent');
+          lazyLessons().cmdLessonsSuggest(cwd, {
+            agent: agentIdx !== -1 ? restArgs[agentIdx + 1] : null,
+          }, raw);
+        } else if (subcommand === 'compact') {
+          const thresholdIdx = restArgs.indexOf('--threshold');
+          lazyLessons().cmdLessonsCompact(cwd, {
+            threshold: thresholdIdx !== -1 ? restArgs[thresholdIdx + 1] : undefined,
+          }, raw);
+        } else if (subcommand === 'deviation-capture') {
+          lazyLessons().cmdDeviationCapture(cwd, parseLessonsOptions(restArgs), raw);
+        } else {
+          error(`Unknown lessons subcommand: ${subcommand}. Available: capture, list, migrate, analyze, suggest, compact, deviation-capture`);
+        }
+        break;
+      }
+
+      // skills namespace
+      case 'skills': {
+        function parseSkillsOptions(args) {
+          const opts = {};
+          for (let i = 0; i < args.length; i++) {
+            if (args[i] === '--source' && args[i + 1]) { opts.source = args[++i]; }
+            else if (args[i] === '--name' && args[i + 1]) { opts.name = args[++i]; }
+            else if (args[i] === '--confirm') { opts.confirm = true; }
+            else if (args[i] === '--verbose') { opts.verbose = true; }
+            else if (!args[i].startsWith('-')) { opts.positional = opts.positional || args[i]; }
+          }
+          return opts;
+        }
+
+        if (subCmd === 'list') {
+          lazySkills().cmdSkillsList(cwd, parseSkillsOptions(restArgs), raw);
+        } else if (subCmd === 'install') {
+          // source can be positional or --source
+          const opts = parseSkillsOptions(restArgs);
+          if (!opts.source && opts.positional) opts.source = opts.positional;
+          await lazySkills().cmdSkillsInstall(cwd, opts, raw);
+        } else if (subCmd === 'validate') {
+          const opts = parseSkillsOptions(restArgs);
+          if (!opts.name && opts.positional) opts.name = opts.positional;
+          lazySkills().cmdSkillsValidate(cwd, opts, raw);
+        } else if (subCmd === 'remove') {
+          const opts = parseSkillsOptions(restArgs);
+          if (!opts.name && opts.positional) opts.name = opts.positional;
+          lazySkills().cmdSkillsRemove(cwd, opts, raw);
+        } else {
+          error('Unknown skills subcommand: ' + subCmd + '. Available: list, install, validate, remove');
+        }
+        break;
+      }
+
        // detect namespace
        case 'detect': {
          if (subCmd === 'tools') {
@@ -1346,13 +1458,13 @@ Examples:
 
       // Unknown namespace
       default:
-        error(`Unknown namespace: ${namespace}. Available namespaces: init, plan, execute, verify, util, research, cache, audit, decisions, detect`);
+        error(`Unknown namespace: ${namespace}. Available namespaces: init, plan, execute, verify, util, research, cache, audit, decisions, detect, lessons, skills`);
     }
     return; // Exit after handling namespaced command
   }
 
   // No command matched any namespace — unknown
-  error(`Unknown command: ${command}. Use namespace:command syntax. Available namespaces: init, plan, execute, verify, util, research, cache, audit, decisions`);
+  error(`Unknown command: ${command}. Use namespace:command syntax. Available namespaces: init, plan, execute, verify, util, research, cache, audit, decisions, lessons, skills`);
 }
 
 // Track command execution in history (Phase 97: UX Polish)

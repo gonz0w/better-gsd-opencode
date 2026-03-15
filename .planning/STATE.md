@@ -1,174 +1,123 @@
-# v12.1 Project State: Tool Integration & Agent Enhancement
+# Project State: v13.0 Closed-Loop Agent Evolution
 
 ## Project Reference
 
 See: `.planning/PROJECT.md` (updated 2026-03-15)
 
 **Core value:** Manage and deliver high-quality software with high-quality documentation, while continuously reducing token usage and improving performance
-**Current focus:** v12.1 Tool Integration & Agent Enhancement — roadmap created
+**Current focus:** v13.0 — closed-loop agent evolution: local overrides, lesson-driven improvement, skill discovery, research enhancement
 
 ## Current Position
 
-**Milestone:** v12.1 Tool Integration & Agent Enhancement
-**Phase:** 128 (Plans 01-03 complete)
+**Milestone:** v13.0 Closed-Loop Agent Evolution
+**Phase:** Phase 133 of 133 (Enhanced Research Workflow) — COMPLETE
 **Current Plan:** Not started
 **Status:** Milestone complete
 **Last Activity:** 2026-03-15
 
-Progress: [██████████] 100% (Phase 128 complete, 3 of 3 plans)
+Progress: [██████████] 100%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 242 (v12.1 Phase 128 Plan 01)
+- Total plans completed: 242 (through v12.1 Phase 128 Plan 03)
 - Average duration: ~14 min/plan (improving with better tooling)
 - Total execution time: ~41.5 hours
 
 **Recent Trend:**
-- v12.0 Phase 122 Plan 01: 14 min, 2 tasks, 9 files (1189 tests)
-- v12.0 Phase 122 Plan 02: 17 min, 2 tasks, 7 files (202 decision tests)
-- v12.0 Phase 123 Plan 01: 10 min, 2 tasks, 4 files (1200 tests)
-- v12.0 Phase 123 Plan 02: 30 min, 2 tasks, 3 files (1250 tests)
-- v12.0 Phase 123 Plan 03: 9 min, 2 tasks, 4 files (1283 tests)
-- v12.1 Phase 124 Plan 01: 3 min, 2 tasks, 3 files (1241 tests - all pass)
-- v12.1 Phase 124 Plan 02: 7 min, 2 tasks, 1 file (67 tests added - 1350 total)
-- v12.1 Phase 126 Plan 01: 15 min, 2 tasks, 9 files (1398 tests - all pass)
-- v12.1 Phase 126 Plan 02: 19 min, 2 tasks, 4 files (1398 tests - all pass)
-- v12.1 Phase 126 Plan 03: 4 min, 2 tasks, 1 file (1427 tests - all pass, 48 new)
-- v12.1 Phase 127 Plan 01: ~15 min, 2 tasks, 2 files (1446 tests - all pass)
-- v12.1 Phase 127 Plan 02: ~10 min, 2 tasks, 2 files (1501 tests - all pass, 55 new)
-- v12.1 Phase 128 Plan 01: 12 min, 2 tasks, 4 files (1503 tests - all pass)
-- v12.1 Phase 128 Plan 02: 14 min, 2 tasks, 2 files (1503 tests - all pass)
-- v12.1 Phase 128 Plan 03: 5 min, 2 tasks, 2 files (1565 tests - all pass, 114 new)
+- v12.1 Phase 126 Plan 03: 4 min, 2 tasks, 1 file (1427 tests)
+- v12.1 Phase 127 Plan 01: ~15 min, 2 tasks, 2 files (1446 tests)
+- v12.1 Phase 127 Plan 02: ~10 min, 2 tasks, 2 files (1501 tests)
+- v12.1 Phase 128 Plan 01: 12 min, 2 tasks, 4 files (1503 tests)
+- v12.1 Phase 128 Plan 02: 14 min, 2 tasks, 2 files (1503 tests)
+- v12.1 Phase 128 Plan 03: 5 min, 2 tasks, 2 files (1565 tests)
+- v13.0 Phase 129 Plan 01: 11 min, 2 tasks, 3 files (foundation utilities + list-local)
+- v13.0 Phase 129 Plan 02: 11 min, 2 tasks, 3 files (agent:override + agent:diff commands)
+- v13.0 Phase 129 Plan 03: 4 min, 2 tasks, 4 files (agent:sync + local_agent_overrides)
+- v13.0 Phase 130 Plan 01: 10 min, 2 tasks, 9 files (lessons schema + capture + migrate + list + memory filters)
+- v13.0 Phase 130 Plan 02: 8 min, 2 tasks, 6 files (lessons:analyze + suggest + compact + workflow hooks)
+- v13.0 Phase 131 Plan 01: 12 min, 2 tasks, 1 file (security scanner + skills:list + skills:validate)
+- v13.0 Phase 131 Plan 02: 12 min, 2 tasks, 1 file (skills:install + skills:remove + audit logging)
+- v13.0 Phase 131 Plan 03: 6 min, 2 tasks, 6 files (router wiring + enricher installed_skills + new-milestone Step 8.5)
+- v13.0 Phase 132 Plan 01: 8 min, 2 tasks, 9 files (autonomousRecoveries typo fix + lessons:deviation-capture with Rule-1 filter + 3-cap)
+- v13.0 Phase 132 Plan 02: 5 min, 2 tasks, 4 files (deviation_auto_capture hook in execute-plan.md + help/discovery metadata)
+- v13.0 Phase 133 Plan 01: 8 min, 2 tasks, 4 files (research:score + research:gaps command handlers with 22 tests)
+- v13.0 Phase 133 Plan 02: 8 min, 2 tasks, 5 files (help/discovery wiring + new-milestone.md quality profile integration)
 - Trend: Stable, improving velocity with infrastructure improvements
 
 *Updated after each plan completion*
 
 ## Accumulated Context
 
-### v12.1 Roadmap Summary
+### v13.0 Roadmap Summary
 
-- **Phases:** 124–128 (5 phases)
-- **Requirements:** 11 total (TOOL-* and AGENT-* categories)
+- **Phases:** 129–133 (5 phases)
+- **Requirements:** 33 total (LOCAL-*, LESSON-*, SKILL-*, DEVCAP-*, RESEARCH-* categories)
 - **Coverage:** 100% — every requirement maps to exactly one phase
-- **Dependencies:** Phase 124 is foundation; phases 125–127 can parallelize; phase 128 aggregates
+- **Dependencies:** Phase 129 first; Phase 130 before Phase 132; Phase 131 and 133 independent
 
 ### Phase Descriptions
 
 | Phase | Name | Goal | Requirements |
 |-------|------|------|--------------|
-| 124 | Tool Detection & Infrastructure | Unified tool capability detection with caching | TOOL-DET-01 |
-| 125 | Core Tools Integration | ripgrep, fd, jq with graceful degradation | TOOL-01, TOOL-02, TOOL-03, TOOL-DEGR-01 |
-| 126 | Extended Tools | yq, bat, GitHub CLI integration | TOOL-04, TOOL-05, TOOL-06 |
-| 127 | Agent Routing Enhancement | Tool-aware routing with decision functions | AGENT-01 |
-| 128 | Agent Collaboration | Inter-agent handoffs & multi-phase sequencing | AGENT-02, AGENT-03 |
+| 129 | Foundation & Agent Overrides | Local agent override lifecycle with YAML validation | LOCAL-01 through LOCAL-07 |
+| 130 | Lesson Schema & Analysis Pipeline | Structured lessons + analysis + workflow hooks | LESSON-01 through LESSON-09 |
+| 131 | Skill Discovery & Security | Security-first skill lifecycle + agentskills.io discovery | SKILL-01 through SKILL-09 |
+| 132 | Deviation Recovery Auto-Capture | Rule-1-only auto-capture in execute-phase | DEVCAP-01 through DEVCAP-04 |
+| 133 | Enhanced Research Workflow | Structured quality profile + conflict detection | RESEARCH-01 through RESEARCH-04 |
+| Phase 0133 P01 | 8min | 2 tasks | 4 files |
+| Phase 0133-02 P02 | 8min | 2 tasks | 5 files |
 
 ### Key Decisions
 
-- [v12.1]: Tool detection centralized in Phase 124 to avoid duplication across 6 tools
-- [v12.1]: Core tools (ripgrep, fd, jq) in Phase 125 due to performance criticality
-- [v12.1]: Extended tools (yq, bat, gh) in Phase 126 for secondary operations
-- [v12.1]: Agent routing (Phase 127) before collaboration (Phase 128) for natural ordering
-- [v12.1]: 25%+ context reduction target via capability-aware filtering
-- [0126-01]: cmdRollbackInfo lives in features.js not misc.js — plan description had wrong file, implementation correct
-- [0126-01]: bat enhancement pattern: isToolEnabled check → temp file → catWithHighlight → finally cleanup → additive result field
-- [0126-02]: isGhUsable() uses exact version match (major.minor.patch) — only 2.88.0 blocked, 2.88.1+ allowed; BLOCKED_VERSIONS array for extensibility
-- [0126-02]: detect:gh-preflight kept internal (no COMMAND_HELP) — workflow-facing tool for GitHub CI pre-flight validation
-- [0126-03]: withToolFallback catches gh fallback throws — tests verify success:false result, not thrown exceptions (error-and-stop behavior preserved)
-- [0126-03]: Version blocklist logic tested by extracting parseVersion + BLOCKED_VERSIONS criteria (no gh binary needed — machine-independent)
-- [0127-01]: tool_availability uses file cache (.planning/.cache/tools.json) not direct getToolStatus() — avoids child_process in ESM plugin
-- [0127-01]: All 6 tools default to false when cache absent/stale (conservative fallback)
-- [0127-01]: Plan decomposition heuristics live in plan-phase.md workflow — tool choice is executor concern, not planner concern
-- [0128-01]: resolveAgentCapabilityLevel: 5-6 tools=HIGH, 2-4=MEDIUM, 0-1=LOW — only LOW triggers warning metadata
-- [0128-01]: resolvePhaseDependencies uses Kahn topological sort; declared depends_on always wins, tool availability breaks ties
-- [0128-01]: Silent capability filtering in scopeContextForAgent — tool_dependency_level drives context stripping, agents don't know what was removed
-- [0128-02]: Critical handoff pairs (planner→executor, researcher→planner) get rich tool context; 7 other pairs get minimal — receiving agents only adjust strategy for critical pairs
-- [0128-02]: handoff_tool_context capability level duplicated inline in enricher (avoids circular dep on decision-rules.js)
-- [0128-02]: Handoff preview uses --tools flag for tool_names_available (no live enrichment needed for preview)
-- [0128-03]: verify:handoff requires --preview flag for CLI contract tests (bare verify:handoff errors with "Unknown handoff subcommand")
-
-### Completed Work
-
-- [✓] Phase 124 Plan 01: Tool Detection Infrastructure (TOOL-DET-01)
-  - File-based caching with 5-minute TTL
-  - Cross-platform PATH resolution (Windows/macOS/Linux)
-  - Semver version comparison
-  - detect:tools JSON command
-
-- [✓] Phase 124 Plan 02: Tool Detection Test Suite (TOOL-DET-01 verification)
-  - 67 comprehensive unit tests covering detector, guidance, fallback, CLI
-  - File cache testing with temp directory isolation
-  - Version parsing for all 6 tool formats
-  - CLI output format validation
-  - All 1350 tests passing (1283 baseline + 67 new)
-
-- [✓] Phase 126 Plan 01: Extended Tools Config Toggles and Integration (TOOL-04, TOOL-05)
-  - tools_yq, tools_bat, tools_gh config toggles in CONFIG_SCHEMA
-  - yq-backed YAML parsing in detectInfraServices and detectMonorepo (with regex fallback)
-  - bat-enhanced diff display in cmdSessionDiff and cmdRollbackInfo (silent fallback, additive diff_highlighted)
-  - All 1398 tests passing
-
-- [✓] Phase 126 Plan 02: gh CLI Version Blocklist and Pre-flight Validation (TOOL-06)
-  - isGhUsable() with BLOCKED_VERSIONS array (exact match 2.88.0 only)
-  - detect:gh-preflight CLI command: { usable, authenticated, version, errors }
-  - Error-and-stop behavior: blocked/missing gh → errors[], usable: false, no partial completion
-  - All 1398 tests passing
-
-- [✓] Phase 126 Plan 03: Extended Tools Integration Tests (TOOL-04, TOOL-05, TOOL-06 verification)
-  - 48 new integration tests in cli-tools-integration.test.cjs
-  - Config toggles verified for all 6 tools (yq, bat, gh, ripgrep, fd, jq)
-  - yq parseYAML/transformYAML/YAMLtoJSON/isYqAvailable integration tests
-  - bat catWithHighlight/getLanguage/getStylePresets/isBatAvailable integration tests
-  - gh version blocklist logic tests (2.88.0 blocked, 2.88.1/2.87.0 allowed)
-  - detect:gh-preflight output shape tests
-  - Error-and-stop behavior confirmed
-  - All 1427 tests passing (96 integration tests)
-
-- [✓] Phase 127 Plan 01: Tool Availability + Tool Routing Decision Functions (AGENT-01)
-  - resolveFileDiscoveryMode, resolveSearchMode, resolveJsonTransformMode in decision-rules.js
-  - All three registered in DECISION_REGISTRY under 'tool-routing' category
-  - tool_availability added to bgsd-context (reads .planning/.cache/tools.json, ESM-safe)
-  - Tool-Aware Planning Guidance added to plan-phase.md workflow
-  - All 1446 tests passing
-
-- [✓] Phase 127 Plan 02: Contract Tests for Tool Routing Decision Functions (AGENT-01 verification)
-  - ~38 contract tests for all three resolve functions (all input/output combinations)
-  - DECISION_REGISTRY integration tests (all three rules registered, evaluateDecisions fires correctly)
-  - ~12 enricher integration tests (tool_availability shape, boolean-only, 6 keys, no version/path)
-  - All 1501 tests passing (55 new tests)
-
-- [✓] Phase 128 Plan 01: Agent Collaboration Decision Functions (AGENT-02, AGENT-03)
-  - resolveAgentCapabilityLevel (HIGH/MEDIUM/LOW) and resolvePhaseDependencies (topological sort) in decision-rules.js
-  - Both registered in DECISION_REGISTRY (state-assessment and workflow-routing categories)
-  - AGENT_MANIFESTS enhanced to cover 10 agent types with tool_dependency_level
-  - scopeContextForAgent: silent capability filtering (strips tool context for low-dependency agents)
-  - All 1503 tests passing
-
-- [✓] Phase 128 Plan 02: Agent Handoff Contracts + Enricher Tool Context (AGENT-02)
-  - 9 agent pair handoff contracts in verify.js (up from 2) with tool_context_type rich/minimal split
-  - Critical pairs (planner→executor, researcher→planner) have tool_context_type 'rich'
-  - 7 other pairs have tool_context_type 'minimal' (tool_count + capability_level)
-  - handoff_tool_context field added to enricher output (available_tools, tool_count, capability_level)
-  - All 1503 tests passing
-
-- [✓] Phase 128 Plan 03: Contract Tests for Agent Collaboration Functions (AGENT-02, AGENT-03 verification)
-  - 89 new tests in decisions.test.cjs (resolveAgentCapabilityLevel 15, resolvePhaseDependencies 18, DECISION_REGISTRY 4 + existing Phase 127 tests)
-  - 25 new tests in enricher-decisions.test.cjs (handoff_tool_context shape 8, capability filtering 12, handoff completeness 5)
-  - All 1565 tests passing (114 new tests, exceeds ~62 target)
-  - All Phase 128 success criteria SC-1 through SC-5 validated by tests
+- [v13.0 roadmap]: Phase 129 first — OC path correction (`.opencode/agents/` not `.planning/agents/`) and YAML validation must precede any automation writing agent files
+- [v13.0 roadmap]: Phase 130 before Phase 132 — `lessons:capture` must exist before deviation auto-capture can call it
+- [v13.0 roadmap]: Phase 131 independent — skill security architecture decoupled from lesson pipeline
+- [v13.0 roadmap]: Phase 133 independent — research scoring has no dependency on Phases 129–132
+- [v13.0 roadmap]: DEVCAP-01 typo fix included in Phase 132 (fix before building capture telemetry on top)
+- [v13.0 roadmap]: Skill install writes to `.agents/skills/` only — never `~/.config`; 41-pattern security scan is mandatory, not optional
+- [Phase 129 Plan 01]: LCS DP for generateUnifiedDiff — O(mn) is acceptable for agent files (<500 lines), avoids external diff library dependency
+- [Phase 129 Plan 01]: sanitizeAgentContent uses regex lookbehind to exclude path contexts (.opencode/agents/) from editor name replacement
+- [Phase 129 Plan 02]: findClosestAgent scores by prefix length (not agent name length) — bgsd-exector correctly maps to bgsd-executor via 9-char prefix match
+- [Phase 129 Plan 02]: injectNameField adds name: as first frontmatter field; all global agents lack name: field so all overrides show a persistent diff at the name: line
+- [Phase 129 Plan 03]: agent:sync uses --accept/--reject flags (not stdin) because bgsd-tools.cjs is a non-interactive CLI
+- [Phase 129 Plan 03]: agent:sync raw string comparison for identical check — silent exit only when truly identical, expected that all overrides with injected name: field show 1-section diff
+- [Phase 130 Plan 01]: validateLesson() receives pre-built entry — id/date set by caller, validation only checks 6 schema-required fields — keeps validation pure and testable
+- [Phase 130 Plan 01]: cmdLessonsMigrate uses type:environment as sentinel per LESSON-02 — downstream analysis can exclude legacy entries by checking type!=environment
+- [Phase 130 Plan 01]: lessons-specific filters in cmdMemoryRead use options.type/since/severity to avoid collision with trajectory filter options
+- [Phase 130 Plan 02]: lessons:suggest excludes type:environment per LESSON-02 sentinel — migrated free-form lessons lack structured data, filtering prevents noisy suggestions
+- [Phase 130 Plan 02]: lessons:compact normalizes root_cause by lowercase+trim before grouping — ensures case/whitespace variants merge correctly
+- [Phase 130 Plan 02]: workflow hooks use 2>/dev/null || true — lessons command failures must never block verification or milestone completion
+- [Phase 131 Plan 01]: 41 patterns exactly in SECURITY_PATTERNS — trimmed from 45 by removing fs.appendFile, dgram, encodeURIComponent+http, </system> (redundant with <system>)
+- [Phase 131 Plan 01]: scanSkillFiles returns structured { verdict, findings, summary } — clean contract for install gatekeeper, validate, and list consumers
+- [Phase 131 Plan 01]: formatScanResults(scanResult, verbose) is pure — callers control when/how to print, no side effects
+- [Phase 131 Plan 02]: Dangerous verdict is hard block: no force/override option in cmdSkillsInstall — files never reach dest dir on dangerous findings
+- [Phase 131 Plan 02]: --confirm pattern mirrors agent:sync --accept/--reject; without --confirm, outputs confirmation data for calling agent to handle Y/N
+- [Phase 131 Plan 02]: logAuditEntry is synchronous — simplifies error handling, audit writes are non-critical and fast
+- [Phase 131 Plan 03]: skills:install uses await in router — cmdSkillsInstall is async (GitHub API fetch), main() is already async so await is safe
+- [Phase 131 Plan 03]: COMMAND_TREE added as new export from commandDiscovery.js — not previously present, created full tree covering all namespaces (additive, backward-compatible)
+- [Phase 132 Plan 01]: deviation-recovery added as 5th type in LESSON_SCHEMA.type_values — reuses existing validateLesson() pipeline without schema changes
+- [Phase 132 Plan 01]: lessons:deviation-capture uses Rule-1-only parseInt filter — silently skips Rules 2, 3, 4 per DEVCAP-01
+- [Phase 132 Plan 01]: cmdDeviationCapture wrapped in try/catch — all errors swallowed and debugLogged, never blocks execution per DEVCAP-04
+- [Phase 132 Plan 02]: Rule-3 explicitly excluded in workflow text AND command filters internally — dual-layer prevents accidental invocation for environmental failures
+- [Phase 133 Plan 01]: research:score + research:gaps use composite negative-signal scoring (5 signals, >= 3 = LOW); router wiring added as Rule-3 blocking fix — commands need explicit case blocks to be callable
+- [Phase 133 Plan 01]: cache-first pattern: cmdResearchScore writes research-score.json, cmdResearchGaps reads it — no independent recomputation keeps the two commands decoupled
+- [Phase 133 Plan 01]: parseResearchFile scans Primary+Secondary sources only for official docs detection (docs.* domain or "official" keyword) — Tertiary sources excluded as secondary references
+- [Phase 133 Plan 02]: quality profile section placed after RESEARCH COMPLETE banner with non-blocking re-research prompt (N default) — shows profile to completers without forcing on skippers; HIGH/MEDIUM gaps only per CONTEXT.md
+- [Phase 133 Plan 02]: advisory gate pattern: surface quality info after completion banner, offer remediation with N default — never block primary workflow
 
 ### Pending Work
 
-None — Phase 128 complete (all 3 plans executed).
+Phase 130 complete. Phase 131 Plans 01–03 complete (security scanner + full skills CLI + router wiring + enricher installed_skills + new-milestone Step 8.5). Phase 131 Plan 04 remains. Phase 132 complete (Plans 01 + 02). Phase 133 complete (Plans 01 + 02): research:score + research:gaps command handlers + CLI wiring + new-milestone.md quality profile integration. v13.0 milestone complete.
 
 ### Blockers/Concerns
 
-None — Phase 128 fully complete. AGENT-02 and AGENT-03 requirements satisfied with test coverage.
+None.
 
 ## Session Continuity
 
-**Last session:** 2026-03-15T15:49:18Z
-**This session:** 2026-03-15 (Phase 128 Plan 03 execution complete — 2 tasks, 5 min, 1565 tests passing)
-**Next steps:** 
-1. Phase 128 complete — run verify-work to confirm all Phase 128 success criteria
-2. Plan next milestone or advance to next phase
+**Last session:** 2026-03-15T23:21:02Z
+**This session:** 2026-03-15 — Completed Phase 133 Plan 02 (research:score + research:gaps CLI wiring into help/discovery/categories + new-milestone.md quality profile integration)
+**Next steps:**
+1. v13.0 milestone is complete — consider /bgsd-complete-milestone
+2. Phase 131 Plan 04 (final verification) may remain

@@ -30,7 +30,11 @@ const COMMAND_ALIASES = {
   'd:l': 'decisions:list',
   'd:i': 'decisions:inspect',
   'd:e': 'decisions:evaluate',
-  'd:s': 'decisions:savings'
+  'd:s': 'decisions:savings',
+  's:l': 'skills:list',
+  's:i': 'skills:install',
+  's:v': 'skills:validate',
+  's:r': 'skills:remove'
 };
 
 const COMMAND_CATEGORIES = {
@@ -52,7 +56,93 @@ const COMMAND_CATEGORIES = {
   },
   research: {
     name: 'Research',
-    commands: ['research:capabilities', 'research:collect', 'research:yt-search', 'research:nlm-create']
+    commands: ['research:capabilities', 'research:collect', 'research:yt-search', 'research:nlm-create', 'research:score', 'research:gaps']
+  },
+  lessons: {
+    name: 'Lessons',
+    commands: ['lessons:capture', 'lessons:list', 'lessons:migrate', 'lessons:deviation-capture']
+  },
+  skills: {
+    name: 'Skills',
+    commands: ['skills:list', 'skills:install', 'skills:validate', 'skills:remove']
+  }
+};
+
+const COMMAND_TREE = {
+  'init': {
+    'execute-phase': null,
+    'plan-phase': null,
+    'new-project': null,
+    'new-milestone': null,
+    'quick': null,
+    'resume': null,
+    'verify-work': null
+  },
+  'plan': {
+    'intent': null,
+    'requirements': null,
+    'roadmap': null,
+    'phases': null,
+    'find-phase': null,
+    'milestone': null,
+    'phase': null
+  },
+  'execute': {
+    'commit': null,
+    'rollback-info': null,
+    'session-diff': null,
+    'session-summary': null,
+    'velocity': null,
+    'worktree': null,
+    'tdd': null,
+    'test-run': null,
+    'trajectory': null
+  },
+  'verify': {
+    'state': null,
+    'verify': null,
+    'assertions': null,
+    'search-decisions': null,
+    'search-lessons': null,
+    'review': null,
+    'context-budget': null,
+    'token-budget': null
+  },
+  'util': {
+    'config-get': null,
+    'config-set': null,
+    'env': null,
+    'memory': null,
+    'cache': null,
+    'agent': null,
+    'codebase': null
+  },
+  'research': {
+    'capabilities': null,
+    'collect': null,
+    'yt-search': null,
+    'yt-transcript': null,
+    'nlm-create': null,
+    'nlm-add-source': null,
+    'nlm-ask': null,
+    'nlm-report': null,
+    'score': null,
+    'gaps': null
+  },
+  'lessons': {
+    'capture': null,
+    'list': null,
+    'migrate': null,
+    'analyze': null,
+    'suggest': null,
+    'compact': null,
+    'deviation-capture': null
+  },
+  'skills': {
+    'list': null,
+    'install': null,
+    'validate': null,
+    'remove': null
   }
 };
 
@@ -263,7 +353,8 @@ function getAllCommands() {
       'util:websearch', 'util:history-digest', 'util:trace-requirement', 'util:codebase', 'util:cache',
       'util:agent', 'util:git',
       'research:capabilities', 'research:collect', 'research:yt-search', 'research:yt-transcript',
-      'research:nlm-create', 'research:nlm-add-source', 'research:nlm-ask', 'research:nlm-report'
+      'research:nlm-create', 'research:nlm-add-source', 'research:nlm-ask', 'research:nlm-report',
+      'research:score', 'research:gaps'
     ];
   }
 }
@@ -477,7 +568,24 @@ function validateCommandRegistry() {
       'nlm-create': null,
       'nlm-add-source': null,
       'nlm-ask': null,
-      'nlm-report': null
+      'nlm-report': null,
+      'score': null,
+      'gaps': null
+    },
+    'lessons': {
+      'capture': null,
+      'list': null,
+      'migrate': null,
+      'analyze': null,
+      'suggest': null,
+      'compact': null,
+      'deviation-capture': null
+    },
+    'skills': {
+      'list': null,
+      'install': null,
+      'validate': null,
+      'remove': null
     },
     'audit': {
       'scan': null
@@ -496,7 +604,8 @@ function validateCommandRegistry() {
   const spaceFormatCommands = [
     'research capabilities', 'research collect', 'research collect --resume',
     'research nlm-add-source', 'research nlm-ask', 'research nlm-create',
-    'research nlm-report', 'research yt-search', 'research yt-transcript'
+    'research nlm-report', 'research yt-search', 'research yt-transcript',
+    'research score', 'research gaps'
   ];
   
   // Known format differences - commands in help use combined subcommand names
@@ -601,6 +710,7 @@ function validateCommandRegistry() {
 }
 
 module.exports = {
+  COMMAND_TREE,
   getAutocompleteHints,
   getCommandAliases,
   expandAlias,

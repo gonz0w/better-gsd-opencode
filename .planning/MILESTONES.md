@@ -1,5 +1,33 @@
 # Milestones
 
+## ✅ v12.1 Tool Integration & Agent Enhancement (Shipped: 2026-03-15)
+
+**Delivered:** Integrated 6 modern CLI tools (ripgrep, fd, jq, yq, bat, gh) into core workflows with graceful degradation, unified detection infrastructure, and 5 new decision functions enabling smarter agent routing and inter-agent collaboration.
+
+**Phases completed:** 5 phases (124-128), 13 plans
+**Timeline:** 1 day (2026-03-15)
+**Tests:** 1,565 passing (up from 1,280 baseline, +285 new tests)
+
+**Key accomplishments:**
+- Unified tool detection infrastructure (`detect.js`) with 5-min file cache, cross-platform PATH resolution, semver comparison, and `detect:tools` JSON API
+- 6 CLI tools integrated with graceful Node.js fallbacks: ripgrep (search), fd (discovery), jq (JSON transform), yq (YAML), bat (syntax highlighting), gh (GitHub ops)
+- 5 new decision functions in DECISION_REGISTRY: `resolveFileDiscoveryMode`, `resolveSearchMode`, `resolveJsonTransformMode`, `resolveAgentCapabilityLevel`, `resolvePhaseDependencies`
+- `tool_availability` injected into bgsd-context enrichment — agents see tool status before task decomposition
+- 9 agent pair handoff contracts with rich/minimal tool context split; `handoff_tool_context` in enricher output
+- Silent capability-aware context filtering in `scopeContextForAgent` — tool-independent agents receive lean context
+- `resolvePhaseDependencies` uses Kahn topological sort for multi-phase sequencing with tool-aware tie-breaking
+- 285 new tests across 5 phases (all 1565 passing, including Phase 128's 114 contract/integration tests)
+- All 11/11 requirements delivered across 3 categories (TOOL-*, AGENT-*, TOOL-DEGR-*)
+
+**What's next:** Ready for next milestone — `/bgsd-new-milestone`
+
+**Archives:**
+- `.planning/milestones/v12.1-ROADMAP.md`
+- `.planning/milestones/v12.1-REQUIREMENTS.md`
+- `.planning/milestones/v12.1-DOCS.md`
+
+---
+
 ## ✅ v12.0 SQLite-First Data Layer (Shipped: 2026-03-15)
 
 **Delivered:** Transformed SQLite from a dumb file cache into the structured data backbone for all workflow operations — parsed state persists across invocations, queries replace markdown re-parsing, and workflows get deterministic data from SQL instead of subprocess calls or LLM inference.
@@ -632,6 +660,4 @@
 - Reduced bundle size by ~50% through minification and tree-shaking
 - Intent classification and parameter extraction modules with 31 phrase command registry
 - Fuzzy matching resolver with disambiguation and contextual help fallback
-
----
 

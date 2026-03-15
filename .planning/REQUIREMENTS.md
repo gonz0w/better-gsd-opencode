@@ -1,228 +1,118 @@
-# v12.1 Requirements: Tool Integration & Agent Enhancement
+# Requirements: v13.0 Closed-Loop Agent Evolution
 
-**Milestone:** v12.1  
-**Status:** In Progress  
+**Status:** Active
 **Created:** 2026-03-15
-
-## Overview
-
-v12.1 focuses on integrating modern CLI tools (ripgrep, fd, jq, yq, bat, gh) into core workflows and improving agent routing & collaboration. This milestone delivers "smarter tools, smarter agents" — enabling faster code operations and better inter-agent coordination.
+**Coverage:** All requirements must map to exactly one phase
 
 ---
 
-## Requirements by Category
+## Milestone v13.0 Requirements
 
-### TOOL-01: ripgrep Integration
+### LOCAL — Local Agent Overrides
 
-**Requirement:** User can leverage ripgrep for fast code search across the codebase when available
+- [ ] **LOCAL-01:** User can list all agents showing both global (~/.config/opencode/agents/) and project-local (.opencode/agents/) with scope annotation
+- [ ] **LOCAL-02:** User can create a project-local override copy of any global agent via `agent:override <name>` writing to `.opencode/agents/`
+- [ ] **LOCAL-03:** User can synchronize a local override with the upstream global agent (see diff, accept/reject changes) via `agent:sync`
+- [ ] **LOCAL-04:** User can view a diff between a local override and its global counterpart via `agent:diff`
+- [ ] **LOCAL-05:** All agent file writes (override creation, sync) pass YAML frontmatter validation before writing — missing `name:` field is a hard error
+- [ ] **LOCAL-06:** All agent file writes sanitize generated content to prevent system-prompt mangling (no literal editor name, use generic terms)
+- [ ] **LOCAL-07:** bgsd-context enricher exposes `local_agent_overrides: [string]` listing which agents have project-local versions
 
-**Acceptance Criteria:**
-- ripgrep detection works on macOS, Linux, Windows (via tool detection infrastructure)
-- Search operations use ripgrep by default when available (50x+ faster than grep)
-- Graceful fallback to Node.js regex search when ripgrep unavailable
-- Shell injection protection via execFileSync array args
-- Performance: <100ms for search of 10K+ file codebase
+### LESSON — Lesson Schema & Analysis Pipeline
 
----
+- [ ] **LESSON-01:** User can capture a structured lesson entry via `lessons:capture` with required fields: `Date`, `Title`, `Severity`, `Type` (workflow|agent-behavior|tooling|environment), `Root Cause`, `Prevention Rule`, `Affected Agents`
+- [ ] **LESSON-02:** Existing free-form lessons.md is migrated to structured format with `Type: environment` (producing 0 improvement suggestions)
+- [ ] **LESSON-03:** User can list all lessons with filtering by type, severity, date via `lessons:list [--type] [--since] [--severity]`
+- [ ] **LESSON-04:** User can analyze lesson patterns via `lessons:analyze` — groups recurrent patterns (≥2 supporting lessons) by affected agent
+- [ ] **LESSON-05:** User can generate structured agent improvement suggestions via `lessons:suggest [--agent]` — advisory only, never auto-applied, threshold ≥2 lessons before surfacing
+- [ ] **LESSON-06:** `util:memory read --store lessons` supports pagination via `--limit`, `--since`, `--type` to handle stores with 100+ entries
+- [ ] **LESSON-07:** `lessons:compact` deduplicates lessons when store exceeds configurable threshold (default 100) — groups identical root causes, keeps latest
+- [ ] **LESSON-08:** verify-work workflow surfaces `lessons:suggest` advisory after phase verification completes (non-blocking, informational)
+- [ ] **LESSON-09:** complete-milestone workflow surfaces `lessons:suggest` at milestone wrapup (non-blocking, informational)
 
-### TOOL-02: fd Integration
+### SKILL — Skill Discovery & Security
 
-**Requirement:** User can leverage fd for fast file discovery across the codebase when available
+- [ ] **SKILL-01:** User can list installed project-local skills in `.agents/skills/` via `skills:list`
+- [ ] **SKILL-02:** User can install a skill from a GitHub URL or local directory via `skills:install <source>` — installs to `.agents/skills/` only, never to `~/.config`
+- [ ] **SKILL-03:** Every skill installation path runs a 41-pattern security scan before writing any file — dangerous verdict blocks install; policy/warn findings require human confirmation
+- [ ] **SKILL-04:** Every skill installation shows full content diff and requires explicit human confirmation before writing to disk
+- [ ] **SKILL-05:** All skill install attempts (including blocked/rejected) are logged to `.agents/skill-audit.json` with timestamp, source, scan result, outcome
+- [ ] **SKILL-06:** User can validate any skill in `.agents/skills/` against the security scanner via `skills:validate <name>`
+- [ ] **SKILL-07:** User can remove an installed project-local skill via `skills:remove <name>`
+- [ ] **SKILL-08:** `new-milestone.md` includes an optional Step 8.5 for skill discovery — presents agentskills.io browse link and prompts whether to install any skills before proceeding to requirements
+- [ ] **SKILL-09:** bgsd-context enricher exposes `installed_skills: [string]` listing skill names from `.agents/skills/`
 
-**Acceptance Criteria:**
-- fd detection works on macOS, Linux, Windows
-- File discovery operations use fd when available (20x+ faster than find)
-- Graceful fallback to Node.js fs.readdirSync traversal
-- Respects .gitignore automatically via fd's default behavior
-- Integration with codebase analysis workflows (convention extraction, dependency graphs)
+### DEVCAP — Deviation Recovery Auto-Capture
 
----
+- [ ] **DEVCAP-01:** `autoRecovery.js` typo `autonomousRecoverles` is fixed to `autonomousRecoveries` so deviation telemetry increments correctly
+- [ ] **DEVCAP-02:** execute-phase workflow captures a structured lesson entry after a Rule 1 (code bug) deviation recovery succeeds — non-blocking (`2>/dev/null || true`), never fires for Rule 3 (environmental) failures
+- [ ] **DEVCAP-03:** Auto-capture is capped at 3 entries per milestone to prevent noise — additional recoveries are silently skipped after cap is reached
+- [ ] **DEVCAP-04:** Auto-captured lessons include: deviation rule type, failure count before success, what behavioral change succeeded, affected agent
 
-### TOOL-03: jq Integration
+### RESEARCH — Enhanced Research Workflow
 
-**Requirement:** User can transform JSON data via jq for complex metrics extraction and configuration
-
-**Acceptance Criteria:**
-- jq detection and version checking (1.8.1+)
-- JSON transformation in workflows (e.g., extracting metrics from test output)
-- Graceful fallback to JavaScript JSON.parse/stringify for simple operations
-- Safe argument passing (no shell injection)
-- Performance: jq overhead <50ms per invocation
-
----
-
-### TOOL-04: yq Integration
-
-**Requirement:** User can transform YAML data via yq for configuration management and analysis
-
-**Acceptance Criteria:**
-- yq detection and version checking (4.44+)
-- YAML transformation in workflows (e.g., config processing)
-- Graceful fallback to JavaScript YAML parsing for simple operations
-- Cross-platform support (Windows/macOS/Linux)
-
----
-
-### TOOL-05: bat Integration
-
-**Requirement:** User can display syntax-highlighted code and config files via bat for enhanced output
-
-**Acceptance Criteria:**
-- bat detection and integration with code display commands
-- Syntax highlighting for code snippets in CLI output
-- Graceful fallback to plain text output when bat unavailable
-- Git diff integration where applicable
+- [ ] **RESEARCH-01:** `research:score <file>` returns a structured quality profile (not a single grade): `{ source_count, high_confidence_pct, oldest_source_days, has_official_docs, flagged_gaps[] }`
+- [ ] **RESEARCH-02:** `new-milestone.md` research completion step surfaces the quality profile summary and flags any research file with LOW confidence for optional re-research (non-blocking)
+- [ ] **RESEARCH-03:** `research:gaps` returns the `flagged_gaps[]` array from a research file's quality profile as a formatted list
+- [ ] **RESEARCH-04:** research:score detects and surfaces multi-source conflicts — explicit surfacing when two or more sources disagree on a fact (`conflicts: [{claim, source_a, source_b}]`)
 
 ---
 
-### TOOL-06: GitHub CLI Integration
+## Future Requirements
 
-**Requirement:** User can execute GitHub operations via gh CLI for PR creation, merging, issue management
-
-**Acceptance Criteria:**
-- gh CLI detection and authentication validation
-- Integration with existing `/bgsd-github-ci` workflow
-- Safe operation even when user not logged in (graceful skip)
-- Version constraint: gh 2.88.1+ (avoid 2.88.0 regression)
+- Skill publishing to agentskills.io / LobeHub marketplace — too early, no write API
+- Cross-registry skill discovery (LobeHub + skills.sh simultaneously) — single source sufficient for v13.0
+- Lesson → GitHub PR workflow for agent file suggestions — requires gh CLI integration beyond current scope
+- Automatic lesson-based agent patching (auto-apply suggestions) — violates human-in-the-loop principle
+- New agent role for "lesson reviewer" — PROJECT.md hard cap at 9 agent roles
 
 ---
 
-### AGENT-01: Tool-Aware Agent Routing
+## Out of Scope
 
-**Requirement:** Agents are aware of available tools and can optimize task decomposition accordingly
-
-**Acceptance Criteria:**
-- Tool availability included in agent context (tool_availability object)
-- New decision function: `resolveFileDiscoveryMode()` → ripgrep vs Node.js decision
-- New decision function: `resolveSearchMode()` → fd vs find decision
-- New decision function: `resolveJsonTransformMode()` → jq vs JavaScript decision
-- Agents can see which tools are available BEFORE decomposing tasks
-- Plan complexity scoring accounts for tool availability
+- **Agent role cap:** Maximum 9 agent roles — closed-loop learning delivered as CLI data + workflow hooks, not new agents
+- **Merge-based agent overrides:** File-shadowing model only (OC native) — merge produces "rule soup"
+- **`.planning/agents/` as override path:** OC does not load this path — only `.opencode/agents/` works
+- **agentskills.io HTTP API calls:** No REST API exists — filesystem-based discovery only
+- **LLM calls in bgsd-tools.cjs CLI:** All analysis must be deterministic — no API calls in CLI
+- **Auto-apply agent patches:** Never auto-modify agent files without human confirmation
 
 ---
 
-### AGENT-02: Enhanced Agent Handoffs
+## Traceability
 
-**Requirement:** Inter-agent handoffs use consistent shared context patterns with tool information
-
-**Acceptance Criteria:**
-- Tool availability passed between agents in context
-- RACI matrix validated for improved handoff patterns
-- New handoff patterns for tool-dependent operations
-- Handoff documentation updated with tool assumptions
-- Test coverage for all agent pair handoffs
-
----
-
-### AGENT-03: Multi-Phase Sequencing Decisions
-
-**Requirement:** New decision functions improve coordination across multi-phase projects
-
-**Acceptance Criteria:**
-- New decision function: `resolvePhaseDependencies()` for sequencing
-- New decision function: `resolveAgentCapabilityLevel()` based on tool count
-- Decision inputs include tool availability and phase complexity
-- 85%+ confidence thresholds with contract tests
-- Integration into phase planning workflows
-
----
-
-### TOOL-DET-01: Unified Tool Detection
-
-**Requirement:** Centralized tool detection with caching and cross-platform support
-
-**Acceptance Criteria:**
-- Single source of truth for tool detection (detect.js)
-- Platform detection works on macOS (Homebrew), Linux (apt/dnf/pacman), Windows (native/WSL)
-- 5-minute detection cache to avoid repeated spawning
-- Tool version detection and feature flagging
-- Fallback to "tool not found" message with installation guidance
-- <50ms total detection time for all 6 tools (with caching)
-
----
-
-### TOOL-DEGR-01: Graceful Degradation
-
-**Requirement:** Workflows complete successfully even when tools unavailable, with clear guidance
-
-**Acceptance Criteria:**
-- All workflows have fallback implementations (no hard tool requirements)
-- User receives clear message when feature unavailable (e.g., "Install ripgrep for faster search")
-- Fallback quality acceptable for common operations
-- Tool absence never crashes CLI
-- Optional features gracefully skip when tools unavailable
-
----
-
-## Future Requirements (v13.0+)
-
-These are candidates for future milestones based on research findings:
-
-- **PERF-01:** SQLite-backed tool detection caching across sessions
-- **PERF-02:** Batch tool invocation for parallel operations
-- **PERF-03:** Tool performance profiling and benchmark suite
-- **DOC-01:** Enhanced skill documentation for tool usage patterns
-- **ARCH-01:** Custom decision functions for tool-specific workflows
-
----
-
-## Traceability to Intent
-
-### v12.1 Outcomes
-
-| Outcome | Requirement(s) | Status |
-|---------|----------------|--------|
-| DO-86: Support ripgrep, fd, jq, yq, bat, gh with graceful degradation | TOOL-01, TOOL-02, TOOL-03, TOOL-04, TOOL-05, TOOL-06, TOOL-DEGR-01, TOOL-DET-01 | Pending |
-| DO-87: Smarter agent routing based on task complexity and capabilities | AGENT-01, AGENT-03 | Pending |
-| DO-88: Better inter-agent collaboration patterns | AGENT-02, AGENT-03 | Complete |
-| DO-89: Decision functions for tool selection and multi-phase sequencing | AGENT-01, AGENT-03 | Complete |
-| DO-90: Improved agent context efficiency through capability-aware filtering | AGENT-01, AGENT-02 | Complete |
-
-### v12.1 Success Criteria
-
-| Criterion | Requirement(s) | Measurement |
-|-----------|----------------|-------------|
-| SC-66: All CLI tools detected and available | TOOL-DET-01, TOOL-01 through TOOL-06 | Detection works for all 6 tools on macOS/Linux/Windows |
-| SC-67: 25%+ context overhead reduction via capability-aware dispatch | AGENT-01, AGENT-02, AGENT-03 | Agent context size reduced, task count per phase reduced |
-| SC-68: All inter-agent handoffs use shared context patterns | AGENT-02 | RACI audit confirms all handoffs include tool info |
-| SC-69: New decision functions with contract tests | AGENT-01, AGENT-03 | 4+ decision functions with 85%+ confidence, 100+ tests |
-| SC-70: Tool absence gracefully handled | TOOL-DEGR-01, TOOL-DET-01 | All workflows complete without tools, with clear guidance |
-
----
-
-## Out of Scope for v12.1
-
-- **Async tool invocation** — Keep synchronous execution for CLI/plugin consistency
-- **Custom tool plugins** — Only integrate the 6 identified tools
-- **Tool version auto-installation** — Assume tools pre-installed via package manager
-- **Advanced tool chaining** — Basic invocation; advanced pipelines defer to v13
-- **Performance optimization beyond v12.0 baseline** — Focus on correctness first
-
----
-
-## Risk Assessment
-
-| Risk | Likelihood | Impact | Mitigation |
-|------|-----------|--------|-----------|
-| Tool not installed on user's system | Medium | Low | Graceful degradation, clear guidance |
-| Version incompatibilities (jq 1.6→1.7 breaking changes) | Low | Medium | Feature detection, version constraints documented |
-| Platform-specific bugs (Windows PATH issues) | Medium | Medium | CI matrix testing Windows/macOS/Linux |
-| Plugin performance regression from tool spawning | Low | Medium | Performance budgets (<100ms), caching |
-| Shell injection vulnerabilities | Very Low | High | execFileSync array args, security audit |
-
----
-
-## Success Criteria Summary
-
-✅ All 6 CLI tools integrated with graceful fallbacks  
-✅ Agent routing improved by 25%+ (context reduction)  
-✅ 4+ new decision functions with contracts and tests  
-✅ All inter-agent handoffs validated via RACI  
-✅ Tool absence causes no CLI failures  
-✅ Performance <100ms per tool call (with caching)  
-✅ Cross-platform verified (macOS/Linux/Windows)  
-✅ 1280+ test suite remains green  
-
----
-
-*Last updated: 2026-03-15 during v12.1 milestone planning*
+| Requirement | Phase | Status |
+|-------------|-------|--------|
+| LOCAL-01 | Phase 129 | Complete |
+| LOCAL-02 | Phase 129 | Complete |
+| LOCAL-03 | Phase 129 | Complete |
+| LOCAL-04 | Phase 129 | Complete |
+| LOCAL-05 | Phase 129 | Complete |
+| LOCAL-06 | Phase 129 | Complete |
+| LOCAL-07 | Phase 129 | Complete |
+| LESSON-01 | Phase 130 | Complete |
+| LESSON-02 | Phase 130 | Complete |
+| LESSON-03 | Phase 130 | Complete |
+| LESSON-04 | Phase 130 | Complete |
+| LESSON-05 | Phase 130 | Complete |
+| LESSON-06 | Phase 130 | Complete |
+| LESSON-07 | Phase 130 | Complete |
+| LESSON-08 | Phase 130 | Complete |
+| LESSON-09 | Phase 130 | Complete |
+| SKILL-01 | Phase 131 | Complete |
+| SKILL-02 | Phase 131 | Complete |
+| SKILL-03 | Phase 131 | Complete |
+| SKILL-04 | Phase 131 | Complete |
+| SKILL-05 | Phase 131 | Complete |
+| SKILL-06 | Phase 131 | Complete |
+| SKILL-07 | Phase 131 | Complete |
+| SKILL-08 | Phase 131 | Complete |
+| SKILL-09 | Phase 131 | Complete |
+| DEVCAP-01 | Phase 132 | Complete |
+| DEVCAP-02 | Phase 132 | Complete |
+| DEVCAP-03 | Phase 132 | Complete |
+| DEVCAP-04 | Phase 132 | Complete |
+| RESEARCH-01 | Phase 133 | Complete |
+| RESEARCH-02 | Phase 133 | Complete |
+| RESEARCH-03 | Phase 133 | Complete |
+| RESEARCH-04 | Phase 133 | Complete |

@@ -235,6 +235,27 @@ function cmdMemoryRead(cwd, options, raw) {
     }
   }
 
+  // Lessons-specific filters (LESSON-06)
+  if (store === 'lessons') {
+    if (options.type) {
+      entries = entries.filter(e => e.type && e.type.toLowerCase() === options.type.toLowerCase());
+    }
+    if (options.since) {
+      entries = entries.filter(e => e.date && e.date >= options.since);
+    }
+    if (options.severity) {
+      entries = entries.filter(e => e.severity && e.severity.toUpperCase() === options.severity.toUpperCase());
+    }
+    // Default sort: newest first
+    if (!asc) {
+      entries = entries.slice().sort((a, b) => {
+        const da = a.date || '';
+        const db = b.date || '';
+        return db.localeCompare(da);
+      });
+    }
+  }
+
   // Slice by limit
   if (limit && parseInt(limit, 10) > 0) {
     entries = entries.slice(0, parseInt(limit, 10));

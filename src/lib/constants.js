@@ -966,6 +966,48 @@ Examples:
   'research:collect --resume': 'Resume interrupted research session from last completed stage',
   'research collect --resume': 'Resume interrupted research session from last completed stage',
 
+  'research:score': `Usage: bgsd-tools research:score <path>
+
+Score a RESEARCH.md file and return a structured quality profile.
+
+Arguments:
+  path    Path to a RESEARCH.md file (required)
+
+Analyzes source count, confidence breakdown, official docs presence, source age,
+flagged gaps, and multi-source conflicts. Writes cache to research-score.json
+in the same directory.
+
+Output: {
+  source_count: number,
+  high_confidence_pct: number,
+  oldest_source_days: number,
+  has_official_docs: boolean,
+  confidence_level: "HIGH" | "MEDIUM" | "LOW",
+  flagged_gaps: [{ gap, severity, suggestion }],
+  conflicts: [{ claim, source_a, source_b }]
+}
+
+Examples:
+  bgsd-tools research:score .planning/phases/0133-enhanced-research-workflow/0133-RESEARCH.md
+  bgsd-tools research:score .planning/research/STACK.md --raw`,
+
+  'research:gaps': `Usage: bgsd-tools research:gaps <path>
+
+Extract flagged gaps from a cached research quality profile.
+
+Arguments:
+  path    Path to a RESEARCH.md file (required — used to locate research-score.json cache)
+
+Note: Reads from research-score.json cache in the same directory as <path>.
+Run research:score first to generate the cache.
+
+Output: { flagged_gaps: [{ gap, severity, suggestion }] }
+Error: { error: "No cached score found. Run research:score first." }
+
+Examples:
+  bgsd-tools research:gaps .planning/phases/0133-enhanced-research-workflow/0133-RESEARCH.md
+  bgsd-tools research:gaps .planning/research/STACK.md --raw`,
+
   // audit namespace
   // decisions namespace
   'decisions:list': `Usage: bgsd-tools decisions:list
@@ -1497,6 +1539,194 @@ Output: { warmed: N, elapsed_ms: M }
 Examples:
   bgsd-tools cache:warm
   bgsd-tools cache:warm .planning/STATE.md .planning/ROADMAP.md`,
+
+  // lessons namespace (Phase 130)
+  'lessons:capture': `Usage: bgsd-tools lessons:capture --title <text> --severity <level> --type <type> --root-cause <text> --prevention <text> --agents <list>
+
+Capture a structured lesson entry to .planning/memory/lessons.json.
+
+Required options:
+  --title <text>        Short description of the lesson
+  --severity <level>    LOW | MEDIUM | HIGH | CRITICAL
+  --type <type>         workflow | agent-behavior | tooling | environment
+  --root-cause <text>   What caused the issue
+  --prevention <text>   Rule to prevent recurrence
+  --agents <list>       Comma-separated affected agent types
+
+Output: { captured, id, title, severity, type, entry_count }
+
+Examples:
+  bgsd-tools lessons:capture --title "Missing validation" --severity HIGH --type tooling --root-cause "No input checks" --prevention "Add input validation" --agents bgsd-executor
+  bgsd-tools lessons:capture --title "Auth failure" --severity CRITICAL --type agent-behavior --root-cause "Token expired" --prevention "Check expiry before use" --agents "bgsd-executor,bgsd-planner"`,
+
+  'lessons:list': `Usage: bgsd-tools lessons:list [options]
+
+List structured lesson entries with optional filters.
+
+Options:
+  --type <type>         Filter by type (workflow | agent-behavior | tooling | environment)
+  --severity <level>    Filter by severity (LOW | MEDIUM | HIGH | CRITICAL)
+  --since <date>        Filter by date >= ISO date (e.g. 2026-03-01)
+  --limit <N>           Maximum results (default: 20)
+  --query <text>        Substring search on title, root_cause, prevention_rule
+
+Output: { entries, count, filtered_total, total, filters }
+
+Examples:
+  bgsd-tools lessons:list
+  bgsd-tools lessons:list --type agent-behavior --severity HIGH
+  bgsd-tools lessons:list --since 2026-03-01 --limit 5
+  bgsd-tools lessons:list --query "auth"`,
+
+  'lessons:migrate': `Usage: bgsd-tools lessons:migrate
+
+Migrate free-form lessons.md to structured format.
+
+Searches for lessons.md at:
+  - <cwd>/lessons.md
+  - <cwd>/tasks/lessons.md
+  - <cwd>/.planning/lessons.md
+
+Each heading section becomes a structured entry with:
+  - type: environment
+  - severity: MEDIUM (default)
+  - prevention_rule: "Migrated from free-form lessons — review and update"
+  - affected_agents: [] (review and populate)
+
+Output: { migrated, sources, entry_count }
+
+Examples:
+  bgsd-tools lessons:migrate`,
+
+  'lessons:analyze': `Usage: bgsd-tools lessons:analyze [--agent <name>]
+
+Analyze recurrent patterns in the lesson store, grouped by affected agent and type.
+Only shows groups with ≥2 supporting lessons (noise filter).
+
+Options:
+  --agent <name>    Filter results to a specific agent (e.g., bgsd-executor)
+
+Output: { groups, group_count, total_lessons_analyzed, filter }
+
+Each group contains:
+  - agent, pattern_type, count, severity_distribution
+  - common_root_causes, lessons (id, title, date, severity)
+
+Examples:
+  bgsd-tools lessons:analyze
+  bgsd-tools lessons:analyze --agent bgsd-executor`,
+
+  'lessons:suggest': `Usage: bgsd-tools lessons:suggest [--agent <name>]
+
+Generate structured improvement suggestions from lesson patterns.
+Excludes type:environment entries (migrated free-form lessons).
+Only generates suggestions for groups with ≥2 supporting lessons.
+Advisory only — never auto-applied.
+
+Options:
+  --agent <name>    Filter suggestions to a specific agent
+
+Output: { suggestions, suggestion_count, advisory_note, filter }
+
+Each suggestion contains:
+  - agent, suggestion_type (behavioral|workflow|tooling|general)
+  - summary, supporting_lessons (count + ids), severity, prevention_rules
+
+Examples:
+  bgsd-tools lessons:suggest
+  bgsd-tools lessons:suggest --agent bgsd-executor`,
+
+  'lessons:deviation-capture': `Usage: bgsd-tools lessons:deviation-capture --rule <number> --failure-count <number> --behavioral-change <text> --agent <name>
+
+Captures a deviation recovery pattern as a structured lesson entry.
+Only Rule 1 (code bug) recoveries are captured — all other rules are silently filtered.
+Capped at 3 entries per milestone to prevent noise.
+
+Options:
+  --rule               Deviation rule number (1=bug, 2=missing, 3=blocking, 4=architectural)
+  --failure-count      Number of failed attempts before successful recovery
+  --behavioral-change  Description of what behavioral change fixed the issue
+  --agent              Name of the agent that performed the recovery
+
+Examples:
+  bgsd-tools lessons:deviation-capture --rule 1 --failure-count 2 --behavioral-change "Added null check before property access" --agent bgsd-executor
+  bgsd-tools lessons:deviation-capture --rule 3 --failure-count 1 --behavioral-change "Reinstalled deps" --agent bgsd-executor  # → silently filtered (Rule 3)`,
+
+  'lessons:compact': `Usage: bgsd-tools lessons:compact [--threshold <N>]
+
+Deduplicate the lesson store by normalized root_cause when entry count exceeds threshold.
+Groups entries with identical root causes, keeps the latest entry per group.
+Merges unique prevention rules and preserves highest severity across the group.
+
+Options:
+  --threshold <N>   Compaction threshold (default: 100). If count < threshold, no-op.
+
+Output when below threshold: { compacted: false, reason, count, threshold }
+Output when compacted:       { compacted: true, before, after, removed, groups_merged }
+
+Examples:
+  bgsd-tools lessons:compact
+  bgsd-tools lessons:compact --threshold 50`,
+
+  'skills:list': `Usage: bgsd-tools skills:list
+
+List all installed project-local skills with their descriptions and scan status.
+
+Skills are stored in .agents/skills/<name>/SKILL.md within the project.
+
+Output: Array of { name, description, scan_status } or "No skills installed."
+
+Examples:
+  bgsd-tools skills:list`,
+
+  'skills:install': `Usage: bgsd-tools skills:install --source <github-url> [--confirm]
+         bgsd-tools skills:install <owner/repo> [--confirm]
+
+Install a skill from a GitHub repository with mandatory 41-pattern security scan.
+
+The install pipeline:
+  1. Fetch repository contents via GitHub API (no git clone required)
+  2. Verify SKILL.md exists in repo root (required)
+  3. Run 41-pattern security scan across all files
+  4. DANGEROUS findings: hard block — install is refused, no override
+  5. WARN findings: show count, prompt confirmation (or use --confirm to auto-accept)
+  6. Write skill to .agents/skills/<name>/ on confirmation
+  7. Log to .agents/skill-audit.json
+
+Options:
+  --source <url>   GitHub URL (https://github.com/owner/repo or owner/repo)
+  --confirm        Auto-accept warn-level findings without interactive prompt
+
+Examples:
+  bgsd-tools skills:install --source owner/my-skill
+  bgsd-tools skills:install https://github.com/owner/my-skill --confirm`,
+
+  'skills:validate': `Usage: bgsd-tools skills:validate --name <skill-name> [--verbose]
+
+Re-scan an installed skill against the 41-pattern security scanner.
+Useful after manual edits or to verify an existing skill's safety.
+
+Options:
+  --name <name>   Name of the installed skill to validate
+  --verbose       Show full matched code snippets for each finding
+
+Output: Scan report with severity-first grouping (dangerous > warn > info), category
+checklist (✓/✗ per category), count summary, and overall verdict.
+
+Examples:
+  bgsd-tools skills:validate --name my-skill
+  bgsd-tools skills:validate --name my-skill --verbose`,
+
+  'skills:remove': `Usage: bgsd-tools skills:remove --name <skill-name>
+
+Remove an installed project-local skill. Deletes the skill directory from
+.agents/skills/<name>/ and logs the removal to .agents/skill-audit.json.
+
+Options:
+  --name <name>   Name of the installed skill to remove
+
+Examples:
+  bgsd-tools skills:remove --name my-skill`,
 };
 
 module.exports = { MODEL_PROFILES, CONFIG_SCHEMA, COMMAND_HELP, VALID_TRAJECTORY_SCOPES };
