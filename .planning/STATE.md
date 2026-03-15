@@ -10,8 +10,8 @@ See: `.planning/PROJECT.md` (updated 2026-03-14)
 ## Current Position
 
 **Phase:** 123 of 123 (Session State) — IN PROGRESS
-**Current Plan:** Plan 02 complete
-**Status:** Ready to plan
+**Current Plan:** Plan 03 complete
+**Status:** Phase complete
 **Last Activity:** 2026-03-15
 
 Progress: [██████████] 100%
@@ -32,6 +32,7 @@ Progress: [██████████] 100%
 - v12.0 Phase 122 Plan 01: 14 min, 2 tasks, 9 files (1189 tests)
 - v12.0 Phase 122 Plan 02: 17 min, 2 tasks, 7 files (202 decision tests)
 - v12.0 Phase 0123 Plan 02: 30min, 2 tasks, 3 files (1250 tests)
+- v12.0 Phase 0123 Plan 03: 9min, 2 tasks, 4 files (1283 tests)
 - Trend: Stable
 
 *Updated after each plan completion*
@@ -71,6 +72,7 @@ Progress: [██████████] 100%
 - [Phase 0122-02]: routeTask cwd parameter added as optional third arg — backward compatible, enables model-selection rule lookup without breaking existing callers
 - [Phase 0123-01]: Schema v5: MIGRATIONS[4] adds 6 session_* tables; SCHEMA_V4_SQL renamed V5_SQL; version guard bumped to >= 5 — Foundation for STATE.md persistence into SQLite — session position, metrics, decisions, todos, blockers, continuity
 - [Phase 0123-02]: SQL-first dual-write: write to SQLite first then regex-update STATE.md to preserve format compatibility with existing tests — Full STATE.md regeneration via generateStateMd() produced a different format breaking 9 tests; targeted regex + SQLite dual-write preserves backward compat while building SQL layer
+- [Phase Phase 0123-03]: invalidateState() must DELETE SQLite session_state row to prevent stale reads — Test writes new STATE.md but SQLite still had live project data — two-layer cache invalidation required
 
 ### Roadmap Evolution
 
@@ -87,6 +89,6 @@ None.
 
 ## Session Continuity
 
-**Last session:** 2026-03-15T01:30:56.978Z
-**Stopped at:** Completed 0123-02-PLAN.md
+**Last session:** 2026-03-15T01:43:17.719Z
+**Stopped at:** Completed 0123-03-PLAN.md
 **Next step:** Phase 123 (final phase)
