@@ -494,7 +494,8 @@ function buildDependencyGraph(intel) {
       const absPath = path.resolve(filePath);
       // Ripgrep pre-filter: quickly check if file has any import/require patterns
       // If ripgrep is available and finds no matches, skip the full file read
-      const preFilter = searchRipgrep('^(import |from |require\\(|use |using |package )', { paths: [absPath], maxCount: 1 });
+      // Note: not anchored to start-of-line since require() can appear mid-line
+      const preFilter = searchRipgrep('\\brequire\\(|^import |^from |^use |^using |^package ', { paths: [absPath], maxCount: 1 });
       if (preFilter.success && !preFilter.usedFallback) {
         // ripgrep ran successfully — if no matches found, skip this file
         if (!Array.isArray(preFilter.result) || preFilter.result.length === 0) {

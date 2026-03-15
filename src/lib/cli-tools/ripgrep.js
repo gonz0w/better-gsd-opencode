@@ -84,13 +84,21 @@ function searchRipgrep(pattern, options = {}) {
   return withToolFallback(
     'ripgrep',
     () => {
-      const output = execFileSync('rg', args, {
-        encoding: 'utf8',
-        stdio: ['pipe', 'pipe', 'pipe'],
-        timeout,
-        // Ignore exit code 1 (no matches)
-        windowsHide: true
-      });
+      let output = '';
+      try {
+        output = execFileSync('rg', args, {
+          encoding: 'utf8',
+          stdio: ['pipe', 'pipe', 'pipe'],
+          timeout,
+          windowsHide: true
+        });
+      } catch (e) {
+        // Exit code 1 = no matches (not an error), exit code 2 = real error
+        if (e.status === 1) {
+          return []; // No matches found — return empty array
+        }
+        throw e; // Real error — let withToolFallback handle it
+      }
       
       // Return parsed results directly (wrapper will add success/usedFallback)
       return parseRipgrepJson(output);
