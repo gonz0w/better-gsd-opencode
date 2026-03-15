@@ -38,7 +38,7 @@
 ## Session State
 
 - [x] **SES-01**: User can have current position, last activity, and performance metrics persisted in SQLite across invocations
-- [ ] **SES-02**: User can have STATE.md regenerated from SQLite state, ensuring markdown and SQL are always consistent
+- [x] **SES-02**: User can have STATE.md regenerated from SQLite state, ensuring markdown and SQL are always consistent
 - [x] **SES-03**: User can view accumulated context (decisions, todos, blockers) from SQLite without parsing STATE.md
 
 ## Future Requirements
@@ -79,5 +79,5 @@ _None deferred — all 6 categories selected for v12.0._
 | DEC-05 | Phase 122 | Complete |
 | DEC-06 | Phase 122 | Complete |
 | SES-01 | Phase 123 | Complete |
-| SES-02 | Phase 123 | Pending |
+| SES-02 | Phase 123 | Complete |
 | SES-03 | Phase 123 | Complete |

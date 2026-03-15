@@ -5,16 +5,16 @@
 See: `.planning/PROJECT.md` (updated 2026-03-14)
 
 **Core value:** Manage and deliver high-quality software with high-quality documentation, while continuously reducing token usage and improving performance
-**Current focus:** Phase 122 — Decision Rules
+**Current focus:** Phase 123 — Session State
 
 ## Current Position
 
-**Phase:** 122 of 123 (Decision Rules) — COMPLETE
-**Current Plan:** Not started
+**Phase:** 123 of 123 (Session State) — IN PROGRESS
+**Current Plan:** Plan 02 complete
 **Status:** Ready to plan
-**Last Activity:** 2026-03-14
+**Last Activity:** 2026-03-15
 
-Progress: [█████████░] 91%
+Progress: [██████████] 100%
 
 ## Performance Metrics
 
@@ -31,6 +31,7 @@ Progress: [█████████░] 91%
 - v12.0 Phase 121 Plan 03: 17 min, 2 tasks, 2 files (1179 tests)
 - v12.0 Phase 122 Plan 01: 14 min, 2 tasks, 9 files (1189 tests)
 - v12.0 Phase 122 Plan 02: 17 min, 2 tasks, 7 files (202 decision tests)
+- v12.0 Phase 0123 Plan 02: 30min, 2 tasks, 3 files (1250 tests)
 - Trend: Stable
 
 *Updated after each plan completion*
@@ -69,6 +70,7 @@ Progress: [█████████░] 91%
 - [Phase 0122-02]: COMMAND_TO_AGENT static map in enricher for agent_type derivation — simpler than dynamic lookup, covers all known bgsd-* commands
 - [Phase 0122-02]: routeTask cwd parameter added as optional third arg — backward compatible, enables model-selection rule lookup without breaking existing callers
 - [Phase 0123-01]: Schema v5: MIGRATIONS[4] adds 6 session_* tables; SCHEMA_V4_SQL renamed V5_SQL; version guard bumped to >= 5 — Foundation for STATE.md persistence into SQLite — session position, metrics, decisions, todos, blockers, continuity
+- [Phase 0123-02]: SQL-first dual-write: write to SQLite first then regex-update STATE.md to preserve format compatibility with existing tests — Full STATE.md regeneration via generateStateMd() produced a different format breaking 9 tests; targeted regex + SQLite dual-write preserves backward compat while building SQL layer
 
 ### Roadmap Evolution
 
@@ -85,6 +87,6 @@ None.
 
 ## Session Continuity
 
-**Last session:** 2026-03-15T01:14:00.382Z
-**Stopped at:** Completed 0123-01-PLAN.md
+**Last session:** 2026-03-15T01:30:56.978Z
+**Stopped at:** Completed 0123-02-PLAN.md
 **Next step:** Phase 123 (final phase)
