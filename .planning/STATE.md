@@ -11,11 +11,11 @@ See: `.planning/PROJECT.md` (updated 2026-03-15)
 
 **Milestone:** v13.0 Closed-Loop Agent Evolution
 **Phase:** Phase 131 of 133 (Skill Discovery & Security)
-**Current Plan:** Plan 01 complete
-**Status:** Plans 02–04 remaining
+**Current Plan:** Plan 02 complete
+**Status:** Plans 03–04 remaining
 **Last Activity:** 2026-03-15
 
-Progress: [██████████] 98%
+Progress: [██████████] 99%
 
 ## Performance Metrics
 
@@ -36,6 +36,8 @@ Progress: [██████████] 98%
 - v13.0 Phase 129 Plan 03: 4 min, 2 tasks, 4 files (agent:sync + local_agent_overrides)
 - v13.0 Phase 130 Plan 01: 10 min, 2 tasks, 9 files (lessons schema + capture + migrate + list + memory filters)
 - v13.0 Phase 130 Plan 02: 8 min, 2 tasks, 6 files (lessons:analyze + suggest + compact + workflow hooks)
+- v13.0 Phase 131 Plan 01: 12 min, 2 tasks, 1 file (security scanner + skills:list + skills:validate)
+- v13.0 Phase 131 Plan 02: 12 min, 2 tasks, 1 file (skills:install + skills:remove + audit logging)
 - Trend: Stable, improving velocity with infrastructure improvements
 
 *Updated after each plan completion*
@@ -82,10 +84,13 @@ Progress: [██████████] 98%
 - [Phase 131 Plan 01]: 41 patterns exactly in SECURITY_PATTERNS — trimmed from 45 by removing fs.appendFile, dgram, encodeURIComponent+http, </system> (redundant with <system>)
 - [Phase 131 Plan 01]: scanSkillFiles returns structured { verdict, findings, summary } — clean contract for install gatekeeper, validate, and list consumers
 - [Phase 131 Plan 01]: formatScanResults(scanResult, verbose) is pure — callers control when/how to print, no side effects
+- [Phase 131 Plan 02]: Dangerous verdict is hard block: no force/override option in cmdSkillsInstall — files never reach dest dir on dangerous findings
+- [Phase 131 Plan 02]: --confirm pattern mirrors agent:sync --accept/--reject; without --confirm, outputs confirmation data for calling agent to handle Y/N
+- [Phase 131 Plan 02]: logAuditEntry is synchronous — simplifies error handling, audit writes are non-critical and fast
 
 ### Pending Work
 
-Phase 130 complete. Phase 131 Plan 01 complete (security scanner + skills:list + skills:validate). Phase 131 Plans 02–04 remain (skills:install, router wiring, bgsd-context). Phases 132 (Deviation Auto-Capture) and 133 (Enhanced Research) also remain.
+Phase 130 complete. Phase 131 Plans 01–02 complete (security scanner + skills:list + skills:validate + skills:install + skills:remove + audit logging). Phase 131 Plans 03–04 remain (router wiring, bgsd-context). Phases 132 (Deviation Auto-Capture) and 133 (Enhanced Research) also remain.
 
 ### Blockers/Concerns
 
@@ -93,8 +98,8 @@ None.
 
 ## Session Continuity
 
-**Last session:** 2026-03-15T20:37:55.878Z
-**This session:** 2026-03-15 — Completed Phase 131 Plan 01 (security scanner + skills:list + skills:validate in src/commands/skills.js)
+**Last session:** 2026-03-15T20:52:40.524Z
+**This session:** 2026-03-15 — Completed Phase 131 Plan 02 (skills:install + skills:remove + logAuditEntry in src/commands/skills.js)
 **Next steps:**
-1. Execute Phase 131 Plan 02 (skills:install command with GitHub fetch + confirmation gate)
-2. Execute Phase 131 Plan 03 (router wiring) and Plan 04 (bgsd-context installed_skills)
+1. Execute Phase 131 Plan 03 (router wiring for skills commands)
+2. Execute Phase 131 Plan 04 (bgsd-context installed_skills)

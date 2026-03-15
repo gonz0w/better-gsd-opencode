@@ -57,7 +57,7 @@
   3. All install attempts (including blocked/rejected) appear in `.agents/skill-audit.json` with timestamp, source, scan verdict, and outcome
   4. User can run `skills:validate <name>` to re-scan an installed skill; user can run `skills:remove <name>` to delete it
   5. `new-milestone.md` Step 8.5 prompts optional skill discovery; bgsd-context `installed_skills` field lists installed skill names
-**Plans**: 3/3 plans created
+**Plans**: 2/3 plans executed
 
 | Plan | Wave | Objective | Tasks |
 |------|------|-----------|-------|
@@ -95,7 +95,7 @@ Phases execute in order: 129 → 130 → 131 (parallel with 130) → 132 (after 
 |-------|-----------|----------------|--------|-----------|
 | 129. Foundation & Agent Overrides | 3/3 | Complete    | 2026-03-15 | - |
 | 130. Lesson Schema & Analysis Pipeline | 2/2 | Complete    | 2026-03-15 | - |
-| 131. Skill Discovery & Security | v13.0 | 0/3 | Planned | - |
+| 131. Skill Discovery & Security | 2/3 | In Progress|  | - |
 | 132. Deviation Recovery Auto-Capture | v13.0 | 0/TBD | Not started | - |
 | 133. Enhanced Research Workflow | v13.0 | 0/TBD | Not started | - |
 
