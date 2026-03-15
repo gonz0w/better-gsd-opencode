@@ -11,8 +11,8 @@ See: `.planning/PROJECT.md` (updated 2026-03-15)
 
 **Milestone:** v13.0 Closed-Loop Agent Evolution
 **Phase:** Phase 130 of 133 (Lesson Schema & Analysis Pipeline)
-**Current Plan:** Plan 02 complete; Phase 130 done
-**Status:** Phase 130 fully complete — all LESSON-* requirements delivered
+**Current Plan:** Not started
+**Status:** Ready to plan
 **Last Activity:** 2026-03-15
 
 Progress: [██████████] 100%
