@@ -90,12 +90,12 @@
 | LOCAL-05 | Phase 129 | Complete |
 | LOCAL-06 | Phase 129 | Complete |
 | LOCAL-07 | Phase 129 | Complete |
-| LESSON-01 | Phase 130 | pending |
-| LESSON-02 | Phase 130 | pending |
-| LESSON-03 | Phase 130 | pending |
+| LESSON-01 | Phase 130 | Complete |
+| LESSON-02 | Phase 130 | Complete |
+| LESSON-03 | Phase 130 | Complete |
 | LESSON-04 | Phase 130 | pending |
 | LESSON-05 | Phase 130 | pending |
-| LESSON-06 | Phase 130 | pending |
+| LESSON-06 | Phase 130 | Complete |
 | LESSON-07 | Phase 130 | pending |
 | LESSON-08 | Phase 130 | pending |
 | LESSON-09 | Phase 130 | pending |

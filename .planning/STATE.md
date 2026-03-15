@@ -10,12 +10,12 @@ See: `.planning/PROJECT.md` (updated 2026-03-15)
 ## Current Position
 
 **Milestone:** v13.0 Closed-Loop Agent Evolution
-**Phase:** Phase 129 of 133 (Foundation & Agent Overrides)
-**Current Plan:** Not started
-**Status:** Ready to plan
+**Phase:** Phase 130 of 133 (Lesson Schema & Analysis Pipeline)
+**Current Plan:** Plan 01 complete; Plan 02 next
+**Status:** Plan 01 done, ready to execute Plan 02
 **Last Activity:** 2026-03-15
 
-Progress: [██████████] 100%
+Progress: [██████████] 99%
 
 ## Performance Metrics
 
@@ -34,6 +34,7 @@ Progress: [██████████] 100%
 - v13.0 Phase 129 Plan 01: 11 min, 2 tasks, 3 files (foundation utilities + list-local)
 - v13.0 Phase 129 Plan 02: 11 min, 2 tasks, 3 files (agent:override + agent:diff commands)
 - v13.0 Phase 129 Plan 03: 4 min, 2 tasks, 4 files (agent:sync + local_agent_overrides)
+- v13.0 Phase 130 Plan 01: 10 min, 2 tasks, 9 files (lessons schema + capture + migrate + list + memory filters)
 - Trend: Stable, improving velocity with infrastructure improvements
 
 *Updated after each plan completion*
@@ -56,6 +57,7 @@ Progress: [██████████] 100%
 | 131 | Skill Discovery & Security | Security-first skill lifecycle + agentskills.io discovery | SKILL-01 through SKILL-09 |
 | 132 | Deviation Recovery Auto-Capture | Rule-1-only auto-capture in execute-phase | DEVCAP-01 through DEVCAP-04 |
 | 133 | Enhanced Research Workflow | Structured quality profile + conflict detection | RESEARCH-01 through RESEARCH-04 |
+
 ### Key Decisions
 
 - [v13.0 roadmap]: Phase 129 first — OC path correction (`.opencode/agents/` not `.planning/agents/`) and YAML validation must precede any automation writing agent files
@@ -70,10 +72,13 @@ Progress: [██████████] 100%
 - [Phase 129 Plan 02]: injectNameField adds name: as first frontmatter field; all global agents lack name: field so all overrides show a persistent diff at the name: line
 - [Phase 129 Plan 03]: agent:sync uses --accept/--reject flags (not stdin) because bgsd-tools.cjs is a non-interactive CLI
 - [Phase 129 Plan 03]: agent:sync raw string comparison for identical check — silent exit only when truly identical, expected that all overrides with injected name: field show 1-section diff
+- [Phase 130 Plan 01]: validateLesson() receives pre-built entry — id/date set by caller, validation only checks 6 schema-required fields — keeps validation pure and testable
+- [Phase 130 Plan 01]: cmdLessonsMigrate uses type:environment as sentinel per LESSON-02 — downstream analysis can exclude legacy entries by checking type!=environment
+- [Phase 130 Plan 01]: lessons-specific filters in cmdMemoryRead use options.type/since/severity to avoid collision with trajectory filter options
 
 ### Pending Work
 
-Phase 129 complete (all 3 plans done). Execute Phase 130 (Lesson Schema & Analysis Pipeline) next.
+Phase 130 Plan 01 complete. Execute Phase 130 Plan 02 (analysis pipeline: LESSON-04, LESSON-05, LESSON-07, LESSON-08, LESSON-09) next.
 
 ### Blockers/Concerns
 
@@ -81,7 +86,7 @@ None.
 
 ## Session Continuity
 
-**Last session:** 2026-03-15T18:46:55.627Z
-**This session:** 2026-03-15 — Completed Phase 129 Plan 03 (agent:sync + local_agent_overrides enrichment)
+**Last session:** 2026-03-15T19:11:31.407Z
+**This session:** 2026-03-15 — Completed Phase 130 Plan 01 (lessons schema + capture + migrate + list + memory filters)
 **Next steps:**
-1. Execute Phase 130 Plan 01 (Lesson Schema & Analysis Pipeline)
+1. Execute Phase 130 Plan 02 (analysis pipeline: LESSON-04, LESSON-05, LESSON-07, LESSON-08, LESSON-09)
