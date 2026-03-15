@@ -1357,7 +1357,7 @@ Examples:
         function parseLessonsOptions(args) {
           const opts = {};
           const flagsWithValues = ['--title', '--severity', '--type', '--root-cause', '--prevention', '--agents',
-            '--since', '--limit', '--query'];
+            '--since', '--limit', '--query', '--rule', '--failure-count', '--behavioral-change', '--agent'];
           for (let i = 0; i < args.length; i++) {
             if (args[i] === '--title' && args[i + 1]) { opts.title = args[++i]; }
             else if (args[i] === '--severity' && args[i + 1]) { opts.severity = args[++i]; }
@@ -1368,6 +1368,10 @@ Examples:
             else if (args[i] === '--since' && args[i + 1]) { opts.since = args[++i]; }
             else if (args[i] === '--limit' && args[i + 1]) { opts.limit = args[++i]; }
             else if (args[i] === '--query' && args[i + 1]) { opts.query = args[++i]; }
+            else if (args[i] === '--rule' && args[i + 1]) { opts.rule = args[++i]; }
+            else if (args[i] === '--failure-count' && args[i + 1]) { opts.failureCount = args[++i]; }
+            else if (args[i] === '--behavioral-change' && args[i + 1]) { opts.behavioralChange = args[++i]; }
+            else if (args[i] === '--agent' && args[i + 1]) { opts.agent = args[++i]; }
           }
           return opts;
         }
@@ -1393,8 +1397,10 @@ Examples:
           lazyLessons().cmdLessonsCompact(cwd, {
             threshold: thresholdIdx !== -1 ? restArgs[thresholdIdx + 1] : undefined,
           }, raw);
+        } else if (subcommand === 'deviation-capture') {
+          lazyLessons().cmdDeviationCapture(cwd, parseLessonsOptions(restArgs), raw);
         } else {
-          error(`Unknown lessons subcommand: ${subcommand}. Available: capture, list, migrate, analyze, suggest, compact`);
+          error(`Unknown lessons subcommand: ${subcommand}. Available: capture, list, migrate, analyze, suggest, compact, deviation-capture`);
         }
         break;
       }

@@ -60,7 +60,7 @@ const COMMAND_CATEGORIES = {
   },
   lessons: {
     name: 'Lessons',
-    commands: ['lessons:capture', 'lessons:list', 'lessons:migrate']
+    commands: ['lessons:capture', 'lessons:list', 'lessons:migrate', 'lessons:deviation-capture']
   },
   skills: {
     name: 'Skills',
@@ -133,7 +133,8 @@ const COMMAND_TREE = {
     'migrate': null,
     'analyze': null,
     'suggest': null,
-    'compact': null
+    'compact': null,
+    'deviation-capture': null
   },
   'skills': {
     'list': null,
@@ -569,7 +570,11 @@ function validateCommandRegistry() {
     'lessons': {
       'capture': null,
       'list': null,
-      'migrate': null
+      'migrate': null,
+      'analyze': null,
+      'suggest': null,
+      'compact': null,
+      'deviation-capture': null
     },
     'skills': {
       'list': null,

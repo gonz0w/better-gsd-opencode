@@ -99,7 +99,8 @@ const COMMAND_CATEGORIES = {
     commands: [
       'lessons:capture',
       'lessons:list',
-      'lessons:migrate'
+      'lessons:migrate',
+      'lessons:deviation-capture'
     ]
   },
   'Skills': {
@@ -201,6 +202,7 @@ const COMMAND_BRIEF = {
   'lessons:capture': 'Capture a structured lesson entry with schema validation',
   'lessons:list': 'List lessons with --type/--severity/--since/--limit/--query filters',
   'lessons:migrate': 'Migrate free-form lessons.md to structured format',
+  'lessons:deviation-capture': 'Auto-capture Rule-1 deviation recovery patterns (non-blocking, 3-per-milestone cap)',
 
   'skills:list': 'List installed project-local skills with scan status',
   'skills:install': 'Install a skill from GitHub with security scan and confirmation',
