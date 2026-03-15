@@ -269,7 +269,7 @@ async function main() {
   }
 
   if (!command) {
-    error('Usage: bgsd-tools <namespace:command> [args] [--pretty] [--verbose]\nCommands: init:<workflow>, plan:<intent|requirements|roadmap|phases|find-phase|milestone|phase>, execute:<commit|rollback-info|session-diff|session-summary|velocity|worktree|tdd|test-run>, verify:<state|verify|assertions|search-decisions|search-lessons|review|context-budget|token-budget>, util:<config-get|config-set|env|current-timestamp|list-todos|todo|memory|mcp|classify|frontmatter|progress|websearch|history-digest|trace-requirement|codebase|cache|agent>, research:<capabilities|yt-search|yt-transcript|collect|nlm-create|nlm-add-source|nlm-ask|nlm-report>');
+    error('Usage: bgsd-tools <namespace:command> [args] [--pretty] [--verbose]\nCommands: init:<workflow>, plan:<intent|requirements|roadmap|phases|find-phase|milestone|phase>, execute:<commit|rollback-info|session-diff|session-summary|velocity|worktree|tdd|test-run>, verify:<state|verify|assertions|search-decisions|search-lessons|review|context-budget|token-budget>, util:<config-get|config-set|env|current-timestamp|list-todos|todo|memory|mcp|classify|frontmatter|progress|websearch|history-digest|trace-requirement|codebase|cache|agent>, research:<capabilities|yt-search|yt-transcript|collect|nlm-create|nlm-add-source|nlm-ask|nlm-report|score|gaps>');
   }
 
   // --help / -h: print command help to stderr (never contaminates JSON stdout)
@@ -1299,12 +1299,16 @@ Examples:
           lazyResearch().cmdResearchNlmAsk(cwd, restArgs, raw);
         } else if (subCmd === 'nlm-report') {
           lazyResearch().cmdResearchNlmReport(cwd, restArgs, raw);
+        } else if (subCmd === 'score') {
+          lazyResearch().cmdResearchScore(cwd, restArgs, raw);
+        } else if (subCmd === 'gaps') {
+          lazyResearch().cmdResearchGaps(cwd, restArgs, raw);
         } else {
-          error('Unknown research subcommand. Available: capabilities, yt-search, yt-transcript, collect, nlm-create, nlm-add-source, nlm-ask, nlm-report');
+          error('Unknown research subcommand. Available: capabilities, yt-search, yt-transcript, collect, nlm-create, nlm-add-source, nlm-ask, nlm-report, score, gaps');
         }
         break;
       }
-
+      
       // cache namespace
       case 'cache': {
         if (subCmd === 'research-stats') {
