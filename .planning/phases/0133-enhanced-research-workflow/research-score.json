@@ -1,0 +1,52 @@
+{
+  "source_count": 2,
+  "high_confidence_pct": 100,
+  "oldest_source_days": 0,
+  "has_official_docs": false,
+  "confidence_level": "MEDIUM",
+  "flagged_gaps": [
+    {
+      "gap": "**Conflict detection:** Look for language patterns indicating source disagreement — phrases like \"contradicts\", \"disagrees\", \"conflicts with\", \"unlike X which says\", or explicit conflict notes",
+      "severity": "MEDIUM",
+      "section": "Open Questions",
+      "suggestion": "Research this open question to improve confidence"
+    },
+    {
+      "gap": "**Don't use an LLM for scoring.** The CLI is deterministic — no API calls. Scoring is regex + heuristic.",
+      "severity": "MEDIUM",
+      "section": "Open Questions",
+      "suggestion": "Research this open question to improve confidence"
+    },
+    {
+      "gap": "**Don't add config.json surface for thresholds.** Per CONTEXT.md: hardcoded defaults only.",
+      "severity": "MEDIUM",
+      "section": "Open Questions",
+      "suggestion": "Research this open question to improve confidence"
+    },
+    {
+      "gap": "**Don't add a backward-compatible `overall_grade` field.** Clean break from A-F grading.",
+      "severity": "MEDIUM",
+      "section": "Open Questions",
+      "suggestion": "Research this open question to improve confidence"
+    },
+    {
+      "gap": "**Don't filter gaps in `research:gaps`.** It returns ALL gaps; `new-milestone.md` filters HIGH+MEDIUM.",
+      "severity": "MEDIUM",
+      "section": "Open Questions",
+      "suggestion": "Research this open question to improve confidence"
+    },
+    {
+      "gap": "**Don't add trust ranking to conflicts.** They're listed neutrally per CONTEXT.md.",
+      "severity": "MEDIUM",
+      "section": "Open Questions",
+      "suggestion": "Research this open question to improve confidence"
+    },
+    {
+      "gap": "**Don't modify the RESEARCH.md template.** The score command reads existing files as-is.",
+      "severity": "MEDIUM",
+      "section": "Open Questions",
+      "suggestion": "Research this open question to improve confidence"
+    }
+  ],
+  "conflicts": []
+}
