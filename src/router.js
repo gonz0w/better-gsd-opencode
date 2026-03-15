@@ -968,8 +968,10 @@ Use without --exact for fuzzy matching.`);
             lazyAgent().cmdAgentValidateContracts(cwd, raw, restArgs.slice(1));
           } else if (agentSub === 'override') {
             lazyAgent().cmdAgentOverride(cwd, raw, restArgs.slice(1));
+          } else if (agentSub === 'diff') {
+            lazyAgent().cmdAgentDiff(cwd, raw, restArgs.slice(1));
           } else {
-            error('Unknown agent subcommand. Available: audit, list, list-local, validate-contracts, override');
+            error('Unknown agent subcommand. Available: audit, list, list-local, validate-contracts, override, diff');
           }
         } else if (subcommand === 'resolve-model') {
           lazyMisc().cmdResolveModel(cwd, restArgs[0], raw);
