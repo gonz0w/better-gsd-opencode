@@ -1,5 +1,32 @@
 # Milestones
 
+## ✅ v12.0 SQLite-First Data Layer (Shipped: 2026-03-15)
+
+**Delivered:** Transformed SQLite from a dumb file cache into the structured data backbone for all workflow operations — parsed state persists across invocations, queries replace markdown re-parsing, and workflows get deterministic data from SQL instead of subprocess calls or LLM inference.
+
+**Phases completed:** 6 phases (118-123), 16 plans
+**Commits:** 80 | **Files changed:** 274 | **Lines:** +46,635 / -19,837
+**Timeline:** 2 days (2026-03-14 → 2026-03-15)
+**Tests:** 1,280 passing (0 failures)
+
+**Key accomplishments:**
+- Built DataStore class with schema versioning (v1-v5), WAL mode, migration runner, and transparent Map fallback for Node <22.5
+- Created structured planning tables (phases, plans, tasks, requirements) with PlanningCache write-through caching and git-hash + mtime hybrid invalidation
+- Eliminated enricher duplication (3x parsePlans, 3x listSummaryFiles) with SQLite-first data paths — measurably faster warm starts (<50ms enrichment)
+- Migrated sacred data (decisions, lessons, trajectories, bookmarks) to SQLite with dual-write preserving JSON backups as git-trackable source of truth
+- Implemented 6 new deterministic decision functions (model-selection, verification-routing, research-gate, phase-readiness, milestone-completion, commit-strategy) consuming SQLite-backed state
+- Moved session state to SQLite — STATE.md becomes a generated view with SQL-first reads/writes ensuring markdown and SQL consistency
+- All 23/23 requirements delivered across 6 categories (FND, TBL, ENR, MEM, DEC, SES)
+
+**What's next:** Ready for next milestone — `/bgsd-new-milestone`
+
+**Archives:**
+- `.planning/milestones/v12.0-ROADMAP.md`
+- `.planning/milestones/v12.0-REQUIREMENTS.md`
+- `.planning/milestones/v12.0-DOCS.md`
+
+---
+
 ## ✅ v11.3 LLM Offloading (Shipped: 2026-03-13)
 
 **Delivered:** Programmatic decision engine offloading deterministic LLM decisions to code, with audit scanner, pure decision functions, workflow integration, and summary generation automation.

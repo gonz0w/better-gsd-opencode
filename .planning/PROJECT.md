@@ -2,7 +2,7 @@
 
 ## What This Is
 
-A single-file Node.js CLI built from 52 organized `src/` modules via esbuild, producing `bin/bgsd-tools.cjs`. It provides structured data operations for AI-driven project planning workflows running in the host editor. Twenty-two versions shipped: v1.0 (test suite, module split, observability), v1.1 (context reduction — 46.7% CLI, 54.6% workflow, 67% reference compression), v2.0 (state validation, cross-session memory, quality scoring), v3.0 (intent engineering — INTENT.md, drift validation, workflow injection), v4.0 (environment awareness, MCP profiling, worktree parallelism), v5.0 (codebase intelligence — convention extraction, dependency graphs, lifecycle awareness), v6.0 (UX overhaul — shared formatting engine, TTY-aware smart output, branded CLI), v7.0 (agent orchestration — AST intelligence, task routing, context efficiency, TDD execution, review gates), v7.1 (trajectory engineering — checkpoint, pivot, compare, choose, decision journal, dead-end detection), v8.0 (performance & agent architecture — SQLite caching, agent consolidation 11→9, namespace routing, profiler instrumentation, token budgets, RACI matrix), v8.1 (RAG-powered research — YouTube integration, NotebookLM synthesis, multi-source orchestration, 4-tier degradation, session persistence), v8.2 (cleanup & validation — dead code removal, namespace-only routing, 24-40% init speedup, RACI handoff contracts), v8.3 (agent quality & skills — OpenCode skills architecture with 27 skills and 52.4% agent line reduction, agent consistency audit, GitHub CI agent overhaul, 766 tests fully green), v9.0 (embedded plugin experience — always-on context injection, native LLM tools, event-driven sync, advisory guardrails), v9.1 (performance acceleration — valibot validation, fast-glob discovery, compile-cache, SQLite statement caching, safe adoption controls), v9.2 (CLI tool integrations — ripgrep, fd, jq, yq, bat, gh, Bun runtime), v9.3 (quality, performance & agent sharpening — command consolidation, deterministic context, Bun validation, benchmark adapter), and v10.0 (agent intelligence & UX — planning/verification/execution intelligence, multi-agent collaboration, rich TTY output, interactive workflows).
+A single-file Node.js CLI built from 52 organized `src/` modules via esbuild, producing `bin/bgsd-tools.cjs`. It provides structured data operations for AI-driven project planning workflows running in the host editor. Twenty-three versions shipped: v1.0 (test suite, module split, observability), v1.1 (context reduction — 46.7% CLI, 54.6% workflow, 67% reference compression), v2.0 (state validation, cross-session memory, quality scoring), v3.0 (intent engineering — INTENT.md, drift validation, workflow injection), v4.0 (environment awareness, MCP profiling, worktree parallelism), v5.0 (codebase intelligence — convention extraction, dependency graphs, lifecycle awareness), v6.0 (UX overhaul — shared formatting engine, TTY-aware smart output, branded CLI), v7.0 (agent orchestration — AST intelligence, task routing, context efficiency, TDD execution, review gates), v7.1 (trajectory engineering — checkpoint, pivot, compare, choose, decision journal, dead-end detection), v8.0 (performance & agent architecture — SQLite caching, agent consolidation 11→9, namespace routing, profiler instrumentation, token budgets, RACI matrix), v8.1 (RAG-powered research — YouTube integration, NotebookLM synthesis, multi-source orchestration, 4-tier degradation, session persistence), v8.2 (cleanup & validation — dead code removal, namespace-only routing, 24-40% init speedup, RACI handoff contracts), v8.3 (agent quality & skills — OpenCode skills architecture with 27 skills and 52.4% agent line reduction, agent consistency audit, GitHub CI agent overhaul, 766 tests fully green), v9.0 (embedded plugin experience — always-on context injection, native LLM tools, event-driven sync, advisory guardrails), v9.1 (performance acceleration — valibot validation, fast-glob discovery, compile-cache, SQLite statement caching, safe adoption controls), v9.2 (CLI tool integrations — ripgrep, fd, jq, yq, bat, gh, Bun runtime), v9.3 (quality, performance & agent sharpening — command consolidation, deterministic context, Bun validation, benchmark adapter), v10.0 (agent intelligence & UX — planning/verification/execution intelligence, multi-agent collaboration, rich TTY output, interactive workflows), and v12.0 (SQLite-first data layer — structured planning tables, cross-invocation persistence, enricher acceleration, memory store migration, deterministic decisions, session state in SQL).
 
 ## Core Value
 
@@ -10,19 +10,19 @@ Manage and deliver high-quality software with high-quality documentation, while 
 
 ## Current State
 
-**Last shipped:** v11.4 Housekeeping & Stabilization (2026-03-14)
+**Last shipped:** v12.0 SQLite-First Data Layer (2026-03-15)
 
-## Current Milestone: v12.0 SQLite-First Data Layer
+<details>
+<summary>Previous: v12.0 SQLite-First Data Layer (shipped 2026-03-15)</summary>
 
-**Goal:** Transform SQLite from a dumb file cache into the structured data backbone for all workflow operations — parsed state persists across invocations, queries replace file re-parsing, and workflows get deterministic data from SQL instead of subprocess calls or LLM inference.
+- DataStore class with schema versioning (v1-v5), WAL mode, and Map fallback for Node <22.5
+- Structured planning tables (phases, plans, tasks, requirements) with write-through caching and git-hash + mtime invalidation
+- Enricher acceleration — eliminated 3x/2x parser duplication with SQLite-first data paths
+- Memory store migration — sacred data (decisions, lessons, trajectories, bookmarks) to SQLite with dual-write JSON backups
+- 6 new deterministic decision functions (model-selection, verification-routing, research-gate, phase-readiness, milestone-completion, commit-strategy)
+- Session state in SQLite — STATE.md as generated view with SQL-first reads/writes
 
-**Target features:**
-- Structured tables for planning data — phases, plans, tasks, requirements, decisions as proper rows with indexes
-- Cross-invocation persistence — parsed roadmap, plan metadata, phase mappings survive between CLI invocations with git-hash invalidation
-- Session state in SQLite — current position, metrics, accumulated context stored in SQL; STATE.md becomes a generated view
-- Memory store migration — decisions.json, lessons.json, trajectories.json, bookmarks.json into SQLite tables with proper indexes
-- Enricher acceleration — fix duplication (3x listSummaryFiles, 2x parsePlans), pre-compute all workflow data from SQLite
-- New deterministic decisions — 6-8 new rules consuming SQLite-backed state for faster evaluation
+</details>
 
 <details>
 <summary>Previous: v11.4 Housekeeping & Stabilization (shipped 2026-03-14)</summary>
@@ -205,9 +205,17 @@ See `.planning/MILESTONES.md` for full history of v1.0 through v8.2.
 - ✓ bgsd-context enrichment with pre-computed decisions consumed by 13 workflows — v11.3
 - ✓ summary:generate CLI command pre-building SUMMARY.md from git/plan data — v11.3
 
+- ✓ DataStore class with schema versioning, migration runner, WAL mode, and Map fallback — v12.0
+- ✓ Structured planning tables (phases, plans, tasks, requirements) with write-through caching — v12.0
+- ✓ Git-hash + mtime hybrid invalidation for SQLite cache freshness — v12.0
+- ✓ Enricher acceleration with zero redundant parser calls and SQLite-first data paths — v12.0
+- ✓ Memory store migration (decisions, lessons, trajectories, bookmarks) to SQLite with dual-write — v12.0
+- ✓ 6 new deterministic decision functions consuming SQLite-backed state — v12.0
+- ✓ Session state in SQLite with STATE.md as generated view — v12.0
+
 ### Active
 
-See `.planning/REQUIREMENTS.md` for v12.0 requirements.
+_No active milestone. Run `/bgsd-new-milestone` to start next._
 
 ### Out of Scope
 
@@ -224,14 +232,14 @@ See `.planning/REQUIREMENTS.md` for v12.0 requirements.
 
 ## Context
 
-Shipped v1.0 through v11.3. 1008 tests (1007 passing), 52 src/ modules, ~837KB bundle, esbuild bundler.
+Shipped v1.0 through v12.0. 1280 tests (all passing), 52 src/ modules, ~871KB bundle, esbuild bundler.
 Platform: OC (host editor).
 Tech stack: Node.js >= 22.5 (required for `node:sqlite` caching), node:test, esbuild, tokenx (bundled), acorn (bundled).
 Source: 52 modules — `src/lib/` and `src/commands/` + router + index.
 Deploy pipeline: `npm run build` → esbuild bundle → `deploy.sh` with smoke test and rollback.
 9 specialized AI agents, 41 slash commands, 45 workflows, 27 skills.
 
-Known tech debt: `node:sqlite` is Stability 1.2 (Release Candidate). Test suite has 1 failure in intent.test.cjs.
+Known tech debt: `node:sqlite` is Stability 1.2 (Release Candidate).
 
 ## Constraints
 
@@ -283,6 +291,12 @@ Known tech debt: `node:sqlite` is Stability 1.2 (Release Candidate). Test suite 
 | Progressive confidence model for decisions | HIGH=authoritative, MEDIUM=LLM confirms, LOW=LLM decides | Good — never kills LLM escape hatch |
 | In-process decision engine via enricher | Evaluate rules during existing hooks, no subprocess overhead | Good — zero latency added |
 | Scaffold-then-fill for SUMMARY.md | CLI generates data sections, LLM fills only judgment | Good — 50%+ writing reduction |
+| Schema versioning via PRAGMA user_version | Inline MIGRATIONS array with delete-and-rebuild on failure | Good — zero-dependency, single-file compatible |
+| Two-layer cache (Map L1 + SQLite L2) with PlanningCache | In-memory for speed, SQLite for cross-invocation persistence | Good — transparent fallback on Node <22.5 |
+| Git-hash + mtime hybrid invalidation | Git hash for commit-level changes, mtime for in-progress edits | Good — catches both committed and uncommitted changes |
+| SQL-first dual-write for state mutations | Write to SQLite first, then regex-update STATE.md to preserve format | Good — backward-compatible with existing tests |
+| JSON canonical, SQLite best-effort for sacred data | Failures in SQLite log but never roll back JSON writes | Good — zero-risk migration |
+| ESM-native db-cache.js alongside CJS db.js | esbuild __require wrapper fails in native ESM; separate ESM module | Good — plugin works in both CJS and ESM contexts |
 
 ---
 
@@ -290,4 +304,4 @@ Known tech debt: `node:sqlite` is Stability 1.2 (Release Candidate). Test suite 
 - ~~Node.js 18+ minimum~~ — Raised to 22.5+ in v11.x for node:sqlite support
 
 ---
-*Last updated: 2026-03-14 after v12.0 milestone start*
+*Last updated: 2026-03-15 after v12.0 milestone completion*

@@ -2,15 +2,15 @@
 
 ## Project Reference
 
-See: `.planning/PROJECT.md` (updated 2026-03-14)
+See: `.planning/PROJECT.md` (updated 2026-03-15)
 
 **Core value:** Manage and deliver high-quality software with high-quality documentation, while continuously reducing token usage and improving performance
-**Current focus:** Phase 123 — Session State
+**Current focus:** Between milestones — v12.0 complete
 
 ## Current Position
 
-**Phase:** 123 of 123 (Session State) — IN PROGRESS
-**Current Plan:** Not started
+**Phase:** None (between milestones)
+**Current Plan:** None
 **Status:** v12.0 milestone complete
 **Last Activity:** 2026-03-15
 
@@ -19,9 +19,9 @@ Progress: [██████████] 100%
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 221 (v12.0 Phase 122 Plan 02)
+- Total plans completed: 237 (v12.0 Phase 123 Plan 03)
 - Average duration: ~15 min/plan
-- Total execution time: ~38 hours
+- Total execution time: ~40 hours
 
 **Recent Trend:**
 - v12.0 Phase 120 Plan 01: 20 min, 2 tasks, 4 files (1108 tests)
@@ -31,8 +31,9 @@ Progress: [██████████] 100%
 - v12.0 Phase 121 Plan 03: 17 min, 2 tasks, 2 files (1179 tests)
 - v12.0 Phase 122 Plan 01: 14 min, 2 tasks, 9 files (1189 tests)
 - v12.0 Phase 122 Plan 02: 17 min, 2 tasks, 7 files (202 decision tests)
-- v12.0 Phase 0123 Plan 02: 30min, 2 tasks, 3 files (1250 tests)
-- v12.0 Phase 0123 Plan 03: 9min, 2 tasks, 4 files (1283 tests)
+- v12.0 Phase 123 Plan 01: 10 min, 2 tasks, 4 files (1200 tests)
+- v12.0 Phase 123 Plan 02: 30 min, 2 tasks, 3 files (1250 tests)
+- v12.0 Phase 123 Plan 03: 9 min, 2 tasks, 4 files (1283 tests)
 - Trend: Stable
 
 *Updated after each plan completion*
@@ -41,43 +42,16 @@ Progress: [██████████] 100%
 
 ### Decisions
 
-- [v12.0 Phase 118]: node:sqlite PRAGMA busy_timeout returns {timeout:N} not {busy_timeout:N} — verify with correct key
-- [v12.0 Phase 118]: PRAGMA user_version works inside explicit transactions on current Node.js — no post-COMMIT workaround needed
-- [v12.0 Phase 118]: DatabaseSync constructor multi-tier fallback handles Node 22.5–25.x+ differences including defensive mode
-- [v11.4]: Test suite fully stabilized — 1008 pass / 0 fail
-- [v11.3]: Progressive confidence model (HIGH/MEDIUM/LOW) — never kills LLM escape hatch
-- [v11.3]: In-process decision engine via enricher — zero subprocess overhead
-- [Phase 118]: All 10 db.test.cjs test groups implemented in one commit — both tasks write to same file, no value in split commits — Avoids incomplete intermediate state; 52 tests cover full FND-01 through FND-04 contract
-- [Phase 118 Plan 02]: db init placed after --no-cache flag parsing so BGSD_CACHE_FORCE_MAP is set before getDb() runs; closeAll() called before unlinkSync in cache:clear for safe file deletion
-- [Phase 119-01]: Schema version 2: MIGRATIONS[1] appended — db.test.cjs assertions updated from v1 to v2 — MIGRATIONS[1] advances schema from version 1 to 2; tests were checking specific version numbers and needed updating
-- [Phase 119-01]: PlanningCache null-return pattern: getPhases/getPlans return null (not []) on miss — callers distinguish no-data from empty — Enables callers to differentiate cache miss from empty result, ensuring parse-on-miss is triggered correctly
-- [Phase 119-02]: ESM plugin cannot import CJS db.js — esbuild __require wrapper fails in native ESM; created ESM-native db-cache.js using top-level await dynamic import('node:sqlite')
-- [Phase 119-02]: storeRoadmap field name adaptation: parser uses camelCase (planCount) but DB schema uses snake_case (plan_count) — adapt in write-through call
-- [Phase 119-02]: raw is null on cache hits (markdown not stored in SQLite) — in-memory Map cache retains full object with raw after first parse in session
-- [Phase 119-03]: clearForCwd() added to PlanningCache — was specified in Plan 02 but not implemented; added as blocking deviation since tests require it for end-to-end invalidation flow — Rule 3 blocking fix
-- [Phase 119-03]: PlanningCache test isolation uses string cwds ('/test/project/tblXX') per describe group — avoids SQLite getDb() singleton collision while providing logical scoping across groups
-- [Phase 0120]: ensurePlans/ensureSummaryFiles closures provide single-allocation lazy access — parsePlans and listSummaryFiles called exactly once per enrichCommand invocation — Eliminates CPU waste from 3x parsePlans and 3x listSummaryFiles redundant calls per invocation
-- [Phase 0120]: PlanningCache.getSummaryCount and getIncompletePlans: SQLite-first enrichment data for plan/summary counts — warm cache serves from SQL, cold falls back to parsers — ENR-02: SQL-backed enrichment eliminates redundant fs operations on warm cache hits
-- [Phase 0120]: ProjectState.phaseDir added to frozen facade — enricher uses statePhaseDir to skip redundant resolvePhaseDir call for current phase — Avoids extra readdirSync on the phases directory when current phase is already resolved in getProjectState
-- [Phase 0120]: performance.now() + Date.now() fallback for _enrichment_ms timing; setTimeout(0) for background warm-up — Sub-millisecond precision needed for ENR-03 measurement; setTimeout(0) is clear fire-and-forget pattern
-- [Phase 0121-01]: Schema advanced from v2 to v3 — MIGRATIONS[2] creates 4 memory_* tables; db-cache.js SCHEMA_V2_SQL renamed to SCHEMA_V3_SQL with same memory tables; version guard bumped to >= 3
-- [Phase 0121-01]: data_json stores full JSON entry in memory tables for lossless round-tripping; searchable columns (summary, text, phase, category) extracted for LIKE queries — no FTS5 per REQUIREMENTS.md
-- [Phase 0121-01]: migrateMemoryStores() idempotency check: COUNT(*) on memory_decisions for cwd — if any exist, skip entire migration
-- [Phase 0121]: JSON canonical, SQLite best-effort dual-write — failures log but never roll back JSON — Sacred data integrity requires JSON as source of truth; SQLite is an acceleration layer
-- [Phase 0121]: searchMemory extended to support null query (fetch all for cwd) for init.js reads without search term — cmdInitMemory needs to fetch recent decisions/lessons without a search query
-- [Phase 0121-03]: SQLite test isolation uses os.tmpdir() prefix dirs + closeAll() before getDb() in beforeEach — avoids getDb() singleton collision; PlanningCache direct API for unit tests, CLI for end-to-end verification
-- [Phase 0122-01]: model_profiles uses multi-column schema (quality_model, balanced_model, budget_model, override_model) with '__defaults__' CWD sentinel for idempotent global seeding — Simpler than one-row-per-tier, matches static MODEL_PROFILES shape
-- [Phase 0122-01]: resolvePlanExistenceRoute backward compat: plan_count > 0 without has_context returns 'has-plans'; with has_context=true returns 'ready' — Old callers unaffected; new behavior only triggered with explicit new inputs
-- [Phase 0122-02]: COMMAND_TO_AGENT static map in enricher for agent_type derivation — simpler than dynamic lookup, covers all known bgsd-* commands
-- [Phase 0122-02]: routeTask cwd parameter added as optional third arg — backward compatible, enables model-selection rule lookup without breaking existing callers
-- [Phase 0123-01]: Schema v5: MIGRATIONS[4] adds 6 session_* tables; SCHEMA_V4_SQL renamed V5_SQL; version guard bumped to >= 5 — Foundation for STATE.md persistence into SQLite — session position, metrics, decisions, todos, blockers, continuity
-- [Phase 0123-02]: SQL-first dual-write: write to SQLite first then regex-update STATE.md to preserve format compatibility with existing tests — Full STATE.md regeneration via generateStateMd() produced a different format breaking 9 tests; targeted regex + SQLite dual-write preserves backward compat while building SQL layer
-- [Phase Phase 0123-03]: invalidateState() must DELETE SQLite session_state row to prevent stale reads — Test writes new STATE.md but SQLite still had live project data — two-layer cache invalidation required
+- [v12.0]: Schema versioning via PRAGMA user_version with inline MIGRATIONS array — zero-dependency, single-file compatible
+- [v12.0]: Two-layer cache (Map L1 + SQLite L2) with PlanningCache — transparent fallback on Node <22.5
+- [v12.0]: Git-hash + mtime hybrid invalidation for SQLite cache freshness
+- [v12.0]: SQL-first dual-write for state mutations — backward-compatible with existing format
+- [v12.0]: JSON canonical, SQLite best-effort for sacred data — failures never roll back JSON
+- [v12.0]: ESM-native db-cache.js alongside CJS db.js for plugin compatibility
 
 ### Roadmap Evolution
 
-- 6 phases (118-123) mapped from 21 requirements across 6 categories
-- Phase 121 (Memory Store) depends only on 118 — can potentially parallelize with 119/120
+_No active roadmap — v12.0 complete, awaiting next milestone._
 
 ### Pending Todos
 
@@ -89,6 +63,6 @@ None.
 
 ## Session Continuity
 
-**Last session:** 2026-03-15T01:43:17.719Z
-**Stopped at:** Completed 0123-03-PLAN.md
-**Next step:** Phase 123 (final phase)
+**Last session:** 2026-03-15
+**Stopped at:** Completed v12.0 milestone archival
+**Next step:** `/bgsd-new-milestone` to start next milestone
