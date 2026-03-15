@@ -251,7 +251,7 @@ async function main() {
   let namespace = null;
   let remainingArgs = args.slice(1);
   
-  const KNOWN_NAMESPACES = ['init', 'plan', 'execute', 'verify', 'util', 'research', 'cache', 'audit', 'decisions'];
+  const KNOWN_NAMESPACES = ['init', 'plan', 'execute', 'verify', 'util', 'research', 'cache', 'audit', 'decisions', 'detect'];
   
   if (command && command.includes(':')) {
     const colonIdx = command.indexOf(':');
@@ -1332,9 +1332,19 @@ Examples:
         break;
       }
 
+      // detect namespace
+      case 'detect': {
+        if (subCmd === 'tools') {
+          lazyTools().cmdDetectTools(cwd, raw);
+        } else {
+          error('Unknown detect subcommand. Available: tools');
+        }
+        break;
+      }
+
       // Unknown namespace
       default:
-        error(`Unknown namespace: ${namespace}. Available namespaces: init, plan, execute, verify, util, research, cache, audit, decisions`);
+        error(`Unknown namespace: ${namespace}. Available namespaces: init, plan, execute, verify, util, research, cache, audit, decisions, detect`);
     }
     return; // Exit after handling namespaced command
   }

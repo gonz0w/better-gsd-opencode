@@ -1,7 +1,7 @@
 'use strict';
 
-const { getToolStatus } = require('../lib/cli-tools/detector');
-const { getInstallGuidance } = require('../lib/cli-tools/install-guidance');
+const { getToolStatus, TOOLS } = require('../lib/cli-tools/detector');
+const { getInstallCommand } = require('../lib/cli-tools/install-guidance');
 const { output } = require('../lib/output');
 
 /**
@@ -65,6 +65,26 @@ function cmdToolsStatus(cwd, raw) {
   }
 }
 
+/**
+ * Detect available tools and output as flat JSON array
+ * @param {string} cwd - Current working directory
+ * @param {boolean} raw - Output raw JSON (flag not used, always outputs JSON)
+ */
+function cmdDetectTools(cwd, raw) {
+  const status = getToolStatus();
+  const result = Object.entries(status).map(([key, info]) => ({
+    name: info.name,
+    cmd: TOOLS[key]?.aliases?.[0] || key,
+    available: info.available,
+    ...(info.version ? { version: info.version } : {}),
+    ...(info.path ? { path: info.path } : {}),
+    ...(!info.available ? { install: getInstallCommand(key) } : {})
+  }));
+  
+  output(result, raw);
+}
+
 module.exports = {
-  cmdToolsStatus
+  cmdToolsStatus,
+  cmdDetectTools
 };
