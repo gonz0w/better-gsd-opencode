@@ -1999,4 +1999,417 @@ function cmdResearchNlmAddSource(cwd, args, raw) {
   }
 }
 
-module.exports = { detectCliTools, detectMcpServers, calculateTier, cmdResearchCapabilities, cmdResearchYtSearch, cmdResearchYtTranscript, cmdResearchCollect, cmdResearchNlmCreate, cmdResearchNlmAddSource, cmdResearchNlmAsk, cmdResearchNlmReport };
+// ─── Research Score (RESEARCH.md Quality Profile) ───────────────────────────
+
+/**
+ * Parse a RESEARCH.md file string into structured data for confidence scoring.
+ *
+ * @param {string} content - Raw RESEARCH.md content
+ * @returns {object} Parsed research data
+ */
+function parseResearchFile(content) {
+  if (!content || typeof content !== 'string') {
+    return {
+      headerConfidence: null,
+      researchDate: null,
+      primaryCount: 0,
+      secondaryCount: 0,
+      tertiaryCount: 0,
+      totalSources: 0,
+      hasOfficialDocs: false,
+      confidenceBreakdown: [],
+      flaggedGaps: [],
+      conflicts: [],
+      highConfidencePct: 0,
+      oldestSourceDays: null,
+    };
+  }
+
+  // Extract header confidence
+  const confidenceMatch = content.match(/\*\*Confidence:\*\*\s*(HIGH|MEDIUM|LOW)/i);
+  const headerConfidence = confidenceMatch ? confidenceMatch[1].toUpperCase() : null;
+
+  // Extract research date
+  const dateMatch = content.match(/\*\*Researched?:\*\*\s*(\d{4}-\d{2}-\d{2})/);
+  const researchDate = dateMatch ? dateMatch[1] : null;
+
+  // Compute oldest source days from research date
+  let oldestSourceDays = null;
+  if (researchDate) {
+    const researchTime = new Date(researchDate).getTime();
+    if (!isNaN(researchTime)) {
+      oldestSourceDays = Math.floor((Date.now() - researchTime) / (1000 * 60 * 60 * 24));
+    }
+  }
+
+  // Split sources by tier — find ## Sources section then parse Primary/Secondary/Tertiary
+  let primaryCount = 0;
+  let secondaryCount = 0;
+  let tertiaryCount = 0;
+
+  const sourcesMatch = content.match(/## Sources([\s\S]*?)(?=\n## |\n---|\s*$)/);
+  if (sourcesMatch) {
+    const sourcesSection = sourcesMatch[1];
+
+    // Split into tiers by ### headings
+    const tierBlocks = sourcesSection.split(/(?=### (Primary|Secondary|Tertiary))/i);
+
+    for (const block of tierBlocks) {
+      const tierHeading = block.match(/^### (Primary|Secondary|Tertiary)/i);
+      if (!tierHeading) continue;
+
+      // Count bullet items: lines starting with "- "
+      const bulletLines = block.split('\n').filter(l => l.trimStart().startsWith('- '));
+      const count = bulletLines.length;
+
+      const tier = tierHeading[1].toLowerCase();
+      if (tier === 'primary') primaryCount = count;
+      else if (tier === 'secondary') secondaryCount = count;
+      else if (tier === 'tertiary') tertiaryCount = count;
+    }
+  }
+
+  const totalSources = primaryCount + secondaryCount + tertiaryCount;
+
+  // Detect official docs: Primary/Secondary sources with docs.* domains or "official" in description
+  let hasOfficialDocs = false;
+  if (sourcesMatch) {
+    const sourcesSection = sourcesMatch[1];
+    // Only Primary + Secondary for official docs detection
+    const primarySecondaryMatch = sourcesSection.match(/### (Primary|Secondary)([\s\S]*?)(?=### Tertiary|### Primary|### Secondary|$)/gi);
+    const checkText = primarySecondaryMatch ? primarySecondaryMatch.join('\n') : sourcesSection;
+    const officialDocsRe = /\bdocs\.[a-z]/i;
+    const officialWordRe = /\bofficial\b/i;
+    if (officialDocsRe.test(checkText) || officialWordRe.test(checkText)) {
+      hasOfficialDocs = true;
+    }
+  }
+
+  // Extract confidence breakdown from ## Metadata → **Confidence breakdown:**
+  const confidenceBreakdown = [];
+  const metadataMatch = content.match(/## Metadata([\s\S]*?)(?=\n## |\n---|\s*$)/);
+  if (metadataMatch) {
+    const metadataSection = metadataMatch[1];
+    const breakdownMatch = metadataSection.match(/\*\*Confidence breakdown:\*\*([\s\S]*?)(?=\n\*\*|\n## |\s*$)/);
+    if (breakdownMatch) {
+      const breakdownLines = breakdownMatch[1].split('\n');
+      for (const line of breakdownLines) {
+        const entryMatch = line.match(/^\s*-\s+(.+?):\s*(HIGH|MEDIUM|LOW)\s*$/i);
+        if (entryMatch) {
+          confidenceBreakdown.push({
+            domain: entryMatch[1].trim(),
+            level: entryMatch[2].toUpperCase(),
+          });
+        }
+      }
+    }
+  }
+
+  // Compute high confidence percentage from breakdown
+  let highConfidencePct = 0;
+  if (confidenceBreakdown.length > 0) {
+    const highCount = confidenceBreakdown.filter(e => e.level === 'HIGH').length;
+    highConfidencePct = Math.round((highCount / confidenceBreakdown.length) * 1000) / 10;
+  } else if (headerConfidence === 'HIGH') {
+    highConfidencePct = 100;
+  } else if (headerConfidence === 'MEDIUM') {
+    highConfidencePct = 50;
+  }
+
+  // Detect gaps: LOW-confidence breakdown sections + Open Questions items
+  const flaggedGaps = [];
+
+  // From confidence breakdown: LOW-rated domains
+  for (const entry of confidenceBreakdown) {
+    if (entry.level === 'LOW') {
+      flaggedGaps.push({
+        gap: `Low confidence in ${entry.domain}`,
+        severity: 'HIGH',
+        section: 'Confidence Breakdown',
+        suggestion: `Research ${entry.domain} further with additional primary sources`,
+      });
+    }
+  }
+
+  // From Open Questions section
+  const openQuestionsMatch = content.match(/## Open Questions([\s\S]*?)(?=\n## |\n---|\s*$)/);
+  if (openQuestionsMatch) {
+    const oqSection = openQuestionsMatch[1];
+    const oqLines = oqSection.split('\n').filter(l => l.trimStart().startsWith('- ') || /^\d+\./.test(l.trim()));
+    for (const line of oqLines) {
+      const questionText = line.replace(/^\s*[-\d.]+\s*/, '').trim();
+      if (questionText) {
+        flaggedGaps.push({
+          gap: questionText,
+          severity: 'MEDIUM',
+          section: 'Open Questions',
+          suggestion: 'Research this open question to improve confidence',
+        });
+      }
+    }
+  }
+
+  // Detect conflicts: scan for language patterns indicating source disagreement
+  const conflicts = [];
+  const conflictPatterns = [
+    /(\w[\w\s,]+?)\s+contradicts?\s+([\w\s,]+?)\s+(?:on|regarding|about)\s+([^\n.]+)/gi,
+    /(\w[\w\s,]+?)\s+disagrees?\s+(?:with\s+)?([\w\s,]+?)\s+(?:on|regarding|about)?\s*([^\n.]*)/gi,
+    /(\w[\w\s,]+?)\s+conflicts?\s+with\s+([\w\s,]+?)\s+(?:on|regarding|about)?\s*([^\n.]*)/gi,
+    /unlike\s+([\w\s,]+?)\s+which\s+says?\s+([^\n,]+),\s*(\w[\w\s,]+?)\s+states?\s+([^\n.]+)/gi,
+    /however[,\s]+([\w\s,]+?)\s+states?\s+([^\n.]+)/gi,
+  ];
+
+  // Scan within Sources section primarily
+  const scanContent = sourcesMatch ? sourcesMatch[0] : content;
+
+  for (const pattern of conflictPatterns) {
+    pattern.lastIndex = 0;
+    let match;
+    while ((match = pattern.exec(scanContent)) !== null) {
+      const sourceA = (match[1] || '').trim();
+      const sourceB = (match[2] || '').trim();
+      const claim = (match[3] || match[4] || '').trim() || 'unspecified claim';
+
+      if (sourceA && sourceB) {
+        conflicts.push({
+          claim: claim,
+          source_a: sourceA,
+          source_b: sourceB,
+        });
+      }
+
+      // Prevent infinite loop on zero-length matches
+      if (match.index === pattern.lastIndex) {
+        pattern.lastIndex++;
+      }
+    }
+  }
+
+  return {
+    headerConfidence,
+    researchDate,
+    primaryCount,
+    secondaryCount,
+    tertiaryCount,
+    totalSources,
+    hasOfficialDocs,
+    confidenceBreakdown,
+    flaggedGaps,
+    conflicts,
+    highConfidencePct,
+    oldestSourceDays,
+  };
+}
+
+/**
+ * Compute composite confidence level from parsed research data.
+ * LOW requires >= 3 negative signals; MEDIUM >= 1; HIGH = 0.
+ *
+ * @param {object} parsed - Result from parseResearchFile()
+ * @returns {'HIGH'|'MEDIUM'|'LOW'}
+ */
+function computeConfidenceLevel(parsed) {
+  let negativeSignals = 0;
+
+  // Signal 1: fewer than 3 sources total
+  if (!parsed.totalSources || parsed.totalSources < 3) {
+    negativeSignals++;
+  }
+
+  // Signal 2: no official documentation
+  if (!parsed.hasOfficialDocs) {
+    negativeSignals++;
+  }
+
+  // Signal 3: research older than 90 days
+  if (parsed.oldestSourceDays != null && parsed.oldestSourceDays > 90) {
+    negativeSignals++;
+  }
+
+  // Signal 4: source conflicts detected
+  if (parsed.conflicts && parsed.conflicts.length > 0) {
+    negativeSignals++;
+  }
+
+  // Signal 5: low high-confidence percentage (< 30%)
+  if (parsed.highConfidencePct < 30 && parsed.highConfidencePct !== null) {
+    negativeSignals++;
+  }
+
+  if (negativeSignals >= 3) return 'LOW';
+  if (negativeSignals >= 1) return 'MEDIUM';
+  return 'HIGH';
+}
+
+/**
+ * Format research score profile for TTY display.
+ * @param {object} profile - Research score profile
+ * @returns {string}
+ */
+function formatResearchScore(profile) {
+  const lines = [];
+
+  lines.push(banner('Research Score'));
+  lines.push('');
+
+  // Confidence level with color
+  const levelColor = profile.confidence_level === 'HIGH' ? color.green
+    : profile.confidence_level === 'MEDIUM' ? color.yellow : color.red;
+  lines.push(color.bold('Confidence Level: ') + levelColor(profile.confidence_level || 'UNKNOWN'));
+  lines.push('');
+
+  // Core metrics
+  lines.push(sectionHeader('Profile'));
+  lines.push(`  Source Count:        ${profile.source_count}`);
+  lines.push(`  High Confidence:     ${profile.high_confidence_pct}%`);
+  lines.push(`  Oldest Source:       ${profile.oldest_source_days != null ? profile.oldest_source_days + ' days' : '—'}`);
+  lines.push(`  Has Official Docs:   ${profile.has_official_docs ? color.green('yes') : color.red('no')}`);
+  lines.push('');
+
+  // Gaps
+  if (profile.flagged_gaps && profile.flagged_gaps.length > 0) {
+    lines.push(sectionHeader('Flagged Gaps'));
+    for (const gap of profile.flagged_gaps) {
+      const sevColor = gap.severity === 'HIGH' ? color.red : gap.severity === 'MEDIUM' ? color.yellow : color.dim;
+      lines.push(`  ${sevColor('[' + gap.severity + ']')} ${gap.gap}`);
+      if (gap.suggestion) lines.push(`    ${color.dim('→ ' + gap.suggestion)}`);
+    }
+    lines.push('');
+  }
+
+  // Conflicts
+  if (profile.conflicts && profile.conflicts.length > 0) {
+    lines.push(sectionHeader('Conflicts Detected'));
+    for (const conflict of profile.conflicts) {
+      lines.push(`  ${color.yellow('!')} ${conflict.claim}`);
+      lines.push(`    ${color.dim('Source A:')} ${conflict.source_a}`);
+      lines.push(`    ${color.dim('Source B:')} ${conflict.source_b}`);
+    }
+  }
+
+  return lines.join('\n');
+}
+
+/**
+ * Command handler: research:score
+ * Parses a RESEARCH.md file and outputs a structured quality profile JSON.
+ * Writes a research-score.json cache file in the same directory.
+ *
+ * @param {string} cwd - Project root directory
+ * @param {string[]} args - Command arguments [path-to-RESEARCH.md]
+ * @param {boolean} raw - Raw output mode
+ */
+function cmdResearchScore(cwd, args, raw) {
+  if (!args || !args[0]) {
+    output({ error: 'Usage: research:score <path-to-RESEARCH.md>' }, { formatter: formatResearchScore, raw });
+    return;
+  }
+
+  const inputPath = args[0];
+  const resolvedPath = path.isAbsolute(inputPath) ? inputPath : path.resolve(cwd, inputPath);
+
+  let content;
+  try {
+    content = fs.readFileSync(resolvedPath, 'utf-8');
+  } catch (e) {
+    output({ error: `Cannot read file: ${resolvedPath} — ${e.message}` }, { formatter: formatResearchScore, raw });
+    return;
+  }
+
+  const parsed = parseResearchFile(content);
+  const confidenceLevel = computeConfidenceLevel(parsed);
+
+  const profile = {
+    source_count: parsed.totalSources,
+    high_confidence_pct: Math.round(parsed.highConfidencePct * 10) / 10,
+    oldest_source_days: parsed.oldestSourceDays,
+    has_official_docs: parsed.hasOfficialDocs,
+    confidence_level: confidenceLevel,
+    flagged_gaps: parsed.flaggedGaps,
+    conflicts: parsed.conflicts,
+  };
+
+  // Write cache file
+  const cachePath = path.join(path.dirname(resolvedPath), 'research-score.json');
+  try {
+    fs.writeFileSync(cachePath, JSON.stringify(profile, null, 2), 'utf-8');
+  } catch (e) {
+    debugLog('research.score', `Failed to write cache: ${e.message}`);
+  }
+
+  output(profile, { formatter: formatResearchScore, raw });
+}
+
+/**
+ * Format research gaps list for TTY display.
+ * @param {object} result - { flagged_gaps: [] }
+ * @returns {string}
+ */
+function formatResearchGaps(result) {
+  const lines = [];
+
+  lines.push(banner('Research Gaps'));
+  lines.push('');
+
+  const gaps = (result && result.flagged_gaps) || [];
+
+  if (gaps.length === 0) {
+    lines.push(color.green('No gaps flagged.'));
+    return lines.join('\n');
+  }
+
+  for (const gap of gaps) {
+    const sevColor = gap.severity === 'HIGH' ? color.red : gap.severity === 'MEDIUM' ? color.yellow : color.dim;
+    lines.push(`  ${sevColor('[' + gap.severity + ']')} ${gap.gap}`);
+    if (gap.section) lines.push(`    ${color.dim('Section: ' + gap.section)}`);
+    if (gap.suggestion) lines.push(`    ${color.dim('→ ' + gap.suggestion)}`);
+    lines.push('');
+  }
+
+  return lines.join('\n');
+}
+
+/**
+ * Command handler: research:gaps
+ * Reads cached research-score.json and returns flagged_gaps[].
+ * Errors if no cache file exists.
+ *
+ * @param {string} cwd - Project root directory
+ * @param {string[]} args - Command arguments [path-to-RESEARCH.md or research-score.json]
+ * @param {boolean} raw - Raw output mode
+ */
+function cmdResearchGaps(cwd, args, raw) {
+  if (!args || !args[0]) {
+    output({ error: 'Usage: research:gaps <path-to-RESEARCH.md or research-score.json>' }, { formatter: formatResearchGaps, raw });
+    return;
+  }
+
+  const inputPath = args[0];
+  const resolvedInput = path.isAbsolute(inputPath) ? inputPath : path.resolve(cwd, inputPath);
+
+  // Resolve cache path — if input is a .md file, look for research-score.json in same dir
+  let cachePath;
+  if (resolvedInput.endsWith('.json')) {
+    cachePath = resolvedInput;
+  } else {
+    cachePath = path.join(path.dirname(resolvedInput), 'research-score.json');
+  }
+
+  if (!fs.existsSync(cachePath)) {
+    output({ error: 'No cached profile found. Run research:score first.' }, { formatter: formatResearchGaps, raw });
+    return;
+  }
+
+  let profile;
+  try {
+    const cacheContent = fs.readFileSync(cachePath, 'utf-8');
+    profile = JSON.parse(cacheContent);
+  } catch (e) {
+    output({ error: `Failed to read cache: ${e.message}` }, { formatter: formatResearchGaps, raw });
+    return;
+  }
+
+  output({ flagged_gaps: profile.flagged_gaps || [] }, { formatter: formatResearchGaps, raw });
+}
+
+module.exports = { detectCliTools, detectMcpServers, calculateTier, cmdResearchCapabilities, cmdResearchYtSearch, cmdResearchYtTranscript, cmdResearchCollect, cmdResearchNlmCreate, cmdResearchNlmAddSource, cmdResearchNlmAsk, cmdResearchNlmReport, cmdResearchScore, cmdResearchGaps, parseResearchFile, computeConfidenceLevel };
