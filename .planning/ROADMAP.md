@@ -86,7 +86,10 @@ This milestone transforms SQLite from a dumb file cache into the structured data
   1. User can have current position, last activity, and performance metrics persist in SQLite across invocations without parsing STATE.md
   2. User can regenerate STATE.md from SQLite state and get identical content — SQL is the programmatic source of truth
   3. User can view accumulated context (decisions, todos, blockers) from SQLite without parsing STATE.md
-**Plans**: TBD
+**Plans**: 3 plans
+  - Plan 01 (Wave 1): Schema migration + PlanningCache session state methods
+  - Plan 02 (Wave 2): SQL-first state commands + STATE.md regeneration
+  - Plan 03 (Wave 3): Plugin-side SQLite reads + comprehensive test suite
 
 ## Progress
 
@@ -100,4 +103,4 @@ Phases execute in numeric order: 118 → 119 → 120 → 121 → 122 → 123
 | 120. Enricher Acceleration | 2/2 | Complete    | 2026-03-14 |
 | 121. Memory Store Migration | 0/3 | Complete    | 2026-03-14 |
 | 122. Decision Rules | 2/2 | Complete    | 2026-03-14 |
-| 123. Session State | 0/0 | Not started | - |
+| 123. Session State | 0/3 | Not started | - |
