@@ -384,6 +384,19 @@ function cmdSkillsValidate(cwd, options, raw) {
   // Run full 41-pattern security scan
   const scanResult = scanSkillFiles(skillDir);
 
+  // Log validate attempt to audit trail
+  logAuditEntry(cwd, {
+    action: 'validate',
+    name,
+    outcome: 'validated',
+    scan_verdict: {
+      dangerous: scanResult.summary.dangerous,
+      warn: scanResult.summary.warn,
+      clean: scanResult.summary.clean,
+      patterns: scanResult.findings.map(f => f.pattern_id),
+    },
+  });
+
   if (raw) {
     output({ name, path: skillDir, scan: scanResult }, raw);
     return;
