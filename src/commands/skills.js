@@ -1,6 +1,7 @@
 'use strict';
 
 const fs = require('fs');
+const os = require('os');
 const path = require('path');
 const { output, error, debugLog } = require('../lib/output');
 
@@ -395,6 +396,423 @@ function cmdSkillsValidate(cwd, options, raw) {
   console.log(formatScanResults(scanResult, verbose || false));
 }
 
+// ─── GitHub Helpers ───────────────────────────────────────────────────────────
+
+/**
+ * Parse a GitHub repository URL or shorthand into { owner, repo }.
+ * Accepts: https://github.com/owner/repo, github.com/owner/repo, owner/repo
+ * Returns null for invalid/unsupported formats (subdirectories, non-GitHub hosts).
+ */
+function parseGitHubUrl(source) {
+  if (!source || typeof source !== 'string') return null;
+
+  let s = source.trim();
+
+  // Strip protocol
+  s = s.replace(/^https?:\/\//, '');
+
+  // Must start with github.com/ or be a plain owner/repo
+  if (s.startsWith('github.com/')) {
+    s = s.slice('github.com/'.length);
+  }
+
+  // Now s should be owner/repo (exactly two path segments, no trailing slash)
+  const parts = s.replace(/\/+$/, '').split('/');
+  if (parts.length !== 2) return null;
+
+  const [owner, repo] = parts;
+  if (!owner || !repo) return null;
+
+  // Basic validation: only alphanumeric, hyphens, underscores, dots
+  const validName = /^[a-zA-Z0-9._-]+$/;
+  if (!validName.test(owner) || !validName.test(repo)) return null;
+
+  return { owner, repo };
+}
+
+/**
+ * Fetch the file list for a GitHub repo via the Contents API.
+ * Recursively fetches subdirectory contents.
+ * Returns array of { name, path, size, download_url, type }.
+ */
+async function fetchGitHubContents(owner, repo, subPath) {
+  const apiPath = subPath ? subPath : '';
+  const url = `https://api.github.com/repos/${owner}/${repo}/contents/${apiPath}`;
+
+  let response;
+  try {
+    response = await fetch(url, {
+      headers: { Accept: 'application/vnd.github.v3+json' },
+    });
+  } catch (e) {
+    throw new Error(`Network error fetching GitHub contents: ${e.message}`);
+  }
+
+  if (response.status === 404) {
+    throw new Error(`Repository not found: ${owner}/${repo}`);
+  }
+  if (response.status === 403) {
+    const remaining = response.headers.get('x-ratelimit-remaining');
+    if (remaining === '0') {
+      throw new Error('GitHub API rate limit exceeded. Wait a few minutes and try again.');
+    }
+    throw new Error(`GitHub API returned 403 Forbidden for ${owner}/${repo}`);
+  }
+  if (!response.ok) {
+    throw new Error(`GitHub API error ${response.status} for ${owner}/${repo}`);
+  }
+
+  const entries = await response.json();
+  if (!Array.isArray(entries)) {
+    throw new Error(`Unexpected response from GitHub API for ${owner}/${repo}`);
+  }
+
+  const files = [];
+  for (const entry of entries) {
+    if (entry.type === 'file') {
+      files.push({ name: entry.name, path: entry.path, size: entry.size, download_url: entry.download_url, type: 'file' });
+    } else if (entry.type === 'dir') {
+      // Recurse into subdirectories
+      const subFiles = await fetchGitHubContents(owner, repo, entry.path);
+      files.push(...subFiles);
+    }
+  }
+  return files;
+}
+
+/**
+ * Download raw file contents from GitHub for each file with a download_url.
+ * Returns array of { path, content, size }.
+ */
+async function downloadFiles(files) {
+  const results = [];
+  for (const file of files) {
+    if (!file.download_url) continue;
+    let response;
+    try {
+      response = await fetch(file.download_url);
+    } catch (e) {
+      throw new Error(`Failed to download ${file.path}: ${e.message}`);
+    }
+    if (!response.ok) {
+      throw new Error(`Failed to download ${file.path}: HTTP ${response.status}`);
+    }
+    const content = await response.text();
+    results.push({ path: file.path, content, size: file.size || Buffer.byteLength(content) });
+  }
+  return results;
+}
+
+// ─── skills:install ───────────────────────────────────────────────────────────
+
+/**
+ * Install a skill from a GitHub repository.
+ *
+ * Without --confirm: fetch, scan, display results, output confirmation prompt.
+ * With --confirm:    re-fetch, verify scan, write files, log audit.
+ *
+ * Dangerous scan verdict is a hard block — files are never written.
+ * Warn verdict is surfaced in the confirmation prompt.
+ */
+async function cmdSkillsInstall(cwd, options, raw) {
+  const { source, confirm, verbose } = options || {};
+
+  if (!source) {
+    error('Usage: skills install --source <github-url>');
+    return;
+  }
+
+  // 1. Parse GitHub URL
+  const parsed = parseGitHubUrl(source);
+  if (!parsed) {
+    error(`Invalid GitHub URL: ${source}\nExpected format: owner/repo, github.com/owner/repo, or https://github.com/owner/repo`);
+    return;
+  }
+  const { owner, repo } = parsed;
+  const name = repo;
+
+  // 2. Check for existing skill installation
+  const skillsDir = path.join(cwd, '.agents', 'skills');
+  const skillDestDir = path.join(skillsDir, name);
+  if (fs.existsSync(skillDestDir)) {
+    error(`Skill '${name}' already installed. Run skills:remove first.`);
+    return;
+  }
+
+  // 3. Fetch repo contents
+  let fileList;
+  try {
+    fileList = await fetchGitHubContents(owner, repo);
+  } catch (e) {
+    error(e.message);
+    return;
+  }
+
+  // 4. Verify SKILL.md exists in repo root
+  const hasSkillMd = fileList.some(f => f.path === 'SKILL.md' || f.name === 'SKILL.md' && !f.path.includes('/'));
+  if (!hasSkillMd) {
+    error(`Invalid skill: no SKILL.md found in repository root of ${owner}/${repo}`);
+    return;
+  }
+
+  // 5. Download all files
+  let downloadedFiles;
+  try {
+    downloadedFiles = await downloadFiles(fileList);
+  } catch (e) {
+    error(e.message);
+    return;
+  }
+
+  // 6. Write to temp directory for scanning
+  const tempDir = path.join(os.tmpdir(), `bgsd-skill-${name}-${Date.now()}`);
+  try {
+    fs.mkdirSync(tempDir, { recursive: true });
+    for (const file of downloadedFiles) {
+      const destPath = path.join(tempDir, file.path);
+      fs.mkdirSync(path.dirname(destPath), { recursive: true });
+      fs.writeFileSync(destPath, file.content, 'utf-8');
+    }
+  } catch (e) {
+    // Clean up temp on error
+    try { fs.rmSync(tempDir, { recursive: true, force: true }); } catch (_) { /* noop */ }
+    error(`Failed to prepare temp directory for scanning: ${e.message}`);
+    return;
+  }
+
+  // 7. Run security scan on temp directory
+  const scanResult = scanSkillFiles(tempDir);
+  const scanOutput = formatScanResults(scanResult, verbose || false);
+
+  // 8. Dangerous verdict — hard block, log audit, clean up
+  if (scanResult.verdict === 'dangerous') {
+    // Log blocked attempt
+    logAuditEntry(cwd, {
+      action: 'blocked',
+      source,
+      name,
+      outcome: 'blocked',
+      scan_verdict: {
+        dangerous: scanResult.summary.dangerous,
+        warn: scanResult.summary.warn,
+        clean: scanResult.summary.clean,
+        patterns: scanResult.findings.map(f => f.pattern_id),
+      },
+    });
+
+    // Clean up temp
+    try { fs.rmSync(tempDir, { recursive: true, force: true }); } catch (_) { /* noop */ }
+
+    if (raw) {
+      output({
+        blocked: true,
+        reason: 'dangerous_patterns',
+        scan: scanResult,
+      }, raw);
+      return;
+    }
+
+    console.log(scanOutput);
+    console.log('');
+    console.log(`Install BLOCKED — dangerous patterns found. Audit entry written.`);
+    return;
+  }
+
+  // Clean up temp dir (no longer needed after scan for non-confirm path)
+  if (!confirm) {
+    try { fs.rmSync(tempDir, { recursive: true, force: true }); } catch (_) { /* noop */ }
+  }
+
+  // 9. Format file list + sizes for display
+  const totalSize = downloadedFiles.reduce((sum, f) => sum + f.size, 0);
+  const totalSizeStr = totalSize < 1024
+    ? `${totalSize}B`
+    : totalSize < 1024 * 1024
+      ? `${(totalSize / 1024).toFixed(1)}KB`
+      : `${(totalSize / (1024 * 1024)).toFixed(1)}MB`;
+
+  // 10. Build confirmation prompt
+  const warnNote = scanResult.verdict === 'warn'
+    ? ` (${scanResult.summary.warn} warnings)`
+    : '';
+  const confirmPrompt = `Install skill '${name}' (${downloadedFiles.length} files, ${totalSizeStr})${warnNote}? [y/N]`;
+
+  // Non-confirm path: show results, output confirmation data
+  if (!confirm) {
+    if (raw) {
+      output({
+        action: 'confirm',
+        name,
+        source,
+        files: downloadedFiles.map(f => ({ path: f.path, size: f.size })),
+        scan: scanResult,
+        prompt: confirmPrompt,
+      }, raw);
+      return;
+    }
+
+    // TTY: show scan results, file list, prompt
+    if (scanResult.verdict !== 'clean') {
+      console.log(scanOutput);
+      console.log('');
+    } else {
+      console.log(scanOutput);
+    }
+    console.log(`Files to install (${downloadedFiles.length}):`);
+    for (const f of downloadedFiles) {
+      const sizeStr = f.size < 1024 ? `${f.size}B` : `${(f.size / 1024).toFixed(1)}KB`;
+      console.log(`  ${f.path} (${sizeStr})`);
+    }
+    console.log('');
+    console.log(confirmPrompt);
+    return;
+  }
+
+  // --confirm path: write files to destination
+  try {
+    fs.mkdirSync(skillDestDir, { recursive: true });
+    for (const file of downloadedFiles) {
+      const destPath = path.join(skillDestDir, file.path);
+      fs.mkdirSync(path.dirname(destPath), { recursive: true });
+      fs.writeFileSync(destPath, file.content, 'utf-8');
+    }
+  } catch (e) {
+    // Clean up partial install on failure
+    try { fs.rmSync(skillDestDir, { recursive: true, force: true }); } catch (_) { /* noop */ }
+    // Clean up temp if still around
+    if (fs.existsSync(tempDir)) {
+      try { fs.rmSync(tempDir, { recursive: true, force: true }); } catch (_) { /* noop */ }
+    }
+    error(`Failed to install skill '${name}': ${e.message}`);
+    return;
+  }
+
+  // Clean up temp dir
+  if (fs.existsSync(tempDir)) {
+    try { fs.rmSync(tempDir, { recursive: true, force: true }); } catch (_) { /* noop */ }
+  }
+
+  // Log successful install
+  logAuditEntry(cwd, {
+    action: 'install',
+    source,
+    name,
+    outcome: 'installed',
+    scan_verdict: {
+      dangerous: scanResult.summary.dangerous,
+      warn: scanResult.summary.warn,
+      clean: scanResult.summary.clean,
+      patterns: scanResult.findings.map(f => f.pattern_id),
+    },
+  });
+
+  const successMsg = `Installed '${name}' to .agents/skills/${name}/ (${downloadedFiles.length} files)`;
+
+  if (raw) {
+    output({ installed: true, name, path: path.join('.agents', 'skills', name), files: downloadedFiles.length }, raw);
+    return;
+  }
+
+  console.log(successMsg);
+}
+
+// ─── Audit Logging ────────────────────────────────────────────────────────────
+
+/**
+ * Append an audit entry to .agents/skill-audit.json.
+ * Entry shape: { timestamp, action, source, name, outcome, scan_verdict }
+ * Creates .agents/ directory if it doesn't exist.
+ * Log grows indefinitely — no rotation.
+ */
+function logAuditEntry(cwd, entry) {
+  const agentsDir = path.join(cwd, '.agents');
+  const auditPath = path.join(agentsDir, 'skill-audit.json');
+
+  // Ensure .agents/ directory exists
+  try {
+    fs.mkdirSync(agentsDir, { recursive: true });
+  } catch (e) {
+    debugLog('skills.audit', 'mkdir .agents failed', e);
+  }
+
+  // Read existing entries or start fresh
+  let entries = [];
+  try {
+    if (fs.existsSync(auditPath)) {
+      const raw = fs.readFileSync(auditPath, 'utf-8');
+      entries = JSON.parse(raw);
+      if (!Array.isArray(entries)) entries = [];
+    }
+  } catch (e) {
+    debugLog('skills.audit', 'read audit log failed (resetting)', e);
+    entries = [];
+  }
+
+  // Build full entry
+  const fullEntry = {
+    timestamp: new Date().toISOString(),
+    action: entry.action,
+    source: entry.source || null,
+    name: entry.name || null,
+    outcome: entry.outcome || entry.action,
+    scan_verdict: entry.scan_verdict || null,
+  };
+
+  entries.push(fullEntry);
+
+  try {
+    fs.writeFileSync(auditPath, JSON.stringify(entries, null, 2), 'utf-8');
+  } catch (e) {
+    debugLog('skills.audit', 'write audit log failed', e);
+  }
+}
+
+// ─── skills:remove ────────────────────────────────────────────────────────────
+
+/**
+ * Remove an installed skill by name and log the removal to the audit trail.
+ * Options:
+ *   name — required skill name to remove
+ */
+function cmdSkillsRemove(cwd, options, raw) {
+  const { name } = options || {};
+
+  if (!name) {
+    error('Usage: skills remove --name <skill-name>');
+    return;
+  }
+
+  const skillDir = path.join(cwd, '.agents', 'skills', name);
+
+  // Check skill directory exists
+  if (!fs.existsSync(skillDir)) {
+    error(`Skill not found: ${name}`);
+    return;
+  }
+
+  // Remove directory recursively
+  try {
+    fs.rmSync(skillDir, { recursive: true, force: true });
+  } catch (e) {
+    error(`Failed to remove skill '${name}': ${e.message}`);
+    return;
+  }
+
+  // Log removal audit entry (name + timestamp only per CONTEXT.md)
+  logAuditEntry(cwd, {
+    action: 'remove',
+    name,
+    outcome: 'removed',
+  });
+
+  if (raw) {
+    output({ removed: name }, raw);
+    return;
+  }
+
+  console.log(`Removed skill '${name}'`);
+}
+
 // ─── Exports ──────────────────────────────────────────────────────────────────
 
 module.exports = {
@@ -403,4 +821,8 @@ module.exports = {
   formatScanResults,
   cmdSkillsList,
   cmdSkillsValidate,
+  parseGitHubUrl,
+  cmdSkillsInstall,
+  logAuditEntry,
+  cmdSkillsRemove,
 };
