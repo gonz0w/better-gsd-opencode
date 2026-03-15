@@ -112,7 +112,7 @@
 | DEVCAP-02 | Phase 132 | Complete |
 | DEVCAP-03 | Phase 132 | Complete |
 | DEVCAP-04 | Phase 132 | Complete |
-| RESEARCH-01 | Phase 133 | pending |
+| RESEARCH-01 | Phase 133 | Complete |
 | RESEARCH-02 | Phase 133 | pending |
-| RESEARCH-03 | Phase 133 | pending |
-| RESEARCH-04 | Phase 133 | pending |
+| RESEARCH-03 | Phase 133 | Complete |
+| RESEARCH-04 | Phase 133 | Complete |

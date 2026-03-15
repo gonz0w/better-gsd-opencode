@@ -15,7 +15,7 @@ See: `.planning/PROJECT.md` (updated 2026-03-15)
 **Status:** Ready to plan
 **Last Activity:** 2026-03-15
 
-Progress: [██████████] 100%
+Progress: [██████████] 99%
 
 ## Performance Metrics
 
@@ -63,6 +63,7 @@ Progress: [██████████] 100%
 | 131 | Skill Discovery & Security | Security-first skill lifecycle + agentskills.io discovery | SKILL-01 through SKILL-09 |
 | 132 | Deviation Recovery Auto-Capture | Rule-1-only auto-capture in execute-phase | DEVCAP-01 through DEVCAP-04 |
 | 133 | Enhanced Research Workflow | Structured quality profile + conflict detection | RESEARCH-01 through RESEARCH-04 |
+| Phase 0133 P01 | 8min | 2 tasks | 4 files |
 
 ### Key Decisions
 
@@ -96,10 +97,13 @@ Progress: [██████████] 100%
 - [Phase 132 Plan 01]: lessons:deviation-capture uses Rule-1-only parseInt filter — silently skips Rules 2, 3, 4 per DEVCAP-01
 - [Phase 132 Plan 01]: cmdDeviationCapture wrapped in try/catch — all errors swallowed and debugLogged, never blocks execution per DEVCAP-04
 - [Phase 132 Plan 02]: Rule-3 explicitly excluded in workflow text AND command filters internally — dual-layer prevents accidental invocation for environmental failures
+- [Phase 133 Plan 01]: research:score + research:gaps use composite negative-signal scoring (5 signals, >= 3 = LOW); router wiring added as Rule-3 blocking fix — commands need explicit case blocks to be callable
+- [Phase 133 Plan 01]: cache-first pattern: cmdResearchScore writes research-score.json, cmdResearchGaps reads it — no independent recomputation keeps the two commands decoupled
+- [Phase 133 Plan 01]: parseResearchFile scans Primary+Secondary sources only for official docs detection (docs.* domain or "official" keyword) — Tertiary sources excluded as secondary references
 
 ### Pending Work
 
-Phase 130 complete. Phase 131 Plans 01–03 complete (security scanner + full skills CLI + router wiring + enricher installed_skills + new-milestone Step 8.5). Phase 131 Plan 04 remains. Phase 132 complete (Plans 01 + 02): autonomousRecoveries typo fix + lessons:deviation-capture CLI + deviation_auto_capture hook in execute-plan.md + help/discovery metadata. Phase 133 (Enhanced Research) remains.
+Phase 130 complete. Phase 131 Plans 01–03 complete (security scanner + full skills CLI + router wiring + enricher installed_skills + new-milestone Step 8.5). Phase 131 Plan 04 remains. Phase 132 complete (Plans 01 + 02): autonomousRecoveries typo fix + lessons:deviation-capture CLI + deviation_auto_capture hook in execute-plan.md + help/discovery metadata. Phase 133 Plan 01 complete: research:score + research:gaps command handlers with 22 tests. Phase 133 may have more plans.
 
 ### Blockers/Concerns
 
@@ -107,8 +111,9 @@ None.
 
 ## Session Continuity
 
-**Last session:** 2026-03-15T22:47:12.541Z
-**This session:** 2026-03-15 — Completed Phase 132 Plan 02 (deviation_auto_capture hook in execute-plan.md + complete help/discovery metadata for lessons:deviation-capture)
+**Last session:** 2026-03-15T23:11:29.593Z
+**This session:** 2026-03-15 — Completed Phase 133 Plan 01 (research:score + research:gaps command handlers with parseResearchFile, computeConfidenceLevel, 22 tests, router wiring)
 **Next steps:**
-1. Execute Phase 133 (Enhanced Research Workflow — structured quality profile + conflict detection)
+1. Check for Phase 133 Plan 02+ (new-milestone.md integration with LOW confidence flagging)
+2. Phase 131 Plan 04 (final verification) if it remains
 2. Phase 131 Plan 04 (final verification) may also be executed if it remains
