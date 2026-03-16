@@ -11,11 +11,11 @@ See: `.planning/PROJECT.md` (updated 2026-03-16)
 
 **Milestone:** v14.0 LLM Workload Reduction
 **Phase:** 134 — Measurement Infrastructure & Baseline
-**Current Plan:** —
-**Status:** Ready to plan
-**Last Activity:** 2026-03-16 — Roadmap created for v14.0 (4 phases, 11 requirements)
+**Current Plan:** 02
+**Status:** Executing
+**Last Activity:** 2026-03-16 — Executed Phase 134 Plan 01 (workflow:baseline + workflow:compare + 21 tests)
 
-Progress: [░░░░░░░░░░] 0%
+Progress: [█░░░░░░░░░] 10%
 
 ## Performance Metrics
 
@@ -34,6 +34,7 @@ Progress: [░░░░░░░░░░] 0%
 - v13.0 Phase 132 Plan 02: 5 min, 2 tasks, 4 files (deviation_auto_capture hook in execute-plan.md)
 - v13.0 Phase 133 Plan 01: 8 min, 2 tasks, 4 files (research:score + research:gaps command handlers)
 - v13.0 Phase 133 Plan 02: 8 min, 2 tasks, 5 files (help/discovery wiring + new-milestone.md quality profile)
+- v14.0 Phase 134 Plan 01: 7 min, 2 tasks, 7 files (workflow:baseline + workflow:compare + structural fingerprint + 21 tests)
 - Trend: Stable, improving velocity with infrastructure improvements
 
 *Updated after each plan completion*
@@ -62,6 +63,9 @@ Progress: [░░░░░░░░░░] 0%
 - [v14.0 roadmap]: COMP-01 + COMP-02 together in Phase 135 — section markers added WITH compression, not separately
 - [v14.0 roadmap]: Phase 136 parallel with 134–135 — scaffold work touches misc.js/verify.js, compression touches workflows/*.md, no overlap
 - [v14.0 roadmap]: Phase 137 last — section-level loading depends on markers from Phase 135; conditional elision depends on scaffolds from Phase 136
+- [134-01]: Reuse measureAllWorkflows() from features.js (exported it) rather than duplicating measurement code
+- [134-01]: Structural fingerprint stores arrays of matched strings (not just counts) for richer future diffing
+- [134-01]: Workflow baselines named workflow-baseline-{timestamp}.json to distinguish from old baseline-{timestamp}.json
 
 ### Blockers/Concerns
 
@@ -70,8 +74,8 @@ None.
 ## Session Continuity
 
 **Last session:** 2026-03-16
-**This session:** 2026-03-16 — Created v14.0 roadmap
+**This session:** 2026-03-16 — Executed Phase 134 Plan 01 (workflow:baseline + workflow:compare + 21 tests)
 **Next steps:**
-1. Plan Phase 134 with `/bgsd-plan-phase 134`
-2. Phase 136 can be planned in parallel (different files)
-3. Begin execution with `/bgsd-execute-phase 134`
+1. Execute Phase 134 Plan 02 (workflow:verify-structure — structural regression detection)
+2. After Phase 134 complete, begin Phase 135 (workflow compression)
+3. Phase 136 (scaffold infrastructure) can run in parallel with 134–135
