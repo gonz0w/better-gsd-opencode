@@ -111,6 +111,7 @@ function lazyDecisions() { return _modules.decisions || (_modules.decisions = re
 function lazyDb() { return _modules.db || (_modules.db = require('./lib/db')); }
 function lazyLessons() { return _modules.lessons || (_modules.lessons = require('./commands/lessons')); }
 function lazySkills() { return _modules.skills || (_modules.skills = require('./commands/skills')); }
+function lazyWorkflow() { return _modules.workflow || (_modules.workflow = require('./commands/workflow')); }
 
 
 async function main() {
@@ -253,7 +254,7 @@ async function main() {
   let namespace = null;
   let remainingArgs = args.slice(1);
   
-  const KNOWN_NAMESPACES = ['init', 'plan', 'execute', 'verify', 'util', 'research', 'cache', 'audit', 'decisions', 'detect', 'lessons', 'skills'];
+  const KNOWN_NAMESPACES = ['init', 'plan', 'execute', 'verify', 'util', 'research', 'cache', 'audit', 'decisions', 'detect', 'lessons', 'skills', 'workflow'];
   
   if (command && command.includes(':')) {
     const colonIdx = command.indexOf(':');
@@ -269,7 +270,7 @@ async function main() {
   }
 
   if (!command) {
-    error('Usage: bgsd-tools <namespace:command> [args] [--pretty] [--verbose]\nCommands: init:<workflow>, plan:<intent|requirements|roadmap|phases|find-phase|milestone|phase>, execute:<commit|rollback-info|session-diff|session-summary|velocity|worktree|tdd|test-run>, verify:<state|verify|assertions|search-decisions|search-lessons|review|context-budget|token-budget>, util:<config-get|config-set|env|current-timestamp|list-todos|todo|memory|mcp|classify|frontmatter|progress|websearch|history-digest|trace-requirement|codebase|cache|agent>, research:<capabilities|yt-search|yt-transcript|collect|nlm-create|nlm-add-source|nlm-ask|nlm-report|score|gaps>');
+    error('Usage: bgsd-tools <namespace:command> [args] [--pretty] [--verbose]\nCommands: init:<workflow>, plan:<intent|requirements|roadmap|phases|find-phase|milestone|phase>, execute:<commit|rollback-info|session-diff|session-summary|velocity|worktree|tdd|test-run>, verify:<state|verify|assertions|search-decisions|search-lessons|review|context-budget|token-budget>, util:<config-get|config-set|env|current-timestamp|list-todos|todo|memory|mcp|classify|frontmatter|progress|websearch|history-digest|trace-requirement|codebase|cache|agent>, research:<capabilities|yt-search|yt-transcript|collect|nlm-create|nlm-add-source|nlm-ask|nlm-report|score|gaps>, workflow:<baseline|compare>');
   }
 
   // --help / -h: print command help to stderr (never contaminates JSON stdout)
@@ -1456,15 +1457,31 @@ Examples:
          break;
        }
 
+      // workflow namespace
+      case 'workflow': {
+        const workflowRestArgs = remainingArgs.slice(1);
+        if (subCmd === 'baseline') {
+          lazyWorkflow().cmdWorkflowBaseline(cwd, raw);
+        } else if (subCmd === 'compare') {
+          lazyWorkflow().cmdWorkflowCompare(cwd, workflowRestArgs, raw);
+        } else if (subCmd === 'verify-structure') {
+          // Reserved for future structural verification command
+          error('workflow:verify-structure not yet implemented');
+        } else {
+          error('Unknown workflow subcommand: ' + subCmd + '. Available: baseline, compare');
+        }
+        break;
+      }
+
       // Unknown namespace
       default:
-        error(`Unknown namespace: ${namespace}. Available namespaces: init, plan, execute, verify, util, research, cache, audit, decisions, detect, lessons, skills`);
+        error(`Unknown namespace: ${namespace}. Available namespaces: init, plan, execute, verify, util, research, cache, audit, decisions, detect, lessons, skills, workflow`);
     }
     return; // Exit after handling namespaced command
   }
 
   // No command matched any namespace — unknown
-  error(`Unknown command: ${command}. Use namespace:command syntax. Available namespaces: init, plan, execute, verify, util, research, cache, audit, decisions, lessons, skills`);
+  error(`Unknown command: ${command}. Use namespace:command syntax. Available namespaces: init, plan, execute, verify, util, research, cache, audit, decisions, lessons, skills, workflow`);
 }
 
 // Track command execution in history (Phase 97: UX Polish)
