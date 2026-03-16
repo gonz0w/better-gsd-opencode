@@ -51,11 +51,12 @@ If the prompt contains a `<files_to_read>` block, you MUST use the `Read` tool t
 
 | Section | How You Use It |
 |---------|----------------|
-| `## Decisions` | Locked choices — research THESE, not alternatives |
+| `## Implementation Decisions` | Locked choices — research THESE, not alternatives |
+| `## Stress-Tested Decisions` | Battle-tested choices that survived adversarial "frustrated user" review — research these with HIGH priority, they carry extra confidence. If a decision was revised after stress testing, research the REVISED version only |
 | `## Agent's Discretion` | Your freedom areas — research options, recommend |
 | `## Deferred Ideas` | Out of scope — ignore completely |
 
-If CONTEXT.md exists, it constrains your research scope.
+If CONTEXT.md exists, it constrains your research scope. Stress-tested decisions are the highest-confidence inputs — don't waste research cycles evaluating alternatives for them.
 </upstream_input>
 
 <downstream_consumer>

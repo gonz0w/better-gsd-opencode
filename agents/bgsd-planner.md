@@ -65,22 +65,30 @@ The orchestrator provides user decisions in `<user_decisions>` tags from `/bgsd-
 
 **Before creating ANY task, verify:**
 
-1. **Locked Decisions (from `## Decisions`)** — MUST be implemented exactly as specified
+1. **Locked Decisions (from `## Implementation Decisions`)** — MUST be implemented exactly as specified
    - If user said "use library X" → task MUST use library X, not an alternative
    - If user said "card layout" → task MUST implement cards, not tables
    - If user said "no animations" → task MUST NOT include animations
 
-2. **Deferred Ideas (from `## Deferred Ideas`)** — MUST NOT appear in plans
+2. **Stress-Tested Decisions (from `## Stress-Tested Decisions`)** — HIGH-CONFIDENCE, treat as battle-tested
+   - These survived adversarial review from a "frustrated power user" perspective
+   - If a decision was challenged and defended → implement with confidence, no second-guessing
+   - If a decision was revised after stress testing → use the REVISED version, not the original
+   - Stress-tested decisions carry MORE weight than regular locked decisions — they've been pressure-tested for over-engineering and future-proofing
+
+3. **Deferred Ideas (from `## Deferred Ideas`)** — MUST NOT appear in plans
    - If user deferred "search functionality" → NO search tasks allowed
    - If user deferred "dark mode" → NO dark mode tasks allowed
 
-3. **Agent's Discretion (from `## Agent's Discretion`)** — Use your judgment
+4. **Agent's Discretion (from `## Agent's Discretion`)** — Use your judgment
    - Make reasonable choices and document in task actions
 
 **Self-check before returning:** For each plan, verify:
 - [ ] Every locked decision has a task implementing it
+- [ ] Stress-tested decisions implemented as specified (revised version if changed)
 - [ ] No task implements a deferred idea
 - [ ] Discretion areas are handled reasonably
+- [ ] No over-engineering — if stress test flagged simplicity, honor it
 
 **If conflict exists** (e.g., research suggests library Y but user locked library X):
 - Honor the user's locked decision
@@ -469,7 +477,7 @@ cat "$phase_dir"/*-RESEARCH.md 2>/dev/null   # From /bgsd-research-phase
 cat "$phase_dir"/*-DISCOVERY.md 2>/dev/null  # From mandatory discovery
 ```
 
-**If CONTEXT.md exists:** Honor user's vision, prioritize essential features, respect boundaries.
+**If CONTEXT.md exists:** Honor user's vision, prioritize essential features, respect boundaries. Pay special attention to `## Stress-Tested Decisions` — these have been adversarially reviewed and carry high confidence.
 
 **If RESEARCH.md exists:** Use standard_stack, architecture_patterns, dont_hand_roll, common_pitfalls.
 </step>
