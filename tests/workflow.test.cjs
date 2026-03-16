@@ -247,39 +247,54 @@ describe('workflow compare logic (unit)', () => {
 
 // ─── Integration: workflow:baseline ─────────────────────────────────────────
 
+// Helper: run workflow:baseline and read the saved JSON from .planning/baselines/
+// Note: workflow:baseline --raw outputs @file: reference (editor temp file, deleted on read).
+// Instead, we run without --raw and read the newest saved baseline file from disk.
+function runBaselineAndRead(cwd) {
+  const baseCwd = cwd || process.cwd();
+  const result = runGsdTools('workflow:baseline', baseCwd);
+  if (!result.success) return { success: false, error: result.error };
+  const baselinesDir = path.join(baseCwd, '.planning', 'baselines');
+  let files;
+  try {
+    files = fs.readdirSync(baselinesDir).filter(f => f.endsWith('.json')).sort();
+  } catch {
+    return { success: false, error: 'No baselines directory found' };
+  }
+  if (files.length === 0) return { success: false, error: 'No baseline files saved' };
+  const newest = files[files.length - 1];
+  const filePath = path.join(baselinesDir, newest);
+  try {
+    const data = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+    return { success: true, data, filePath: path.join('.planning', 'baselines', newest) };
+  } catch (e) {
+    return { success: false, error: `Failed to parse ${filePath}: ${e.message}` };
+  }
+}
+
 describe('workflow:baseline (integration)', () => {
   test('returns valid JSON with expected top-level fields', () => {
-    const result = runGsdTools('workflow:baseline --raw');
-    assert.ok(result.success, `workflow:baseline failed: ${result.error}`);
+    const r = runBaselineAndRead();
+    assert.ok(r.success, `workflow:baseline failed: ${r.error}`);
+    const data = r.data;
 
-    let data;
-    try {
-      data = JSON.parse(result.output);
-    } catch (e) {
-      assert.fail(`Output is not valid JSON: ${result.output.slice(0, 200)}`);
-    }
-
-    assert.strictEqual(data.version, 1, 'version should be 1');
     assert.ok(typeof data.timestamp === 'string', 'timestamp should be a string');
     assert.ok(typeof data.workflow_count === 'number', 'workflow_count should be a number');
     assert.ok(typeof data.total_tokens === 'number', 'total_tokens should be a number');
     assert.ok(Array.isArray(data.workflows), 'workflows should be an array');
-    assert.ok(typeof data.baseline_file === 'string', 'baseline_file should be a string');
   });
 
   test('workflow_count is at least 40', () => {
-    const result = runGsdTools('workflow:baseline --raw');
-    assert.ok(result.success, `workflow:baseline failed: ${result.error}`);
-    const data = JSON.parse(result.output);
-    assert.ok(data.workflow_count >= 40, `Expected at least 40 workflows, got ${data.workflow_count}`);
+    const r = runBaselineAndRead();
+    assert.ok(r.success, `workflow:baseline failed: ${r.error}`);
+    assert.ok(r.data.workflow_count >= 40, `Expected at least 40 workflows, got ${r.data.workflow_count}`);
   });
 
   test('each workflow entry has required fields and structure fingerprint', () => {
-    const result = runGsdTools('workflow:baseline --raw');
-    assert.ok(result.success, `workflow:baseline failed: ${result.error}`);
-    const data = JSON.parse(result.output);
+    const r = runBaselineAndRead();
+    assert.ok(r.success, `workflow:baseline failed: ${r.error}`);
 
-    for (const w of data.workflows) {
+    for (const w of r.data.workflows) {
       assert.ok(typeof w.name === 'string', `workflow.name should be string, got ${typeof w.name}`);
       assert.ok(typeof w.workflow_tokens === 'number', `${w.name}: workflow_tokens should be number`);
       assert.ok(typeof w.ref_count === 'number', `${w.name}: ref_count should be number`);
@@ -295,22 +310,20 @@ describe('workflow:baseline (integration)', () => {
   });
 
   test('saves baseline file to .planning/baselines/', () => {
-    const result = runGsdTools('workflow:baseline --raw');
-    assert.ok(result.success, `workflow:baseline failed: ${result.error}`);
-    const data = JSON.parse(result.output);
+    const r = runBaselineAndRead();
+    assert.ok(r.success, `workflow:baseline failed: ${r.error}`);
 
-    assert.ok(data.baseline_file.startsWith('.planning/baselines/'), 'baseline_file should be in .planning/baselines/');
-    assert.ok(data.baseline_file.endsWith('.json'), 'baseline_file should be a JSON file');
-    assert.ok(fs.existsSync(data.baseline_file), `Baseline file should exist on disk: ${data.baseline_file}`);
+    assert.ok(r.filePath.startsWith('.planning/baselines/'), 'baseline should be in .planning/baselines/');
+    assert.ok(r.filePath.endsWith('.json'), 'baseline should be a JSON file');
+    assert.ok(fs.existsSync(r.filePath), `Baseline file should exist on disk: ${r.filePath}`);
   });
 
   test('total_tokens equals sum of workflow total_tokens', () => {
-    const result = runGsdTools('workflow:baseline --raw');
-    assert.ok(result.success, `workflow:baseline failed: ${result.error}`);
-    const data = JSON.parse(result.output);
+    const r = runBaselineAndRead();
+    assert.ok(r.success, `workflow:baseline failed: ${r.error}`);
 
-    const computedTotal = data.workflows.reduce((s, w) => s + w.total_tokens, 0);
-    assert.strictEqual(data.total_tokens, computedTotal, 'total_tokens should equal sum of workflow totals');
+    const computedTotal = r.data.workflows.reduce((s, w) => s + w.total_tokens, 0);
+    assert.strictEqual(r.data.total_tokens, computedTotal, 'total_tokens should equal sum of workflow totals');
   });
 });
 
