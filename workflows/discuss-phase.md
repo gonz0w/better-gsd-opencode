@@ -1,7 +1,9 @@
 <purpose>
-Extract implementation decisions that downstream agents need. Analyze the phase to identify gray areas, let the user choose what to discuss, then deep-dive each selected area until satisfied.
+Extract implementation decisions that downstream agents need. Analyze the phase to identify gray areas, let the user choose what to discuss, then Socratic-dive each selected area — questioning assumptions and asking "why" at every turn.
 
-You are a thinking partner, not an interviewer. The user is the visionary — you are the builder. Your job is to capture decisions that will guide research and planning, not to figure out implementation yourself.
+You are a thinking partner, not an interviewer. The user is the visionary — you are the builder. Your job is to capture decisions WITH REASONING that will guide research and planning. Don't just record what the user chose — understand and capture why they chose it.
+
+After discussion, stress-test decisions by role-playing a frustrated 2-year power user who pushes back on design choices. The goal: future-proof without over-engineering.
 </purpose>
 
 <downstream_awareness>
@@ -216,11 +218,22 @@ Continue to discuss_areas with selected areas.
 </step>
 
 <step name="discuss_areas">
-For each selected area, conduct a focused discussion loop.
+For each selected area, conduct a focused Socratic discussion loop.
 
-**Philosophy: 4 questions, then check.**
+**Philosophy: Socratic method — question assumptions, ask "why", dig deeper.**
 
-Ask 4 questions per area before offering to continue or move on. Each answer often reveals the next question.
+Your role is not to accept decisions at face value. For every choice the user makes, probe the reasoning behind it. The goal is to surface hidden assumptions and ensure decisions are intentional, not reflexive.
+
+**Socratic questioning patterns:**
+- **"Why this over [alternative]?"** — After every decision, ask why they chose it over the obvious alternative
+- **"What changes if we're wrong about [assumption]?"** — Surface the cost of being wrong
+- **"Who benefits from this decision?"** — Connect choices back to end users
+- **"What would have to be true for [opposite choice] to be better?"** — Inversion forces deeper thinking
+- **"You said [X] — is that because of [reason A] or [reason B]?"** — Don't accept vague rationale
+
+**Don't be adversarial — be curious.** You're helping them think, not challenging them. The tone is "help me understand" not "prove it."
+
+Ask 4 questions per area before offering to continue or move on. Each answer often reveals the next question — follow the thread, don't follow a script.
 
 **For each area:**
 
@@ -234,6 +247,7 @@ Ask 4 questions per area before offering to continue or move on. Each answer oft
    - question: Specific decision for this area
    - options: 2-3 concrete choices (question adds "Other" automatically)
    - Include "You decide" as an option when reasonable — captures agent discretion
+   - **After each answer:** Follow up with a "why" before moving to the next question. E.g., user picks "Cards" → "What makes cards the right fit here? Is it about scannability, visual appeal, or something else?"
 
 3. **After 4 questions, check:**
    - header: "[Area]" (max 12 chars)
@@ -244,15 +258,14 @@ Ask 4 questions per area before offering to continue or move on. Each answer oft
    If "Next area" → proceed to next selected area
    If "Other" (free text) → interpret intent: continuation phrases ("chat more", "keep going", "yes", "more") map to "More questions"; advancement phrases ("done", "move on", "next", "skip") map to "Next area". If ambiguous, ask: "Continue with more questions about [area], or move to the next area?"
 
-4. **After all areas complete:**
-   - header: "Done"
-   - question: "That covers [list areas]. Ready to create context?"
-   - options: "Create context" / "Revisit an area"
+4. **After all areas complete:** Proceed to `customer_stress_test`.
 
 **Question design:**
 - Options should be concrete, not abstract ("Cards" not "Option A")
 - Each answer should inform the next question
-- If user picks "Other", receive their input, reflect it back, confirm
+- **Every decision gets a "why" follow-up** — don't just record choices, understand reasoning
+- If user picks "Other", receive their input, reflect it back, ask why
+- If user says "I don't know" or gives vague reasoning, that's valuable — note it as an assumption to revisit
 
 **Scope creep handling:**
 If user mentions something outside the phase domain:
@@ -264,6 +277,50 @@ Back to [current area]: [return to current question]"
 ```
 
 Track deferred ideas internally.
+</step>
+
+<step name="customer_stress_test">
+Quick adversarial review of decisions made so far. The agent role-plays as a frustrated long-time user pushing back on design choices.
+
+**Purpose:** Catch over-engineering, short-sighted decisions, and missing longevity considerations before they get baked into plans. This is a 2-3 minute rapid-fire sanity check, not an extended debate.
+
+**Setup:**
+```
+---
+
+**Stress Test:** Before I write this up, let me put on a different hat for a minute.
+
+I'm going to play the role of someone who's been using this product for 2 years. They're invested, they're opinionated, and they've seen things break before. I'll push back on the decisions we just made — your job is to defend them, change your mind, or say "good point."
+
+This is quick — 3-5 challenges, then we move on.
+
+---
+```
+
+**Role-play rules:**
+- Adopt the voice of a frustrated but loyal power user — someone who CARES, not someone who hates the product
+- Reference real pain points: "I've been using this for 2 years and every time you guys [change X / add Y / ignore Z]..."
+- Challenge from these angles:
+  1. **Over-engineering** — "Why are you building [complex thing] when [simple thing] works fine? Just ship it."
+  2. **Future-proofing gaps** — "What happens in 6 months when [reasonable scenario]? Did you think about that?"
+  3. **Migration pain** — "So I have to re-learn / re-do / migrate [thing] again? Seriously?"
+  4. **Consistency** — "This doesn't match how [other part] works. Why is this different?"
+  5. **Missing basics** — "You're adding [fancy feature] but [basic thing] still doesn't work right."
+
+**Format:** For each challenge:
+1. State the complaint in-character (1-2 sentences, genuine frustration)
+2. Wait for user response
+3. Either accept ("Fair enough, that makes sense") or push back once more ("But what about [edge case]?")
+
+**After 3-5 challenges:**
+- header: "Stress Test"
+- question: "That's my grumpy user impression. Any of those points change your thinking?"
+- options: "No changes — proceed" / "Revisit a decision"
+
+If "Revisit" → ask which decision, discuss briefly, then proceed to write_context
+If "No changes" → proceed to write_context
+
+**What to capture:** Any decisions that changed or new considerations surfaced go into CONTEXT.md under a "Stress-Tested" note so downstream agents know these were deliberately challenged and defended.
 </step>
 
 <step name="write_context">
@@ -318,6 +375,17 @@ mkdir -p ".planning/phases/${padded_phase}-${phase_slug}"
 [If none: "No specific requirements — open to standard approaches"]
 
 </specifics>
+
+<stress_tested>
+## Stress-Tested Decisions
+
+[Decisions that were challenged during the customer stress test and deliberately defended or revised. Downstream agents should treat these as high-confidence — they survived adversarial review.]
+
+[If a decision changed: note the original choice, the challenge, and the revised decision]
+
+[If none changed: "All decisions held up under stress testing — no revisions needed"]
+
+</stress_tested>
 
 <deferred>
 ## Deferred Ideas
@@ -459,9 +527,11 @@ Route to `confirm_creation` step (existing behavior — show manual next steps).
 - Phase validated against roadmap
 - Gray areas identified through intelligent analysis (not generic questions)
 - User selected which areas to discuss
-- Each selected area explored until user satisfied
+- Each selected area explored with Socratic "why" follow-ups — decisions have reasoning, not just choices
 - Scope creep redirected to deferred ideas
-- CONTEXT.md captures actual decisions, not vague vision
+- Customer stress test challenged decisions from a real-user perspective
+- Over-engineering and future-proofing gaps surfaced and addressed
+- CONTEXT.md captures actual decisions with reasoning and stress-test results
 - Deferred ideas preserved for future phases
 - STATE.md updated with session info
 - User knows next steps
