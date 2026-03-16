@@ -44,14 +44,14 @@
 
 | REQ ID | Phase | Plan | Status |
 |--------|-------|------|--------|
-| MEAS-01 | — | — | Pending |
-| MEAS-02 | — | — | Pending |
-| MEAS-03 | — | — | Pending |
-| COMP-01 | — | — | Pending |
-| COMP-02 | — | — | Pending |
-| COMP-03 | — | — | Pending |
-| COMP-04 | — | — | Pending |
-| SCAF-01 | — | — | Pending |
-| SCAF-02 | — | — | Pending |
-| SCAF-03 | — | — | Pending |
-| SCAF-04 | — | — | Pending |
+| MEAS-01 | 134 | — | Pending |
+| MEAS-02 | 134 | — | Pending |
+| MEAS-03 | 134 | — | Pending |
+| COMP-01 | 135 | — | Pending |
+| COMP-02 | 135 | — | Pending |
+| COMP-03 | 135 | — | Pending |
+| COMP-04 | 137 | — | Pending |
+| SCAF-01 | 136 | — | Pending |
+| SCAF-02 | 136 | — | Pending |
+| SCAF-03 | 136 | — | Pending |
+| SCAF-04 | 137 | — | Pending |
