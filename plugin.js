@@ -6455,7 +6455,7 @@ function enrichCommand(input, output, cwd) {
     milestone: currentMilestone ? currentMilestone.version : null,
     milestone_name: currentMilestone ? currentMilestone.name : null
   };
-  const phaseNum = detectPhaseArg(input.parts);
+  const phaseNum = detectPhaseArg(input.parts, input.command);
   let effectivePhaseNum = phaseNum;
   let plans = null;
   let summaryFiles = null;
@@ -6840,15 +6840,22 @@ ${JSON.stringify(enrichment, null, 2)}
     });
   }
 }
-function detectPhaseArg(parts) {
-  if (!parts || !Array.isArray(parts)) return null;
-  for (let i = 1; i < parts.length; i++) {
-    const part = parts[i];
-    if (typeof part === "string") {
-      const match = part.match(/^(\d{1,3})$/);
-      if (match) {
-        return parseInt(match[1], 10);
+function detectPhaseArg(parts, commandStr) {
+  if (parts && Array.isArray(parts)) {
+    for (let i = 1; i < parts.length; i++) {
+      const part = parts[i];
+      if (typeof part === "string") {
+        const match = part.match(/^(\d{1,3})$/);
+        if (match) {
+          return parseInt(match[1], 10);
+        }
       }
+    }
+  }
+  if (commandStr && typeof commandStr === "string") {
+    const match = commandStr.match(/bgsd-\S+\s+(\d{1,3})(?:\s|$)/);
+    if (match) {
+      return parseInt(match[1], 10);
     }
   }
   return null;
