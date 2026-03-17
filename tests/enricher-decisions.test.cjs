@@ -750,15 +750,10 @@ describe('Phase 128: handoff tool context and capability-aware filtering', () =>
     // Build a synthetic enrichment context as the enricher would produce
     function buildEnrichment(toolAvailability) {
       const tools = ['ripgrep', 'fd', 'jq', 'yq', 'bat', 'gh'];
-      const available = tools.filter(t => toolAvailability && toolAvailability[t] === true);
-      const count = available.length;
+      const count = tools.filter(t => toolAvailability && toolAvailability[t] === true).length;
       const level = count >= 5 ? 'HIGH' : count >= 2 ? 'MEDIUM' : 'LOW';
       return {
-        handoff_tool_context: {
-          available_tools: available,
-          tool_count: count,
-          capability_level: level,
-        },
+        handoff_tool_context: { capability_level: level },
       };
     }
 
@@ -766,24 +761,6 @@ describe('Phase 128: handoff tool context and capability-aware filtering', () =>
       const enrichment = buildEnrichment({ ripgrep: true, fd: true, jq: true, yq: false, bat: false, gh: false });
       assert.ok(typeof enrichment.handoff_tool_context === 'object' && enrichment.handoff_tool_context !== null,
         'handoff_tool_context should be a non-null object');
-    });
-
-    it('available_tools is an array of strings', () => {
-      const enrichment = buildEnrichment({ ripgrep: true, fd: true, jq: false, yq: false, bat: false, gh: false });
-      assert.ok(Array.isArray(enrichment.handoff_tool_context.available_tools),
-        'available_tools should be an array');
-      for (const tool of enrichment.handoff_tool_context.available_tools) {
-        assert.strictEqual(typeof tool, 'string', `Tool entry should be string, got ${typeof tool}`);
-      }
-    });
-
-    it('tool_count matches available_tools length', () => {
-      const enrichment = buildEnrichment({ ripgrep: true, fd: true, jq: true, yq: false, bat: false, gh: false });
-      assert.strictEqual(
-        enrichment.handoff_tool_context.tool_count,
-        enrichment.handoff_tool_context.available_tools.length,
-        'tool_count should equal available_tools.length'
-      );
     });
 
     it('capability_level is HIGH/MEDIUM/LOW string', () => {
@@ -807,26 +784,8 @@ describe('Phase 128: handoff tool context and capability-aware filtering', () =>
       assert.strictEqual(l.handoff_tool_context.capability_level, 'LOW');
     });
 
-    it('available_tools contains only tool names from the 6 known tools', () => {
-      const knownTools = new Set(['ripgrep', 'fd', 'jq', 'yq', 'bat', 'gh']);
-      const enrichment = buildEnrichment({ ripgrep: true, fd: true, jq: false, yq: false, bat: true, gh: false });
-      for (const tool of enrichment.handoff_tool_context.available_tools) {
-        assert.ok(knownTools.has(tool), `Unknown tool in available_tools: ${tool}`);
-      }
-    });
-
-    it('tool names are strings, not objects', () => {
-      const enrichment = buildEnrichment({ ripgrep: true, fd: true, jq: true, yq: true, bat: true, gh: true });
-      for (const tool of enrichment.handoff_tool_context.available_tools) {
-        assert.strictEqual(typeof tool, 'string', 'Each tool entry must be a string, not an object');
-        assert.ok(!tool.includes('{'), 'Tool entry must not be a JSON object string');
-      }
-    });
-
     it('handoff_tool_context defaults gracefully when tool_availability absent', () => {
       const enrichment = buildEnrichment(null);
-      assert.deepStrictEqual(enrichment.handoff_tool_context.available_tools, []);
-      assert.strictEqual(enrichment.handoff_tool_context.tool_count, 0);
       assert.strictEqual(enrichment.handoff_tool_context.capability_level, 'LOW');
     });
   });

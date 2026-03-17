@@ -526,26 +526,19 @@ export function enrichCommand(input, output, cwd) {
     enrichment.installed_skills = [];
   }
 
-  // Phase 128: Handoff tool context (derived from tool_availability)
+  // Handoff tool context (capability_level only — sole confirmed consumer field)
   try {
     const ta = enrichment.tool_availability || {};
-    const availableTools = Object.entries(ta)
-      .filter(([, available]) => available === true)
-      .map(([name]) => name);
-    const toolCount = availableTools.length;
+    const toolCount = Object.values(ta).filter(v => v === true).length;
 
-    // Capability level (mirrors resolveAgentCapabilityLevel logic but avoids circular dep)
+    // Capability level thresholds
     let capabilityLevel = 'MEDIUM';
     if (toolCount >= 5) capabilityLevel = 'HIGH';
     else if (toolCount <= 1) capabilityLevel = 'LOW';
 
-    enrichment.handoff_tool_context = {
-      available_tools: availableTools,  // tool names only — no descriptions/schemas per CONTEXT.md
-      tool_count: toolCount,
-      capability_level: capabilityLevel,
-    };
+    enrichment.handoff_tool_context = { capability_level: capabilityLevel };
   } catch {
-    enrichment.handoff_tool_context = { available_tools: [], tool_count: 0, capability_level: 'LOW' };
+    enrichment.handoff_tool_context = { capability_level: 'LOW' };
   }
 
   // In-process decision evaluation (ENGINE-02: no subprocess overhead)
