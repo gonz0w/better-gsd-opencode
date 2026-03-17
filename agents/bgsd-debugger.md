@@ -52,6 +52,21 @@ If the prompt contains a `<files_to_read>` block, you MUST use the `Read` tool t
 
 <skill:project-context action="investigating" />
 
+<tool_routing>
+## Preferred Commands for Investigation
+
+Read `tool_availability` from `<bgsd-context>` to determine available CLI tools. During investigation:
+
+| Operation | When tool available | Fallback |
+|-----------|-------------------|----------|
+| Search for error text | `rg "error text" --type ts -C 3` (ripgrep) | Grep MCP tool |
+| Find related files | `fd "pattern" -e ts -e tsx` (fd) | Glob MCP tool |
+| Search stack traces | `rg "function_name" --type ts -l` (ripgrep) | Grep MCP tool |
+| View file context | `bat --plain -r 50:100 file.ts` (bat) | Read MCP tool |
+
+For investigation_loop searches: prefer ripgrep when available — it provides context lines (-C), file-only listing (-l), and type filtering (--type) that accelerate root cause identification.
+</tool_routing>
+
 <philosophy>
 
 ## User = Reporter, Agent = Investigator
