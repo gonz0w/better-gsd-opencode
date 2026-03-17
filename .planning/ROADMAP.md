@@ -8,7 +8,7 @@ Make the tool detection infrastructure from v12.1 actionable — workflows and a
 
 - [x] **Phase 138: Workflow & Agent Tool Routing** - Wire tool detection decisions into workflows and agent system prompts so behavior adapts to available tools (completed 2026-03-17)
 - [x] **Phase 139: End-to-End Validation** - Prove the full detection → enrichment → workflow behavior chain with E2E and contract tests (completed 2026-03-17)
-- [ ] **Phase 140: Infrastructure Pruning** - Audit and remove unused Chain B infrastructure after routing is wired and validated
+- [x] **Phase 140: Infrastructure Pruning** - Audit and remove unused Chain B infrastructure after routing is wired and validated (completed 2026-03-17)
 
 ## Phase Details
 
@@ -41,7 +41,7 @@ Make the tool detection infrastructure from v12.1 actionable — workflows and a
   1. handoff_tool_context enrichment field either has documented consumers or is removed/simplified
   2. No orphaned detection/caching/decision code paths remain after audit — every tool infrastructure path has a verified consumer
   3. All existing tests continue to pass after pruning changes
-**Plans**: TBD
+**Plans**: 1/1 plans complete
 
 ## Progress
 
@@ -52,4 +52,4 @@ Phases execute in numeric order: 138 → 139 → 140
 |-------|----------------|--------|-----------|
 | 138. Workflow & Agent Tool Routing | 2/2 | Complete    | 2026-03-17 |
 | 139. End-to-End Validation | 1/1 | Complete    | 2026-03-17 |
-| 140. Infrastructure Pruning | 0/TBD | Not started | - |
+| 140. Infrastructure Pruning | 1/1 | Complete   | 2026-03-17 |
