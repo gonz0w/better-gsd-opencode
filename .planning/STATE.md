@@ -11,8 +11,8 @@ See: `.planning/PROJECT.md` (updated 2026-03-17)
 
 **Milestone:** v14.1 Tool-Aware Agent Routing
 **Phase:** 140 of 140 (Infrastructure Pruning)
-**Current Plan:** 01 — COMPLETE
-**Status:** Phase complete — v14.1 milestone complete
+**Current Plan:** Not started
+**Status:** Milestone complete
 **Last Activity:** 2026-03-17
 
 Progress: [██████████] 100%
