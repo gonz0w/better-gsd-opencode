@@ -11,7 +11,7 @@ See: `.planning/PROJECT.md` (updated 2026-03-17)
 
 **Milestone:** v14.1 Tool-Aware Agent Routing
 **Phase:** 138 of 140 (Workflow & Agent Tool Routing)
-**Current Plan:** (none)
+**Current Plan:** Not started
 **Status:** Ready to plan
 **Last Activity:** 2026-03-17
 

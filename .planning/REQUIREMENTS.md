@@ -2,18 +2,18 @@
 
 ## Workflow Routing
 
-- [ ] **ROUTE-01:** execute-plan.md emits tool-specific search and discovery instructions based on file-discovery-mode and search-mode decisions from bgsd-context — agents see "use rg for content search" when ripgrep is available, or "use node grep" when not
-- [ ] **ROUTE-02:** execute-phase.md passes tool routing guidance to spawned executor agents via the Task() prompt — capability level and tool decisions included in agent context
-- [ ] **ROUTE-03:** map-codebase.md uses fd for file discovery and ripgrep for content search when available, falling back to node-based commands when absent
+- [x] **ROUTE-01:** execute-plan.md emits tool-specific search and discovery instructions based on file-discovery-mode and search-mode decisions from bgsd-context — agents see "use rg for content search" when ripgrep is available, or "use node grep" when not
+- [x] **ROUTE-02:** execute-phase.md passes tool routing guidance to spawned executor agents via the Task() prompt — capability level and tool decisions included in agent context
+- [x] **ROUTE-03:** map-codebase.md uses fd for file discovery and ripgrep for content search when available, falling back to node-based commands when absent
 
 ## Agent Guidance
 
-- [ ] **AGENT-01:** Executor agent system prompt includes a tool usage section that adapts based on tool_availability — specific CLI commands for search, discovery, and JSON transforms when tools are present
-- [ ] **AGENT-02:** Debugger agent system prompt includes search-mode guidance for investigation — ripgrep commands when available, node-based search when not
+- [x] **AGENT-01:** Executor agent system prompt includes a tool usage section that adapts based on tool_availability — specific CLI commands for search, discovery, and JSON transforms when tools are present
+- [x] **AGENT-02:** Debugger agent system prompt includes search-mode guidance for investigation — ripgrep commands when available, node-based search when not
 
 ## GitHub Preflight
 
-- [ ] **GH-01:** github-ci.md workflow uses detect:gh-preflight JSON output for authentication validation, replacing raw `gh auth status` shell call
+- [x] **GH-01:** github-ci.md workflow uses detect:gh-preflight JSON output for authentication validation, replacing raw `gh auth status` shell call
 
 ## Validation
 
