@@ -41,6 +41,23 @@ If the prompt contains a `<files_to_read>` block, you MUST use the `Read` tool t
 
 <skill:project-context action="mapping" />
 
+<tool_routing>
+## Preferred Commands
+
+Read `tool_availability` from `<bgsd-context>` to determine available CLI tools.
+
+| Operation | When tool available | Fallback |
+|-----------|-------------------|----------|
+| File discovery | `fd -e ts -e tsx --type f` (fd) | Glob MCP tool |
+| Directory listing | `fd --type d --max-depth 3` (fd) | `ls` or Glob tool |
+| Content search | `rg "pattern" --type ts -l` (ripgrep) | Grep MCP tool |
+| Import analysis | `rg "^import" --type ts` (ripgrep) | Grep MCP tool |
+| Code metrics | `rg "TODO\|FIXME\|HACK" --type ts -c` (ripgrep) | Grep MCP tool |
+| File reading | `bat --plain file.ts` (bat) | Read MCP tool |
+
+Use resolved commands from the table in the explore_codebase blocks below. If a tool is not available per bgsd-context, use the fallback.
+</tool_routing>
+
 <why_this_matters>
 **These documents are consumed by other GSD commands:**
 
@@ -113,20 +130,20 @@ cat package.json 2>/dev/null | head -100
 ls -la *.config.* tsconfig.json .nvmrc .python-version 2>/dev/null
 ls .env* 2>/dev/null  # Note existence only, never read contents
 
-# Find SDK/API imports
-grep -r "import.*stripe\|import.*supabase\|import.*aws\|import.*@" src/ --include="*.ts" --include="*.tsx" 2>/dev/null | head -50
+# Find SDK/API imports — use content search from Preferred Commands
+# (rg "^import.*(stripe|supabase|aws|@)" --type ts, or Grep MCP tool)
 ```
 
 **For arch focus:**
 ```bash
-# Directory structure
-find . -type d -not -path '*/node_modules/*' -not -path '*/.git/*' | head -50
+# Directory structure — use directory listing from Preferred Commands
+# (fd --type d --max-depth 3, or ls/Glob tool)
 
 # Entry points
 ls src/index.* src/main.* src/app.* src/server.* app/page.* 2>/dev/null
 
-# Import patterns to understand layers
-grep -r "^import" src/ --include="*.ts" --include="*.tsx" 2>/dev/null | head -100
+# Import patterns to understand layers — use import analysis from Preferred Commands
+# (rg "^import" --type ts, or Grep MCP tool)
 ```
 
 **For quality focus:**
@@ -137,22 +154,23 @@ cat .prettierrc 2>/dev/null
 
 # Test files and config
 ls jest.config.* vitest.config.* 2>/dev/null
-find . -name "*.test.*" -o -name "*.spec.*" | head -30
+# Find test files — use file discovery from Preferred Commands
+# (fd -e test.ts -e spec.ts --type f, or Glob MCP tool)
 
-# Sample source files for convention analysis
-ls src/**/*.ts 2>/dev/null | head -10
+# Sample source files for convention analysis — use file discovery from Preferred Commands
+# (fd -e ts --type f, or Glob MCP tool)
 ```
 
 **For concerns focus:**
 ```bash
-# TODO/FIXME comments
-grep -rn "TODO\|FIXME\|HACK\|XXX" src/ --include="*.ts" --include="*.tsx" 2>/dev/null | head -50
+# TODO/FIXME comments — use code metrics from Preferred Commands
+# (rg "TODO|FIXME|HACK|XXX" --type ts -c, or Grep MCP tool)
 
-# Large files (potential complexity)
-find src/ -name "*.ts" -o -name "*.tsx" | xargs wc -l 2>/dev/null | sort -rn | head -20
+# Large files (potential complexity) — use file discovery from Preferred Commands
+# (fd -e ts --type f, then wc -l for size metrics)
 
-# Empty returns/stubs
-grep -rn "return null\|return \[\]\|return {}" src/ --include="*.ts" --include="*.tsx" 2>/dev/null | head -30
+# Empty returns/stubs — use content search from Preferred Commands
+# (rg "return null|return \[\]|return \{\}" --type ts, or Grep MCP tool)
 ```
 
 Read key files identified during exploration. Use Glob and Grep liberally.
