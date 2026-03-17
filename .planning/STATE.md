@@ -11,8 +11,8 @@ See: `.planning/PROJECT.md` (updated 2026-03-17)
 
 **Milestone:** v14.1 Tool-Aware Agent Routing
 **Phase:** 139 of 140 (End-to-End Validation)
-**Current Plan:** Plan 01 (complete)
-**Status:** Phase complete
+**Current Plan:** Not started
+**Status:** Ready to plan
 **Last Activity:** 2026-03-17
 
 Progress: [██████████] 100%
