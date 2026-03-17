@@ -4,9 +4,7 @@ Mark current phase complete and advance to next. "Planning next phase" = "curren
 </purpose>
 <!-- /section -->
 
-<required_reading>
-Read: `.planning/STATE.md`, `.planning/PROJECT.md`, `.planning/ROADMAP.md`, current phase `*-PLAN.md` and `*-SUMMARY.md` files.
-</required_reading>
+<skill:bgsd-context-init />
 
 <process>
 
@@ -157,105 +155,20 @@ Resume file: None
 <!-- section: offer_next -->
 <step name="offer_next_phase">
 
-**Pre-computed decision (auto-advance):** If `decisions.auto-advance` exists in `<bgsd-context>`, use its `.value`. Skip config/flag check.
+Pre-computed decisions: use `decisions.auto-advance` and `decisions.branch-handling` from `<bgsd-context>` if present.
 
-**Pre-computed decision (branch-handling):** If `decisions.branch-handling` exists in `<bgsd-context>`, use its `.value`. Skip branch state evaluation.
+Use `is_last_phase` from `plan:phase complete`:
 
-**Fallback:** Use `is_last_phase` from `plan:phase complete`:
-- `false` → Route A (more phases)
-- `true` → Route B (milestone complete)
+**Route A (more phases):** Check `ls .planning/phases/*[X+1]*/*-CONTEXT.md 2>/dev/null`
+- Yolo: CONTEXT.md → `/bgsd-plan-phase [X+1] --auto`, else `/bgsd-discuss-phase [X+1] --auto`
+- Interactive: Show `## ✓ Phase [X] Complete` + `## ▶ Next Up` block with `/bgsd-discuss-phase [X+1]` (no context) or `/bgsd-plan-phase [X+1]` (has context), `<sub>/clear first</sub>`
 
-For additional context: `node __OPENCODE_CONFIG__/bgsd-oc/bin/bgsd-tools.cjs plan:roadmap analyze`
-
----
-
-**Route A: More phases remain**
-
-Check CONTEXT.md for next phase:
-```bash
-ls .planning/phases/*[X+1]*/*-CONTEXT.md 2>/dev/null
-```
-
-<if mode="yolo">
-
-If CONTEXT.md exists → `/bgsd-plan-phase [X+1] --auto`
-If not → `/bgsd-discuss-phase [X+1] --auto`
-
-</if>
-
-<if mode="interactive" OR="custom with gates.confirm_transition true">
-
-If CONTEXT.md does NOT exist:
-```
-## ✓ Phase [X] Complete
-
-## ▶ Next Up
-
-**Phase [X+1]: [Name]** — [Goal]
-
-`/bgsd-discuss-phase [X+1]`
-
-<sub>`/clear` first → fresh context window</sub>
-
----
-**Also available:** `/bgsd-plan-phase [X+1]`
----
-```
-
-If CONTEXT.md exists:
-```
-## ✓ Phase [X] Complete
-
-## ▶ Next Up
-
-**Phase [X+1]: [Name]** — [Goal]
-<sub>✓ Context gathered, ready to plan</sub>
-
-`/bgsd-plan-phase [X+1]`
-
-<sub>`/clear` first → fresh context window</sub>
----
-```
-
-</if>
-
----
-
-**Route B: Milestone complete**
-
+**Route B (milestone complete):**
 ```bash
 node __OPENCODE_CONFIG__/bgsd-oc/bin/bgsd-tools.cjs util:config-set workflow.auto_advance false
 ```
-
-<if mode="yolo">
-
-```
-🎉 Milestone {version} 100% complete — all {N} phases finished!
-⚡ Auto-continuing: Complete milestone and archive
-```
-
-Exit and run: `/bgsd-complete-milestone {version}`
-
-</if>
-
-<if mode="interactive" OR="custom with gates.confirm_transition true">
-
-```
-## ✓ Phase {X}: {Name} Complete
-
-🎉 Milestone {version} is 100% complete — all {N} phases finished!
-
-## ▶ Next Up
-
-**Complete Milestone {version}** — archive and prepare for next
-
-`/bgsd-complete-milestone {version}`
-
-<sub>`/clear` first → fresh context window</sub>
----
-```
-
-</if>
+- Yolo: `🎉 Milestone {version} complete!` → exit, run `/bgsd-complete-milestone {version}`
+- Interactive: `## ✓ Phase {X} Complete` + `🎉 100% complete` + `## ▶ Next Up: /bgsd-complete-milestone {version}` + `<sub>/clear first</sub>`
 
 </step>
 <!-- /section -->
