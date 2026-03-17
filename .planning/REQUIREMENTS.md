@@ -44,11 +44,11 @@
 
 | REQ ID | Phase | Plan | Status |
 |--------|-------|------|--------|
-| MEAS-01 | 134 | — | Pending |
-| MEAS-02 | 134 | — | Pending |
-| MEAS-03 | 134 | — | Pending |
-| COMP-01 | 135 | — | Pending |
-| COMP-02 | 135 | — | Pending |
+| MEAS-01 | 134 | 01 | Complete |
+| MEAS-02 | 134 | 01 | Complete |
+| MEAS-03 | 134 | 02 | Complete |
+| COMP-01 | 135 | 02,03,04,05 | Complete |
+| COMP-02 | 135 | 02,03,04,05 | Complete |
 | COMP-03 | 135 | 01 | Complete |
 | COMP-04 | 137 | — | Pending |
 | SCAF-01 | 136 | — | Pending |
