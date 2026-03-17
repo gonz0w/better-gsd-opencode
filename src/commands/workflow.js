@@ -566,9 +566,282 @@ function cmdWorkflowVerifyStructure(cwd, args, raw) {
   output(result, raw);
 }
 
+// ─── Elision helpers for measurement ─────────────────────────────────────────
+
+/**
+ * Strip ALL conditional sections from workflow text (worst-case elision — all conditions false).
+ * This measures maximum possible token savings from elision.
+ *
+ * @param {string} text - Workflow content
+ * @returns {string} Text with all conditional sections removed
+ */
+function stripAllConditionalSections(text) {
+  if (!text) return text;
+  const SECTION_CLOSE = '<!-- /section -->';
+  const CONDITIONAL_OPEN_RE = /<!--\s*section:\s*\S+\s+if="[^"]+"\s*-->/g;
+
+  let result = text;
+  let changed = true;
+  // Repeat until no more conditional sections remain (handles successive removals)
+  while (changed) {
+    changed = false;
+    const matches = [];
+    let m;
+    const re = new RegExp(CONDITIONAL_OPEN_RE.source, 'g');
+    while ((m = re.exec(result)) !== null) {
+      matches.push({ fullMatch: m[0], startIndex: m.index });
+    }
+    // Process in reverse to preserve indices
+    for (let i = matches.length - 1; i >= 0; i--) {
+      const { fullMatch, startIndex } = matches[i];
+      const closeIndex = result.indexOf(SECTION_CLOSE, startIndex + fullMatch.length);
+      const sectionEnd = closeIndex === -1 ? result.length : closeIndex + SECTION_CLOSE.length;
+      const afterSection = result.slice(sectionEnd);
+      const trailingNewline = afterSection.startsWith('\n') ? '\n' : '';
+      result = result.slice(0, startIndex) + afterSection.slice(trailingNewline.length);
+      changed = true;
+    }
+  }
+  return result;
+}
+
+// ─── workflow:savings ─────────────────────────────────────────────────────────
+
+/**
+ * Generate a cumulative token savings table showing the reduction journey
+ * across milestones: original → post-compression (Phase 135) → post-elision (Phase 137).
+ *
+ * Attempts to load Phase 134 (original) and Phase 135 (post-compression) baselines
+ * from .planning/baselines/. If unavailable, falls back to hardcoded values from
+ * Phase 135 SUMMARY (the actual measured token counts).
+ *
+ * The post-elision column shows token counts with ALL conditional sections removed
+ * (worst-case savings / maximum elision).
+ *
+ * @param {string} cwd - Current working directory
+ * @param {string[]} args - Positional args (unused currently)
+ * @param {boolean} raw - JSON output mode
+ */
+function cmdWorkflowSavings(cwd, args, raw) {
+  const baselinesDir = path.join(cwd, '.planning', 'baselines');
+  const measureAllWorkflows = getMeasureAllWorkflows();
+
+  // ── Step 1: Measure post-elision token counts ─────────────────────────────
+  // Post-elision = current workflow files with ALL conditional sections removed.
+  // This represents worst-case savings (all conditions false: no TDD, no CI, no review).
+  const current = measureAllWorkflows(cwd);
+  if (current.error) {
+    error(current.error);
+  }
+
+  // Detect plugin dir to read actual workflow file content for elision measurement
+  let pluginDir = process.env.BGSD_PLUGIN_DIR;
+  if (!pluginDir) {
+    pluginDir = path.resolve(__dirname, '..');
+  }
+  const workflowsDir = path.join(pluginDir, 'workflows');
+
+  // Build a map of post-elision token counts (all conditional sections stripped)
+  const elisionTokenMap = {};
+  try {
+    const { estimateTokens } = require('../lib/context');
+    for (const w of (current.workflows || [])) {
+      const wfPath = path.join(workflowsDir, w.name);
+      if (fs.existsSync(wfPath)) {
+        const content = fs.readFileSync(wfPath, 'utf-8');
+        const stripped = stripAllConditionalSections(content);
+        elisionTokenMap[w.name] = estimateTokens(stripped);
+      }
+    }
+  } catch (e) {
+    debugLog('workflow.savings', 'failed to measure elision tokens', e);
+  }
+
+  // ── Step 2: Hardcoded baselines from Phase 135 SUMMARY (actual measured values) ──
+  // Source: Phase 135 Plan 02-05 SUMMARY files, measured with workflow:baseline before compression.
+  // On-disk baselines were all created during Phase 137 (post-compression), so they can't serve
+  // as pre-compression reference. The SUMMARY files contain the authoritative pre/post counts.
+  const PHASE135_DATA = {
+    'execute-phase.md':    { original: 5355, post_compression: 3321 },
+    'discuss-phase.md':    { original: 5204, post_compression: 2917 },
+    'execute-plan.md':     { original: 4749, post_compression: 2727 },
+    'new-milestone.md':    { original: 4716, post_compression: 2518 },
+    'transition.md':       { original: 3357, post_compression: 1900 },
+    'new-project.md':      { original: 3133, post_compression: 1751 },
+    'audit-milestone.md':  { original: 2553, post_compression: 1496 },
+    'quick.md':            { original: 2776, post_compression: 1659 },
+    'resume-project.md':   { original: 2185, post_compression: 1576 },
+    'map-codebase.md':     { original: 2371, post_compression: 1363 },
+  };
+
+  // ── Step 3: Try to load earlier snapshots (optional enhancement) ──────────
+  // If a pre-compression snapshot exists on disk (older than Phase 135), prefer it.
+  // Since the project gitignores baselines, disk-based baselines may not be pre-compression.
+  // We attempt to find baselines where the token counts are HIGHER than the current state
+  // (indicating a pre-compression snapshot). This is a best-effort enhancement; the
+  // hardcoded PHASE135_DATA above is the authoritative fallback.
+  let diskPhase134 = null;
+  let diskPhase135 = null;
+  try {
+    if (fs.existsSync(baselinesDir)) {
+      const files = fs.readdirSync(baselinesDir)
+        .filter(f => f.startsWith('workflow-baseline-') && f.endsWith('.json'))
+        .sort(); // oldest first
+      // Look for snapshots where execute-plan.md tokens exceed current (i.e., pre-compression)
+      for (const file of files) {
+        try {
+          const snap = JSON.parse(fs.readFileSync(path.join(baselinesDir, file), 'utf-8'));
+          const epW = (snap.workflows || []).find(w => w.name === 'execute-plan.md');
+          if (epW) {
+            const tokens = epW.workflow_tokens || epW.total_tokens;
+            if (tokens > 4000 && !diskPhase134) {
+              // Token count > 4000 → pre-compression snapshot
+              diskPhase134 = snap;
+            } else if (tokens > 2800 && tokens <= 4000 && !diskPhase135) {
+              // Token count 2800-4000 → post-compression, pre-elision snapshot
+              diskPhase135 = snap;
+            }
+          }
+        } catch { /* skip malformed snapshot */ }
+      }
+    }
+  } catch (e) {
+    debugLog('workflow.savings', 'failed to scan baselines', e);
+  }
+
+  const mapDisk134 = {};
+  if (diskPhase134) {
+    for (const w of (diskPhase134.workflows || [])) {
+      mapDisk134[w.name] = w.workflow_tokens || w.total_tokens;
+    }
+  }
+
+  const mapDisk135 = {};
+  if (diskPhase135) {
+    for (const w of (diskPhase135.workflows || [])) {
+      mapDisk135[w.name] = w.workflow_tokens || w.total_tokens;
+    }
+  }
+
+  const mapCurrent = {};
+  for (const w of (current.workflows || [])) {
+    mapCurrent[w.name] = w.workflow_tokens || w.total_tokens;
+  }
+
+  // ── Step 4: Build savings table ───────────────────────────────────────────
+  // Include the 10 target workflows from Phase 135 that have conditional sections
+  const targetWorkflows = [
+    'execute-phase.md',
+    'execute-plan.md',
+    'quick.md',
+    'discuss-phase.md',
+    'new-milestone.md',
+    'transition.md',
+    'new-project.md',
+    'audit-milestone.md',
+    'resume-project.md',
+    'map-codebase.md',
+  ];
+
+  const rows = [];
+  for (const name of targetWorkflows) {
+    const historical = PHASE135_DATA[name] || {};
+
+    // Original: disk phase134 (if found) → hardcoded historical
+    const original = mapDisk134[name] || historical.original || null;
+
+    // Post-compression: disk phase135 (if found) → hardcoded historical
+    const postCompression = mapDisk135[name] || historical.post_compression || null;
+
+    // Post-elision: current tokens with ALL conditional sections stripped
+    // Falls back to current measurement if elision measurement unavailable
+    const postElision = elisionTokenMap[name] || mapCurrent[name] || null;
+
+    // Total reduction vs original
+    let totalReductionPct = null;
+    if (original && postElision) {
+      totalReductionPct = Math.round(((original - postElision) / original) * 1000) / 10;
+    }
+
+    // Compression-only reduction
+    let compressionPct = null;
+    if (original && postCompression) {
+      compressionPct = Math.round(((original - postCompression) / original) * 1000) / 10;
+    }
+
+    // Elision-only reduction (vs post-compression)
+    let elisionPct = null;
+    if (postCompression && postElision) {
+      elisionPct = Math.round(((postCompression - postElision) / postCompression) * 1000) / 10;
+    }
+
+    rows.push({
+      name,
+      original,
+      post_compression: postCompression,
+      post_elision: postElision,
+      compression_pct: compressionPct,
+      elision_pct: elisionPct,
+      total_reduction_pct: totalReductionPct,
+      baseline_source_134: mapDisk134[name] ? 'disk' : 'hardcoded',
+      baseline_source_135: mapDisk135[name] ? 'disk' : 'hardcoded',
+    });
+  }
+
+  // ── Step 5: Compute averages ──────────────────────────────────────────────
+  const withTotalReduction = rows.filter(r => r.total_reduction_pct !== null);
+  const avgTotalReduction = withTotalReduction.length > 0
+    ? Math.round(withTotalReduction.reduce((s, r) => s + r.total_reduction_pct, 0) / withTotalReduction.length * 10) / 10
+    : null;
+
+  const withElisionPct = rows.filter(r => r.elision_pct !== null);
+  const avgElisionPct = withElisionPct.length > 0
+    ? Math.round(withElisionPct.reduce((s, r) => s + r.elision_pct, 0) / withElisionPct.length * 10) / 10
+    : null;
+
+  const result = {
+    generated_at: new Date().toISOString(),
+    baseline_source: diskPhase134 ? 'disk' : 'hardcoded_phase135_summary',
+    summary: {
+      avg_total_reduction_pct: avgTotalReduction,
+      avg_elision_pct: avgElisionPct,
+      workflows_measured: rows.length,
+    },
+    workflows: rows,
+  };
+
+  // ── Step 8: Print human-readable table ────────────────────────────────────
+  const maxNameLen = Math.max(20, ...rows.map(r => r.name.length));
+  const header = `${'Workflow'.padEnd(maxNameLen)} | Original | Compressed | Post-Elision | Total %`;
+  const sep = '-'.repeat(maxNameLen) + '-+----------+------------+--------------+---------';
+  process.stderr.write('\n## Cumulative Token Savings\n\n');
+  process.stderr.write('Phase 134 → Phase 135 (compression) → Phase 137 (elision)\n\n');
+  process.stderr.write(header + '\n');
+  process.stderr.write(sep + '\n');
+  for (const r of rows) {
+    const name = r.name.padEnd(maxNameLen);
+    const orig = r.original !== null ? String(r.original).padStart(8) : '       ?';
+    const comp = r.post_compression !== null ? String(r.post_compression).padStart(10) : '         ?';
+    const elid = r.post_elision !== null ? String(r.post_elision).padStart(12) : '           ?';
+    const tot = r.total_reduction_pct !== null ? `-${r.total_reduction_pct}%`.padStart(7) : '      ?';
+    process.stderr.write(`${name} | ${orig} | ${comp} | ${elid} | ${tot}\n`);
+  }
+  process.stderr.write(sep + '\n');
+  if (avgTotalReduction !== null) {
+    process.stderr.write(`${'Average'.padEnd(maxNameLen)} |          |            |              | -${avgTotalReduction}%\n`);
+  }
+  if (avgElisionPct !== null) {
+    process.stderr.write(`\nElision-only average reduction: -${avgElisionPct}%\n`);
+  }
+  process.stderr.write('\n');
+
+  output(result, raw);
+}
+
 module.exports = {
   cmdWorkflowBaseline,
   cmdWorkflowCompare,
   cmdWorkflowVerifyStructure,
+  cmdWorkflowSavings,
   extractStructuralFingerprint,
 };

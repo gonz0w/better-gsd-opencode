@@ -35,10 +35,11 @@ const COMMAND_ALIASES = {
   's:i': 'skills:install',
   's:v': 'skills:validate',
   's:r': 'skills:remove',
-  'w': 'workflow',
-  'w:b': 'workflow:baseline',
-  'w:c': 'workflow:compare',
-  'w:v': 'workflow:verify-structure'
+   'w': 'workflow',
+   'w:b': 'workflow:baseline',
+   'w:c': 'workflow:compare',
+   'w:v': 'workflow:verify-structure',
+   'w:s': 'workflow:savings'
 };
 
 const COMMAND_CATEGORIES = {
@@ -72,7 +73,7 @@ const COMMAND_CATEGORIES = {
   },
   measurement: {
     name: 'Measurement',
-    commands: ['workflow:baseline', 'workflow:compare']
+    commands: ['workflow:baseline', 'workflow:compare', 'workflow:savings']
   }
 };
 
@@ -155,7 +156,8 @@ const COMMAND_TREE = {
   'workflow': {
     'baseline': null,
     'compare': null,
-    'verify-structure': null
+    'verify-structure': null,
+    'savings': null
   }
 };
 

@@ -271,7 +271,7 @@ async function main() {
   }
 
   if (!command) {
-    error('Usage: bgsd-tools <namespace:command> [args] [--pretty] [--verbose]\nCommands: init:<workflow>, plan:<intent|requirements|roadmap|phases|find-phase|milestone|phase>, execute:<commit|rollback-info|session-diff|session-summary|velocity|worktree|tdd|test-run>, verify:<state|verify|assertions|search-decisions|search-lessons|review|context-budget|token-budget>, util:<config-get|config-set|env|current-timestamp|list-todos|todo|memory|mcp|classify|frontmatter|progress|websearch|history-digest|trace-requirement|codebase|cache|agent>, research:<capabilities|yt-search|yt-transcript|collect|nlm-create|nlm-add-source|nlm-ask|nlm-report|score|gaps>, workflow:<baseline|compare|verify-structure>');
+    error('Usage: bgsd-tools <namespace:command> [args] [--pretty] [--verbose]\nCommands: init:<workflow>, plan:<intent|requirements|roadmap|phases|find-phase|milestone|phase>, execute:<commit|rollback-info|session-diff|session-summary|velocity|worktree|tdd|test-run>, verify:<state|verify|assertions|search-decisions|search-lessons|review|context-budget|token-budget>, util:<config-get|config-set|env|current-timestamp|list-todos|todo|memory|mcp|classify|frontmatter|progress|websearch|history-digest|trace-requirement|codebase|cache|agent>, research:<capabilities|yt-search|yt-transcript|collect|nlm-create|nlm-add-source|nlm-ask|nlm-report|score|gaps>, workflow:<baseline|compare|verify-structure|savings>');
   }
 
   // --help / -h: print command help to stderr (never contaminates JSON stdout)
@@ -1485,8 +1485,10 @@ Examples:
           lazyWorkflow().cmdWorkflowCompare(cwd, workflowRestArgs, raw);
         } else if (subCmd === 'verify-structure') {
           lazyWorkflow().cmdWorkflowVerifyStructure(cwd, workflowRestArgs, raw);
+        } else if (subCmd === 'savings') {
+          lazyWorkflow().cmdWorkflowSavings(cwd, workflowRestArgs, raw);
         } else {
-          error('Unknown workflow subcommand: ' + subCmd + '. Available: baseline, compare, verify-structure');
+          error('Unknown workflow subcommand: ' + subCmd + '. Available: baseline, compare, verify-structure, savings');
         }
         break;
       }

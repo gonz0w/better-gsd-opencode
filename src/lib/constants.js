@@ -1763,6 +1763,25 @@ Examples:
   bgsd-tools workflow:compare
   bgsd-tools workflow:compare .planning/baselines/workflow-baseline-2026-01-01T00-00-00-000Z.json
   bgsd-tools workflow:compare baseline-a.json baseline-b.json`,
+
+  'workflow:savings': `Usage: bgsd-tools workflow:savings
+
+Generate a cumulative token savings table showing the reduction journey across milestones:
+  Original (pre-Phase 135) → Post-Compression (Phase 135) → Post-Elision (Phase 137)
+
+Loads Phase 134 and Phase 135 baselines from .planning/baselines/ if available.
+Falls back to hardcoded Phase 135 SUMMARY values if disk baselines unavailable.
+The post-elision column shows current workflow token counts (all conditional sections removed).
+
+Output:
+  | Workflow | Original | Compressed | Post-Elision | Total % |
+
+Options:
+  --raw   JSON output
+
+Examples:
+  bgsd-tools workflow:savings
+  bgsd-tools workflow:savings --raw`,
 };
 
 module.exports = { MODEL_PROFILES, CONFIG_SCHEMA, COMMAND_HELP, VALID_TRAJECTORY_SCOPES };
