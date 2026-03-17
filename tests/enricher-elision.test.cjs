@@ -307,6 +307,106 @@ CI content without closing marker`;
   });
 });
 
+describe('elideConditionalSections: dangling reference check', () => {
+  let elide;
+
+  before(async () => {
+    const mod = await import(PLUGIN_PATH);
+    elide = mod.elideConditionalSections;
+  });
+
+  it('dangling ref: text with reference to elided section reports warning', () => {
+    // Elide tdd_execution, but remaining content mentions it
+    const text = `<!-- section: tdd_execution if="is_tdd" -->
+TDD content here.
+<!-- /section -->
+
+For TDD tasks, see tdd_execution for the cycle.
+`;
+    const result = elide(text, { is_tdd: false });
+    assert.strictEqual(result.sections_elided, 1, 'section should be elided');
+    assert.ok(Array.isArray(result.warnings), 'warnings should be an array');
+    assert.strictEqual(result.warnings.length, 1, 'should have 1 dangling reference warning');
+    assert.strictEqual(result.warnings[0].section, 'tdd_execution', 'warning should name the elided section');
+    assert.ok(result.warnings[0].references.length > 0, 'warning should list matching lines');
+    assert.ok(result.warnings[0].references[0].includes('tdd_execution'), 'reference line should contain section name');
+  });
+
+  it('dangling ref: no dangling references → empty warnings array', () => {
+    const text = `<!-- section: tdd_execution if="is_tdd" -->
+TDD content here.
+<!-- /section -->
+
+This is about standard execution, nothing TDD-specific.
+`;
+    const result = elide(text, { is_tdd: false });
+    assert.strictEqual(result.sections_elided, 1, 'section should be elided');
+    assert.ok(Array.isArray(result.warnings), 'warnings should be an array');
+    assert.strictEqual(result.warnings.length, 0, 'no dangling references — empty warnings');
+  });
+
+  it('dangling ref: elided section name in another elided section → no false positive', () => {
+    // Both sections are elided. tdd_execution mention is inside ci_quality_gate which is also elided.
+    const text = `<!-- section: tdd_execution if="is_tdd" -->
+TDD content.
+<!-- /section -->
+
+<!-- section: ci_quality_gate if="ci_enabled" -->
+After CI, check tdd_execution results.
+<!-- /section -->
+
+Clean non-conditional content.
+`;
+    const result = elide(text, { is_tdd: false, ci_enabled: false });
+    assert.strictEqual(result.sections_elided, 2, 'both sections should be elided');
+    // tdd_execution reference was inside ci_quality_gate (also elided) — not in remaining content
+    assert.strictEqual(result.warnings.length, 0, 'no dangling refs — reference was inside an elided section');
+  });
+
+  it('dangling ref: no elision → warnings array is empty', () => {
+    const text = `<!-- section: tdd_execution if="is_tdd" -->
+TDD content.
+<!-- /section -->
+
+Mentions tdd_execution but section is kept.
+`;
+    const result = elide(text, { is_tdd: true });
+    assert.strictEqual(result.sections_elided, 0, 'no elision');
+    assert.ok(Array.isArray(result.warnings), 'warnings is always an array');
+    assert.strictEqual(result.warnings.length, 0, 'no warnings when nothing elided');
+  });
+
+  it('dangling ref: word-boundary matching avoids substring false positives', () => {
+    // "auto_test" is elided, but "auto_test_runner" should NOT trigger a warning
+    const text = `<!-- section: auto_test if="has_test_command" -->
+Auto test content.
+<!-- /section -->
+
+Run the auto_test_runner separately.
+`;
+    const result = elide(text, { has_test_command: false });
+    assert.strictEqual(result.sections_elided, 1, 'section elided');
+    // "auto_test_runner" contains "auto_test" as substring but word boundary stops it
+    // Depends on whether regex engine sees underscore as word char (it does — \w includes _)
+    // So "auto_test_runner" should NOT match \bauto_test\b because _runner follows without boundary
+    assert.strictEqual(result.warnings.length, 0, 'no false positive from substring match');
+  });
+
+  it('dangling ref: multiple dangling references from same elided section', () => {
+    const text = `<!-- section: ci_quality_gate if="ci_enabled" -->
+CI content.
+<!-- /section -->
+
+Step A: skip ci_quality_gate in local runs.
+Step B: ci_quality_gate is optional here.
+`;
+    const result = elide(text, { ci_enabled: false });
+    assert.strictEqual(result.sections_elided, 1);
+    assert.strictEqual(result.warnings.length, 1, 'one warning entry for the section');
+    assert.ok(result.warnings[0].references.length >= 2, 'multiple lines reference the section');
+  });
+});
+
 describe('elideConditionalSections: integration with enrichCommand', () => {
   let enrichCommand;
   let tempDir;
@@ -373,6 +473,34 @@ describe('elideConditionalSections: integration with enrichCommand', () => {
     const ctxText = output.parts[0].text;
     const ctx = JSON.parse(ctxText.slice('<bgsd-context>'.length + 1, -'</bgsd-context>'.length - 1).trim());
     assert.strictEqual(ctx.elision_applied, undefined, 'elision_applied should not be set when no elision occurred');
+  });
+
+  it('integration: dangling reference warnings appear in _elision stats', () => {
+    const input = { command: 'bgsd-execute-phase', parts: ['bgsd-execute-phase'] };
+    const output = {
+      parts: [{
+        type: 'text',
+        text: [
+          '<!-- section: ci_quality_gate if="ci_enabled" -->',
+          'CI gate step content.',
+          '<!-- /section -->',
+          '',
+          '<!-- section: execute -->',
+          'Core execution step references ci_quality_gate here.',
+          '<!-- /section -->',
+        ].join('\n'),
+      }],
+    };
+
+    enrichCommand(input, output, tempDir);
+
+    const ctxText = output.parts[0].text;
+    const ctx = JSON.parse(ctxText.slice('<bgsd-context>'.length + 1, -'</bgsd-context>'.length - 1).trim());
+    assert.strictEqual(ctx.elision_applied, true, 'elision should have occurred');
+    assert.ok(ctx._elision, '_elision stats should be present');
+    assert.ok(ctx._elision.dangling_warnings, 'dangling_warnings should be in _elision');
+    assert.strictEqual(ctx._elision.dangling_warnings.length, 1, 'one dangling reference warning');
+    assert.strictEqual(ctx._elision.dangling_warnings[0].section, 'ci_quality_gate');
   });
 
   it('integration: bgsd-context block not processed for elision', () => {

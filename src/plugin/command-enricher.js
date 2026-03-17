@@ -598,6 +598,20 @@ export function enrichCommand(input, output, cwd) {
         allElidedNames.push(...result.elided_names);
         totalTokensSaved += result.tokens_saved_estimate;
       }
+      // Store dangling warnings on the part temporarily for collection below
+      if (result.warnings && result.warnings.length > 0) {
+        part._elisionWarnings = result.warnings;
+      }
+    }
+
+    // Collect all dangling reference warnings across parts
+    const allDanglingWarnings = [];
+    for (let idx = 1; idx < output.parts.length; idx++) {
+      const part = output.parts[idx];
+      if (part && part._elisionWarnings) {
+        allDanglingWarnings.push(...part._elisionWarnings);
+        delete part._elisionWarnings;
+      }
     }
 
     if (sectionsElided > 0) {
@@ -607,6 +621,9 @@ export function enrichCommand(input, output, cwd) {
         elided_names: allElidedNames,
         tokens_saved_estimate: totalTokensSaved,
       };
+      if (allDanglingWarnings.length > 0) {
+        enrichment._elision.dangling_warnings = allDanglingWarnings;
+      }
       // Update bgsd-context block with elision flag and stats
       if (output.parts[0] && output.parts[0].text) {
         enrichment.elision_applied = true;
@@ -616,7 +633,14 @@ export function enrichCommand(input, output, cwd) {
       if (process.env.BGSD_DEBUG) {
         // eslint-disable-next-line no-console
         console.error(`[bgsd-enricher] elision: removed ${sectionsElided} sections (${allElidedNames.join(', ')}) ~${totalTokensSaved} tokens saved`);
+        if (allDanglingWarnings.length > 0) {
+          // eslint-disable-next-line no-console
+          console.error(`[bgsd-enricher] dangling references found: ${allDanglingWarnings.map(w => w.section).join(', ')}`);
+        }
       }
+    } else if (allDanglingWarnings.length > 0 && process.env.BGSD_DEBUG) {
+      // eslint-disable-next-line no-console
+      console.error(`[bgsd-enricher] dangling references found (no elision): ${allDanglingWarnings.map(w => w.section).join(', ')}`);
     }
   }
 }
@@ -740,9 +764,13 @@ function toSlug(name) {
  * 3. Boolean string: `"true"` = keep, `"false"` = elide
  * 4. Missing key = keep (fail-open: don't elide if condition can't be evaluated)
  *
+ * After elision, performs a dangling reference scan: if remaining content contains
+ * any of the elided section names as whole words, reports warnings. These are
+ * references to removed sections that could confuse agents.
+ *
  * @param {string} text - Workflow text to process
  * @param {object} enrichment - Enrichment object with fields and decisions
- * @returns {{ text: string, sections_elided: number, elided_names: string[], tokens_saved_estimate: number }}
+ * @returns {{ text: string, sections_elided: number, elided_names: string[], tokens_saved_estimate: number, warnings: Array<{section: string, references: string[]}> }}
  */
 export function elideConditionalSections(text, enrichment) {
   if (!text || typeof text !== 'string') {
@@ -810,11 +838,29 @@ export function elideConditionalSections(text, enrichment) {
     elidedNames.unshift(name); // unshift to maintain order
   }
 
+  // Post-elision dangling reference scan
+  // Scans remaining content for references to elided section names using word-boundary matching.
+  // Catches cases where a non-conditional section references an elided section by name.
+  const warnings = [];
+  if (elidedNames.length > 0) {
+    const lines = result.split('\n');
+    for (const name of elidedNames) {
+      // Word-boundary match: name must appear as a whole word (not substring of another identifier)
+      // Use word boundaries to avoid false positives (e.g., "tdd_execution" vs "tdd_execution_mode")
+      const wordRe = new RegExp(`\\b${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`);
+      const matchingLines = lines.filter(line => wordRe.test(line));
+      if (matchingLines.length > 0) {
+        warnings.push({ section: name, references: matchingLines });
+      }
+    }
+  }
+
   return {
     text: result,
     sections_elided: sectionsElided,
     elided_names: elidedNames,
     tokens_saved_estimate: tokensSaved,
+    warnings,
   };
 }
 
