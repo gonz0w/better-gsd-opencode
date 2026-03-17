@@ -5,17 +5,17 @@
 See: `.planning/PROJECT.md` (updated 2026-03-17)
 
 **Core value:** Manage and deliver high-quality software with high-quality documentation, while continuously reducing token usage and improving performance
-**Current focus:** Between milestones — v14.0 complete, ready for next milestone
+**Current focus:** v14.1 Tool-Aware Agent Routing — making tool detection actionable in workflows and agents
 
 ## Current Position
 
-**Milestone:** (none — between milestones)
-**Phase:** (none)
+**Milestone:** v14.1 Tool-Aware Agent Routing
+**Phase:** (not started — defining requirements)
 **Current Plan:** (none)
-**Status:** v14.0 milestone archived, ready for `/bgsd-new-milestone`
+**Status:** Defining requirements
 **Last Activity:** 2026-03-17
 
-Progress: [██████████] v14.0 complete
+Progress: [░░░░░░░░░░] v14.1 starting
 
 ## Performance Metrics
 
@@ -107,7 +107,8 @@ None.
 ## Session Continuity
 
 **Last session:** 2026-03-17
-**This session:** 2026-03-17 — Completed v14.0 LLM Workload Reduction milestone. All 4 phases, 12 plans, 11 requirements delivered. Archives created, PROJECT.md evolved, git tag v14.0 created.
-**Stopped at:** Milestone v14.0 archived
+**This session:** 2026-03-17 — Starting v14.1 Tool-Aware Agent Routing milestone
+**Stopped at:** Defining requirements
 **Next steps:**
-1. Start next milestone: `/bgsd-new-milestone`
+1. Define requirements and create roadmap
+2. Plan and execute Phase 138+

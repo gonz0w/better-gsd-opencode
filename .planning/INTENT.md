@@ -1,4 +1,4 @@
-**Revision:** 23
+**Revision:** 24
 **Created:** 2026-02-25
 **Updated:** 2026-03-17
 
@@ -35,6 +35,14 @@ A high-performance agent orchestration engine that maximizes LLM reasoning and c
 **DO-97:** Pre-compute PLAN.md scaffolds — CLI generates task structure, file paths, and dependency data from roadmap; LLM fills only objectives and verification criteria
 **DO-98:** Pre-compute VERIFICATION.md scaffolds — CLI pre-fills success criteria, test results, and requirement status; LLM fills only judgment sections
 **DO-99:** Reduce per-invocation context load — workflows load only the sections relevant to their current step, not the full document
+
+### v14.1 — Tool-Aware Agent Routing (active)
+
+**DO-100:** Workflows consume tool routing decisions — file-discovery-mode, search-mode, json-transform-mode decisions alter agent instructions based on available tools
+**DO-101:** Agents receive actionable tool guidance — executor/debugger/mapper agents get specific tool commands based on capability level (HIGH/MEDIUM/LOW)
+**DO-102:** github-ci uses detect:gh-preflight — structured preflight check replaces raw gh auth status call
+**DO-103:** End-to-end validation proves the full chain — detection to enrichment to workflow behavioral change tested
+**DO-104:** Dead-weight infrastructure pruned — unused Chain B artifacts simplified or removed
 </outcomes>
 
 <criteria>
@@ -60,6 +68,13 @@ A high-performance agent orchestration engine that maximizes LLM reasoning and c
 **SC-77:** `plan:generate` produces a PLAN.md scaffold with >= 60% of content pre-filled from CLI data
 **SC-78:** `verify:generate` produces a VERIFICATION.md scaffold with success criteria and test data pre-filled
 **SC-79:** Workflow compression preserves all behavioral logic — zero regressions in workflow execution
+
+### v14.1 — Tool-Aware Agent Routing (active)
+
+**SC-80:** At least 3 workflows emit different agent instructions when tool_availability changes (tools present vs absent)
+**SC-81:** github-ci workflow uses detect:gh-preflight JSON output instead of raw gh auth status
+**SC-82:** E2E test validates: mock tool_availability → enricher → workflow output contains tool-specific guidance
+**SC-83:** No orphaned decision rules — every computed decision in Chain B has at least one workflow consumer
 </criteria>
 
 <constraints>
@@ -85,6 +100,11 @@ The data layer should be invisible to users — workflows feel faster, decisions
 </health>
 
 <history>
+### v14.1 — 2026-03-17
+- **Added** outcomes: DO-100 through DO-104 for tool-aware routing, agent guidance, gh-preflight, validation, pruning
+- **Added** criteria: SC-80 through SC-83 for v14.1 verification
+  - Reason: Milestone v14.1 initiated — making v12.1 tool detection infrastructure actionable in workflows and agents
+
 ### v14.0 — 2026-03-17 (milestone complete)
 - **Marked delivered** v14.0 outcomes (DO-96 through DO-99) — all delivered
 - **Marked achieved** v14.0 criteria (SC-76 through SC-79) — all achieved
@@ -127,6 +147,5 @@ The data layer should be invisible to users — workflows feel faster, decisions
 
 (See `.planning/archive/INTENT-vv12.0.md` for full history)
 </history>
-<!-- Highest outcome ID: DO-99 -->
-<!-- Highest criteria ID: SC-79 -->
-<!-- Highest outcome ID: OUT-0 -->
+<!-- Highest outcome ID: DO-104 -->
+<!-- Highest criteria ID: SC-83 -->
