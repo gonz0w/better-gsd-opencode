@@ -50,8 +50,8 @@
 | COMP-01 | 135 | 02,03,04,05 | Complete |
 | COMP-02 | 135 | 02,03,04,05 | Complete |
 | COMP-03 | 135 | 01 | Complete |
-| COMP-04 | 137 | — | Pending |
+| COMP-04 | 137 | 01 | In Progress |
 | SCAF-01 | 136 | 02 | Complete |
 | SCAF-02 | 136 | 03 | Complete |
 | SCAF-03 | 136 | 01,02,03 | Complete |
-| SCAF-04 | 137 | — | Pending |
+| SCAF-04 | 137 | 01 | In Progress |

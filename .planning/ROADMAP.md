@@ -63,7 +63,7 @@
   1. Workflow loading in command enricher supports section-level extraction — agents receive only the section(s) relevant to the current step, not the full workflow file
   2. Workflow steps that reference conditional features (TDD, auto-test, review, deviation-capture) are elided when bgsd-context decisions indicate those features don't apply to the current task
   3. End-to-end measurement shows cumulative token savings from compression + scaffolds + section loading, with no behavioral regressions in critical workflows (execute-plan, execute-phase, verify-work)
-**Plans**: TBD
+**Plans**: 1/2 plans executed
 
 ## Progress
 
@@ -75,7 +75,7 @@ Phases 134 → 135 (after 134) → 136 (parallel with 134–135) → 137 (after 
 | 134. Measurement Infrastructure & Baseline | 2/2 | Complete    | 2026-03-16 | - |
 | 135. Workflow Compression & Section Markers | 5/5 | Complete    | 2026-03-17 | - |
 | 136. Scaffold Infrastructure | v14.0 | 3/3 | Complete | 2026-03-17 |
-| 137. Section-Level Loading & Conditional Elision | v14.0 | 0/TBD | Not started | - |
+| 137. Section-Level Loading & Conditional Elision | 1/2 | In Progress|  | - |
 
 ---
 

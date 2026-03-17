@@ -10,12 +10,12 @@ See: `.planning/PROJECT.md` (updated 2026-03-16)
 ## Current Position
 
 **Milestone:** v14.0 LLM Workload Reduction
-**Phase:** 136 — Scaffold Infrastructure
-**Current Plan:** Complete (3/3)
-**Status:** Complete — ready for Phase 137
+**Phase:** 137 — Section-Level Loading & Conditional Elision
+**Current Plan:** Plan 01 complete (1/2)
+**Status:** In progress — Plan 01 done, Plan 02 pending
 **Last Activity:** 2026-03-17
 
-Progress: [██████████] 100%
+Progress: [██████████] 99%
 
 ## Performance Metrics
 
@@ -44,6 +44,7 @@ Progress: [██████████] 100%
 - v14.0 Phase 136 Plan 01: 8 min, 2 tasks, 2 files (scaffold merge lib: DATA_MARKER, JUDGMENT_MARKER, parseMarkedSections, mergeScaffold; 28 unit tests)
 - v14.0 Phase 136 Plan 02: 15 min, 2 tasks, 3 files (plan:generate command — roadmap pre-fill, data/judgment markers, idempotent merge)
 - v14.0 Phase 136 Plan 03: 5 min, 2 tasks, 2 files (verify:generate command — success criteria pre-fill, must-haves extraction; 31 integration tests; 1681 tests pass)
+- v14.0 Phase 137 Plan 01: 16 min, 5 tasks, 9 files (elideConditionalSections + enrichCommand wiring + if= annotations on TDD/auto-test/CI/post-execution + 28 tests; 1709 tests pass)
 - Trend: Stable, improving velocity with infrastructure improvements
 
 *Updated after each plan completion*
@@ -91,6 +92,9 @@ Progress: [██████████] 100%
 - [136-02]: REQUIREMENTS.md format is **ID:** (colon inside bold markers) not **ID**: — regex must match `\*\*ID:\*\*` not `\*\*ID\*\*:`
 - [136-02]: Frontmatter values must be raw strings (not `"0050"`) to prevent idempotency failure where extractFrontmatter strips embedded quotes
 - [136-02]: marker count must use `/g` regex flag — `String.match(constant)` finds only first occurrence
+- [137-01]: command.execute.before hook fires BEFORE @-reference resolution — output.parts starts empty; elision processes injected content only
+- [137-01]: Fail-open elision: missing enrichment key keeps section (safe default prevents accidental removal)
+- [137-01]: Section fingerprint normalization: strip if= attributes from section names for baseline comparison
 
 ### Blockers/Concerns
 
@@ -99,6 +103,7 @@ None.
 ## Session Continuity
 
 **Last session:** 2026-03-17T04:04:52.144Z
-**This session:** 2026-03-17 — Executed Phase 136 (scaffold infrastructure). 3/3 plans complete. SCAF-01, SCAF-02, SCAF-03 done. 1681 tests pass.
+**This session:** 2026-03-17 — Executed Phase 137 Plan 01 (conditional elision engine + workflow annotations). elideConditionalSections() implemented, 5 if= annotations added, 28 tests pass, 1709 total.
+**Stopped at:** Completed 137-01-PLAN.md
 **Next steps:**
-1. Phase 137 (section-level loading) — depends on Phase 135 markers AND Phase 136 scaffolds, both now complete
+1. Phase 137 Plan 02 — dangling reference check + cumulative savings measurement + regression tests
