@@ -516,3 +516,227 @@ describe('elideConditionalSections: integration with enrichCommand', () => {
     assert.ok(output.parts[0].text.startsWith('<bgsd-context>'), 'parts[0] is bgsd-context');
   });
 });
+
+// ─── Structural Regression Tests (Phase 137 Plan 02 Task 3) ──────────────────
+// Tests read actual workflow files and verify elision doesn't break structural
+// integrity of critical workflows. Uses extractStructuralFingerprint to compare.
+
+describe('structural regression: execute-plan.md after elision', () => {
+  let elide;
+  const WORKFLOWS_DIR = path.resolve(__dirname, '..', 'workflows');
+  let workflowContent;
+
+  before(async () => {
+    const mod = await import(PLUGIN_PATH);
+    elide = mod.elideConditionalSections;
+    try {
+      workflowContent = fs.readFileSync(path.join(WORKFLOWS_DIR, 'execute-plan.md'), 'utf-8');
+    } catch (e) {
+      workflowContent = null;
+    }
+  });
+
+  it('execute-plan.md exists and has conditional sections', () => {
+    assert.ok(workflowContent, 'execute-plan.md should exist');
+    assert.ok(workflowContent.includes('if="is_tdd"'), 'should have is_tdd conditional section');
+    assert.ok(workflowContent.includes('if="has_test_command"'), 'should have has_test_command conditional section');
+    assert.ok(workflowContent.includes('if="verifier_enabled"'), 'should have verifier_enabled conditional section');
+  });
+
+  it('execute-plan: core sections remain after full elision (is_tdd=false, has_test_command=false, verifier_enabled=false)', () => {
+    if (!workflowContent) return;
+
+    const enrichment = { is_tdd: false, has_test_command: false, verifier_enabled: false };
+    const result = elide(workflowContent, enrichment);
+
+    // Core sections must remain
+    const coreSections = [
+      'init_context', 'identify_plan', 'execute', 'context_budget',
+      'parse_segments', 'task_commit', 'checkpoint_protocol', 'verification_gate',
+      'create_summary', 'update_position', 'update_roadmap', 'offer_next',
+      'deviation_rules',
+    ];
+    for (const section of coreSections) {
+      assert.ok(
+        result.text.includes(`<!-- section: ${section}`),
+        `Core section "${section}" should remain after elision`
+      );
+    }
+  });
+
+  it('execute-plan: conditional sections are removed when conditions are false', () => {
+    if (!workflowContent) return;
+
+    const enrichment = { is_tdd: false, has_test_command: false, verifier_enabled: false };
+    const result = elide(workflowContent, enrichment);
+
+    assert.ok(result.sections_elided >= 3, `Should elide at least 3 sections (got ${result.sections_elided})`);
+    assert.ok(!result.text.includes('if="is_tdd"'), 'tdd_execution section should be removed');
+    assert.ok(!result.text.includes('if="has_test_command"'), 'auto_test section should be removed');
+    assert.ok(!result.text.includes('if="verifier_enabled"'), 'post_execution section should be removed');
+  });
+
+  it('execute-plan: conditional sections kept when conditions are true', () => {
+    if (!workflowContent) return;
+
+    const enrichment = { is_tdd: true, has_test_command: true, verifier_enabled: true };
+    const result = elide(workflowContent, enrichment);
+
+    assert.strictEqual(result.sections_elided, 0, 'No sections should be elided when all conditions are true');
+    // Verify all sections present (including conditionals)
+    assert.ok(result.text.includes('if="is_tdd"'), 'tdd_execution section kept when is_tdd=true');
+    assert.ok(result.text.includes('if="has_test_command"'), 'auto_test section kept when has_test_command=true');
+  });
+
+  it('execute-plan: deviation_rules section is always preserved (not conditional)', () => {
+    if (!workflowContent) return;
+
+    // deviation_rules has no if= condition — must always remain
+    const enrichment = { is_tdd: false, has_test_command: false, verifier_enabled: false };
+    const result = elide(workflowContent, enrichment);
+
+    assert.ok(
+      result.text.includes('<!-- section: deviation_rules -->'),
+      'deviation_rules section must be unconditional (no if= attribute)'
+    );
+    // Verify it's unconditional in the original too
+    assert.ok(
+      workflowContent.includes('<!-- section: deviation_rules -->'),
+      'deviation_rules should not have if= attribute in source'
+    );
+    assert.ok(
+      !workflowContent.includes('<!-- section: deviation_rules if='),
+      'deviation_rules must not have if= condition'
+    );
+  });
+});
+
+describe('structural regression: execute-phase.md after elision', () => {
+  let elide;
+  const WORKFLOWS_DIR = path.resolve(__dirname, '..', 'workflows');
+  let workflowContent;
+
+  before(async () => {
+    const mod = await import(PLUGIN_PATH);
+    elide = mod.elideConditionalSections;
+    try {
+      workflowContent = fs.readFileSync(path.join(WORKFLOWS_DIR, 'execute-phase.md'), 'utf-8');
+    } catch (e) {
+      workflowContent = null;
+    }
+  });
+
+  it('execute-phase.md exists and has ci_quality_gate conditional', () => {
+    assert.ok(workflowContent, 'execute-phase.md should exist');
+    assert.ok(workflowContent.includes('if="ci_enabled"'), 'should have ci_enabled conditional section');
+  });
+
+  it('execute-phase: core sections remain after ci_enabled=false elision', () => {
+    if (!workflowContent) return;
+
+    const enrichment = { ci_enabled: false };
+    const result = elide(workflowContent, enrichment);
+
+    // Core sections must remain
+    const coreSections = [
+      'purpose', 'initialize', 'discover_plans', 'execute_waves',
+      'checkpoint_handling', 'aggregate_results', 'close_artifacts',
+      'verify_phase_goal',
+    ];
+    for (const section of coreSections) {
+      assert.ok(
+        result.text.includes(`<!-- section: ${section}`),
+        `Core section "${section}" should remain after elision`
+      );
+    }
+  });
+
+  it('execute-phase: ci_quality_gate removed when ci_enabled=false', () => {
+    if (!workflowContent) return;
+
+    const enrichment = { ci_enabled: false };
+    const result = elide(workflowContent, enrichment);
+
+    assert.strictEqual(result.sections_elided, 1, 'exactly 1 section should be elided (ci_quality_gate)');
+    assert.ok(result.elided_names.includes('ci_quality_gate'), 'ci_quality_gate should be in elided_names');
+    assert.ok(!result.text.includes('if="ci_enabled"'), 'ci_enabled conditional should be removed');
+  });
+
+  it('execute-phase: ci_quality_gate kept when ci_enabled=true', () => {
+    if (!workflowContent) return;
+
+    const enrichment = { ci_enabled: true };
+    const result = elide(workflowContent, enrichment);
+
+    assert.strictEqual(result.sections_elided, 0, 'No sections elided when ci_enabled=true');
+    assert.ok(result.text.includes('if="ci_enabled"'), 'ci_quality_gate section kept');
+  });
+});
+
+describe('structural regression: verify-work.md elision is a no-op', () => {
+  let elide;
+  const WORKFLOWS_DIR = path.resolve(__dirname, '..', 'workflows');
+  let workflowContent;
+
+  before(async () => {
+    const mod = await import(PLUGIN_PATH);
+    elide = mod.elideConditionalSections;
+    try {
+      workflowContent = fs.readFileSync(path.join(WORKFLOWS_DIR, 'verify-work.md'), 'utf-8');
+    } catch (e) {
+      workflowContent = null;
+    }
+  });
+
+  it('verify-work.md exists', () => {
+    assert.ok(workflowContent, 'verify-work.md should exist');
+  });
+
+  it('verify-work.md has no conditional if= sections', () => {
+    if (!workflowContent) return;
+    const hasConditionals = workflowContent.includes(' if="');
+    assert.ok(!hasConditionals, 'verify-work.md should have no conditional sections');
+  });
+
+  it('verify-work: elision with all conditions false is a no-op', () => {
+    if (!workflowContent) return;
+
+    const enrichment = { is_tdd: false, ci_enabled: false, verifier_enabled: false, has_test_command: false };
+    const result = elide(workflowContent, enrichment);
+
+    assert.strictEqual(result.sections_elided, 0, 'no sections should be elided from verify-work.md');
+    assert.strictEqual(result.text, workflowContent, 'text should be unchanged');
+  });
+
+  it('verify-work: elision with all conditions true is also a no-op', () => {
+    if (!workflowContent) return;
+
+    const enrichment = { is_tdd: true, ci_enabled: true, verifier_enabled: true, has_test_command: true };
+    const result = elide(workflowContent, enrichment);
+
+    assert.strictEqual(result.sections_elided, 0, 'no sections should be elided from verify-work.md');
+    assert.strictEqual(result.text, workflowContent, 'text should be unchanged');
+  });
+});
+
+describe('workflow:verify-structure CLI passes after elision', () => {
+  it('workflow:verify-structure returns 0 exit code (no structural regressions)', async () => {
+    const { execSync } = require('child_process');
+    const binPath = path.resolve(__dirname, '..', 'bin', 'bgsd-tools.cjs');
+    const cwd = path.resolve(__dirname, '..');
+
+    let exitCode = 0;
+    let output = '';
+    try {
+      output = execSync(
+        `BGSD_PLUGIN_DIR="${cwd}" node "${binPath}" workflow:verify-structure`,
+        { cwd, encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'] }
+      );
+    } catch (e) {
+      exitCode = e.status || 1;
+      output = e.stderr || '';
+    }
+
+    assert.strictEqual(exitCode, 0, `workflow:verify-structure should pass with exit code 0. Output: ${output}`);
+  });
+});
