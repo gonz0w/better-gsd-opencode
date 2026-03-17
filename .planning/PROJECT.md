@@ -8,6 +8,17 @@ A single-file Node.js CLI built from 52 organized `src/` modules via esbuild, pr
 
 Manage and deliver high-quality software with high-quality documentation, while continuously reducing token usage and improving performance.
 
+## Current Milestone: v14.1 Tool-Aware Agent Routing
+
+**Goal:** Make the tool detection infrastructure from v12.1 actionable — workflows and agents consume tool_availability decisions to route behavior, gh-preflight replaces raw calls, and dead-weight infrastructure is pruned.
+
+**Target features:**
+- Workflows read file-discovery-mode, search-mode, json-transform-mode decisions and emit tool-specific instructions
+- Executor/debugger/mapper agents receive actionable tool usage guidance based on capability level
+- github-ci workflow uses detect:gh-preflight instead of raw gh auth status
+- End-to-end tests proving detection → enrichment → workflow behavior change
+- Prune Chain B infrastructure that can't be made useful
+
 ## Current State
 
 **Last shipped:** v14.0 LLM Workload Reduction (2026-03-17)
@@ -275,7 +286,11 @@ See `.planning/MILESTONES.md` for full history of v1.0 through v8.2.
 
 ### Active
 
-(None — between milestones)
+- Tool-aware workflow routing — workflows consume tool decisions to alter agent instructions
+- Agent tool guidance — executor/debugger/mapper agents get actionable tool usage based on capability level
+- gh-preflight integration — github-ci uses detect:gh-preflight CLI command
+- End-to-end validation — tests proving full detection → enrichment → behavior chain
+- Dead weight pruning — remove or simplify unused Chain B infrastructure
 
 ### Out of Scope
 
@@ -387,4 +402,4 @@ Known tech debt: `node:sqlite` is Stability 1.2 (Release Candidate).
 - ~~Node.js 18+ minimum~~ — Raised to 22.5+ in v11.x for node:sqlite support
 
 ---
-*Last updated: 2026-03-17 after v14.0 milestone completed*
+*Last updated: 2026-03-17 after v14.1 milestone started*

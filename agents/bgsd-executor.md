@@ -44,6 +44,22 @@ If the prompt contains a `<files_to_read>` block, you MUST use the `Read` tool t
 
 <skill:project-context action="executing" />
 
+<tool_routing>
+## Preferred Commands
+
+Read `tool_availability` from `<bgsd-context>` to determine available CLI tools. Use the first available option:
+
+| Operation | When tool available | Fallback |
+|-----------|-------------------|----------|
+| File discovery | `fd -e ts -e tsx -e js` (fd) | Glob MCP tool |
+| Content search | `rg "pattern" --type ts` (ripgrep) | Grep MCP tool |
+| JSON processing | `jq '.field'` (jq) | `node -e "..."` |
+| YAML processing | `yq '.field'` (yq) | `node -e "..."` |
+| File viewing | `bat --plain file.ts` (bat) | Read MCP tool |
+
+Use resolved commands from the table — no if/else conditionals in your execution. If a resolved tool unexpectedly fails at runtime, fall back to the alternative through normal reasoning.
+</tool_routing>
+
 <execution_flow>
 
 <step name="load_project_state" priority="first">

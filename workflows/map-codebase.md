@@ -11,7 +11,7 @@ Read all execution_context files before starting.
 <!-- section: init_context -->
 <skill:bgsd-context-init />
 
-Extract from `<bgsd-context>` JSON: `mapper_model`, `commit_docs`, `codebase_dir`, `existing_maps`, `has_maps`, `codebase_dir_exists`.
+Extract from `<bgsd-context>` JSON: `mapper_model`, `commit_docs`, `codebase_dir`, `existing_maps`, `has_maps`, `codebase_dir_exists`, `tool_availability`, `capability_level` (from `handoff_tool_context.capability_level`).
 <!-- /section -->
 
 <!-- section: check_existing -->
@@ -42,15 +42,23 @@ Expected output: STACK.md, INTEGRATIONS.md (tech), ARCHITECTURE.md, STRUCTURE.md
 <step name="spawn_agents">
 Spawn 4 parallel `bgsd-codebase-mapper` agents (`run_in_background=true`, NOT `Explore`). Each prompt: "Focus: {focus}. Write {docs} to .planning/codebase/. Return confirmation only."
 
+Build `TOOL_GUIDANCE` from `tool_availability` before spawning:
+```
+Tool capability: {capability_level}.
+{If fd available: "File discovery: fd -e ts -e tsx -e js -e jsx"}
+{If ripgrep available: "Content search: rg 'pattern' --type ts"}
+{If neither fd nor ripgrep: "Use Glob and Grep MCP tools for file discovery and content search"}
+```
+
 ```
 Task(subagent_type="bgsd-codebase-mapper", model="{mapper_model}", run_in_background=true,
-  description="Map tech", prompt="Focus: tech. Write STACK.md + INTEGRATIONS.md.")
+  description="Map tech", prompt="Focus: tech. Write STACK.md + INTEGRATIONS.md. {TOOL_GUIDANCE}")
 Task(subagent_type="bgsd-codebase-mapper", model="{mapper_model}", run_in_background=true,
-  description="Map arch", prompt="Focus: arch. Write ARCHITECTURE.md + STRUCTURE.md.")
+  description="Map arch", prompt="Focus: arch. Write ARCHITECTURE.md + STRUCTURE.md. {TOOL_GUIDANCE}")
 Task(subagent_type="bgsd-codebase-mapper", model="{mapper_model}", run_in_background=true,
-  description="Map quality", prompt="Focus: quality. Write CONVENTIONS.md + TESTING.md.")
+  description="Map quality", prompt="Focus: quality. Write CONVENTIONS.md + TESTING.md. {TOOL_GUIDANCE}")
 Task(subagent_type="bgsd-codebase-mapper", model="{mapper_model}", run_in_background=true,
-  description="Map concerns", prompt="Focus: concerns. Write CONCERNS.md.")
+  description="Map concerns", prompt="Focus: concerns. Write CONCERNS.md. {TOOL_GUIDANCE}")
 ```
 </step>
 <!-- /section -->
