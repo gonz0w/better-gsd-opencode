@@ -18,7 +18,7 @@
 
 - [ ] **COMP-01:** Top 10 workflows (discuss-phase, execute-phase, new-milestone, execute-plan, transition, new-project, audit-milestone, quick, resume-project, map-codebase) are prose-tightened with 40%+ average token reduction
 - [ ] **COMP-02:** All top 10 workflows have `<!-- section: step_name -->` markers at each major process step enabling selective extraction
-- [ ] **COMP-03:** Shared blocks repeated across 3+ workflows (deviation rules, commit protocol, checkpoint format) are extracted to skill references, reducing duplication
+- [x] **COMP-03:** Shared blocks repeated across 3+ workflows (deviation rules, commit protocol, checkpoint format) are extracted to skill references, reducing duplication
 - [ ] **COMP-04:** Workflow loading in command enricher supports section-level extraction — agent receives only the section(s) relevant to the current step instead of the full workflow
 
 ### SCAF — Scaffold Generation
@@ -49,7 +49,7 @@
 | MEAS-03 | 134 | — | Pending |
 | COMP-01 | 135 | — | Pending |
 | COMP-02 | 135 | — | Pending |
-| COMP-03 | 135 | — | Pending |
+| COMP-03 | 135 | 01 | Complete |
 | COMP-04 | 137 | — | Pending |
 | SCAF-01 | 136 | — | Pending |
 | SCAF-02 | 136 | — | Pending |

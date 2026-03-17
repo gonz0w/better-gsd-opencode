@@ -10,12 +10,12 @@ See: `.planning/PROJECT.md` (updated 2026-03-16)
 ## Current Position
 
 **Milestone:** v14.0 LLM Workload Reduction
-**Phase:** 134 — Measurement Infrastructure & Baseline
-**Current Plan:** Not started
-**Status:** Ready to plan
-**Last Activity:** 2026-03-16
+**Phase:** 135 — Workflow Compression & Section Markers
+**Current Plan:** Plan 02 (1/5 complete)
+**Status:** In Progress
+**Last Activity:** 2026-03-17
 
-Progress: [██████████] 100%
+Progress: [██████████] 95%
 
 ## Performance Metrics
 
@@ -36,6 +36,7 @@ Progress: [██████████] 100%
 - v13.0 Phase 133 Plan 02: 8 min, 2 tasks, 5 files (help/discovery wiring + new-milestone.md quality profile)
 - v14.0 Phase 134 Plan 01: 7 min, 2 tasks, 7 files (workflow:baseline + workflow:compare + structural fingerprint + 21 tests)
 - v14.0 Phase 134 Plan 02: 12 min, 2 tasks, 4 files (workflow:verify-structure + regression detection + 14 tests)
+- v14.0 Phase 135 Plan 01: 5 min, 2 tasks, 5 files (pre-compression baseline + 3 shared skill extractions)
 - Trend: Stable, improving velocity with infrastructure improvements
 
 *Updated after each plan completion*
@@ -69,6 +70,9 @@ Progress: [██████████] 100%
 - [134-01]: Workflow baselines named workflow-baseline-{timestamp}.json to distinguish from old baseline-{timestamp}.json
 - [134-02]: CLI-based unit tests (execSync + BGSD_PLUGIN_DIR) for verify-structure — direct stdout capture interferes with node:test runner
 - [134-02]: Fixed __dirname path in workflow.js: path.resolve(dirname, '..') not '../..' (bundled binary has bin/ as dirname)
+- [135-01]: Baseline JSON gitignored (.planning/.gitignore: baselines/*.json) — snapshot exists on disk, not in git (intentional per project convention)
+- [135-01]: Parameterized CI gate skill with {{scope}}/{{base_branch}} to serve both execute-phase and quick workflows
+- [135-01]: bgsd-context-init skill has no placeholders — 2-paragraph preamble is identical across all 10 workflows
 
 ### Blockers/Concerns
 
@@ -76,8 +80,8 @@ None.
 
 ## Session Continuity
 
-**Last session:** 2026-03-16T23:56:52.457Z
-**This session:** 2026-03-16 — Executed Phase 134 Plan 02 (workflow:verify-structure + 14 tests). Phase 134 COMPLETE.
+**Last session:** 2026-03-17T01:01:15Z
+**This session:** 2026-03-17 — Executed Phase 135 Plan 01 (pre-compression baseline + shared skill extraction). COMP-03 complete.
 **Next steps:**
-1. Begin Phase 135 (workflow compression — top 10 workflows compressed 40%+, section markers)
+1. Continue Phase 135 Plans 02-05 (compress top 10 workflows, add section markers)
 2. Phase 136 (scaffold infrastructure) can run in parallel with 135 (different files)
