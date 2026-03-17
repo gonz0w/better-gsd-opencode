@@ -35,16 +35,26 @@ SCOPE=""
 
 **Step 2: Validate prerequisites**
 
+**Pre-computed decision:** If `decisions.gh-preflight` exists in `<bgsd-context>`, use its `.value` directly. Otherwise run:
+
 ```bash
-# Check gh CLI authentication
-gh auth status 2>&1
+# Check gh CLI authentication via structured preflight
+BGSD_HOME=$(ls -d $HOME/.config/*/bgsd-oc 2>/dev/null | head -1)
+GH_PREFLIGHT=$(node ${BGSD_HOME}/bin/bgsd-tools.cjs detect:gh-preflight 2>/dev/null)
 ```
 
-If not authenticated, error with instructions:
+Parse the JSON output: check `usable` field (boolean). Surface `warnings` array for version-specific issues.
+
+If `usable` is false, error with actionable fix:
 ```
-ERROR: GitHub CLI not authenticated.
-Run: gh auth login
+ERROR: gh CLI not usable: {GH_PREFLIGHT.error}
+Fix: {GH_PREFLIGHT.fix_command}
 Then retry: /bgsd-github-ci
+```
+
+If `warnings` array is non-empty, display each warning before proceeding:
+```
+⚠ gh CLI warning: {warning}
 ```
 
 ```bash
