@@ -702,3 +702,34 @@
 
 ---
 
+
+## ✅ v14.1 Tool-Aware Agent Routing (Shipped: 2026-03-17)
+
+**Delivered:** Made the v12.1 tool detection infrastructure actionable — 4 workflows and 3 agents now route behavior based on available tools, E2E tests prove the full detection→enrichment→behavior chain, and dead-weight infrastructure is pruned.
+
+**Phases completed:** 3 phases (138–140), 4 plans, 9 tasks
+**Timeline:** 1 day (2026-03-17)
+**Tests:** 1,677 passing (0 failures); net reduction from pruning
+
+**Key accomplishments:**
+- Wired tool detection decisions into 4 workflows: file-discovery/search-mode guidance in execute-plan, capability_level hints in execute-phase executor spawns, fd/rg TOOL_GUIDANCE in map-codebase mapper spawns, and detect:gh-preflight replacing raw `gh auth status` in github-ci
+- Added `<tool_routing>` Preferred Commands sections to executor (5 ops), debugger (4 investigation ops), and codebase-mapper (6 ops) — all 3 agents use fd/rg/jq/bat when available and fall back to MCP tools or node when not
+- Added 13 E2E tests (TEST-01) confirming all Chain B decision rules produce tool-dependent outputs; 11 contract tests (TEST-02) dynamically verifying every Chain B rule has at least one workflow or agent consumer — zero orphaned decisions
+- Pruned unused infrastructure: `handoff_tool_context` simplified to `{ capability_level }` only; 3 orphaned rules removed (`agent-capability-level`, `json-transform-mode`, `phase-dependencies`); DECISION_REGISTRY pruned 22→19 entries
+
+**Stats:**
+- 14 files modified across phases 138–140
+- 4 plans, 9 tasks; 1 day from start to ship
+- All 10/10 requirements delivered (ROUTE-01–03, AGENT-01–02, GH-01, TEST-01–02, PRUNE-01–02)
+
+**Git range:** `feat(138-01)` → `feat(v14.1)` (Phase 140 Infrastructure Pruning, PR #28)
+
+**What's next:** Ready for next milestone — `/bgsd-new-milestone`
+
+**Archives:**
+- `.planning/milestones/v14.1-ROADMAP.md`
+- `.planning/milestones/v14.1-REQUIREMENTS.md`
+- `.planning/milestones/v14.1-DOCS.md`
+
+---
+
