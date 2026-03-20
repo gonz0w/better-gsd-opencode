@@ -11,7 +11,7 @@ v15.0 implements a question design system for workflow discussions — replacing
 
 ## Phases
 
-- [ ] **Phase 141: Taxonomy & Infrastructure** - Define question taxonomy, option generation rules, prompts.js template library, and decision routing functions
+- [x] **Phase 141: Taxonomy & Infrastructure** - Define question taxonomy, option generation rules, prompts.js template library, and decision routing functions (completed 2026-03-20)
 - [ ] **Phase 142: Primary Workflow Migration** - Migrate discuss-phase, new-milestone, plan-phase, transition, verify-work, execute-phase to template references
 - [ ] **Phase 143: Remaining Workflows & CLI Tools** - Audit remaining workflows, migrate all to templates, add questions:audit/list/validate CLI commands
 
@@ -28,7 +28,7 @@ v15.0 implements a question design system for workflow discussions — replacing
   4. resolveQuestionType(workflow, step) and resolveOptionGeneration(questionType, context) are in DECISION_REGISTRY with contract tests
   5. Questions explicitly state "Pick one" or "Select all that apply" based on question type (mutual exclusivity signaling)
   6. Option templates include outcome trade-off hints where applicable (consequence-framed)
-**Plans**: 3/3 plans executed
+**Plans**: 3/3 plans complete
 
 ### Phase 142: Primary Workflow Migration
 **Goal**: Migrate 6 primary workflows to use question() template references instead of inline question text
@@ -59,7 +59,7 @@ v15.0 implements a question design system for workflow discussions — replacing
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 141. Taxonomy & Infrastructure | 3/3 | Complete | 2026-03-19 |
+| 141. Taxonomy & Infrastructure | 3/3 | Complete    | 2026-03-20 |
 | 142. Primary Workflow Migration | 0/? | Not started | - |
 | 143. Remaining Workflows & CLI Tools | 0/? | Not started | - |
 
