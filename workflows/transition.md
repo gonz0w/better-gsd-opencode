@@ -157,6 +157,8 @@ Pre-computed decisions: use `decisions.auto-advance` and `decisions.branch-handl
 
 Use `is_last_phase` from `plan:phase complete`:
 
+→ Next action: `questionTemplate('transition-next-route', 'SINGLE_CHOICE')` (Plan more phases / Complete milestone)
+
 **Route A (more phases):** Check `ls .planning/phases/*[X+1]*/*-CONTEXT.md 2>/dev/null`
 - Yolo: CONTEXT.md → `/bgsd-plan-phase [X+1] --auto`, else `/bgsd-discuss-phase [X+1] --auto`
 - Interactive: Show `## ✓ Phase [X] Complete` + `## ▶ Next Up` block with `/bgsd-discuss-phase [X+1]` (no context) or `/bgsd-plan-phase [X+1]` (has context), `<sub>/clear first</sub>`

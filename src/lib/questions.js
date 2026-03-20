@@ -216,6 +216,52 @@ const OPTION_TEMPLATES = {
       { id: 'manual', label: 'Manual handling — I will address', diversity: { approach: 0.3 } }
     ],
     typeHint: 'SINGLE_CHOICE'
+  },
+
+  // new-milestone workflow templates
+  'new-milestone-goals': {
+    question: 'What do you want to build next?',
+    options: [
+      { id: 'explore-features', label: 'Explore features', diversity: { scope: 0.3 } },
+      { id: 'explore-priorities', label: 'Clarify priorities', diversity: { priority: 0.5 } },
+      { id: 'explore-constraints', label: 'Identify constraints', diversity: { scope: 0.7 } },
+      { id: 'explore-scope', label: 'Discuss scope', diversity: { scope: 0.9 } }
+    ],
+    typeHint: 'EXPLORATION'
+  },
+  'new-milestone-version': {
+    question: 'Confirm milestone version?',
+    options: [
+      { id: 'yes', label: 'Yes, proceed with suggested version', diversity: { certainty: 1.0 } },
+      { id: 'no', label: 'No, I want to adjust', diversity: { certainty: 0.0 } }
+    ],
+    typeHint: 'BINARY'
+  },
+  'new-milestone-research': {
+    question: 'Research the domain ecosystem for new features before defining requirements?',
+    options: [
+      { id: 'research-first', label: 'Research first (Recommended)', diversity: { scope: 0.8 } },
+      { id: 'skip-research', label: 'Skip research', diversity: { scope: 0.2 } }
+    ],
+    typeHint: 'SINGLE_CHOICE'
+  },
+  'new-milestone-skills': {
+    question: 'Install any skills before defining requirements?',
+    options: [
+      { id: 'yes', label: 'Yes', diversity: { certainty: 1.0 } },
+      { id: 'no', label: 'No', diversity: { certainty: 0.0 } }
+    ],
+    typeHint: 'BINARY'
+  },
+  'new-milestone-scope-category': {
+    question: 'Select categories to scope for this milestone',
+    options: [
+      { id: 'category-1', label: 'Category 1', diversity: { scope: 0.2 } },
+      { id: 'category-2', label: 'Category 2', diversity: { scope: 0.4 } },
+      { id: 'category-3', label: 'Category 3', diversity: { scope: 0.6 } },
+      { id: 'none', label: 'None for this milestone', diversity: { scope: 1.0 } }
+    ],
+    typeHint: 'MULTI_CHOICE'
   }
 };
 
