@@ -28,7 +28,7 @@ v15.0 implements a question design system for workflow discussions — replacing
   4. resolveQuestionType(workflow, step) and resolveOptionGeneration(questionType, context) are in DECISION_REGISTRY with contract tests
   5. Questions explicitly state "Pick one" or "Select all that apply" based on question type (mutual exclusivity signaling)
   6. Option templates include outcome trade-off hints where applicable (consequence-framed)
-**Plans**: TBD
+**Plans**: 2/3 plans executed
 
 ### Phase 142: Primary Workflow Migration
 **Goal**: Migrate 6 primary workflows to use question() template references instead of inline question text
@@ -59,7 +59,7 @@ v15.0 implements a question design system for workflow discussions — replacing
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 141. Taxonomy & Infrastructure | 1/3 | In progress | - |
+| 141. Taxonomy & Infrastructure | 2/3 | In Progress|  |
 | 142. Primary Workflow Migration | 0/? | Not started | - |
 | 143. Remaining Workflows & CLI Tools | 0/? | Not started | - |
 
