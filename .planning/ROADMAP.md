@@ -12,7 +12,7 @@ v15.0 implements a question design system for workflow discussions — replacing
 ## Phases
 
 - [x] **Phase 141: Taxonomy & Infrastructure** - Define question taxonomy, option generation rules, prompts.js template library, and decision routing functions (completed 2026-03-20)
-- [ ] **Phase 142: Primary Workflow Migration** - Migrate discuss-phase, new-milestone, plan-phase, transition, verify-work, execute-phase to template references
+- [x] **Phase 142: Primary Workflow Migration** - Migrate discuss-phase, new-milestone, plan-phase, transition, verify-work, execute-phase to template references (completed 2026-03-20)
 - [ ] **Phase 143: Remaining Workflows & CLI Tools** - Audit remaining workflows, migrate all to templates, add questions:audit/list/validate CLI commands
 
 ## Phase Details
@@ -41,7 +41,7 @@ v15.0 implements a question design system for workflow discussions — replacing
   4. transition.md uses question() template references — phase transition workflow unchanged
   5. verify-work.md uses question() template references — verification flow preserved
   6. execute-phase.md (checkpoint human-verify step) uses question() template references
-**Plans**: 6/6 plans executed
+**Plans**: 6/6 plans complete
 
 ### Phase 143: Remaining Workflows & CLI Tools
 **Goal**: Audit remaining ~40 workflows, migrate all to templates, add questions:audit/list/validate CLI commands
