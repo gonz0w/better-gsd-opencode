@@ -1665,14 +1665,20 @@ function parsePlans(phaseNum, cwd) {
   if (_plansCache.has(cacheKey)) {
     return _plansCache.get(cacheKey);
   }
-  const numStr = String(phaseNum).padStart(2, "0");
+  const normalized = String(phaseNum).replace(/^0+/, "") || "0";
   const phasesDir = join6(resolvedCwd, ".planning", "phases");
   let phaseDir = null;
   try {
-    const entries = readdirSync(phasesDir);
-    const dirName = entries.find((d) => d.startsWith(numStr + "-") || d === numStr);
-    if (dirName) {
-      phaseDir = join6(phasesDir, dirName);
+    const entries = readdirSync(phasesDir, { withFileTypes: true });
+    for (const entry of entries) {
+      if (!entry.isDirectory()) continue;
+      const dirMatch = entry.name.match(/^(\d+(?:\.\d+)?)-?(.*)/);
+      if (!dirMatch) continue;
+      const dirPhaseNum = dirMatch[1].replace(/^0+/, "") || "0";
+      if (dirPhaseNum === normalized) {
+        phaseDir = join6(phasesDir, entry.name);
+        break;
+      }
     }
   } catch {
     return Object.freeze([]);
@@ -5966,11 +5972,21 @@ function _eagerMtimeCheck(resolvedCwd, phaseNum) {
       join10(resolvedCwd, ".planning", "STATE.md")
     ];
     if (phaseNum) {
-      const numStr = String(phaseNum).padStart(2, "0");
+      const normalized = String(phaseNum).replace(/^0+/, "") || "0";
       const phasesDir = join10(resolvedCwd, ".planning", "phases");
       try {
-        const entries = readdirSync2(phasesDir);
-        const dirName = entries.find((d) => d.startsWith(numStr + "-") || d === numStr);
+        const entries = readdirSync2(phasesDir, { withFileTypes: true });
+        let dirName = null;
+        for (const entry of entries) {
+          if (!entry.isDirectory()) continue;
+          const dirMatch = entry.name.match(/^(\d+(?:\.\d+)?)-?(.*)/);
+          if (!dirMatch) continue;
+          const dirPhaseNum = dirMatch[1].replace(/^0+/, "") || "0";
+          if (dirPhaseNum === normalized) {
+            dirName = entry.name;
+            break;
+          }
+        }
         if (dirName) {
           const phaseDir = join10(phasesDir, dirName);
           const files = readdirSync2(phaseDir);
@@ -6029,12 +6045,18 @@ function getProjectState(cwd) {
   if (phaseNum) {
     plans = parsePlans(phaseNum, resolvedCwd);
     try {
-      const numStr = String(phaseNum).padStart(2, "0");
+      const normalized = String(phaseNum).replace(/^0+/, "") || "0";
       const phasesDir = join10(resolvedCwd, ".planning", "phases");
-      const entries = readdirSync2(phasesDir);
-      const dirName = entries.find((d) => d.startsWith(numStr + "-") || d === numStr);
-      if (dirName) {
-        phaseDir = `.planning/phases/${dirName}`;
+      const entries = readdirSync2(phasesDir, { withFileTypes: true });
+      for (const entry of entries) {
+        if (!entry.isDirectory()) continue;
+        const dirMatch = entry.name.match(/^(\d+(?:\.\d+)?)-?(.*)/);
+        if (!dirMatch) continue;
+        const dirPhaseNum = dirMatch[1].replace(/^0+/, "") || "0";
+        if (dirPhaseNum === normalized) {
+          phaseDir = `.planning/phases/${entry.name}`;
+          break;
+        }
       }
     } catch {
     }
@@ -6827,13 +6849,18 @@ function detectPhaseArg(parts, commandStr) {
   return null;
 }
 function resolvePhaseDir(phaseNum, cwd) {
-  const numStr = String(phaseNum).padStart(2, "0");
+  const normalized = String(phaseNum).replace(/^0+/, "") || "0";
   const phasesDir = join11(cwd, ".planning", "phases");
   try {
-    const entries = readdirSync3(phasesDir);
-    const dirName = entries.find((d) => d.startsWith(numStr + "-") || d === numStr);
-    if (dirName) {
-      return `.planning/phases/${dirName}`;
+    const entries = readdirSync3(phasesDir, { withFileTypes: true });
+    for (const entry of entries) {
+      if (!entry.isDirectory()) continue;
+      const dirMatch = entry.name.match(/^(\d+(?:\.\d+)?)-?(.*)/);
+      if (!dirMatch) continue;
+      const dirPhaseNum = dirMatch[1].replace(/^0+/, "") || "0";
+      if (dirPhaseNum === normalized) {
+        return `.planning/phases/${entry.name}`;
+      }
     }
   } catch {
   }
