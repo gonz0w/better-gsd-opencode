@@ -49,6 +49,76 @@ const OPTION_TEMPLATES = {
   //   },
   //   typeHint: 'SINGLE_CHOICE'
   // }
+
+  // discuss-phase workflow templates
+  'discuss-context-existing': {
+    question: 'What would you like to do with the existing context?',
+    options: [
+      { id: 'update', label: 'Update it', diversity: { approach: 0.3 } },
+      { id: 'view', label: 'View it', diversity: { approach: 0.6 } },
+      { id: 'skip', label: 'Skip', diversity: { approach: 1.0 } }
+    ],
+    typeHint: 'SINGLE_CHOICE'
+  },
+  'discuss-replan-warning': {
+    question: 'Phase already has plans. How do you want to proceed?',
+    options: [
+      { id: 'continue', label: 'Continue and replan after', diversity: { certainty: 0.3 } },
+      { id: 'view', label: 'View existing plans', diversity: { certainty: 0.6 } },
+      { id: 'cancel', label: 'Cancel', diversity: { certainty: 1.0 } }
+    ],
+    typeHint: 'SINGLE_CHOICE'
+  },
+  'discuss-gray-areas': {
+    question: 'Which areas do you want to discuss?',
+    options: [],
+    typeHint: 'MULTI_CHOICE'
+  },
+  'discuss-socratic-continue': {
+    question: 'More questions about this area, or move to next?',
+    options: [
+      { id: 'more', label: 'More questions', diversity: { certainty: 0.4 } },
+      { id: 'next', label: 'Next area', diversity: { certainty: 0.8 } }
+    ],
+    typeHint: 'SINGLE_CHOICE'
+  },
+  'discuss-stress-test-response': {
+    question: 'Any of those points change your thinking?',
+    options: [
+      { id: 'proceed', label: 'No changes — proceed', diversity: { certainty: 0.8 } },
+      { id: 'revisit', label: 'Revisit a decision', diversity: { certainty: 0.3 } }
+    ],
+    typeHint: 'SINGLE_CHOICE'
+  },
+
+  // execute-phase workflow templates
+  'execute-checkpoint-verify': {
+    question: 'Verification result:',
+    options: [
+      { id: 'pass', label: 'Pass', diversity: { certainty: 1.0 } },
+      { id: 'fail', label: 'Fail', diversity: { certainty: 0.0 } },
+      { id: 'adjust', label: 'Needs adjustment', diversity: { certainty: 0.5 } }
+    ],
+    typeHint: 'SINGLE_CHOICE'
+  },
+  'execute-checkpoint-retry': {
+    question: 'How do you want to proceed?',
+    options: [
+      { id: 'retry', label: 'Retry', diversity: { certainty: 0.3 } },
+      { id: 'continue', label: 'Continue', diversity: { certainty: 0.7 } },
+      { id: 'skip', label: 'Skip', diversity: { certainty: 1.0 } }
+    ],
+    typeHint: 'SINGLE_CHOICE'
+  },
+  'execute-wave-continue': {
+    question: 'Wave complete — what next?',
+    options: [
+      { id: 'proceed', label: 'Proceed to next wave', diversity: { certainty: 0.8 } },
+      { id: 'review', label: 'Review current wave', diversity: { certainty: 0.5 } },
+      { id: 'pause', label: 'Pause', diversity: { certainty: 0.2 } }
+    ],
+    typeHint: 'SINGLE_CHOICE'
+  }
 };
 
 /**
