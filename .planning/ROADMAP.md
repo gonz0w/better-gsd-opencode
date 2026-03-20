@@ -61,7 +61,7 @@ v15.0 implements a question design system for workflow discussions — replacing
 |-------|----------------|--------|-----------|
 | 141. Taxonomy & Infrastructure | 3/3 | Complete    | 2026-03-20 |
 | 142. Primary Workflow Migration | 6/6 | Complete    | 2026-03-20 |
-| 143. Remaining Workflows & CLI Tools | 1/5 | In Progress|  |
+| 143. Remaining Workflows & CLI Tools | 2/5 | In Progress|  |
 
 ---
 
