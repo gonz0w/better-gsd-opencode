@@ -59,10 +59,10 @@ v15.0 implements a question design system for workflow discussions — replacing
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 141. Taxonomy & Infrastructure | 0/3 | Planning complete | - |
+| 141. Taxonomy & Infrastructure | 1/3 | In progress | - |
 | 142. Primary Workflow Migration | 0/? | Not started | - |
 | 143. Remaining Workflows & CLI Tools | 0/? | Not started | - |
 
 ---
 
-*Last updated: 2026-03-19*
+*Last updated: 2026-03-20*
