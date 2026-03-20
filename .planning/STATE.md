@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-03-17)
 ## Current Position
 
 **Phase:** 143 of 143 (Remaining Workflows & CLI Tools)
-**Current Plan:** Plan 03 complete, Plan 04 pending
+**Current Plan:** Plan 05 pending
 **Status:** Executing
 **Last Activity:** 2026-03-20
 
-Progress: [▓▓▓▓▓▓▓▓▓░] 96%
+Progress: [▓▓▓▓▓▓▓▓▓▓] 97%
 
 ## Performance Metrics
 
@@ -29,13 +29,14 @@ Progress: [▓▓▓▓▓▓▓▓▓░] 96%
 |-------|-------|-------|----------|
 | 141 | 3 | 3 | 1.3 min |
 | 142 | 6 | 6 | 2.3 min |
-| 143 | 2 | 5 | 3 min |
+| 143 | 3 | 5 | 2.5 min |
 
 **Recent Trend:**
 - v14.1 Phase 140 Plan 01: 9 min, 3 tasks, 7 files (prune orphaned rules)
 - Trend: Stable
 
 *Updated after each plan completion*
+| Phase 143-remaining-workflows-cli-tools P04 | 2 min | 5 tasks | 6 files |
 | Phase 143-remaining-workflows-cli-tools P03 | 2 min | 3 tasks | 2 files |
 | Phase 143-remaining-workflows-cli-tools P02 | 4 min | 3 tasks | 1 file |
 | Phase 142-primary-workflow-migration P06 | 2 min | 3 tasks | 2 files |
@@ -62,6 +63,7 @@ Recent decisions affecting current work:
 - [Phase 143]: questions:audit/list/validate CLI commands added
 - [Phase 143 Plan 02]: Audit found 6 workflows needing migration (settings, check-todos, add-todo, update, cleanup, complete-milestone), 12 cmd-*.md workflows are active wrappers, 2 use conversational questions only
 - [Phase 143 Plan 03]: Migrated settings.md to use 7 questionTemplate() calls — 7 templates added to questions.js
+- [Phase 143 Plan 04]: Migrated 5 workflows to questionTemplate() (check-todos, add-todo, update, cleanup, complete-milestone) — 6 templates added to questions.js
 - [Phase ci]: CI: merged - 2 checks passed, 0 fixed, 0 dismissed
 
 ### Pending Todos
@@ -79,5 +81,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-03-20
-Stopped at: Phase 143 Plan 03 complete — settings.md migrated to questionTemplate(), 7 templates added
+Stopped at: Phase 143 Plan 04 complete — 5 workflows migrated to questionTemplate(), questions:audit 90.5% compliant
 Resume file: None
