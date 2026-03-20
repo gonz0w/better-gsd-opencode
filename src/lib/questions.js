@@ -118,6 +118,69 @@ const OPTION_TEMPLATES = {
       { id: 'pause', label: 'Pause', diversity: { certainty: 0.2 } }
     ],
     typeHint: 'SINGLE_CHOICE'
+  },
+
+  // plan-phase workflow templates
+  'plan-phase-context': {
+    question: 'How would you like to proceed?',
+    options: [
+      { id: 'continue-without', label: 'Continue without context', diversity: { certainty: 0.3 } },
+      { id: 'discuss-first', label: 'Run discuss-phase first', diversity: { certainty: 0.7 } }
+    ],
+    typeHint: 'SINGLE_CHOICE'
+  },
+  'plan-phase-existing': {
+    question: 'What would you like to do with existing plans?',
+    options: [
+      { id: 'add-more', label: 'Add more plans', diversity: { scope: 0.3 } },
+      { id: 'view', label: 'View existing plans', diversity: { scope: 0.5 } },
+      { id: 'replan', label: 'Replan', diversity: { scope: 0.8 } }
+    ],
+    typeHint: 'SINGLE_CHOICE'
+  },
+  'plan-phase-checker-passed': {
+    question: 'Verification passed. How would you like to proceed?',
+    options: [
+      { id: 'continue', label: 'Continue', diversity: { certainty: 0.5 } },
+      { id: 'view-plans', label: 'View plans', diversity: { certainty: 0.7 } }
+    ],
+    typeHint: 'SINGLE_CHOICE'
+  },
+  'plan-phase-checker-issues': {
+    question: 'Verification found issues. How would you like to proceed?',
+    options: [
+      { id: 'force', label: 'Force continue', diversity: { certainty: 0.3 } },
+      { id: 'guidance', label: 'Get guidance', diversity: { certainty: 0.5 } },
+      { id: 'abandon', label: 'Abandon', diversity: { certainty: 0.9 } }
+    ],
+    typeHint: 'SINGLE_CHOICE'
+  },
+
+  // transition workflow templates
+  'transition-complete': {
+    question: 'Ready to mark done and move to next phase?',
+    options: [
+      { id: 'mark-done', label: 'Mark done', diversity: { certainty: 0.8 } },
+      { id: 'cancel', label: 'Cancel', diversity: { certainty: 0.2 } }
+    ],
+    typeHint: 'SINGLE_CHOICE'
+  },
+  'transition-incomplete': {
+    question: 'What would you like to do with incomplete plans?',
+    options: [
+      { id: 'continue', label: 'Continue current phase', diversity: { certainty: 0.3 } },
+      { id: 'mark-complete', label: 'Mark complete anyway', diversity: { certainty: 0.6 } },
+      { id: 'review', label: 'Review what\'s left', diversity: { certainty: 0.9 } }
+    ],
+    typeHint: 'SINGLE_CHOICE'
+  },
+  'transition-next-route': {
+    question: 'What would you like to do next?',
+    options: [
+      { id: 'more-phases', label: 'Plan more phases', diversity: { certainty: 0.4 } },
+      { id: 'milestone-complete', label: 'Complete milestone', diversity: { certainty: 0.8 } }
+    ],
+    typeHint: 'SINGLE_CHOICE'
   }
 };
 
