@@ -733,3 +733,26 @@
 
 ---
 
+
+## v15.0 Workflow Questioning & Decision Quality (Shipped: 2026-03-20)
+
+**Phases completed:** 3 phases, 14 plans, 0 tasks
+
+**Key accomplishments:**
+- Question taxonomy enum with 7 types, option rules with diversity constraints, and runtime option generation
+- questionTemplate(id,type,context) function in prompts.js with graceful runtime fallback
+- Added resolveQuestionType and resolveOptionGeneration decision functions for question taxonomy routing
+- Migrated discuss-phase.md to use questionTemplate() for all 5 question types
+- Added 5 new-milestone question templates and migrated new-milestone.md to use questionTemplate()
+- plan-phase.md migrated to use questionTemplate() with 4 new option templates
+- Migrated transition.md to use questionTemplate() for 3 phase transition decision points
+- Migrated verify-work.md to use questionTemplate() for 4 decision points while preserving conversational verification flow
+- execute-phase.md checkpoint human-verify now uses questionTemplate() for option generation
+- Added questions:audit/list/validate CLI commands for workflow taxonomy compliance auditing
+- Audit complete: 44 workflows inventoried, 6 migration targets identified for questionTemplate() migration
+- Migrated settings.md to use 7 questionTemplate() calls, extracting options to shared templates in questions.js
+- Migrated 5 workflows to questionTemplate() calls, added 6 templates to questions.js
+- Phase 143 complete: questions CLI tools operational, 13 templates added, 6 workflows migrated, 90.5% taxonomy compliance
+
+---
+

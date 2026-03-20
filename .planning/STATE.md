@@ -11,7 +11,7 @@ See: .planning/PROJECT.md (updated 2026-03-17)
 
 **Phase:** 143 of 143 (Remaining Workflows & CLI Tools)
 **Current Plan:** Plan 05 complete
-**Status:** Complete
+**Status:** v15.0 milestone complete
 **Last Activity:** 2026-03-20
 
 Progress: [▓▓▓▓▓▓▓▓▓▓] 100%
