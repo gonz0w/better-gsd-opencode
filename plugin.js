@@ -1868,7 +1868,21 @@ var init_config = __esm({
         test_suggestions: true,
         convention_confidence_threshold: 70,
         dedup_threshold: 3,
-        test_debounce_ms: 500
+        test_debounce_ms: 500,
+        // Phase 144: Destructive command detection (GARD-04)
+        destructive_commands: Object.freeze({
+          enabled: true,
+          sandbox_mode: "auto",
+          categories: Object.freeze({
+            filesystem: true,
+            database: true,
+            git: true,
+            system: true,
+            "supply-chain": true
+          }),
+          disabled_patterns: [],
+          custom_patterns: []
+        })
       })
     });
     NESTED_OBJECT_KEYS = /* @__PURE__ */ new Set([
