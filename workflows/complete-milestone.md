@@ -26,10 +26,10 @@ Yolo: auto-approve scope. Interactive: ask confirmation.
 
 <step name="gather_stats">
 ```bash
-git log --oneline --grep="feat(" | head -20
-git diff --stat FIRST_COMMIT..LAST_COMMIT | tail -1
+jj log --no-graph -T 'change_id.shortest(8) ++ " " ++ description.first_line() ++ "\n"' | grep "feat(" | head -20
+jj diff --stat -r FIRST_CHANGE..LAST_CHANGE
 ```
-Present: phases, plans, tasks, files, LOC, timeline, git range.
+Present: phases, plans, tasks, files, LOC, timeline, change range.
 </step>
 
 <step name="extract_accomplishments">
@@ -74,14 +74,14 @@ Automatically generate documentation artifact with changelog and STATE.md metric
      # No previous tag - use first commit
      SINCE_DATE="1970-01-01"
    else
-     # Get the date of the previous tag
+     # Get the date of the previous tag (git tags still work in colocated mode)
      SINCE_DATE=$(git log -1 --format=%ci "$PREV_TAG" 2>/dev/null | cut -d' ' -f1 || echo "1970-01-01")
    fi
    ```
 
-2. **Generate changelog from git log:**
+2. **Generate changelog from jj log:**
    ```bash
-   CHANGELOG=$(git log --oneline --since="$SINCE_DATE" --format="%h %s" 2>/dev/null | head -50 || echo "No commits in range")
+   CHANGELOG=$(jj log --no-graph -T 'change_id.shortest(8) ++ " " ++ description.first_line() ++ "\n"' 2>/dev/null | head -50 || echo "No commits in range")
    ```
 
 3. **Extract STATE.md metrics:**
@@ -186,6 +186,7 @@ If branches exist: offer squash merge / merge with history / delete / keep. Hand
 ```bash
 git tag -a v[X.Y] -m "v[X.Y] [Name] — [accomplishments]"
 ```
+Note: `git tag` is used directly — jj does not have native tag support. This works in colocated mode.
 questionTemplate('complete-milestone-push'):
 - question: "Push to remote?"
 </step>

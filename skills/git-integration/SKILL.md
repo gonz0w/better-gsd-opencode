@@ -1,6 +1,6 @@
 ---
 name: git-integration
-description: Git workflow patterns for bGSD — commit points (what to commit and when), commit message formats for initialization/task/plan/handoff, per-task commit rationale, example git log, and anti-patterns to avoid.
+description: VCS workflow patterns for bGSD using jj (Jujutsu, colocated with Git) — commit points (what to commit and when), commit message formats for initialization/task/plan/handoff, per-task commit rationale, example log, and anti-patterns to avoid.
 type: shared
 agents: [executor, github-ci]
 sections: [commit-points, commit-formats, example-log, anti-patterns, rationale]
@@ -8,7 +8,14 @@ sections: [commit-points, commit-formats, example-log, anti-patterns, rationale]
 
 ## Purpose
 
-Defines the git integration strategy for the bGSD framework. The core principle: **commit outcomes, not process.** The git log reads like a changelog of what shipped, not a diary of planning activity. Per-task atomic commits enable failure recovery, git bisect debugging, and granular attribution.
+Defines the VCS integration strategy for the bGSD framework using **jj** (Jujutsu) in a colocated Git workspace. The core principle: **commit outcomes, not process.** The history reads like a changelog of what shipped, not a diary of planning activity. Per-task atomic commits enable failure recovery, debugging, and granular attribution.
+
+**jj basics for agents:**
+- jj has **no staging area** — all working copy changes are automatically part of the current change
+- `jj commit` = finalize current change and start a new empty one
+- `jj describe` = update the message of the current change without finalizing
+- `jj split` = separate changes when working copy has unrelated edits
+- The underlying Git repo is colocated, so `git log` and other read-only git commands still work for inspection
 
 ## Placeholders
 
@@ -38,39 +45,43 @@ Defines the git integration strategy for the bGSD framework. The core principle:
 
 **Task completion:**
 ```
-{type}({{phase}}-{{plan}}): {task-name}
+jj commit -m "{type}({{phase}}-{{plan}}): {task-name}
 
 - [Key change 1]
 - [Key change 2]
+"
 ```
 
 Types: `feat`, `fix`, `test`, `refactor`, `perf`, `chore`, `docs`, `style`.
 
 **Plan completion (metadata):**
 ```
-docs({{phase}}-{{plan}}): complete [plan-name] plan
+jj commit -m "docs({{phase}}-{{plan}}): complete [plan-name] plan
 
 Tasks completed: [N]/[N]
 SUMMARY: .planning/phases/XX-name/{phase}-{plan}-SUMMARY.md
+"
 ```
 
 **Project initialization:**
 ```
-docs: initialize [project-name] ([N] phases)
+jj commit -m "docs: initialize [project-name] ([N] phases)
 
 [One-liner from PROJECT.md]
+"
 ```
 
 **Handoff (WIP):**
 ```
-wip: [phase-name] paused at task [X]/[Y]
+jj commit -m "wip: [phase-name] paused at task [X]/[Y]
 
 Current: [task name]
+"
 ```
 <!-- /section -->
 
 <!-- section: example-log -->
-### Example Git Log (Per-Task Commits)
+### Example History (Per-Task Commits)
 
 ```
 # Phase 04 - Checkout
@@ -99,24 +110,26 @@ Each plan produces 2-4 commits (tasks + metadata). Clear, granular, bisectable.
 
 **Do commit (outcomes):** Each task completion (feat/fix/test/refactor), plan completion metadata (docs), project initialization (docs).
 
+**Don't use `git add` / `git commit`:** Use `jj commit` instead. The colocated repo keeps Git in sync automatically.
+
 **Key principle:** Commit working code and shipped outcomes, not planning process.
 <!-- /section -->
 
 <!-- section: rationale -->
 ### Why Per-Task Commits
 
-**Context engineering:** Git history becomes primary context source for future AI sessions. `git log --grep="{phase}-{plan}"` shows all work for a plan.
+**Context engineering:** History becomes primary context source for future AI sessions. `jj log --revisions 'description(glob:"{phase}-{plan}*")'` shows all work for a plan. In colocated mode, `git log --grep="{phase}-{plan}"` also works.
 
-**Failure recovery:** Task 1 committed, Task 2 failed → next session sees task 1 complete, retries task 2. Can `git reset --hard` to last successful task.
+**Failure recovery:** Task 1 committed, Task 2 failed → next session sees task 1 complete, retries task 2. Can `jj backout -r <change>` to revert a specific change.
 
-**Debugging:** `git bisect` finds exact failing task. `git blame` traces to specific task context. Each commit independently revertable.
+**Debugging:** Bisect-style investigation via `jj log` to find exact failing task. `jj diff -r <change>` shows what a specific change introduced. Each commit independently revertable with `jj backout`.
 
-**Observability:** Granular attribution for solo developer + AI workflow. Atomic commits are git best practice.
+**Observability:** Granular attribution for solo developer + AI workflow. Atomic commits are best practice.
 <!-- /section -->
 
 ## Cross-references
 
-- <skill:commit-protocol /> — Detailed staging and commit execution protocol
+- <skill:commit-protocol /> — Detailed commit execution protocol using jj
 
 ## Examples
 

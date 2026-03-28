@@ -24,7 +24,7 @@ When an executor's context window is nearly exhausted mid-plan, it must save sta
 
 If spawned as continuation agent (`<completed_tasks>` in prompt):
 
-1. Verify previous commits exist: `git log --oneline -5`
+1. Verify previous commits exist: `jj log -n 5 --no-graph`
 2. DO NOT redo completed tasks
 3. Start from resume point in prompt
 4. Handle based on checkpoint type:
@@ -38,7 +38,7 @@ The executor should monitor context usage and proactively save state when approa
 ```bash
 node $BGSD_HOME/bin/bgsd-tools.cjs util:memory write \
   --store bookmarks \
-  --entry '{"phase":"{{phase}}","plan":"{{plan}}","task":N,"total_tasks":M,"git_head":"'$(git rev-parse --short HEAD)'"}'
+  --entry '{"phase":"{{phase}}","plan":"{{plan}}","task":N,"total_tasks":M,"git_head":"'$(jj log -r @- --no-graph -T 'commit_id.shortest(8)')'"}'
 ```
 <!-- /section -->
 
@@ -47,7 +47,7 @@ node $BGSD_HOME/bin/bgsd-tools.cjs util:memory write \
 
 A fresh agent receives the completed tasks table and resume point. It must:
 
-1. **Verify commits exist** — Check `git log` for expected hashes
+1. **Verify commits exist** — Check `jj log` for expected change-ids
 2. **Skip completed tasks** — Never redo work that was committed
 3. **Pick up at resume point** — Start from the exact task specified
 4. **Carry forward context** — The completed tasks table provides commit hashes and files for SUMMARY generation

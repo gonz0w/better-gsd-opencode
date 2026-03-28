@@ -78,9 +78,9 @@ Track timing checkpoints: CHECK_WAIT_START/END, FIX_START/END.
 Create and push the branch:
 
 ```bash
-git fetch origin "$BASE_BRANCH" 2>/dev/null
-git checkout -b "$BRANCH_NAME" 2>/dev/null || git checkout "$BRANCH_NAME"
-git push -u origin "$BRANCH_NAME" 2>&1
+jj git fetch
+jj bookmark create "$BRANCH_NAME" -r @
+jj git push -b "$BRANCH_NAME" 2>&1
 ```
 
 **Auth gate handling:** If push fails with authentication error, load <skill:checkpoint-protocol /> and return checkpoint with type `human-action`.

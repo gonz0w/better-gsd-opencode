@@ -59,7 +59,7 @@ If `warnings` array is non-empty, display each warning before proceeding:
 
 ```bash
 # Check there are commits to push
-COMMITS=$(git log origin/${BASE_BRANCH}..HEAD --oneline 2>/dev/null)
+COMMITS=$(jj log -r "ancestors(@)~ ancestors(main)" --no-graph -T 'change_id.shortest(8) ++ " " ++ description.first_line() ++ "\n"' 2>/dev/null)
 ```
 
 If no commits ahead of base:
@@ -89,7 +89,7 @@ Otherwise derive scope:
 CURRENT=$(grep "^Last activity:" .planning/STATE.md 2>/dev/null | head -1)
 
 # Fallback: derive from most recent commit
-RECENT=$(git log -1 --format="%s" 2>/dev/null)
+RECENT=$(jj log -r @- --no-graph -T 'description.first_line()' 2>/dev/null)
 ```
 
 Build branch name:

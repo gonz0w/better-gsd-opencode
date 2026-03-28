@@ -8873,7 +8873,7 @@ function createStuckDetector(notifier, config) {
 }
 
 // src/plugin/advisory-guardrails.js
-import { readFileSync as readFileSync10 } from "fs";
+import { readFileSync as readFileSync10, statSync as statSync4 } from "fs";
 import { join as join17, basename, extname, isAbsolute, resolve as resolve2 } from "path";
 import { homedir as homedir6 } from "os";
 var NAMING_PATTERNS = {
@@ -8977,6 +8977,99 @@ function detectTestConfig(cwd) {
   return result;
 }
 var WRITE_TOOLS = /* @__PURE__ */ new Set(["write", "edit", "patch"]);
+var BASH_TOOLS = /* @__PURE__ */ new Set(["bash"]);
+var DESTRUCTIVE_PATTERNS = [
+  // ── Filesystem ──
+  { id: "fs-rm-recursive", category: "filesystem", severity: "critical", pattern: /\brm\s+(-[a-zA-Z]*r[a-zA-Z]*\b|--recursive)/, description: "Recursive file deletion (rm -r, rm -rf, rm --recursive)" },
+  { id: "fs-rm-force", category: "filesystem", severity: "warning", pattern: /\brm\s+-[a-zA-Z]*f[a-zA-Z]*\b(?!.*-[a-zA-Z]*r)/, description: "Forced file deletion without recursive (rm -f)" },
+  { id: "fs-rm-plain", category: "filesystem", severity: "info", pattern: /\brm\s+(?!-)/, description: "Plain file deletion (rm)" },
+  { id: "fs-format", category: "filesystem", severity: "critical", pattern: /\b(mkfs|format)\b/, description: "Disk formatting" },
+  { id: "fs-dd", category: "filesystem", severity: "critical", pattern: /\bdd\s+.*of=/, description: "Raw disk write (dd of=)" },
+  // ── Database ──
+  { id: "db-drop-table", category: "database", severity: "critical", pattern: /\bDROP\s+(TABLE|DATABASE|SCHEMA)\b/i, description: "Drop database object" },
+  { id: "db-truncate", category: "database", severity: "critical", pattern: /\bTRUNCATE\s+TABLE\b/i, description: "Truncate table" },
+  { id: "db-delete-no-where", category: "database", severity: "warning", pattern: /\bDELETE\s+FROM\s+\w+\s*(?:;|$)/i, description: "DELETE without WHERE clause" },
+  // ── Git ──
+  { id: "git-force-push", category: "git", severity: "critical", pattern: /\bgit\s+push\s+.*--force\b/, description: "Force push (rewrite remote history)" },
+  { id: "git-force-push-f", category: "git", severity: "critical", pattern: /\bgit\s+push\s+-[a-zA-Z]*f/, description: "Force push shorthand (-f)" },
+  { id: "git-reset-hard", category: "git", severity: "warning", pattern: /\bgit\s+reset\s+--hard\b/, description: "Hard reset (discard uncommitted changes)" },
+  { id: "git-clean-fd", category: "git", severity: "warning", pattern: /\bgit\s+clean\s+-[a-zA-Z]*f/, description: "Force clean untracked files" },
+  // ── System ──
+  { id: "sys-kill-9", category: "system", severity: "warning", pattern: /\bkill\s+-9\b/, description: "Force kill process (SIGKILL)" },
+  { id: "sys-chmod-777", category: "system", severity: "warning", pattern: /\bchmod\s+777\b/, description: "World-writable permissions" },
+  { id: "sys-chmod-recursive", category: "system", severity: "warning", pattern: /\bchmod\s+-[a-zA-Z]*R/, description: "Recursive permission change" },
+  { id: "sys-chown-recursive", category: "system", severity: "warning", pattern: /\bchown\s+-[a-zA-Z]*R/, description: "Recursive ownership change" },
+  { id: "sys-shutdown", category: "system", severity: "critical", pattern: /\b(shutdown|reboot|halt|poweroff)\b/, description: "System shutdown/reboot" },
+  { id: "sys-iptables-flush", category: "system", severity: "critical", pattern: /\biptables\s+-F\b/, description: "Flush firewall rules" },
+  { id: "sys-systemctl-disable", category: "system", severity: "warning", pattern: /\bsystemctl\s+(disable|stop)\s/, description: "Disable/stop system service" },
+  // ── Supply Chain ──
+  { id: "sc-curl-pipe", category: "supply-chain", severity: "info", pattern: /\bcurl\s+.*\|\s*(ba)?sh\b/, description: "Pipe remote script to shell (curl | bash)" },
+  { id: "sc-wget-pipe", category: "supply-chain", severity: "info", pattern: /\bwget\s+.*\|\s*(ba)?sh\b/, description: "Pipe remote script to shell (wget | bash)" },
+  { id: "sc-eval", category: "supply-chain", severity: "info", pattern: /\beval\s+/, description: "Shell eval (arbitrary code execution)" },
+  { id: "sc-npm-global", category: "supply-chain", severity: "info", pattern: /\bnpm\s+install\s+-g\b/, description: "Global npm package installation" },
+  { id: "sc-pip-sudo", category: "supply-chain", severity: "info", pattern: /\bsudo\s+pip\s+install\b/, description: "Sudo pip install (system-wide)" },
+  { id: "sc-source-remote", category: "supply-chain", severity: "info", pattern: /\b(source|\.)\s+<\(\s*curl\b/, description: "Source remote script (source <(curl ...))" }
+];
+function normalizeCommand(raw) {
+  let normalized = raw.normalize("NFKD");
+  normalized = normalized.replace(/[\u200B-\u200D\u2060\uFEFF]/g, "");
+  normalized = normalized.replace(/[\u0300-\u036F]/g, "");
+  return normalized;
+}
+function detectSandboxEnvironment(configOverride) {
+  if (configOverride === true) return true;
+  if (configOverride === false) return false;
+  const envSignals = [
+    "DOCKER_HOST",
+    "SINGULARITY_NAME",
+    "MODAL_TASK_ID",
+    "DAYTONA_WS_ID",
+    "CODESPACES",
+    "GITPOD_WORKSPACE_ID"
+  ];
+  if (envSignals.some((key) => process.env[key])) return true;
+  try {
+    statSync4("/.dockerenv");
+    return true;
+  } catch {
+  }
+  try {
+    statSync4("/run/.containerenv");
+    return true;
+  } catch {
+  }
+  try {
+    const cgroup = readFileSync10("/proc/self/cgroup", "utf-8");
+    if (/docker|containerd|kubepods/i.test(cgroup)) return true;
+  } catch {
+  }
+  return false;
+}
+function mergePatterns(builtIn, custom) {
+  const merged = [...builtIn];
+  for (const cp of custom) {
+    if (!cp.id || !cp.pattern || !cp.category || !cp.severity) continue;
+    let pattern;
+    try {
+      pattern = typeof cp.pattern === "string" ? new RegExp(cp.pattern) : cp.pattern;
+    } catch {
+      continue;
+    }
+    merged.push({ ...cp, pattern, custom: true });
+  }
+  return merged;
+}
+function matchPatterns(normalizedCommand, patterns, disabledPatterns, categoryConfig) {
+  const matches = [];
+  for (const p of patterns) {
+    if (disabledPatterns.has(p.id)) continue;
+    if (categoryConfig[p.category] === false) continue;
+    if (p.pattern.test(normalizedCommand)) {
+      matches.push(p);
+    }
+  }
+  return matches;
+}
 function createAdvisoryGuardrails(cwd, notifier, config) {
   const guardConfig = config.advisory_guardrails || {};
   const conventionsEnabled = guardConfig.conventions !== false;
@@ -8985,6 +9078,14 @@ function createAdvisoryGuardrails(cwd, notifier, config) {
   const dedupThreshold = guardConfig.dedup_threshold || 3;
   const testDebounceMs = guardConfig.test_debounce_ms || 500;
   const confidenceThreshold = guardConfig.convention_confidence_threshold || 70;
+  const destructiveConfig = guardConfig.destructive_commands || {};
+  const destructiveEnabled = destructiveConfig.enabled !== false;
+  const sandboxMode = destructiveConfig.sandbox_mode ?? "auto";
+  const categoryConfig = destructiveConfig.categories || {};
+  const disabledPatterns = new Set(destructiveConfig.disabled_patterns || []);
+  const customPatterns = destructiveConfig.custom_patterns || [];
+  const isSandbox = destructiveEnabled ? detectSandboxEnvironment(sandboxMode) : false;
+  const mergedPatterns = destructiveEnabled ? mergePatterns(DESTRUCTIVE_PATTERNS, customPatterns) : [];
   let logger = null;
   function getLogger() {
     if (!logger) {
@@ -9025,7 +9126,28 @@ function createAdvisoryGuardrails(cwd, notifier, config) {
     if (guardConfig.enabled === false) return;
     try {
       const toolName = input?.tool;
-      if (!toolName || !WRITE_TOOLS.has(toolName)) return;
+      if (!toolName) return;
+      if (destructiveEnabled && BASH_TOOLS.has(toolName)) {
+        const rawCommand = input?.args?.command;
+        if (!rawCommand) return;
+        const normalized = normalizeCommand(rawCommand);
+        const matches = matchPatterns(normalized, mergedPatterns, disabledPatterns, categoryConfig);
+        for (const match of matches) {
+          if (isSandbox && match.severity !== "critical") continue;
+          const behavioral = match.severity === "critical" ? "Confirm with user before proceeding with this destructive operation." : match.severity === "warning" ? "Proceed with caution \u2014 this operation may be difficult to reverse." : "";
+          try {
+            await notifier.notify({
+              type: "advisory-destructive",
+              severity: "info",
+              message: `GARD-04: ${rawCommand.slice(0, 80)} matched [${match.id}] (${match.severity.toUpperCase()})${behavioral ? ". " + behavioral : ""}`
+            });
+          } catch (err) {
+            getLogger().write("ERROR", `Advisory destructive notification failed: ${err.message}`);
+          }
+        }
+        return;
+      }
+      if (!WRITE_TOOLS.has(toolName)) return;
       const filePath = input?.args?.filePath;
       if (!filePath) return;
       const absPath = isAbsolute(filePath) ? filePath : resolve2(cwd, filePath);

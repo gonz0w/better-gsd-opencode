@@ -131,7 +131,7 @@ Read PLAN.md — this IS the execution instructions. If plan references CONTEXT.
 
 After committing task work, save bookmark:
 ```bash
-node __OPENCODE_CONFIG__/bgsd-oc/bin/bgsd-tools.cjs util:memory write --store bookmarks --entry '{"phase":"${PHASE}","plan":"${PLAN}","task":${TASK_NUM},"total_tasks":${TOTAL_TASKS},"git_head":"'$(git rev-parse --short HEAD)'"}'
+node __OPENCODE_CONFIG__/bgsd-oc/bin/bgsd-tools.cjs util:memory write --store bookmarks --entry '{"phase":"${PHASE}","plan":"${PLAN}","task":${TASK_NUM},"total_tasks":${TOTAL_TASKS},"git_head":"'$(jj log -r @- --no-graph -T 'commit_id.shortest(8)')'"}'
 ```
 <!-- /section -->
 

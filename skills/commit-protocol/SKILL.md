@@ -1,14 +1,16 @@
 ---
 name: commit-protocol
-description: Atomic task commit protocol with staging rules, conventional commit message format, and hash tracking for SUMMARY.md. Used after completing each task during plan execution.
+description: Atomic task commit protocol using jj (Jujutsu) with conventional commit message format and change-id tracking for SUMMARY.md. Used after completing each task during plan execution.
 type: shared
 agents: [executor, github-ci]
-sections: [staging, commit-message, hash-tracking]
+sections: [commit, commit-message, hash-tracking]
 ---
 
 ## Purpose
 
-Standardizes how agents commit code changes after completing tasks. Ensures atomic commits per task, proper commit message format for traceability, and hash tracking for SUMMARY.md documentation. Used by the executor for per-task commits and by the CI agent for fix commits.
+Standardizes how agents commit code changes after completing tasks using **jj** (Jujutsu VCS, colocated with Git). Ensures atomic commits per task, proper commit message format for traceability, and change-id tracking for SUMMARY.md documentation. Used by the executor for per-task commits and by the CI agent for fix commits.
+
+**Key difference from git:** jj has no staging area. All file changes in the working copy are automatically part of the current change. There is no `git add` step.
 
 ## Placeholders
 
@@ -19,23 +21,33 @@ Standardizes how agents commit code changes after completing tasks. Ensures atom
 
 ## Content
 
-<!-- section: staging -->
-### Staging Protocol
+<!-- section: commit -->
+### Commit Protocol
 
 After each task completes (verification passed, done criteria met), commit immediately.
 
 **Check modified files:**
 ```bash
-git status --short
+jj status
 ```
 
-**Stage task-related files individually** — never use `git add .` or `git add -A`:
+**If the working copy contains unrelated changes**, use `jj split` to separate task-related changes before committing. Otherwise, commit directly — jj automatically includes all working copy changes.
+
+**To exclude specific files from the commit**, use `jj split` interactively or restore unrelated files after committing:
 ```bash
-git add src/api/auth.ts
-git add src/types/user.ts
+jj restore --from @- path/to/unrelated-file.ts
 ```
 
-Staging files individually ensures only task-related changes are committed. Avoid catching unrelated modifications, generated files, or temporary artifacts.
+**Commit the current change:**
+```bash
+jj commit -m "{type}({{phase}}-{{plan}}): {concise task description}
+
+- {key change 1}
+- {key change 2}
+"
+```
+
+After `jj commit`, the working copy becomes a new empty change automatically — you're ready for the next task.
 
 <!-- section: commit-message -->
 ### Commit Message Format
@@ -55,7 +67,7 @@ Select the commit type based on the nature of the change:
 
 **Format:**
 ```bash
-git commit -m "{type}({{phase}}-{{plan}}): {concise task description}
+jj commit -m "{type}({{phase}}-{{plan}}): {concise task description}
 
 - {key change 1}
 - {key change 2}
@@ -67,20 +79,25 @@ The scope `({phase}-{plan})` provides traceability from commit to plan. The body
 <!-- section: hash-tracking -->
 ### Hash Tracking
 
-After committing, record the short hash for inclusion in SUMMARY.md:
+After committing, the just-committed change is the parent of `@`. Record its short change-id for inclusion in SUMMARY.md:
 
 ```bash
-TASK_COMMIT=$(git rev-parse --short HEAD)
+TASK_COMMIT=$(jj log -r @- --no-graph -T 'change_id.shortest(8)')
 ```
 
-Track all task commit hashes throughout execution. These are included in the SUMMARY.md "Task Commits" section, enabling rollback and audit.
+Track all task change-ids throughout execution. These are included in the SUMMARY.md "Task Commits" section, enabling rollback and audit.
+
+**Note:** In a colocated repo, the underlying git commit hash is also available if needed:
+```bash
+GIT_HASH=$(jj log -r @- --no-graph -T 'commit_id.shortest(8)')
+```
 
 ### Bookmark After Commit
 
 Save execution progress after each task commit:
 ```bash
 node $BGSD_HOME/bin/bgsd-tools.cjs util:memory write --store bookmarks \
-  --entry '{"phase":"${PHASE}","plan":"${PLAN}","task":${TASK_NUM},"total_tasks":${TOTAL_TASKS},"git_head":"'$(git rev-parse --short HEAD)'"}'
+  --entry '{"phase":"${PHASE}","plan":"${PLAN}","task":${TASK_NUM},"total_tasks":${TOTAL_TASKS},"git_head":"'$(jj log -r @- --no-graph -T 'commit_id.shortest(8)')'"}'
 ```
 
 This enables resumption if the agent is interrupted mid-plan.
@@ -94,22 +111,29 @@ This enables resumption if the agent is interrupted mid-plan.
 
 **Standard task commit:**
 ```bash
-git add src/api/auth.ts
-git add src/types/user.ts
-git commit -m "feat(01-02): implement login endpoint
+jj commit -m "feat(01-02): implement login endpoint
 
 - POST /api/auth/login with bcrypt validation
 - Returns JWT in httpOnly cookie
 "
-TASK_COMMIT=$(git rev-parse --short HEAD)
+TASK_COMMIT=$(jj log -r @- --no-graph -T 'change_id.shortest(8)')
 ```
 
 **CI fix commit:**
 ```bash
-git add src/utils/sanitize.ts
-git commit -m "fix(ci): address js/sql-injection - parameterized queries
+jj commit -m "fix(ci): address js/sql-injection - parameterized queries
 
 - Fixed: SQL injection in user lookup
 - Alert: #42
 "
+```
+
+**Splitting unrelated changes out before committing:**
+```bash
+# If working copy has both task files and unrelated edits:
+jj commit -m "feat(03-01): add payment processing"
+# Then restore any files that shouldn't have been included:
+jj restore --from @-- path/to/unrelated-file.ts
+# Squash the restoration into the commit:
+jj squash --from @ --into @-
 ```
