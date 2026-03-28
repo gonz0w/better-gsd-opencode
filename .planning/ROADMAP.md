@@ -12,7 +12,7 @@ v16.0 transforms bGSD from a planning/execution engine into a complete enterpris
 
 ## Phases
 
-- [ ] **Phase 144: Safety Guardrails** - Destructive command detection with pattern library, user confirmation gate, and container bypass
+- [x] **Phase 144: Safety Guardrails** - Destructive command detection with pattern library, user confirmation gate, and container bypass (completed 2026-03-28)
 - [ ] **Phase 145: Structured Agent Memory** - MEMORY.md file format, frozen-snapshot prompt injection, content sanitization, and management CLI
 - [ ] **Phase 146: Code Review Workflow** - CLI scan module, fix-first categorization, confidence gating, /bgsd-review workflow, and false positive exclusions
 - [ ] **Phase 147: Security Audit Workflow** - OWASP pattern library, secrets detection, dependency vulnerability checks, /bgsd-security workflow, and FP exclusions
@@ -29,7 +29,7 @@ v16.0 transforms bGSD from a planning/execution engine into a complete enterpris
   2. Unicode homoglyph variants of destructive commands (Cyrillic 'а' for Latin 'a', zero-width characters) are detected and flagged identically to ASCII originals
   3. Commands executed inside Docker, Singularity, or Modal containers skip confirmation automatically (sandboxed execution detected)
   4. User can always proceed past any warning — nothing blocks workflow execution (C-03 advisory constraint)
-**Plans**: 1/2 plans executed
+**Plans**: 2/2 plans complete
 
 ### Phase 145: Structured Agent Memory
 **Goal**: Agents recall project-specific facts, user preferences, and environment patterns across sessions via a structured, injectable MEMORY.md
@@ -83,7 +83,7 @@ v16.0 transforms bGSD from a planning/execution engine into a complete enterpris
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 144. Safety Guardrails | 1/2 | In Progress|  |
+| 144. Safety Guardrails | 2/2 | Complete   | 2026-03-28 |
 | 145. Structured Agent Memory | 0/0 | Not started | - |
 | 146. Code Review Workflow | 0/0 | Not started | - |
 | 147. Security Audit Workflow | 0/0 | Not started | - |
