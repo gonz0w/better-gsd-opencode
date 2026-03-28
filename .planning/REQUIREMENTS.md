@@ -122,29 +122,29 @@ Traceability matrix at bottom.
 
 | REQ-ID | Type | Phase | Intent Outcome | Priority |
 |---------|------|-------|----------------|----------|
-| SAFE-01 | must | TBD | DO-114 | HIGH |
-| SAFE-02 | must | TBD | DO-114 | HIGH |
-| SAFE-03 | should | TBD | DO-114 | MEDIUM |
-| MEM-01 | must | TBD | DO-113 | HIGH |
-| MEM-02 | must | TBD | DO-113 | HIGH |
-| MEM-03 | must | TBD | DO-113 | HIGH |
-| MEM-04 | must | TBD | DO-113 | MEDIUM |
-| REV-01 | must | TBD | DO-109 | HIGH |
-| REV-02 | must | TBD | DO-109 | HIGH |
-| REV-03 | must | TBD | DO-109 | HIGH |
-| REV-04 | must | TBD | DO-109, DO-111 | HIGH |
-| REV-05 | should | TBD | DO-109 | MEDIUM |
-| SEC-01 | must | TBD | DO-110 | HIGH |
-| SEC-02 | must | TBD | DO-110 | HIGH |
-| SEC-03 | should | TBD | DO-110 | MEDIUM |
-| SEC-04 | must | TBD | DO-110 | HIGH |
-| SEC-05 | should | TBD | DO-110 | MEDIUM |
-| READY-01 | must | TBD | DO-111 | HIGH |
-| READY-02 | must | TBD | DO-111 | HIGH |
-| REL-01 | must | TBD | DO-112 | HIGH |
-| REL-02 | must | TBD | DO-112 | HIGH |
-| REL-03 | must | TBD | DO-112 | HIGH |
-| REL-04 | must | TBD | DO-112 | HIGH |
+| SAFE-01 | must | Phase 144 | DO-114 | HIGH |
+| SAFE-02 | must | Phase 144 | DO-114 | HIGH |
+| SAFE-03 | should | Phase 144 | DO-114 | MEDIUM |
+| MEM-01 | must | Phase 145 | DO-113 | HIGH |
+| MEM-02 | must | Phase 145 | DO-113 | HIGH |
+| MEM-03 | must | Phase 145 | DO-113 | HIGH |
+| MEM-04 | must | Phase 145 | DO-113 | MEDIUM |
+| REV-01 | must | Phase 146 | DO-109 | HIGH |
+| REV-02 | must | Phase 146 | DO-109 | HIGH |
+| REV-03 | must | Phase 146 | DO-109 | HIGH |
+| REV-04 | must | Phase 146 | DO-109, DO-111 | HIGH |
+| REV-05 | should | Phase 146 | DO-109 | MEDIUM |
+| SEC-01 | must | Phase 147 | DO-110 | HIGH |
+| SEC-02 | must | Phase 147 | DO-110 | HIGH |
+| SEC-03 | should | Phase 147 | DO-110 | MEDIUM |
+| SEC-04 | must | Phase 147 | DO-110 | HIGH |
+| SEC-05 | should | Phase 147 | DO-110 | MEDIUM |
+| READY-01 | must | Phase 148 | DO-111 | HIGH |
+| READY-02 | must | Phase 148 | DO-111 | HIGH |
+| REL-01 | must | Phase 148 | DO-112 | HIGH |
+| REL-02 | must | Phase 148 | DO-112 | HIGH |
+| REL-03 | must | Phase 148 | DO-112 | HIGH |
+| REL-04 | must | Phase 148 | DO-112 | HIGH |
 
 ---
 
