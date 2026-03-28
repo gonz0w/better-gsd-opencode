@@ -386,14 +386,14 @@ INIT=$(node $BGSD_HOME/bin/bgsd-tools.cjs verify:state)
 
 **Commit the fix:**
 
-Stage and commit code changes (NEVER `git add -A` or `git add .`):
+Commit code changes using jj (all working copy changes are included automatically — no staging needed):
 ```bash
-git add src/path/to/fixed-file.ts
-git add src/path/to/other-file.ts
-git commit -m "fix: {brief description}
+jj commit -m "fix: {brief description}
 
 Root cause: {root_cause}"
 ```
+
+If the working copy contains unrelated changes, use `jj split` to separate them before committing.
 
 Then commit planning docs via CLI (respects `commit_docs` config automatically):
 ```bash

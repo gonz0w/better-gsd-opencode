@@ -51,7 +51,7 @@ CI_FLAG=""
 
 **Fallback:** If `branching_strategy` is `"none"`: skip. Otherwise:
 ```bash
-git checkout -b "$BRANCH_NAME" 2>/dev/null || git checkout "$BRANCH_NAME"
+jj bookmark create "$BRANCH_NAME" -r @ 2>/dev/null || jj bookmark set "$BRANCH_NAME" -r @
 ```
 </step>
 <!-- /section -->
@@ -181,7 +181,7 @@ Execute each wave in sequence. Within a wave: parallel if `PARALLELIZATION=true`
   )
   ```
 
-4. **Spot-check:** Verify first 2 files from `key-files.created`. `git log --oneline --all --grep="{phase}-{plan}"` ≥1 commit. Check for `## Self-Check: FAILED`. Fail → report, ask "Retry?" or "Continue?".
+4. **Spot-check:** Verify first 2 files from `key-files.created`. `jj log --no-graph -T 'change_id.shortest(8) ++ " " ++ description.first_line() ++ "\n"' | grep "{phase}-{plan}"` ≥1 commit. Check for `## Self-Check: FAILED`. Fail → report, ask "Retry?" or "Continue?".
 
 5. **Failures:** `classifyHandoffIfNeeded` error → spot-check; if pass → treat as success. Real failures → report → ask continue/stop.
 

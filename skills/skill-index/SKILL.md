@@ -7,7 +7,7 @@ agents: [all]
 
 # Skill Index
 
-**Generated:** 2026-03-20T05:23:43.937Z
+**Generated:** 2026-03-28T17:12:25.390Z
 **Total skills:** 30
 
 | Skill | Type | Agents | Description |
@@ -16,7 +16,7 @@ agents: [all]
 | bgsd-context-init | shared | all | Standard bgsd-context initialization preamble shared by all workflows — detects auto-injected bgsd-context block, provides plugin-required error message, and specifies the Parse JSON instruction pattern. |
 | checkpoint-protocol | shared | executor, github-ci, planner, debugger | Checkpoint detection, handling, and structured return format for pausing execution at human interaction points. Covers human-verify, decision, and human-action checkpoint types with auto-mode behavior. |
 | ci-quality-gate | shared | orchestrator | CI quality gate spawn pattern for post-execution code scanning — checks config, displays gate header, spawns bgsd-github-ci with ci_parameters, and handles merged/checkpoint results. |
-| commit-protocol | shared | executor, github-ci | Atomic task commit protocol with staging rules, conventional commit message format, and hash tracking for SUMMARY.md. Used after completing each task during plan execution. |
+| commit-protocol | shared | executor, github-ci | Atomic task commit protocol using jj (Jujutsu) with conventional commit message format and change-id tracking for SUMMARY.md. Used after completing each task during plan execution. |
 | continuation-format | shared | executor | Standard format for presenting next steps after command/workflow completion — Next Up block structure, format rules, variants for different completion scenarios (next plan, phase complete, milestone complete), context-pulling patterns, and anti-patterns. |
 | debugger-hypothesis-testing | agent-specific | debugger | Scientific hypothesis testing methodology for debuggers — forming falsifiable hypotheses, experimental design framework, evidence quality assessment, decision criteria for acting, recovery from wrong hypotheses, and multiple competing hypotheses strategy. |
 | debugger-investigation | agent-specific | debugger | Investigation techniques for debuggers — binary search, rubber duck debugging, minimal reproduction, working backwards, differential debugging, observability-first, comment-out-everything, git bisect, technique selection guide, and technique composition patterns. |
@@ -24,7 +24,7 @@ agents: [all]
 | debugger-verification | agent-specific | debugger | Debug fix verification methodology — what "verified" means (5 criteria), reproduction verification, regression testing, environment verification, stability testing, test-first debugging, verification checklist, and red flags indicating insufficient verification. |
 | deviation-rules | shared | executor, github-ci | Auto-fix decision framework for handling unexpected issues during execution — classifying bugs, missing functionality, blocking issues, and architectural changes with clear rules for when to fix automatically vs escalate to the user. |
 | executor-continuation | agent-specific | executor | Context window continuation handling for executors — saving execution state before context exhaustion, resumption protocol for fresh agents, and completed task verification on resume. |
-| git-integration | shared | executor, github-ci | Git workflow patterns for bGSD — commit points (what to commit and when), commit message formats for initialization/task/plan/handoff, per-task commit rationale, example git log, and anti-patterns to avoid. |
+| git-integration | shared | executor, github-ci | VCS workflow patterns for bGSD using jj (Jujutsu, colocated with Git) — commit points (what to commit and when), commit message formats for initialization/task/plan/handoff, per-task commit rationale, example log, and anti-patterns to avoid. |
 | goal-backward | shared | planner, verifier, plan-checker, roadmapper | Goal-backward verification methodology — deriving observable truths, required artifacts, wiring connections, and key links from a stated goal. Used to create must-haves for plans and verify phase achievement. |
 | model-profiles | shared | planner, executor, verifier, debugger, roadmapper, project-researcher, phase-researcher, codebase-mapper, plan-checker, github-ci | AI model selection profiles for bGSD agents — quality/balanced/budget profile definitions, per-agent model assignments, resolution logic, per-agent overrides, and design rationale for why each agent uses its assigned model tier. |
 | phase-argument-parsing | shared | planner, executor, verifier, roadmapper | Phase argument parsing and normalization — extracting phase numbers from user input, zero-padding, decimal suffix handling, validation via bgsd-tools find-phase, and directory lookup patterns. |

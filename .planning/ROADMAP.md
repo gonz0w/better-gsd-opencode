@@ -4,65 +4,91 @@
 
 - ✅ **v14.1 Tool-Aware Agent Routing** - Phases 138-140 (shipped 2026-03-17)
 - ✅ **v15.0 Workflow Questioning & Decision Quality** - Phases 141-143 (shipped 2026-03-20)
+- 🚧 **v16.0 Enterprise Developer Team** - Phases 144-148 (in progress)
 
 ## Overview
 
-v15.0 implements a question design system for workflow discussions — replacing bare open-ended questions with taxonomy-driven multiple-choice options. Phase 141 establishes the taxonomy infrastructure (enum, template library, option generation rules, decision routing). Phase 142 migrates the 6 highest-traffic workflows to use template references. Phase 143 audits and migrates the remaining ~40 workflows and adds CLI audit tools.
+v16.0 transforms bGSD from a planning/execution engine into a complete enterprise development team. Five phases deliver safety guardrails, structured agent memory, code review, security audit, and a release pipeline — all built on existing infrastructure with zero new agents and zero runtime dependencies. Phase 144 adds destructive command detection. Phase 145 creates structured agent memory for cross-session learning. Phase 146 builds the code review workflow establishing the CLI-first/agent-second pattern. Phase 147 replicates that pattern for security audit. Phase 148 caps the milestone with a readiness dashboard and automated release workflow.
 
 ## Phases
 
-- [x] **Phase 141: Taxonomy & Infrastructure** - Define question taxonomy, option generation rules, prompts.js template library, and decision routing functions (completed 2026-03-20)
-- [x] **Phase 142: Primary Workflow Migration** - Migrate discuss-phase, new-milestone, plan-phase, transition, verify-work, execute-phase to template references (completed 2026-03-20)
-- [x] **Phase 143: Remaining Workflows & CLI Tools** - Audit remaining workflows, migrate all to templates, add questions:audit/list/validate CLI commands (completed 2026-03-20)
+- [x] **Phase 144: Safety Guardrails** - Destructive command detection with pattern library, user confirmation gate, and container bypass (completed 2026-03-28)
+- [ ] **Phase 145: Structured Agent Memory** - MEMORY.md file format, frozen-snapshot prompt injection, content sanitization, and management CLI
+- [ ] **Phase 146: Code Review Workflow** - CLI scan module, fix-first categorization, confidence gating, /bgsd-review workflow, and false positive exclusions
+- [ ] **Phase 147: Security Audit Workflow** - OWASP pattern library, secrets detection, dependency vulnerability checks, /bgsd-security workflow, and FP exclusions
+- [ ] **Phase 148: Review Readiness & Release Pipeline** - Readiness dashboard CLI, semver version bump, changelog generation, git tag/PR automation, and /bgsd-release workflow
 
 ## Phase Details
 
-### Phase 141: Taxonomy & Infrastructure
-**Goal**: Question taxonomy infrastructure — enum, template library, option generation rules, decision routing
+### Phase 144: Safety Guardrails
+**Goal**: Users are protected from accidentally executing destructive commands through pattern-based detection with Unicode normalization and contextual bypass
 **Depends on**: Nothing (first phase)
-**Requirements**: TAX-01, TAX-02, TAX-03, TAX-04, TAX-05, TAX-06, TAX-07
+**Requirements**: SAFE-01, SAFE-02, SAFE-03
 **Success Criteria** (what must be TRUE):
-  1. TAXONOMY enum in prompts.js defines 7 question types: BINARY, SINGLE_CHOICE, MULTI_CHOICE, RANKING, FILTERING, EXPLORATION, CLARIFICATION
-  2. questionTemplate(id, type, context) function centralizes all question templates — workflows reference by ID instead of inline text
-  3. Option generation rules enforce: MIN 3 options, MAX 5 options, diversity across certainty/scope/approach/priority dimensions, formatting parity (same length/grammar/detail), plausible distractors, and escape hatch ("Something else")
-  4. resolveQuestionType(workflow, step) and resolveOptionGeneration(questionType, context) are in DECISION_REGISTRY with contract tests
-  5. Questions explicitly state "Pick one" or "Select all that apply" based on question type (mutual exclusivity signaling)
-  6. Option templates include outcome trade-off hints where applicable (consequence-framed)
-**Plans**: 3/3 plans complete
+  1. Running a destructive command (rm -rf, DROP TABLE, git push --force) triggers an advisory warning with risk details before execution proceeds
+  2. Unicode homoglyph variants of destructive commands (Cyrillic 'а' for Latin 'a', zero-width characters) are detected and flagged identically to ASCII originals
+  3. Commands executed inside Docker, Singularity, or Modal containers skip confirmation automatically (sandboxed execution detected)
+  4. User can always proceed past any warning — nothing blocks workflow execution (C-03 advisory constraint)
+**Plans**: 2/2 plans complete
 
-### Phase 142: Primary Workflow Migration
-**Goal**: Migrate 6 primary workflows to use question() template references instead of inline question text
-**Depends on**: Phase 141
-**Requirements**: MIGRATE-01, MIGRATE-02, MIGRATE-03, MIGRATE-04, MIGRATE-05, MIGRATE-06
+### Phase 145: Structured Agent Memory
+**Goal**: Agents recall project-specific facts, user preferences, and environment patterns across sessions via a structured, injectable MEMORY.md
+**Depends on**: Phase 144
+**Requirements**: MEM-01, MEM-02, MEM-03, MEM-04
 **Success Criteria** (what must be TRUE):
-  1. discuss-phase.md uses question() template references for all questions — zero inline question text remains
-  2. new-milestone.md (steps 2, 3, 8, 9) uses question() template references — conversation flow preserved
-  3. plan-phase.md uses question() template references — planning context injection intact
-  4. transition.md uses question() template references — phase transition workflow unchanged
-  5. verify-work.md uses question() template references — verification flow preserved
-  6. execute-phase.md (checkpoint human-verify step) uses question() template references
-**Plans**: 6/6 plans complete
+  1. MEMORY.md exists in `.planning/` with structured sections (project facts, user preferences, environment patterns, correction history) that are human-readable and git-trackable
+  2. MEMORY.md contents are injected into agent system prompts at session start as a frozen snapshot — mid-session writes update disk but NOT the active prompt
+  3. Memory entries are scanned for prompt injection patterns before injection; entries matching threat patterns are blocked with clear warnings
+  4. User can manage memory via `memory:list`, `memory:add`, `memory:remove`, and `memory:prune` CLI commands
+  5. Stale memory entries older than a configurable threshold are pruned on demand without affecting recent entries
+**Plans**: TBD
 
-### Phase 143: Remaining Workflows & CLI Tools
-**Goal**: Audit remaining ~40 workflows, migrate all to templates, add questions:audit/list/validate CLI commands
-**Depends on**: Phase 142
-**Requirements**: MIGRATE-07, MIGRATE-08, CLI-01, CLI-02, CLI-03
+### Phase 146: Code Review Workflow
+**Goal**: Users can run a single command to get structured code review with auto-fixes for mechanical issues and batched questions for judgment calls
+**Depends on**: Phase 145
+**Requirements**: REV-01, REV-02, REV-03, REV-04, REV-05
 **Success Criteria** (what must be TRUE):
-  1. questions:audit command scans workflows, identifies inline question text vs template references, reports taxonomy compliance percentage
-  2. questions:list command lists all question templates in prompts.js with taxonomy type and usage count per workflow
-  3. questions:validate command validates all question templates have 3-5 options, formatting parity, and escape hatches
-  4. Remaining ~40 workflows audited with inventory of inline question text documented
-  5. All remaining workflows migrated to question() template references — zero bare open-ended questions remain
-**Plans**: 5/5 plans complete
+  1. `review:scan` CLI command analyzes staged/committed changes and produces structured JSON findings with file, line, category, severity, confidence score, and suggested fix
+  2. Findings are classified as AUTO-FIX (applied silently), ASK (batched into single user question), or INFO (advisory notice) — mechanical issues never interrupt the user
+  3. Only findings with >= 8/10 confidence are reported; low-confidence findings are suppressed to reduce noise
+  4. `/bgsd-review` workflow orchestrates CLI scan + verifier agent judgment in a two-stage review (structural audit then quality assessment)
+  5. Project-local `.planning/review-exclusions.json` allows suppressing known false positives with reason and author for auditability
+**Plans**: TBD
+
+### Phase 147: Security Audit Workflow
+**Goal**: Users can scan their codebase for security vulnerabilities with OWASP coverage, secrets detection, and dependency checks — all confidence-gated
+**Depends on**: Phase 146
+**Requirements**: SEC-01, SEC-02, SEC-03, SEC-04, SEC-05
+**Success Criteria** (what must be TRUE):
+  1. Security scanning patterns cover OWASP Top 10 categories (injection, broken auth, sensitive data exposure, XSS, broken access control, security misconfiguration, etc.)
+  2. Secrets-in-code detection identifies API keys, tokens, passwords, and private keys in source files with a configurable allowlist for test fixtures
+  3. Dependency vulnerability checking parses package.json/requirements.txt/go.mod for known vulnerable versions with severity and remediation info
+  4. `/bgsd-security` workflow orchestrates security:scan CLI + verifier agent assessment with >= 8/10 confidence threshold and independent verification of each finding
+  5. Project-local `.planning/security-exclusions.json` allows suppressing known false positives with reason and expiry date, separate from code review exclusions
+**Plans**: TBD
+
+### Phase 148: Review Readiness & Release Pipeline
+**Goal**: Users can check pre-ship readiness at a glance and automate the entire release process (version bump → changelog → tag → PR) with a single command
+**Depends on**: Phase 147
+**Requirements**: READY-01, READY-02, REL-01, REL-02, REL-03, REL-04
+**Success Criteria** (what must be TRUE):
+  1. `review:readiness` CLI command returns JSON with pass/fail/skip status for tests passing, lint clean, review findings resolved, security findings resolved, TODOs in diff, and changelog updated
+  2. Readiness dashboard is advisory-only — clearly labeled informational, never blocks any workflow, color-coded in TTY mode, JSON for piping
+  3. `release:bump` analyzes conventional commits since last tag to determine semver bump (major/minor/patch) with manual override support
+  4. `release:changelog` generates CHANGELOG.md entries from plan summaries + conventional commit messages grouped by type (feat, fix, docs, etc.)
+  5. `/bgsd-release` workflow orchestrates version bump → changelog → git tag → PR creation with dry-run default — user confirms before any git mutations
+**Plans**: TBD
 
 ## Progress
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 141. Taxonomy & Infrastructure | 3/3 | Complete    | 2026-03-20 |
-| 142. Primary Workflow Migration | 6/6 | Complete    | 2026-03-20 |
-| 143. Remaining Workflows & CLI Tools | 5/5 | Complete    | 2026-03-20 |
+| 144. Safety Guardrails | 2/2 | Complete    | 2026-03-28 |
+| 145. Structured Agent Memory | 0/0 | Not started | - |
+| 146. Code Review Workflow | 0/0 | Not started | - |
+| 147. Security Audit Workflow | 0/0 | Not started | - |
+| 148. Review Readiness & Release Pipeline | 0/0 | Not started | - |
 
 ---
 
-*Last updated: 2026-03-20*
+*Last updated: 2026-03-28*

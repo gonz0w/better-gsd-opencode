@@ -128,7 +128,7 @@ Why bad: Combine into one checkpoint at end.
 
 When spawned as a continuation agent (after a checkpoint was resolved):
 
-1. Verify previous commits exist: `git log --oneline -5`
+1. Verify previous commits exist: `jj log -n 5 --no-graph`
 2. DO NOT redo completed tasks
 3. Start from resume point in prompt
 4. Handle based on checkpoint type:

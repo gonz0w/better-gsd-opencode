@@ -93,7 +93,7 @@ timestamp=$(node __OPENCODE_CONFIG__/bgsd-oc/bin/bgsd-tools.cjs util:current-tim
 <step name="commit">
 Save a bookmark before committing:
 ```bash
-node __OPENCODE_CONFIG__/bgsd-oc/bin/bgsd-tools.cjs util:memory write --store bookmarks --entry '{"phase":"${PHASE}","plan":"${PLAN}","task":${TASK_NUM},"total_tasks":${TOTAL_TASKS},"paused":true,"notes":"${PAUSE_REASON}","blockers":"${BLOCKERS}","git_head":"'$(git rev-parse --short HEAD)'"}'
+node __OPENCODE_CONFIG__/bgsd-oc/bin/bgsd-tools.cjs util:memory write --store bookmarks --entry '{"phase":"${PHASE}","plan":"${PLAN}","task":${TASK_NUM},"total_tasks":${TOTAL_TASKS},"paused":true,"notes":"${PAUSE_REASON}","blockers":"${BLOCKERS}","git_head":"'$(jj log -r @- --no-graph -T 'commit_id.shortest(8)')'"}'
 ```
 
 ```bash
