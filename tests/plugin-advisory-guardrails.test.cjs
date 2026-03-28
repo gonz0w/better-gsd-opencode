@@ -721,3 +721,100 @@ describe('GARD-04: Destructive command detection', () => {
     assert.ok(ids.some(m => m.includes('[db-drop-table]')), 'should detect database pattern');
   });
 });
+
+// ─── GARD-04: Unicode Normalization ─────────────────────────────────────────
+
+describe('GARD-04: Unicode normalization', () => {
+  let tmpDir, notifier;
+
+  beforeEach(async () => {
+    await loadModule();
+    tmpDir = createTempProject({ convention: 'kebab-case' });
+    notifier = createMockNotifier();
+  });
+
+  afterEach(() => cleanup(tmpDir));
+
+  // ── Unicode bypass detection tests ──
+
+  test('fullwidth rm command (ｒｍ) triggers CRITICAL detection after NFKD normalization', async () => {
+    const guardrails = createAdvisoryGuardrails(tmpDir, notifier, {});
+    // U+FF52 ｒ, U+FF4D ｍ — fullwidth Latin letters
+    await guardrails.onToolAfter(bashEvent('\uFF52\uFF4D -rf /tmp'));
+
+    assert.ok(notifier.calls.length >= 1, 'fullwidth rm should be detected after NFKD');
+    assert.ok(notifier.calls[0].message.includes('[fs-rm-recursive]'));
+    assert.ok(notifier.calls[0].message.includes('(CRITICAL)'));
+  });
+
+  test('zero-width space in rm command triggers detection', async () => {
+    const guardrails = createAdvisoryGuardrails(tmpDir, notifier, {});
+    // r + U+200B (zero-width space) + m
+    await guardrails.onToolAfter(bashEvent('r\u200Bm -rf /tmp'));
+
+    assert.ok(notifier.calls.length >= 1, 'zero-width space should be stripped');
+    assert.ok(notifier.calls[0].message.includes('[fs-rm-recursive]'));
+  });
+
+  test('zero-width non-joiner in rm command triggers detection', async () => {
+    const guardrails = createAdvisoryGuardrails(tmpDir, notifier, {});
+    // r + U+200C (zero-width non-joiner) + m
+    await guardrails.onToolAfter(bashEvent('r\u200Cm -rf /tmp'));
+
+    assert.ok(notifier.calls.length >= 1, 'zero-width non-joiner should be stripped');
+    assert.ok(notifier.calls[0].message.includes('[fs-rm-recursive]'));
+  });
+
+  test('combining mark in rm command triggers detection after stripping', async () => {
+    const guardrails = createAdvisoryGuardrails(tmpDir, notifier, {});
+    // rm + U+0301 (combining acute accent)
+    await guardrails.onToolAfter(bashEvent('rm\u0301 -rf /tmp'));
+
+    assert.ok(notifier.calls.length >= 1, 'combining marks should be stripped after NFKD');
+    assert.ok(notifier.calls[0].message.includes('[fs-rm-recursive]'));
+  });
+
+  test('BOM character prefix triggers detection', async () => {
+    const guardrails = createAdvisoryGuardrails(tmpDir, notifier, {});
+    // U+FEFF (BOM) + rm -rf
+    await guardrails.onToolAfter(bashEvent('\uFEFFrm -rf /tmp'));
+
+    assert.ok(notifier.calls.length >= 1, 'BOM prefix should be stripped');
+    assert.ok(notifier.calls[0].message.includes('[fs-rm-recursive]'));
+  });
+
+  // ── False-positive resilience (Stack Overflow paste scenarios) ──
+
+  test('smart quotes in npm install do NOT trigger destructive pattern', async () => {
+    const guardrails = createAdvisoryGuardrails(tmpDir, notifier, {});
+    // U+2018 and U+2019 smart single quotes
+    await guardrails.onToolAfter(bashEvent('npm install \u2018lodash\u2019'));
+
+    assert.strictEqual(notifier.calls.length, 0, 'smart quotes in npm install should not trigger');
+  });
+
+  test('em-dash in echo comment does NOT trigger destructive pattern', async () => {
+    const guardrails = createAdvisoryGuardrails(tmpDir, notifier, {});
+    // U+2014 em-dash
+    await guardrails.onToolAfter(bashEvent('echo "step 1 \u2014 install deps"'));
+
+    assert.strictEqual(notifier.calls.length, 0, 'em-dash in echo should not trigger');
+  });
+
+  test('curly double quotes do NOT trigger destructive pattern', async () => {
+    const guardrails = createAdvisoryGuardrails(tmpDir, notifier, {});
+    // U+201C and U+201D curly double quotes
+    await guardrails.onToolAfter(bashEvent('echo \u201Chello world\u201D'));
+
+    assert.strictEqual(notifier.calls.length, 0, 'curly quotes in echo should not trigger');
+  });
+
+  test('eval inside evaluation does NOT match (word boundary prevents it)', async () => {
+    const guardrails = createAdvisoryGuardrails(tmpDir, notifier, {});
+    await guardrails.onToolAfter(bashEvent('echo "evaluation complete"'));
+
+    // The sc-eval pattern uses \beval\s+ which requires eval followed by whitespace
+    // "evaluation" has eval followed by 'u', not whitespace
+    assert.strictEqual(notifier.calls.length, 0, 'eval inside evaluation should not match');
+  });
+});
