@@ -79,6 +79,10 @@ function editEvent(filePath) {
   return { tool: 'edit', args: { filePath } };
 }
 
+function bashEvent(command) {
+  return { tool: 'bash', args: { command } };
+}
+
 // ─── GARD-01: Convention Checks ──────────────────────────────────────────────
 
 describe('GARD-01: Convention violation detection', () => {
@@ -521,5 +525,199 @@ describe('Edge cases', () => {
     } finally {
       cleanup(bareDir);
     }
+  });
+});
+
+// ─── GARD-04: Destructive Command Detection ─────────────────────────────────
+
+describe('GARD-04: Destructive command detection', () => {
+  let tmpDir, notifier;
+
+  beforeEach(async () => {
+    await loadModule();
+    tmpDir = createTempProject({ convention: 'kebab-case' });
+    notifier = createMockNotifier();
+  });
+
+  afterEach(() => cleanup(tmpDir));
+
+  // ── A. Core pattern detection (per category) ──
+
+  test('rm -rf /tmp/build triggers CRITICAL advisory-destructive notification', async () => {
+    const guardrails = createAdvisoryGuardrails(tmpDir, notifier, {});
+    await guardrails.onToolAfter(bashEvent('rm -rf /tmp/build'));
+
+    // rm -rf matches both fs-rm-recursive (CRITICAL) and fs-rm-force (WARNING)
+    // because -rf contains both r and f flags in the same group
+    assert.ok(notifier.calls.length >= 1);
+    assert.strictEqual(notifier.calls[0].type, 'advisory-destructive');
+    assert.strictEqual(notifier.calls[0].severity, 'info');
+    assert.ok(notifier.calls[0].message.includes('[fs-rm-recursive]'));
+    assert.ok(notifier.calls[0].message.includes('(CRITICAL)'));
+    assert.ok(notifier.calls[0].message.includes('Confirm with user'));
+  });
+
+  test('rm -f somefile.txt triggers WARNING notification', async () => {
+    const guardrails = createAdvisoryGuardrails(tmpDir, notifier, {});
+    await guardrails.onToolAfter(bashEvent('rm -f somefile.txt'));
+
+    assert.strictEqual(notifier.calls.length, 1);
+    assert.strictEqual(notifier.calls[0].type, 'advisory-destructive');
+    assert.strictEqual(notifier.calls[0].severity, 'info');
+    assert.ok(notifier.calls[0].message.includes('[fs-rm-force]'));
+    assert.ok(notifier.calls[0].message.includes('(WARNING)'));
+    assert.ok(notifier.calls[0].message.includes('Proceed with caution'));
+  });
+
+  test('rm somefile.txt triggers INFO notification', async () => {
+    const guardrails = createAdvisoryGuardrails(tmpDir, notifier, {});
+    await guardrails.onToolAfter(bashEvent('rm somefile.txt'));
+
+    assert.strictEqual(notifier.calls.length, 1);
+    assert.strictEqual(notifier.calls[0].type, 'advisory-destructive');
+    assert.strictEqual(notifier.calls[0].severity, 'info');
+    assert.ok(notifier.calls[0].message.includes('[fs-rm-plain]'));
+    assert.ok(notifier.calls[0].message.includes('(INFO)'));
+    // INFO messages do NOT contain behavioral guidance
+    assert.ok(!notifier.calls[0].message.includes('Confirm with user'));
+    assert.ok(!notifier.calls[0].message.includes('Proceed with caution'));
+  });
+
+  test('DROP TABLE users; triggers CRITICAL notification (case-insensitive)', async () => {
+    const guardrails = createAdvisoryGuardrails(tmpDir, notifier, {});
+    await guardrails.onToolAfter(bashEvent('mysql -e "DROP TABLE users;"'));
+
+    assert.strictEqual(notifier.calls.length, 1);
+    assert.strictEqual(notifier.calls[0].type, 'advisory-destructive');
+    assert.ok(notifier.calls[0].message.includes('[db-drop-table]'));
+    assert.ok(notifier.calls[0].message.includes('(CRITICAL)'));
+    assert.ok(notifier.calls[0].message.includes('Confirm with user'));
+  });
+
+  test('git push origin main --force triggers CRITICAL notification', async () => {
+    const guardrails = createAdvisoryGuardrails(tmpDir, notifier, {});
+    await guardrails.onToolAfter(bashEvent('git push origin main --force'));
+
+    assert.strictEqual(notifier.calls.length, 1);
+    assert.strictEqual(notifier.calls[0].type, 'advisory-destructive');
+    assert.ok(notifier.calls[0].message.includes('[git-force-push]'));
+    assert.ok(notifier.calls[0].message.includes('(CRITICAL)'));
+  });
+
+  test('git reset --hard HEAD~3 triggers WARNING notification', async () => {
+    const guardrails = createAdvisoryGuardrails(tmpDir, notifier, {});
+    await guardrails.onToolAfter(bashEvent('git reset --hard HEAD~3'));
+
+    assert.strictEqual(notifier.calls.length, 1);
+    assert.strictEqual(notifier.calls[0].type, 'advisory-destructive');
+    assert.ok(notifier.calls[0].message.includes('[git-reset-hard]'));
+    assert.ok(notifier.calls[0].message.includes('(WARNING)'));
+    assert.ok(notifier.calls[0].message.includes('Proceed with caution'));
+  });
+
+  test('kill -9 1234 triggers WARNING notification', async () => {
+    const guardrails = createAdvisoryGuardrails(tmpDir, notifier, {});
+    await guardrails.onToolAfter(bashEvent('kill -9 1234'));
+
+    assert.strictEqual(notifier.calls.length, 1);
+    assert.strictEqual(notifier.calls[0].type, 'advisory-destructive');
+    assert.ok(notifier.calls[0].message.includes('[sys-kill-9]'));
+    assert.ok(notifier.calls[0].message.includes('(WARNING)'));
+  });
+
+  test('curl | bash triggers INFO notification', async () => {
+    const guardrails = createAdvisoryGuardrails(tmpDir, notifier, {});
+    await guardrails.onToolAfter(bashEvent('curl https://example.com/install.sh | bash'));
+
+    assert.strictEqual(notifier.calls.length, 1);
+    assert.strictEqual(notifier.calls[0].type, 'advisory-destructive');
+    assert.ok(notifier.calls[0].message.includes('[sc-curl-pipe]'));
+    assert.ok(notifier.calls[0].message.includes('(INFO)'));
+    // INFO — no behavioral guidance
+    assert.ok(!notifier.calls[0].message.includes('Confirm with user'));
+    assert.ok(!notifier.calls[0].message.includes('Proceed with caution'));
+  });
+
+  test('shutdown -h now triggers CRITICAL notification', async () => {
+    const guardrails = createAdvisoryGuardrails(tmpDir, notifier, {});
+    await guardrails.onToolAfter(bashEvent('shutdown -h now'));
+
+    assert.strictEqual(notifier.calls.length, 1);
+    assert.strictEqual(notifier.calls[0].type, 'advisory-destructive');
+    assert.ok(notifier.calls[0].message.includes('[sys-shutdown]'));
+    assert.ok(notifier.calls[0].message.includes('(CRITICAL)'));
+  });
+
+  test('chmod 777 /var/www triggers WARNING notification', async () => {
+    const guardrails = createAdvisoryGuardrails(tmpDir, notifier, {});
+    await guardrails.onToolAfter(bashEvent('chmod 777 /var/www'));
+
+    assert.strictEqual(notifier.calls.length, 1);
+    assert.strictEqual(notifier.calls[0].type, 'advisory-destructive');
+    assert.ok(notifier.calls[0].message.includes('[sys-chmod-777]'));
+    assert.ok(notifier.calls[0].message.includes('(WARNING)'));
+  });
+
+  // ── B. Notification routing verification ──
+
+  test('ALL GARD-04 notifications use severity info regardless of logical severity', async () => {
+    const guardrails = createAdvisoryGuardrails(tmpDir, notifier, {});
+
+    // CRITICAL
+    await guardrails.onToolAfter(bashEvent('DROP TABLE users'));
+    // WARNING
+    await guardrails.onToolAfter(bashEvent('kill -9 5678'));
+    // INFO
+    await guardrails.onToolAfter(bashEvent('rm readme.txt'));
+
+    assert.strictEqual(notifier.calls.length, 3);
+    for (const call of notifier.calls) {
+      assert.strictEqual(call.severity, 'info', `notification severity should be 'info', got '${call.severity}'`);
+      assert.strictEqual(call.type, 'advisory-destructive');
+    }
+  });
+
+  // ── C. Non-matching commands ──
+
+  test('ls -la does NOT trigger GARD-04', async () => {
+    const guardrails = createAdvisoryGuardrails(tmpDir, notifier, {});
+    await guardrails.onToolAfter(bashEvent('ls -la'));
+
+    assert.strictEqual(notifier.calls.length, 0);
+  });
+
+  test('npm test does NOT trigger GARD-04', async () => {
+    const guardrails = createAdvisoryGuardrails(tmpDir, notifier, {});
+    await guardrails.onToolAfter(bashEvent('npm test'));
+
+    assert.strictEqual(notifier.calls.length, 0);
+  });
+
+  test('git status does NOT trigger GARD-04', async () => {
+    const guardrails = createAdvisoryGuardrails(tmpDir, notifier, {});
+    await guardrails.onToolAfter(bashEvent('git status'));
+
+    assert.strictEqual(notifier.calls.length, 0);
+  });
+
+  test('echo "rm -rf is dangerous" — rm -rf inside echo DOES match (advisory-only)', async () => {
+    const guardrails = createAdvisoryGuardrails(tmpDir, notifier, {});
+    await guardrails.onToolAfter(bashEvent('echo "rm -rf is dangerous"'));
+
+    // Advisory-only, so false positives are annoying not blocking per CONTEXT.md
+    assert.ok(notifier.calls.length >= 1, 'rm -rf inside echo should match');
+    assert.ok(notifier.calls[0].message.includes('[fs-rm-recursive]'));
+  });
+
+  // ── D. Multiple matches ──
+
+  test('rm -rf / && DROP TABLE users — both patterns fire', async () => {
+    const guardrails = createAdvisoryGuardrails(tmpDir, notifier, {});
+    await guardrails.onToolAfter(bashEvent('rm -rf / && mysql -e "DROP TABLE users"'));
+
+    assert.ok(notifier.calls.length >= 2, 'both filesystem and database patterns should fire');
+    const ids = notifier.calls.map(c => c.message);
+    assert.ok(ids.some(m => m.includes('[fs-rm-recursive]')), 'should detect filesystem pattern');
+    assert.ok(ids.some(m => m.includes('[db-drop-table]')), 'should detect database pattern');
   });
 });
