@@ -2,6 +2,14 @@
   {
     "phase": "144",
     "plan": "02",
+    "task": 2,
+    "total_tasks": 3,
+    "git_head": "c64094ae",
+    "timestamp": "2026-03-28T16:50:11.129Z"
+  },
+  {
+    "phase": "144",
+    "plan": "02",
     "task": 1,
     "total_tasks": 3,
     "git_head": "8bab2ebd",
@@ -150,13 +158,5 @@
     "total_tasks": 2,
     "git_head": "667b9f9",
     "timestamp": "2026-03-15T15:41:10.239Z"
-  },
-  {
-    "phase": "0128",
-    "plan": "01",
-    "task": 2,
-    "total_tasks": 2,
-    "git_head": "cadc4c0",
-    "timestamp": "2026-03-15T15:34:53.925Z"
   }
 ]
