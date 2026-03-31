@@ -5,24 +5,24 @@
 See: .planning/PROJECT.md (updated 2026-03-30)
 
 **Core value:** Manage and deliver high-quality software with high-quality documentation, while continuously reducing token usage and improving performance.
-**Current focus:** v18.0 roadmap created — ready to start planning Phase 168.
+**Current focus:** Phase 168 Plan 01 completed — ready to continue model-settings execution with Plan 02.
 
 ## Current Position
 
 **Phase:** 168
-**Current Plan:** Not started
-**Total Plans in Phase:** TBD
-**Status:** Ready for planning
-**Last Activity:** 2026-03-30
+**Current Plan:** 2
+**Total Plans in Phase:** 4
+**Status:** In progress
+**Last Activity:** 2026-03-31
 
-Progress: [░░░░░░░░░░] 0%
+Progress: [██████████] 97%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 338 (through Phase 167 P02)
+- Total plans completed: 339 (through Phase 168 P01)
 - Average duration: ~13 min/plan
-- Total execution time: ~51.0 hours
+- Total execution time: ~51.1 hours
 
 **By Phase:**
 
@@ -33,6 +33,7 @@ Progress: [░░░░░░░░░░] 0%
 | 165 | 3 | 3 | ~11.3 min |
 | 166 | 2 | 2 | ~9.5 min |
 | 167 | 2 | 2 | 9.5 min |
+| 168 | 1 | 1 | ~2.0 min |
 
 **Recent Trend:**
 - Last shipped milestone: v17.1 completed 5 phases (163-167)
@@ -56,7 +57,8 @@ Progress: [░░░░░░░░░░] 0%
 - [Phase 167]: Touched CLI and plugin diagnostics now share one quiet-by-default `BGSD_DEBUG` or `--verbose` contract.
 - [v18.0 Roadmap]: Split milestone into 5 phases (168-172): model settings contract, canonical resolution, safe `cmux` targeting, trustworthy ambient state, and low-noise attention UX.
 - [v18.0 Roadmap]: Kept the first `cmux` slice workspace-scoped and fallback-safe; deeper per-agent identity remains deferred until signal quality proves reliable.
-- [v18.0 Roadmap]: Kept dynamic model work provider-agnostic and migration-safe by separating settings contract work from canonical resolution and routing behavior.
+- [v18.0 Roadmap]: Kept dynamic model work provider-agnostic by separating settings contract work from canonical resolution and routing behavior.
+- [Phase 168-adaptive-model-settings-contract]: Phase 168 planning artifacts now center on built-in quality/balanced/budget profiles, one selected global profile, and sparse direct overrides instead of aliases or migration-safe legacy compatibility.
 
 ### Pending Todos
 
@@ -64,10 +66,10 @@ None yet.
 
 ### Blockers/Concerns
 
-None.
+None
 
 ## Session Continuity
 
-Last session: 2026-03-30 00:00
-Stopped at: Active milestone roadmap written; next step is `/bgsd-plan discuss 168`.
+Last session: 2026-03-31T01:58:16.517Z
+Stopped at: Completed 168-01-PLAN.md
 Resume file: None
