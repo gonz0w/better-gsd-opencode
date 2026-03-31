@@ -9,6 +9,7 @@ const path = require('path');
 const { execSync } = require('child_process');
 
 const { TOOLS_PATH, runGsdTools, createTempProject, cleanup } = require('./helpers.cjs');
+const { routeTask } = require('../src/lib/orchestration.js');
 
 describe('orchestration: classifyTaskComplexity', () => {
   test('minimal task (1 file, no tests) scores 1-2', () => {
@@ -46,6 +47,7 @@ autonomous: true
     const parsed = JSON.parse(res.output);
     assert.ok(parsed.tasks[0].complexity.score <= 2, `Expected score <= 2, got ${parsed.tasks[0].complexity.score}`);
     assert.strictEqual(parsed.tasks[0].complexity.label, parsed.tasks[0].complexity.score === 1 ? 'trivial' : 'simple');
+    assert.strictEqual(parsed.tasks[0].complexity.recommended_profile, 'budget');
     cleanup(tmpDir);
   });
 
@@ -94,6 +96,7 @@ autonomous: true
     const parsed = JSON.parse(res.output);
     assert.ok(parsed.tasks[0].complexity.score >= 4, `Expected score >= 4, got ${parsed.tasks[0].complexity.score}`);
     assert.ok(['complex', 'very_complex'].includes(parsed.tasks[0].complexity.label));
+    assert.strictEqual(parsed.tasks[0].complexity.recommended_profile, 'quality');
     cleanup(tmpDir);
   });
 
@@ -132,7 +135,58 @@ autonomous: true
     const parsed = JSON.parse(res.output);
     assert.strictEqual(parsed.tasks[0].complexity.score, 3, 'Expected score 3 for 3 files + tests');
     assert.strictEqual(parsed.tasks[0].complexity.label, 'moderate');
+    assert.strictEqual(parsed.tasks[0].complexity.recommended_profile, 'balanced');
     cleanup(tmpDir);
+  });
+});
+
+describe('orchestration: routeTask', () => {
+  test('recommends a shared profile and resolves the concrete model canonically', () => {
+    const routed = routeTask({ score: 3, label: 'moderate' }, {
+      model_settings: {
+        default_profile: 'budget',
+        profiles: {
+          quality: { model: 'gpt-5.4' },
+          balanced: { model: 'gpt-5.4-mini' },
+          budget: { model: 'gpt-5.4-nano' },
+        },
+        agent_overrides: {},
+      },
+    });
+
+    assert.strictEqual(routed.profile, 'balanced');
+    assert.strictEqual(routed.model, 'gpt-5.4-mini');
+    assert.ok(!/haiku|sonnet|opus/.test(routed.reason), `Unexpected provider-tier reason: ${routed.reason}`);
+  });
+
+  test('changing a profile backing model changes the resolved model without changing the recommended profile', () => {
+    const baseComplexity = { score: 4, label: 'complex' };
+    const profileA = routeTask(baseComplexity, {
+      model_settings: {
+        default_profile: 'budget',
+        profiles: {
+          quality: { model: 'gpt-5.4' },
+          balanced: { model: 'gpt-5.4-mini' },
+          budget: { model: 'gpt-5.4-nano' },
+        },
+        agent_overrides: {},
+      },
+    });
+    const profileB = routeTask(baseComplexity, {
+      model_settings: {
+        default_profile: 'budget',
+        profiles: {
+          quality: { model: 'gpt-5.5-preview' },
+          balanced: { model: 'gpt-5.4-mini' },
+          budget: { model: 'gpt-5.4-nano' },
+        },
+        agent_overrides: {},
+      },
+    });
+
+    assert.strictEqual(profileA.profile, 'quality');
+    assert.strictEqual(profileB.profile, 'quality');
+    assert.notStrictEqual(profileA.model, profileB.model);
   });
 });
 
@@ -351,9 +405,9 @@ describe('orchestration: classify plan CLI', () => {
     assert.ok(parsed.task_count >= 2, 'Should have at least 2 tasks');
     assert.ok(parsed.tasks.every(t => t.complexity.score >= 1 && t.complexity.score <= 5), 'All scores 1-5');
     assert.ok(parsed.tasks.every(t => ['trivial', 'simple', 'moderate', 'complex', 'very_complex'].includes(t.complexity.label)), 'All labels valid');
-    assert.ok(parsed.tasks.every(t => ['haiku', 'sonnet', 'opus'].includes(t.complexity.recommended_model)), 'All models valid');
+    assert.ok(parsed.tasks.every(t => ['budget', 'balanced', 'quality'].includes(t.complexity.recommended_profile)), 'All profiles valid');
     assert.ok(typeof parsed.plan_complexity === 'number', 'plan_complexity should be a number');
-    assert.ok(typeof parsed.recommended_model === 'string', 'recommended_model should be a string');
+    assert.ok(typeof parsed.recommended_profile === 'string', 'recommended_profile should be a string');
   });
 });
 
@@ -387,4 +441,3 @@ describe('orchestration: init execute-phase integration', () => {
     }
   });
 });
-
