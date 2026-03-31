@@ -49,7 +49,7 @@ class MapBackend {
 }
 
 // ---------------------------------------------------------------------------
-// Schema SQL (version 5 — planning tables + memory stores + model_profiles + session state)
+// Schema SQL (version 5 — planning tables + memory stores + legacy model_profiles compatibility + session state)
 // ---------------------------------------------------------------------------
 
 const SCHEMA_V5_SQL = `
@@ -629,61 +629,9 @@ export class PlanningCache {
     } catch { return null; }
   }
 
-  /**
-   * Get model profile row for a specific cwd and agent type.
-   * Falls back to '__defaults__' cwd if no project-specific override exists.
-   *
-   * @param {string} cwd - Project root directory
-   * @param {string} agentType - Agent type (e.g. 'bgsd-planner')
-   * @returns {{ quality_model: string, balanced_model: string, budget_model: string, override_model: string|null }|null}
-   */
-  getModelProfile(cwd, agentType) {
-    if (this._isMap()) return null;
-    try {
-      const row = this._stmt('mp_get_cwd', 'SELECT * FROM model_profiles WHERE agent_type = ? AND cwd = ?').get(agentType, cwd);
-      if (row) return row;
-      const defaultRow = this._stmt('mp_get_def', "SELECT * FROM model_profiles WHERE agent_type = ? AND cwd = '__defaults__'").get(agentType);
-      return defaultRow || null;
-    } catch { return null; }
-  }
-
-  /**
-   * Get all model profiles for a cwd. Falls back to '__defaults__' if none found.
-   *
-   * @param {string} cwd - Project root directory
-   * @returns {Array|null}
-   */
-  getModelProfiles(cwd) {
-    if (this._isMap()) return null;
-    try {
-      const rows = this._stmt('mp_all_cwd', 'SELECT * FROM model_profiles WHERE cwd = ? ORDER BY agent_type').all(cwd);
-      if (rows && rows.length > 0) return rows;
-      const defaults = this._stmt('mp_all_def', "SELECT * FROM model_profiles WHERE cwd = '__defaults__' ORDER BY agent_type").all();
-      return defaults && defaults.length > 0 ? defaults : null;
-    } catch { return null; }
-  }
-
-  /**
-   * Seed model profile defaults for a project cwd from '__defaults__' rows.
-   * No-op if project-specific rows already exist for this cwd.
-   *
-   * @param {string} cwd - Project root directory
-   */
-  seedModelDefaults(cwd) {
-    if (this._isMap()) return;
-    try {
-      const existing = this._stmt('mp_count', 'SELECT COUNT(*) AS cnt FROM model_profiles WHERE cwd = ?').get(cwd);
-      if (existing && existing.cnt > 0) return;
-      const defaults = this._stmt('mp_seed_def', "SELECT * FROM model_profiles WHERE cwd = '__defaults__'").all();
-      if (!defaults || defaults.length === 0) return;
-      const ins = this._stmt('mp_seed_ins', `INSERT OR IGNORE INTO model_profiles (agent_type, cwd, quality_model, balanced_model, budget_model, override_model) VALUES (?, ?, ?, ?, ?, ?)`);
-      this._db.exec('BEGIN');
-      for (const row of defaults) {
-        ins.run(row.agent_type, cwd, row.quality_model, row.balanced_model, row.budget_model, row.override_model || null);
-      }
-      this._db.exec('COMMIT');
-    } catch { try { this._db.exec('ROLLBACK'); } catch {} }
-  }
+  // Legacy model_profiles helpers were intentionally removed in Phase 169.
+  // The plugin cache still tolerates the compatibility table on disk, but live
+  // model resolution must go through canonical config helpers instead.
 
   // -------------------------------------------------------------------------
   // Session State Operations (Phase 123)
