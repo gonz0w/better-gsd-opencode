@@ -8,7 +8,7 @@ const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
 
-const { TOOLS_PATH, runGsdTools, createTempProject, cleanup, writeStateFixture, hasJj, initJjRepo, initColocatedCommitRepo } = require('./helpers.cjs');
+const { TOOLS_PATH, runGsdTools, runGsdToolsFull, createTempProject, cleanup, writeStateFixture, hasJj, initJjRepo, initColocatedCommitRepo } = require('./helpers.cjs');
 const { getPhaseTree, buildPhaseSnapshotInternal, invalidateFileCache } = require('../src/lib/helpers');
 
 describe('integration: workflow sequences', () => {
@@ -378,7 +378,7 @@ describe('integration: state round-trip', () => {
   });
 });
 
-describe('integration: config migration', () => {
+describe('integration: canonical config workflow after config-migrate retirement', () => {
   let tmpDir;
 
   beforeEach(() => {
@@ -397,107 +397,42 @@ describe('integration: config migration', () => {
     cleanup(tmpDir);
   });
 
-  test('migrates old flat config to modern format', () => {
-    // Write an old-style flat config
+  test('rejects util:config-migrate via the normal unknown-command path', () => {
     fs.writeFileSync(
       path.join(tmpDir, '.planning', 'config.json'),
       JSON.stringify({
         mode: 'yolo',
-        depth: 'thorough',
-        commit_docs: true,
-        branching_strategy: 'phase-branch',
-        research: true
+        workflow: { research: true }
       }, null, 2)
     );
 
-    const result = runGsdTools('util:config-migrate', tmpDir);
-    assert.ok(result.success, `config-migrate failed: ${result.error}`);
-    const data = JSON.parse(result.output);
-
-    // Should have migrated some keys
-    assert.ok(data.migrated_keys.length > 0, 'should have migrated keys');
-    assert.ok(data.config_path, 'should have config_path');
-
-    // Verify the resulting config has nested structure
-    const newConfig = JSON.parse(fs.readFileSync(path.join(tmpDir, '.planning', 'config.json'), 'utf-8'));
-    assert.ok(newConfig.planning || newConfig.git || newConfig.workflow,
-      'migrated config should have nested sections');
+    const result = runGsdToolsFull('util:config-migrate', tmpDir);
+    assert.strictEqual(result.success, false, 'retired config-migrate route should fail');
+    assert.match(result.stderr, /Unknown util subcommand: config-migrate/, 'retired route should resolve to unknown-command failure');
   });
 
-  test('idempotent on modern config', () => {
-    // Write a fully-complete modern config with ALL schema keys
+  test('keeps canonical validation and edit commands as the supported config flow', () => {
     const modernConfig = {
       mode: 'yolo',
-      depth: 'thorough',
-      model_profile: 'balanced',
-      model_settings: {
-        default_profile: 'balanced',
-        profiles: {
-          quality: { model: 'gpt-5.4' },
-          balanced: { model: 'gpt-5.4-mini' },
-          budget: { model: 'gpt-5.4-nano' },
-        },
-        agent_overrides: {},
-      },
-      parallelization: true,
-      brave_search: false,
-      model_profiles: {},
-      test_commands: {},
-      test_gate: true,
-      context_window: 200000,
-      context_target_percent: 50,
-      ytdlp_path: '',
-      nlm_path: '',
-      mcp_config_path: '',
-      runtime: 'auto',
-      planning: { commit_docs: true, search_gitignored: false },
-      git: {
-        branching_strategy: 'phase-branch',
-        phase_branch_template: 'gsd/phase-{phase}-{slug}',
-        milestone_branch_template: 'gsd/{milestone}-{slug}'
-      },
-      workflow: { research: true, plan_check: true, verifier: true, rag: true, rag_timeout: 30 },
-      workspace: {
-        base_path: '/tmp/gsd-workspaces',
-        max_concurrent: 3,
-      },
-      optimization: {
-        valibot: true,
-        valibot_fallback: false,
-        discovery: 'optimized',
-        compile_cache: false,
-        sqlite_cache: true
-      },
-      tools: {
-        ripgrep: true,
-        fd: true,
-        jq: true,
-        yq: true,
-        ast_grep: true,
-        sd: true,
-        hyperfine: true,
-        bat: true,
-        gh: true
-      }
+      workflow: { research: true },
+      planning: { commit_docs: true }
     };
     fs.writeFileSync(
       path.join(tmpDir, '.planning', 'config.json'),
       JSON.stringify(modernConfig, null, 2)
     );
 
-    const result = runGsdTools('util:config-migrate', tmpDir);
-    assert.ok(result.success, `config-migrate failed: ${result.error}`);
-    const data = JSON.parse(result.output);
+    const validate = runGsdTools('verify:validate-config', tmpDir);
+    assert.ok(validate.success, `verify:validate-config should succeed: ${validate.error}`);
+    const validateData = JSON.parse(validate.output);
+    assert.strictEqual(validateData.valid_json, true, 'canonical validation should still parse the current config');
 
-    // Should have zero migrated keys (already fully modern)
-    assert.deepStrictEqual(data.migrated_keys, [], 'modern config should have nothing to migrate');
-    assert.ok(data.unchanged_keys.length > 0, 'should have unchanged keys');
+    const setResult = runGsdTools('util:config-set workflow.research false', tmpDir);
+    assert.ok(setResult.success, `util:config-set should stay supported: ${setResult.error}`);
 
-    // Nested sections should be unchanged
-    const afterConfig = JSON.parse(fs.readFileSync(path.join(tmpDir, '.planning', 'config.json'), 'utf-8'));
-    assert.deepStrictEqual(afterConfig.planning, modernConfig.planning, 'planning section unchanged');
-    assert.deepStrictEqual(afterConfig.git, modernConfig.git, 'git section unchanged');
-    assert.deepStrictEqual(afterConfig.workflow, modernConfig.workflow, 'workflow section unchanged');
+    const getResult = runGsdTools('util:config-get workflow.research', tmpDir);
+    assert.ok(getResult.success, `util:config-get should stay supported: ${getResult.error}`);
+    assert.strictEqual(JSON.parse(getResult.output), false, 'canonical config editing should update the current config directly');
   });
 });
 

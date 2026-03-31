@@ -306,7 +306,7 @@ describe('--help flag', () => {
     }).trim();
     assert.ok(result.includes('No help available'), `Expected "no help", got: ${result.slice(0, 80)}`);
     assert.ok(result.includes('verify:state'), 'Should list verify:state in available commands');
-    assert.ok(result.includes('util:config-migrate'), 'Should list util:config-migrate in available commands');
+    assert.ok(!result.includes('util:config-migrate'), 'Retired util:config-migrate should be absent from available commands');
   });
 
   test('help text does not contaminate stdout', () => {
@@ -330,7 +330,7 @@ describe('--help flag', () => {
   });
 });
 
-describe('config-migrate command', () => {
+describe('retired config migration surface', () => {
   let tmpDir;
 
   beforeEach(() => {
@@ -341,121 +341,26 @@ describe('config-migrate command', () => {
     cleanup(tmpDir);
   });
 
-  test('adds missing keys with schema defaults', () => {
-    // Create a minimal config missing most keys
+  test('rejects util:config-migrate and keeps maintainers on canonical config commands', () => {
     const configPath = path.join(tmpDir, '.planning', 'config.json');
     fs.writeFileSync(configPath, JSON.stringify({
-      model_profile: 'quality',
-    }, null, 2));
-
-    const result = runGsdTools('util:config-migrate', tmpDir);
-    assert.ok(result.success, `Command failed: ${result.error}`);
-
-    const parsed = JSON.parse(result.output);
-    assert.ok(parsed.migrated_keys.length > 0, 'Should have migrated keys');
-    assert.ok(parsed.migrated_keys.includes('model_settings'), 'canonical model_settings should be added for legacy-only config');
-    assert.ok(!parsed.migrated_keys.includes('model_profile'), 'legacy model_profile should remain preserved');
-
-    // Verify the written config has the new keys
-    const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
-    assert.strictEqual(config.model_profile, 'quality', 'Existing value preserved');
-    assert.strictEqual(config.model_settings.default_profile, 'balanced', 'canonical model_settings should be present after migration');
-    assert.strictEqual(config.test_gate, true, 'Missing key added with default');
-  });
-
-  test('existing values are never overwritten', () => {
-    const configPath = path.join(tmpDir, '.planning', 'config.json');
-    fs.writeFileSync(configPath, JSON.stringify({
-      model_profile: 'budget',
-      mode: 'yolo',
-      brave_search: true,
       workflow: { research: false },
     }, null, 2));
 
-    const result = runGsdTools('util:config-migrate', tmpDir);
-    assert.ok(result.success, `Command failed: ${result.error}`);
+    const retired = runGsdToolsFull('util:config-migrate', tmpDir);
+    assert.strictEqual(retired.success, false, 'retired config-migrate command should fail');
+    assert.match(retired.stderr, /Unknown util subcommand: config-migrate/, 'retired command should use the unknown-command path');
 
-    const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
-    assert.strictEqual(config.model_profile, 'budget', 'model_profile preserved');
-    assert.strictEqual(config.mode, 'yolo', 'mode preserved');
-    assert.strictEqual(config.brave_search, true, 'brave_search preserved');
-    assert.strictEqual(config.workflow.research, false, 'nested workflow.research preserved');
+    const configGet = runGsdTools('util:config-get workflow.research', tmpDir);
+    assert.ok(configGet.success, `config-get should remain the canonical config path: ${configGet.error}`);
+    assert.strictEqual(JSON.parse(configGet.output), false, 'canonical config-get should still read current config values');
   });
 
-  test('backup file is created before writing', () => {
-    const configPath = path.join(tmpDir, '.planning', 'config.json');
-    const backupPath = configPath + '.bak';
-    const original = { model_profile: 'balanced' };
-    fs.writeFileSync(configPath, JSON.stringify(original, null, 2));
-
-    const result = runGsdTools('util:config-migrate', tmpDir);
-    assert.ok(result.success, `Command failed: ${result.error}`);
-
-    const parsed = JSON.parse(result.output);
-    // Should have migrated keys since original only has 1 key
-    assert.ok(parsed.migrated_keys.length > 0, 'Should migrate missing keys');
-    assert.ok(parsed.backup_path !== null, 'backup_path should be set');
-
-    // Verify backup exists and contains original content
-    assert.ok(fs.existsSync(backupPath), 'Backup file should exist');
-    const backup = JSON.parse(fs.readFileSync(backupPath, 'utf-8'));
-    assert.strictEqual(backup.model_profile, 'balanced', 'Backup has original value');
-    assert.strictEqual(backup.test_gate, undefined, 'Backup should not have migrated keys');
-  });
-
-  test('already-complete config returns empty migrated_keys', () => {
-    // Build a config with ALL schema keys present
-    const configPath = path.join(tmpDir, '.planning', 'config.json');
-    const fullConfig = {
-      model_profile: 'balanced',
-      model_settings: {
-        default_profile: 'balanced',
-        profiles: {
-          quality: { model: 'gpt-5.4' },
-          balanced: { model: 'gpt-5.4-mini' },
-          budget: { model: 'gpt-5.4-nano' },
-        },
-        agent_overrides: {},
-      },
-      brave_search: false,
-      mode: 'interactive',
-      parallelization: true,
-      model_profiles: {},
-      depth: 'standard',
-      test_commands: {},
-      test_gate: true,
-      context_window: 200000,
-      context_target_percent: 50,
-      planning: { commit_docs: true, search_gitignored: false },
-      git: { branching_strategy: 'none', phase_branch_template: 'gsd/phase-{phase}-{slug}', milestone_branch_template: 'gsd/{milestone}-{slug}' },
-      workflow: { research: true, plan_check: true, verifier: true, rag: true, rag_timeout: 30 },
-      optimization: { valibot: true, valibot_fallback: false, discovery: 'optimized', compile_cache: false, sqlite_cache: true },
-      tools: { ripgrep: true, fd: true, jq: true, yq: true, ast_grep: true, sd: true, hyperfine: true, bat: true, gh: true },
-      ytdlp_path: '',
-      nlm_path: '',
-      mcp_config_path: '',
-      runtime: 'auto',
-    };
-    fs.writeFileSync(configPath, JSON.stringify(fullConfig, null, 2));
-
-    const result = runGsdTools('util:config-migrate', tmpDir);
-    assert.ok(result.success, `Command failed: ${result.error}`);
-
-    const parsed = JSON.parse(result.output);
-    assert.deepStrictEqual(parsed.migrated_keys, [], 'No keys should be migrated');
-    assert.strictEqual(parsed.backup_path, null, 'No backup needed when nothing migrated');
-
-    const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
-    assert.deepStrictEqual(config.model_profiles, {}, 'legacy model_profiles compatibility key should be preserved untouched');
-  });
-
-  test('config-migrate help text available', () => {
-    const result = execSync(`node "${TOOLS_PATH}" util:config-migrate --help 2>&1`, {
-      encoding: 'utf-8',
-      stdio: ['pipe', 'pipe', 'pipe'],
-    }).trim();
-    assert.ok(result.includes('Usage: bgsd-tools'), `Expected config-migrate help, got: ${result.slice(0, 80)}`);
-    assert.ok(result.includes('CONFIG_SCHEMA'), 'Should mention CONFIG_SCHEMA');
+  test('verify:validate-config remains the supported troubleshooting command', () => {
+    const validate = runGsdTools('verify:validate-config', tmpDir);
+    assert.ok(validate.success, `validate-config should remain available: ${validate.error}`);
+    const payload = JSON.parse(validate.output);
+    assert.strictEqual(typeof payload.exists, 'boolean', 'validate-config should still return the canonical config validation payload');
   });
 });
 

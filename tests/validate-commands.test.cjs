@@ -70,8 +70,8 @@ describe('validateCommandIntegrity', () => {
     const legacyGroup = result.groupedIssues.find(group => group.file === 'workflows/legacy.md');
     assert.ok(legacyGroup, 'expected grouped report for workflows/legacy.md');
     assert.ok(
-      legacyGroup.issues.some(issue => issue.suggestion === '/bgsd-plan phase 159'),
-      'legacy planning alias should point at the canonical planning-family command'
+      legacyGroup.issues.some(issue => issue.kind === 'nonexistent-command' && issue.command === '/bgsd-plan-phase 159'),
+      'removed planning aliases should now be reported as unknown slash commands'
     );
   });
 
@@ -196,14 +196,14 @@ describe('validateCommandIntegrity', () => {
         },
         {
           surface: 'workflow',
-          path: 'workflows/health.md',
+          path: 'commands/bgsd-inspect.md',
           content: [
-            '# /bgsd-health',
+            '# /bgsd-inspect',
             '',
-            '**Usage:** `/bgsd-health --repair`',
+            '**Usage:** `/bgsd-inspect health`',
             '',
             '```',
-            'Fix: Run /bgsd-health --repair to reset to defaults',
+            'Fix: Run /bgsd-inspect health to inspect current planning state',
             '```',
           ].join('\n'),
         },
@@ -221,7 +221,7 @@ describe('validateCommandIntegrity', () => {
       'internal XML-style bgsd tags should not be treated as slash commands'
     );
     assert.equal(
-      result.issues.some(issue => issue.file === 'workflows/health.md'),
+      result.issues.some(issue => issue.file === 'commands/bgsd-inspect.md'),
       false,
       'workflow files should be able to reference their own command name as metadata/examples'
     );
@@ -265,19 +265,15 @@ describe('validateCommandIntegrity', () => {
     writeFile(repo, 'bin/manifest.json', JSON.stringify({
       files: [
         'commands/bgsd-plan.md',
-        'commands/bgsd-plan-phase.md',
         'commands/bgsd-execute-phase.md',
         'commands/bgsd-settings.md',
-        'commands/bgsd-set-profile.md',
       ],
     }, null, 2));
 
     for (const commandFile of [
       'commands/bgsd-plan.md',
-      'commands/bgsd-plan-phase.md',
       'commands/bgsd-execute-phase.md',
       'commands/bgsd-settings.md',
-      'commands/bgsd-set-profile.md',
     ]) {
       writeFile(repo, commandFile, readRepoFile(commandFile));
     }
@@ -331,6 +327,39 @@ describe('validateCommandIntegrity', () => {
       result.issues.some(issue => issue.command.includes('verify:verify plan-structure')),
       false,
       'valid node-invoked bgsd-tools commands should remain allowed'
+    );
+  });
+
+  test('config-migrate is absent from discovery inventory and canonical config docs', () => {
+    const result = validateCommandIntegrity({
+      cwd: ROOT,
+      surfaces: [
+        {
+          surface: 'docs',
+          path: 'docs/troubleshooting.md',
+          content: readRepoFile('docs/troubleshooting.md'),
+        },
+        {
+          surface: 'docs',
+          path: 'docs/expert-guide.md',
+          content: readRepoFile('docs/expert-guide.md'),
+        },
+        {
+          surface: 'plan',
+          path: '.planning/phases/174-greenfield-compatibility-surface-cleanup/174-01-PLAN.md',
+          content: 'Validate the retired route with `node bin/bgsd-tools.cjs util:config-migrate` before continuing.',
+        },
+      ],
+    });
+
+    assert.equal(
+      result.issues.some(issue => issue.kind === 'nonexistent-command' && issue.command.includes('util:config-migrate')),
+      true,
+      'command-integrity checks should reject reintroducing util:config-migrate anywhere in surfaced guidance'
+    );
+    assert.ok(
+      result.inventories.cliCommands.every(command => !command.includes('config-migrate')),
+      'discovery inventory should no longer advertise util:config-migrate'
     );
   });
 });
