@@ -2,17 +2,17 @@
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-03-30)
+See: .planning/PROJECT.md (updated 2026-03-31)
 
 **Core value:** Manage and deliver high-quality software with high-quality documentation, while continuously reducing token usage and improving performance.
-**Current focus:** Phase 172 complete — ready for verification
+**Current focus:** v18.0 shipped — ready to define the next milestone.
 
 ## Current Position
 
 **Phase:** 172 — Ambient Attention UX & Noise Control
 **Current Plan:** Not started
 **Total Plans in Phase:** 2
-**Status:** v18.0 milestone complete
+**Status:** Ready for next milestone
 **Last Activity:** 2026-03-31
 
 **Progress:** [██████████] 100%
@@ -20,9 +20,9 @@ See: .planning/PROJECT.md (updated 2026-03-30)
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 342 (through Phase 170 P02)
-- Average duration: ~13 min/plan
-- Total execution time: ~51.8 hours
+- Total plans completed: 353 (through Phase 172 P02)
+- Average duration: ~12 min/plan
+- Total execution time: ~54.5 hours
 
 **By Phase:**
 
@@ -33,30 +33,30 @@ See: .planning/PROJECT.md (updated 2026-03-30)
 | 165 | 3 | 3 | ~11.3 min |
 | 166 | 2 | 2 | ~9.5 min |
 | 167 | 2 | 2 | 9.5 min |
-| 168 | 1 | 1 | ~2.0 min |
-| 169 | 1 | 1 | ~10.0 min |
-| 170 | 2 | 2 | ~14.5 min |
-| 171 | 1 | 1 | 67 min |
+| 168 | 4 | 4 | ~8.2 min |
+| 169 | 4 | 4 | ~8.8 min |
+| 170 | 3 | 3 | ~14.3 min |
+| 171 | 2 | 2 | ~39.0 min |
+| 172 | 2 | 2 | ~10.5 min |
 
 **Recent Trend:**
-- Last shipped milestone: v17.1 completed 5 phases (163-167)
+- Last shipped milestone: v18.0 completed 5 phases (168-172)
 - Trend: Stable
-| Phase 169 P01 | 10 min | 2 tasks | 8 files |
-| Phase 168-adaptive-model-settings-contract P02 | 13 min | 2 tasks | 7 files |
+| Phase 168 P01 | 2 min | 2 tasks | 3 files |
+| Phase 168 P02 | 13 min | 2 tasks | 7 files |
 | Phase 168 P03 | 9 min | 2 tasks | 11 files |
 | Phase 168 P04 | 9 min | 1 tasks | 9 files |
+| Phase 169 P01 | 10 min | 2 tasks | 8 files |
 | Phase 169 P02 | 9 min | 2 tasks | 2 files |
 | Phase 169 P03 | 7 min | 2 tasks | 5 files |
-| Phase 169-canonical-model-resolution-visibility P04 | 9 min | 2 tasks | 9 files |
+| Phase 169 P04 | 9 min | 2 tasks | 9 files |
 | Phase 170 P01 | 24 min | 2 tasks | 6 files |
 | Phase 170 P02 | 5 min | 2 tasks | 3 files |
 | Phase 170 P03 | 14 min | 2 tasks | 5 files |
 | Phase 171 P01 | 67 min | 2 tasks | 2 files |
 | Phase 171 P02 | 11 min | 2 tasks | 4 files |
-| Phase 171 P02 | 11 min | 2 tasks | 4 files |
 | Phase 172 P01 | 15 min | 2 tasks | 5 files |
-| Phase 172-ambient-attention-ux-noise-control P01 | 15 min | 2 tasks | 5 files |
-| Phase 172-ambient-attention-ux-noise-control P02 | 6 min | 2 tasks | 5 files |
+| Phase 172 P02 | 6 min | 2 tasks | 5 files |
 
 ## Accumulated Context
 

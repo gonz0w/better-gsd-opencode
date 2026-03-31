@@ -1,5 +1,34 @@
 # Milestones
 
+## ✅ v18.0 Adaptive Models & Ambient cmux UX (Shipped: 2026-03-31)
+
+**Delivered:** bGSD now ships provider-agnostic model selection through one canonical settings contract and adds trustworthy, low-noise `cmux` workspace status, progress, logs, and attention signals behind a safe fail-open adapter boundary.
+
+**Phases completed:** 5 phases (168-172), 15 plans, 29 tasks
+**Commits:** 61 | **Files changed:** 208 | **Lines:** +15,556 / -4,719
+**Timeline:** 2 days (2026-03-30 -> 2026-03-31)
+
+**Key accomplishments:**
+- Provider-agnostic `model_settings` now define shared `quality` / `balanced` / `budget` profiles, one global default, and sparse direct agent overrides
+- Canonical configured-versus-resolved model state now drives helpers, diagnostics, init output, workflow routing, and settings UX from one config-first path
+- Legacy cache model-profile surfaces are now compatibility-only, keeping canonical config the sole live model-selection truth
+- `cmux` integration now stays quiet until safe workspace proof and a reversible write probe succeed, preventing cross-workspace leakage and preserving fail-open fallback outside `cmux`
+- Ambient sidebar state, context, progress, logs, and notifications now flow through shared trust-first snapshot and attention-policy contracts with exact-or-hidden progress plus semantic dedupe and cooldowns
+- All 17 milestone requirements shipped, while the audit recorded only non-blocking live `cmux` validation and regression-cleanup follow-up
+
+**What's next:** Ready for next milestone - `/bgsd-new-milestone`
+
+**Archives:**
+- `.planning/milestones/v18.0-ROADMAP.md`
+- `.planning/milestones/v18.0-REQUIREMENTS.md`
+- `.planning/milestones/v18.0-DOCS.md`
+- `.planning/milestones/v18.0-MILESTONE-AUDIT.md`
+- `.planning/milestones/v18.0-MILESTONE-INTENT.md`
+- `.planning/milestones/v18.0-phases/`
+- `.planning/archive/INTENT-vv18.0.md`
+
+---
+
 ## ✅ v17.1 Workflow Reliability & Foundation Hardening (Shipped: 2026-03-30)
 
 **Delivered:** bGSD now ships a quieter and more reliable workflow foundation with shared mutation and metadata contracts, JJ-aware execution truth, plan-scoped completion repair, and one predictable diagnostic contract across touched CLI and plugin flows.
@@ -841,31 +870,4 @@
 - `.planning/milestones/v14.1-ROADMAP.md`
 - `.planning/milestones/v14.1-REQUIREMENTS.md`
 - `.planning/milestones/v14.1-DOCS.md`
-
----
-
-
-
-## v18.0 Adaptive Models & Ambient cmux UX (Shipped: 2026-03-31)
-
-**Phases completed:** 5 phases, 15 plans, 6 tasks
-
-**Key accomplishments:**
-- Phase 168 planning artifacts now describe built-in quality/balanced/budget profiles, one global default, and sparse direct overrides without legacy alias promises.
-- Canonical model_settings normalization now maps quality, balanced, and budget profiles to concrete models with one default profile and sparse agent overrides.
-- Canonical model_settings resolution now drives helpers, decision rules, init output, enricher context, and resolve-model diagnostics from one config-first path.
-- Project-default-first settings UX and docs now edit shared quality/balanced/budget models, one selected default profile, and sparse direct overrides with GPT-family defaults.
-- Configured-versus-resolved model-state now flows through shared helpers, decision payloads, enricher context, and misc diagnostics.
-- Init compact summaries now show configured-versus-resolved model state, and verbose init output expands the same contract per agent across execute, plan, quick, and progress flows.
-- Orchestration now recommends quality/balanced/budget profiles and resolves the final executor model through canonical config.
-- Legacy cache model-profile APIs are gone, SQLite keeps only inert compatibility rows, and plugin/runtime checks prove canonical config remains the sole live model-selection truth.
-- Bounded cmux transport helpers now classify availability and cache an inert plugin adapter that stays quiet when cmux is missing or unusable.
-- cmux workspace targeting now trusts only env-plus-identify proof or one exact allowAll cwd match, suppressing mismatches and ambiguity.
-- cmux attachment now requires a reversible targeted sidebar write probe, then exposes cached workspace-scoped status, progress, and log methods through one trusted adapter.
-- Pure ambient snapshot derivation for trustworthy cmux workspace state, workflow-aware context, and exact-versus-activity progress gating
-- Attached cmux sidebar sync that publishes trusted state, workflow context, and exact-or-activity progress through one lifecycle-driven adapter path
-- Pure cmux attention policy with semantic dedupe keys and trusted attached-only notify delivery
-- Edge-triggered plugin attention sync that logs meaningful lifecycle moments, notifies checkpoints and completion boundaries, and suppresses repeated warning churn
-
----
 

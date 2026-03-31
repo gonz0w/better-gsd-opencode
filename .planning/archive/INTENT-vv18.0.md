@@ -1,6 +1,6 @@
 **Revision:** 29
 **Created:** 2026-02-25
-**Updated:** 2026-03-31
+**Updated:** 2026-03-30
 
 <objective>
 A high-performance agent orchestration engine that delivers enterprise-quality software through a complete AI development team while maximizing LLM output per token by shifting administrative work to deterministic CLI operations.
@@ -39,10 +39,6 @@ A high-performance agent orchestration engine that delivers enterprise-quality s
 
 ### v17.1 complete — 2026-03-30
 - Archived delivered v17.1 outcomes and success criteria to `.planning/archive/INTENT-vv17.1.md`
-- Returned active intent to pending milestone candidates only
-
-### v18.0 complete — 2026-03-31
-- Archived delivered v18.0 outcomes and success criteria to `.planning/archive/INTENT-vv18.0.md`
 - Returned active intent to pending milestone candidates only
 </history>
 

@@ -2,34 +2,40 @@
 
 ## What This Is
 
-A single-file Node.js CLI built from 52 organized `src/` modules via esbuild, producing `bin/bgsd-tools.cjs`. It provides structured data operations for AI-driven project planning workflows running in the host editor. Twenty-seven versions shipped: v1.0 (test suite, module split, observability), v1.1 (context reduction — 46.7% CLI, 54.6% workflow, 67% reference compression), v2.0 (state validation, cross-session memory, quality scoring), v3.0 (intent engineering — INTENT.md, drift validation, workflow injection), v4.0 (environment awareness, MCP profiling, worktree parallelism), v5.0 (codebase intelligence — convention extraction, dependency graphs, lifecycle awareness), v6.0 (UX overhaul — shared formatting engine, TTY-aware smart output, branded CLI), v7.0 (agent orchestration — AST intelligence, task routing, context efficiency, TDD execution, review gates), v7.1 (trajectory engineering — checkpoint, pivot, compare, choose, decision journal, dead-end detection), v8.0 (performance & agent architecture — SQLite caching, agent consolidation 11→9, namespace routing, profiler instrumentation, token budgets, RACI matrix), v8.1 (RAG-powered research — YouTube integration, NotebookLM synthesis, multi-source orchestration, 4-tier degradation, session persistence), v8.2 (cleanup & validation — dead code removal, namespace-only routing, 24-40% init speedup, RACI handoff contracts), v8.3 (agent quality & skills — OpenCode skills architecture with 27 skills and 52.4% agent line reduction, agent consistency audit, GitHub CI agent overhaul, 766 tests fully green), v9.0 (embedded plugin experience — always-on context injection, native LLM tools, event-driven sync, advisory guardrails), v9.1 (performance acceleration — valibot validation, fast-glob discovery, compile-cache, SQLite statement caching, safe adoption controls), v9.2 (CLI tool integrations — ripgrep, fd, jq, yq, bat, gh, Bun runtime), v9.3 (quality, performance & agent sharpening — command consolidation, deterministic context, Bun validation, benchmark adapter), v10.0 (agent intelligence & UX — planning/verification/execution intelligence, multi-agent collaboration, rich TTY output, interactive workflows), v12.0 (SQLite-first data layer — structured planning tables, cross-invocation persistence, enricher acceleration, memory store migration, deterministic decisions, session state in SQL), v12.1 (tool integration & agent enhancement — unified tool detection, 6 CLI tool integrations with fallbacks, capability-aware agent routing and handoff contracts), v13.0 (closed-loop agent evolution — project-local agent overrides, structured lesson schema with analysis pipeline, security-first skill discovery, deviation recovery auto-capture, enhanced research quality profiling), v14.0 (LLM workload reduction — workflow measurement, 41.1% avg compression across 10 workflows, 3 shared skills extracted, scaffold generation, conditional section elision), and v14.1 (tool-aware agent routing — 4 workflows and 3 agents consume tool detection decisions, E2E + contract validation tests, DECISION_REGISTRY pruned 22→19, 1677 tests passing).
+A single-file Node.js CLI built from 52 organized `src/` modules via esbuild, producing `bin/bgsd-tools.cjs`. It provides structured data operations for AI-driven project planning workflows running in the host editor. Twenty-eight versions shipped: v1.0 (test suite, module split, observability), v1.1 (context reduction — 46.7% CLI, 54.6% workflow, 67% reference compression), v2.0 (state validation, cross-session memory, quality scoring), v3.0 (intent engineering — INTENT.md, drift validation, workflow injection), v4.0 (environment awareness, MCP profiling, worktree parallelism), v5.0 (codebase intelligence — convention extraction, dependency graphs, lifecycle awareness), v6.0 (UX overhaul — shared formatting engine, TTY-aware smart output, branded CLI), v7.0 (agent orchestration — AST intelligence, task routing, context efficiency, TDD execution, review gates), v7.1 (trajectory engineering — checkpoint, pivot, compare, choose, decision journal, dead-end detection), v8.0 (performance & agent architecture — SQLite caching, agent consolidation 11→9, namespace routing, profiler instrumentation, token budgets, RACI matrix), v8.1 (RAG-powered research — YouTube integration, NotebookLM synthesis, multi-source orchestration, 4-tier degradation, session persistence), v8.2 (cleanup & validation — dead code removal, namespace-only routing, 24-40% init speedup, RACI handoff contracts), v8.3 (agent quality & skills — OpenCode skills architecture with 27 skills and 52.4% agent line reduction, agent consistency audit, GitHub CI agent overhaul, 766 tests fully green), v9.0 (embedded plugin experience — always-on context injection, native LLM tools, event-driven sync, advisory guardrails), v9.1 (performance acceleration — valibot validation, fast-glob discovery, compile-cache, SQLite statement caching, safe adoption controls), v9.2 (CLI tool integrations — ripgrep, fd, jq, yq, bat, gh, Bun runtime), v9.3 (quality, performance & agent sharpening — command consolidation, deterministic context, Bun validation, benchmark adapter), v10.0 (agent intelligence & UX — planning/verification/execution intelligence, multi-agent collaboration, rich TTY output, interactive workflows), v12.0 (SQLite-first data layer — structured planning tables, cross-invocation persistence, enricher acceleration, memory store migration, deterministic decisions, session state in SQL), v12.1 (tool integration & agent enhancement — unified tool detection, 6 CLI tool integrations with fallbacks, capability-aware agent routing and handoff contracts), v13.0 (closed-loop agent evolution — project-local agent overrides, structured lesson schema with analysis pipeline, security-first skill discovery, deviation recovery auto-capture, enhanced research quality profiling), v14.0 (LLM workload reduction — workflow measurement, 41.1% avg compression across 10 workflows, 3 shared skills extracted, scaffold generation, conditional section elision), and v14.1 (tool-aware agent routing — 4 workflows and 3 agents consume tool detection decisions, E2E + contract validation tests, DECISION_REGISTRY pruned 22→19, 1677 tests passing).
 
 ## Core Value
 
 Manage and deliver high-quality software with high-quality documentation, while continuously reducing token usage and improving performance.
 
-## Current Milestone: v18.0 Adaptive Models & Ambient cmux UX
+## Current Milestone: None active
 
-**Goal:** Make model behavior fully settings-driven and surface trustworthy ambient workspace state through `cmux` without adding noise or breaking fallback behavior.
-**Target features:**
-- Dynamic alias-based model configuration with GPT-first defaults and provider-agnostic settings UX
-- Canonical profile and override resolution across all workflow spawn paths
-- `cmux` workspace detection, status, progress, log, and attention-notification integration
-- Quiet fallback behavior when `cmux` is absent or state is not trustworthy enough to show
+**Status:** v18.0 Adaptive Models & Ambient cmux UX shipped on 2026-03-31.
+**Next milestone setup:** Use `/bgsd-new-milestone` when ready to define the next roadmap slice.
 
 ## Milestone Status
 
-**Current milestone:** v18.0 Adaptive Models & Ambient cmux UX
-**Status:** Requirements and roadmap defined - ready for Phase 168
-**Next step:** Start planning with `/bgsd-plan discuss 168`
+**Current milestone:** None active
+**Next step:** Define the next milestone with `/bgsd-new-milestone`
 
 ## Current State
 
-**Last shipped:** v17.1 Workflow Reliability & Foundation Hardening (2026-03-30)
-**Now planning:** v18.0 Adaptive Models & Ambient cmux UX
+**Last shipped:** v18.0 Adaptive Models & Ambient cmux UX (2026-03-31)
+**Now planning:** No active milestone - ready for next milestone definition
 
 <details>
-<summary>Latest shipment: v17.1 Workflow Reliability & Foundation Hardening (shipped 2026-03-30)</summary>
+<summary>Latest shipment: v18.0 Adaptive Models & Ambient cmux UX (shipped 2026-03-31)</summary>
+
+- Provider-agnostic `model_settings` now define shared `quality` / `balanced` / `budget` profiles, one global default, and sparse direct agent overrides
+- Canonical configured-versus-resolved model state now drives helpers, diagnostics, init output, routing, and settings UX from one config-first path
+- Safe `cmux` targeting now requires exact workspace proof plus a reversible write probe before attachment, while ambiguous or non-`cmux` sessions stay quiet and fail open
+- Ambient sidebar status, context, progress, logs, and notifications now reuse trust-first snapshot and attention-policy contracts instead of guessing from weak signals
+- The milestone audit passed all requirements and integration checks, with only non-blocking live `cmux` validation and regression-cleanup follow-up left for later work
+
+</details>
+
+<details>
+<summary>Previous: v17.1 Workflow Reliability & Foundation Hardening (shipped 2026-03-30)</summary>
 
 - Shared mutation contracts now unify touched state/session, JSON-backed memory, config, handoff, and plugin progress writes behind locked or atomic update paths
 - Planning and verifier flows now consume one truthful `must_haves` metadata contract with shared indexes and approval-time semantic gates
@@ -378,6 +384,12 @@ See `.planning/MILESTONES.md` for full history of v1.0 through v8.2.
 - ✓ JJ path-scoped fallback commits and repo-local runtime freshness verification now make detached or dirty execution states reliable — v17.1
 - ✓ Plan realism analysis plus plan-scoped completion readback repair now keep execution guidance and summary/state metadata aligned to on-disk truth — v17.1
 - ✓ Shared `BGSD_DEBUG` or `--verbose` diagnostics now keep default CLI and plugin runs quiet while preserving explicit reliability investigation output — v17.1
+- ✓ Provider-agnostic `model_settings` contract with shared profiles, one global default, and sparse agent overrides — v18.0
+- ✓ Canonical configured-versus-resolved model visibility across init, diagnostics, enrichment, and routing — v18.0
+- ✓ Provider-agnostic profile routing that resolves concrete models from canonical config — v18.0
+- ✓ Safe `cmux` workspace detection, exact targeting proof, and write-proven adapter boundary — v18.0
+- ✓ Trust-first ambient `cmux` sidebar state, context, and progress snapshots — v18.0
+- ✓ Low-noise ambient `cmux` logs and notifications with semantic dedupe and cooldowns — v18.0
 - ✓ JJ-first execution gate plus JJ workspace lifecycle and recovery-first diagnostics — v17.0
 - ✓ Canonical `/bgsd-quick`, `/bgsd-plan`, `/bgsd-inspect`, and `/bgsd-settings` command families with compatibility aliases — v17.0
 - ✓ Inventory-backed command-integrity validation for help, docs, workflows, skills, templates, and runtime guidance — v17.0
@@ -517,6 +529,11 @@ Known tech debt: `node:sqlite` is Stability 1.2 (Release Candidate).
 | Repo-local runtime truth over ambient bundle assumptions | JJ execution and verification were unreliable when local source and generated runtime drifted apart | Good — deliverables verification and workflow guidance now prove the active checkout against rebuilt local artifacts |
 | Disk-truth completion repair over ambient workspace heuristics | Summary generation and complete-plan metadata were drifting when dirty workspaces or stale in-memory fields leaked into finalization | Good — plan-scoped files, totals, focus, and roadmap/state wording now recompute from on-disk truth before success returns |
 | One debug contract with quiet defaults | Reliability investigations needed explicit diagnostics without noisy normal-path stdout or duplicated stderr chatter | Good — touched CLI and plugin flows now share `BGSD_DEBUG` or `--verbose` gating with clean default output |
+| Shared quality/balanced/budget profiles over provider-tier defaults | Users need a provider-agnostic model-settings surface that survives provider swaps and workflow changes | Good — canonical `model_settings` now drive one stable public contract |
+| Configured-versus-resolved model state as the visibility contract | Users need to see both chosen intent and the concrete model that will actually run | Good — init, diagnostics, enrichment, and routing stay aligned on one shared payload |
+| Safe `cmux` attachment requires exact workspace proof plus a reversible write probe | Ambient UX is only useful if workspace targeting is trustworthy | Good — ambiguous or unattached sessions stay quiet and fail open |
+| Pure trust-first sidebar snapshot before any `cmux` writes | Status, context, and progress should hide weak signals instead of guessing | Good — sidebar surfaces only exact or activity-safe data |
+| Semantic attention keys with cooldowns over rendered-message dedupe | Notifications should stay meaningful without repetitive churn | Good — warnings, blockers, and completion moments notify without spam |
 
 ---
 
@@ -524,4 +541,4 @@ Known tech debt: `node:sqlite` is Stability 1.2 (Release Candidate).
 - ~~Node.js 18+ minimum~~ — Raised to 22.5+ in v11.x for node:sqlite support
 
 ---
-*Last updated: 2026-03-30 after initializing milestone v18.0 Adaptive Models & Ambient cmux UX*
+*Last updated: 2026-03-31 after completing milestone v18.0 Adaptive Models & Ambient cmux UX*
