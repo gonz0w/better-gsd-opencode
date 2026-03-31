@@ -8,20 +8,25 @@ A single-file Node.js CLI built from 52 organized `src/` modules via esbuild, pr
 
 Manage and deliver high-quality software with high-quality documentation, while continuously reducing token usage and improving performance.
 
-## Current Milestone: None active
+## Current Milestone: v18.0 Adaptive Models & Ambient cmux UX
 
-**Status:** v17.1 Workflow Reliability & Foundation Hardening shipped on 2026-03-30.
-**Next milestone setup:** Use `/bgsd-new-milestone` when ready to define the next roadmap slice.
+**Goal:** Make model behavior fully settings-driven and surface trustworthy ambient workspace state through `cmux` without adding noise or breaking fallback behavior.
+**Target features:**
+- Dynamic alias-based model configuration with GPT-first defaults and provider-agnostic settings UX
+- Canonical profile and override resolution across all workflow spawn paths
+- `cmux` workspace detection, status, progress, log, and attention-notification integration
+- Quiet fallback behavior when `cmux` is absent or state is not trustworthy enough to show
 
 ## Milestone Status
 
-**Current milestone:** None active
-**Next step:** Define the next milestone with `/bgsd-new-milestone`
+**Current milestone:** v18.0 Adaptive Models & Ambient cmux UX
+**Status:** Requirements and roadmap defined - ready for Phase 168
+**Next step:** Start planning with `/bgsd-plan discuss 168`
 
 ## Current State
 
 **Last shipped:** v17.1 Workflow Reliability & Foundation Hardening (2026-03-30)
-**Now planning:** No active milestone - ready for next milestone definition
+**Now planning:** v18.0 Adaptive Models & Ambient cmux UX
 
 <details>
 <summary>Latest shipment: v17.1 Workflow Reliability & Foundation Hardening (shipped 2026-03-30)</summary>
@@ -384,10 +389,9 @@ See `.planning/MILESTONES.md` for full history of v1.0 through v8.2.
 
 - TDD reliability follow-up using `.planning/research/TDD-RELIABILITY-PRD.md` as the planning seed
 - Workflow acceleration follow-up using `.planning/research/WORKFLOW-ACCELERATION-PRD.md` as the planning seed
-- Dynamic model configuration follow-up using `.planning/research/DYNAMIC-MODEL-CONFIG-PRD.md` as the planning seed
 - Greenfield compatibility cleanup follow-up using `.planning/research/GREENFIELD-COMPAT-CLEANUP-PRD.md` as the planning seed
-- CMUX-first OpenCode UX follow-up using `research/CMUX-FIRST-UX-PRD.md` and `research/CMUX-FIRST-UX-BACKLOG.md` as the planning seeds
 - Multi-user repo coordination follow-up using `.planning/research/MULTI-USER-REPO-COORDINATION-PRD.md` and `.planning/research/MULTI-USER-REPO-COORDINATION-BACKLOG.md` as the planning seeds
+- Bun-first migration follow-up using `.planning/research/BUN-MIGRATION-PRD.md` and `.planning/research/BUN-MIGRATION-BACKLOG.md` as the planning seeds
 - Clarify legacy `verify:state` `Plan` alias expectations or explicitly deprecate them in a follow-up reliability slice
 - Refresh stale integration fixtures that still assume pre-164 empty `must_haves` approval semantics
 - Add a narrower plugin smoke slice for post-audit confidence without broad test-run timeouts
@@ -520,4 +524,4 @@ Known tech debt: `node:sqlite` is Stability 1.2 (Release Candidate).
 - ~~Node.js 18+ minimum~~ — Raised to 22.5+ in v11.x for node:sqlite support
 
 ---
-*Last updated: 2026-03-30 after completing milestone v17.1 Workflow Reliability & Foundation Hardening*
+*Last updated: 2026-03-30 after initializing milestone v18.0 Adaptive Models & Ambient cmux UX*
