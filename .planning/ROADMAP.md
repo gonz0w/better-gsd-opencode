@@ -14,7 +14,7 @@ v18.0 makes bGSD easier to tune and easier to trust at a glance. The milestone f
 - [x] **Phase 168: Adaptive Model Settings Contract** (completed 2026-03-31) - Give users one provider-agnostic settings surface for built-in profiles, one global default, and sparse direct overrides.
 - [x] **Phase 169: Canonical Model Resolution & Visibility** (completed 2026-03-31) - Resolve every workflow spawn through one canonical model path and expose configured versus concrete model state.
 - [x] **Phase 170: cmux Workspace Detection & Safe Targeting** (completed 2026-03-31) - Detect reachable `cmux` workspaces, scope updates correctly, and stay silent when targeting is unsafe or unavailable.
-- [ ] **Phase 171: Ambient Workspace Status & Progress** - Surface trustworthy workspace state, context, and progress only when plugin signal quality is strong enough.
+- [x] **Phase 171: Ambient Workspace Status & Progress** (completed 2026-03-31) - Surface trustworthy workspace state, context, and progress only when plugin signal quality is strong enough.
 - [ ] **Phase 172: Ambient Attention UX & Noise Control** - Show concise logs and notifications for meaningful moments without repetitive sidebar churn.
 
 ## Phase Details
@@ -57,7 +57,7 @@ v18.0 makes bGSD easier to tune and easier to trust at a glance. The milestone f
   1. Users see stable workspace states such as `Working`, `Input needed`, `Blocked`, `Idle`, `Warning`, and `Complete` that match real plugin lifecycle state.
   2. Users see a compact sidebar status pill with phase, plan, task, or workflow context whenever that context is reliable enough to trust.
   3. Users see sidebar progress when phase, plan, task, or workflow progress is trustworthy, and the plugin hides progress instead of guessing when signal quality is weak.
-**Plans**: 1/2 plans executed
+**Plans**: 2/2 plans complete
 
 ### Phase 172: Ambient Attention UX & Noise Control
 **Goal**: Users get actionable ambient logs and notifications from `cmux` without spam or distracting churn
@@ -76,7 +76,7 @@ v18.0 makes bGSD easier to tune and easier to trust at a glance. The milestone f
 | 168. Adaptive Model Settings Contract | 4/4 | Complete    | 2026-03-31 |
 | 169. Canonical Model Resolution & Visibility | 4/4 | Complete    | 2026-03-31 |
 | 170. cmux Workspace Detection & Safe Targeting | 3/3 | Complete    | 2026-03-31 |
-| 171. Ambient Workspace Status & Progress | 1/2 | In Progress|  |
+| 171. Ambient Workspace Status & Progress | 2/2 | Complete   | 2026-03-31 |
 | 172. Ambient Attention UX & Noise Control | 0/TBD | Not started | - |
 
 ---
