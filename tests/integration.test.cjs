@@ -191,22 +191,45 @@ Canonical model resolution fixture.
     const executorResolve = runGsdTools('util:resolve-model bgsd-executor', tmpDir);
     assert.ok(executorResolve.success, `resolve-model executor failed: ${executorResolve.error}`);
     const executorData = JSON.parse(executorResolve.output);
+    assert.strictEqual(executorData.configured, 'ollama/qwen3-coder:latest');
     assert.strictEqual(executorData.model, 'ollama/qwen3-coder:latest');
+    assert.strictEqual(executorData.resolved_model, 'ollama/qwen3-coder:latest');
     assert.strictEqual(executorData.selected_profile, 'quality');
     assert.strictEqual(executorData.source, 'agent_override');
 
     const plannerResolve = runGsdTools('util:resolve-model bgsd-planner', tmpDir);
     assert.ok(plannerResolve.success, `resolve-model planner failed: ${plannerResolve.error}`);
     const plannerData = JSON.parse(plannerResolve.output);
+    assert.strictEqual(plannerData.configured, 'quality');
     assert.strictEqual(plannerData.model, 'gpt-5.4');
+    assert.strictEqual(plannerData.resolved_model, 'gpt-5.4');
     assert.strictEqual(plannerData.selected_profile, 'quality');
     assert.strictEqual(plannerData.source, 'default_profile');
+
+    const settingsResult = runGsdTools('util:settings --raw', tmpDir);
+    assert.ok(settingsResult.success, `util:settings failed: ${settingsResult.error}`);
+    const settingsData = JSON.parse(settingsResult.output);
+    assert.deepStrictEqual(settingsData.categories['Model Settings'].model_settings.value, {
+      default_profile: 'quality',
+      profiles: {
+        quality: { model: 'gpt-5.4' },
+        balanced: { model: 'gpt-5.4-mini' },
+        budget: { model: 'gpt-5.4-nano' },
+      },
+      agent_overrides: {
+        'bgsd-executor': 'ollama/qwen3-coder:latest',
+      },
+    });
 
     const initResult = runGsdTools('init:execute-phase 168 --verbose', tmpDir);
     assert.ok(initResult.success, `init:execute-phase failed: ${initResult.error}`);
     const initData = JSON.parse(initResult.output);
     assert.strictEqual(initData.executor_model, 'ollama/qwen3-coder:latest');
     assert.strictEqual(initData.verifier_model, 'gpt-5.4');
+
+    const constantsSource = fs.readFileSync(path.join(__dirname, '..', 'src', 'lib', 'constants.js'), 'utf-8');
+    assert.match(constantsSource, /configured, selected_profile, resolved_model, and source/i, 'resolve-model help should describe configured-versus-resolved output');
+    assert.doesNotMatch(constantsSource, /Uses model_profile config/i, 'resolve-model help should stop teaching model_profile as the primary contract');
   });
 });
 
@@ -1128,14 +1151,14 @@ describe('test-coverage', () => {
 });
 
 describe('integration: phase 158 command inventory baseline', () => {
-  test('manifest ships canonical family wrappers alongside compatibility aliases', () => {
+  test('manifest ships the canonical command family wrappers', () => {
     const manifest = JSON.parse(fs.readFileSync(path.join(process.cwd(), 'bin', 'manifest.json'), 'utf-8'));
 
     for (const file of [
       'commands/bgsd-quick.md',
-      'commands/bgsd-quick-task.md',
       'commands/bgsd-plan.md',
       'commands/bgsd-inspect.md',
+      'commands/bgsd-settings.md',
     ]) {
       assert.ok(manifest.files.includes(file), `${file} should be shipped in the manifest`);
     }
@@ -1145,9 +1168,9 @@ describe('integration: phase 158 command inventory baseline', () => {
     const deploy = fs.readFileSync(path.join(process.cwd(), 'deploy.sh'), 'utf-8');
     const install = fs.readFileSync(path.join(process.cwd(), 'install.js'), 'utf-8');
 
-    assert.match(deploy, /canonical and compatibility wrappers/i);
-    assert.match(install, /Canonical and compatibility slash commands/);
-    assert.match(install, /canonical and compatibility wrappers stay aligned/i);
+    assert.match(deploy, /canonical command wrappers/i);
+    assert.match(install, /Canonical slash commands/);
+    assert.match(install, /command wrapper deployment stays aligned/i);
   });
 });
 
