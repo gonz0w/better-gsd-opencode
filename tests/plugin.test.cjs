@@ -1275,3 +1275,189 @@ None yet.
     }
   });
 });
+
+describe('Plugin cmux attention sync', () => {
+  const pluginPath = path.join(__dirname, '..', 'plugin.js');
+
+  function writeCmuxAttentionFixture(tmpDir, stateContent, roadmapStatus = 'current') {
+    fs.mkdirSync(path.join(tmpDir, '.planning', 'phases', '172-ambient-attention-ux-noise-control'), { recursive: true });
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'STATE.md'), stateContent);
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'ROADMAP.md'), `# Roadmap
+
+## Current Milestone
+
+### v18.0
+- Status: Active
+- Phases: 168-172
+
+## Phases
+
+### Phase 172: Ambient Attention UX & Noise Control
+- Goal: Surface actionable ambient logs and notifications without spam
+- Status: ${roadmapStatus}
+`);
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'phases', '172-ambient-attention-ux-noise-control', '172-02-PLAN.md'), `---
+phase: 172-ambient-attention-ux-noise-control
+plan: 02
+---
+
+<tasks>
+<task type="auto">
+  <name>Fixture attention task</name>
+  <files>src/plugin/index.js</files>
+  <action>Exercise attention sync</action>
+  <done>Attention sync verified</done>
+</task>
+</tasks>
+`);
+  }
+
+  function buildAttentionState({
+    phase = '172 — Ambient Attention UX & Noise Control',
+    plan = '02',
+    status = 'Ready to plan',
+    lastActivity = '2026-03-31T18:00:00Z',
+    progressLine = '**Progress:** [████░░░░░░] 40%',
+    continuity = 'Planning next step',
+    blockers = ['None yet.'],
+  } = {}) {
+    const blockerLines = blockers.length > 0 ? blockers.map((line) => `- ${line}`).join('\n') : 'None yet.';
+
+    return `# Project State
+
+## Current Position
+
+**Phase:** ${phase}
+**Current Plan:** ${plan}
+**Status:** ${status}
+**Last Activity:** ${lastActivity}
+
+${progressLine}
+
+## Accumulated Context
+
+### Decisions
+
+None yet.
+
+### Blockers/Concerns
+
+${blockerLines}
+
+## Session Continuity
+
+**Last session:** 2026-03-31
+**Stopped at:** ${continuity}
+**Resume file:** None
+`;
+  }
+
+  function createAttentionCmux(calls) {
+    return {
+      resolveAvailability: async () => ({
+        available: true,
+        attached: true,
+        mode: 'managed',
+        suppressionReason: null,
+        workspaceId: 'workspace:1',
+        surfaceId: 'surface:1',
+        writeProven: true,
+      }),
+      setStatus: async ({ workspace, key, value }) => {
+        calls.push(`setStatus:${workspace}:${key}:${value}`);
+        return { ok: true };
+      },
+      clearStatus: async ({ workspace, key }) => {
+        calls.push(`clearStatus:${workspace}:${key}`);
+        return { ok: true };
+      },
+      setProgress: async ({ workspace, progress, label }) => {
+        calls.push(`setProgress:${workspace}:${progress}:${label || ''}`);
+        return { ok: true };
+      },
+      clearProgress: async ({ workspace }) => {
+        calls.push(`clearProgress:${workspace}`);
+        return { ok: true };
+      },
+      log: async ({ workspace, level, source, message }) => {
+        calls.push(`log:${workspace}:${level}:${source}:${message}`);
+        return { ok: true };
+      },
+      notify: async ({ workspace, level, title, subtitle, body }) => {
+        calls.push(`notify:${workspace}:${level}:${title}:${subtitle || ''}:${body}`);
+        return { ok: true };
+      },
+    };
+  }
+
+  test('Plugin cmux attention sync keeps startup and routine task completion log-only while checkpoint waits notify', async () => {
+    const mod = await import(pluginPath);
+    const tmpDir = createTempProject();
+    const calls = [];
+
+    try {
+      writeCmuxAttentionFixture(tmpDir, buildAttentionState());
+      mod.resetCmuxAdapterCache();
+
+      const plugin = await mod.BgsdPlugin({ directory: tmpDir, cmux: createAttentionCmux(calls) });
+      const startupAttention = calls.filter((entry) => entry.startsWith('log:') || entry.startsWith('notify:'));
+
+      assert.strictEqual(startupAttention.length, 1, 'startup should emit one concise log-only ambient event');
+      assert.match(startupAttention[0], /^log:workspace:1:info:bgsd:/, 'startup should stay log-only');
+
+      await plugin['tool.execute.after']({ tool: 'Task', args: { task: 'Routine hook' } });
+
+      const taskAttention = calls.filter((entry) => entry.startsWith('log:') || entry.startsWith('notify:'));
+      assert.strictEqual(taskAttention.filter((entry) => entry.startsWith('notify:')).length, 0, 'routine task completion should stay log-only');
+      assert.ok(taskAttention.length >= 2, 'routine task completion should append a log-only event');
+
+      fs.writeFileSync(path.join(tmpDir, '.planning', 'STATE.md'), buildAttentionState({
+        status: 'Input needed',
+        continuity: 'checkpoint waiting for review',
+      }));
+      await plugin.event({ event: { type: 'file.watcher.updated', path: path.join(tmpDir, '.planning', 'STATE.md') } });
+
+      const checkpointAttention = calls.filter((entry) => entry.startsWith('log:') || entry.startsWith('notify:'));
+      assert.ok(checkpointAttention.some((entry) => /checkpoint/i.test(entry) && entry.startsWith('log:')), 'checkpoint should emit a concise sidebar log');
+      assert.ok(checkpointAttention.some((entry) => /checkpoint/i.test(entry) && entry.startsWith('notify:')), 'checkpoint should emit a notify-worthy attention event');
+    } finally {
+      cleanup(tmpDir);
+    }
+  });
+
+  test('Plugin cmux attention sync phase-complete boundaries notify once and repeated warning suppression stays quiet', async () => {
+    const mod = await import(pluginPath);
+    const tmpDir = createTempProject();
+    const calls = [];
+
+    try {
+      writeCmuxAttentionFixture(tmpDir, buildAttentionState({
+        status: 'Warning',
+        continuity: 'stuck spinning warning',
+      }));
+      mod.resetCmuxAdapterCache();
+
+      const plugin = await mod.BgsdPlugin({ directory: tmpDir, cmux: createAttentionCmux(calls) });
+      const firstWarningAttention = calls.filter((entry) => entry.startsWith('log:') || entry.startsWith('notify:'));
+
+      assert.ok(firstWarningAttention.some((entry) => entry.startsWith('notify:') && /warning/i.test(entry)), 'first warning should notify');
+
+      await plugin.event({ event: { type: 'session.idle' } });
+
+      const repeatedWarningAttention = calls.filter((entry) => entry.startsWith('log:') || entry.startsWith('notify:'));
+      assert.deepStrictEqual(repeatedWarningAttention, firstWarningAttention, 'repeated warning suppression should keep unchanged warning refreshes quiet');
+
+      writeCmuxAttentionFixture(tmpDir, buildAttentionState({
+        status: 'Complete',
+        continuity: 'phase complete',
+      }), 'complete');
+      await plugin.event({ event: { type: 'file.watcher.updated', path: path.join(tmpDir, '.planning', 'STATE.md') } });
+
+      const phaseCompleteAttention = calls.filter((entry) => entry.startsWith('log:') || entry.startsWith('notify:'));
+      assert.ok(phaseCompleteAttention.some((entry) => entry.startsWith('log:') && /phase/i.test(entry)), 'phase-complete should emit a success log');
+      assert.ok(phaseCompleteAttention.some((entry) => entry.startsWith('notify:') && /phase/i.test(entry)), 'phase-complete should emit a success notification');
+    } finally {
+      cleanup(tmpDir);
+    }
+  });
+});
