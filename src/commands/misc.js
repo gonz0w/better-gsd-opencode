@@ -9,7 +9,7 @@ const { applyConfigValue, buildDefaultConfig, deepMerge, migrateConfig, serializ
 const { CONFIG_SCHEMA } = require('../lib/constants');
 const { writeFileAtomic } = require('../lib/atomic-write');
 const { execJj, classifyPathScopedCommitFallback } = require('../lib/jj');
-const { safeReadFile, cachedReadFile, normalizePhaseName, findPhaseInternal, generateSlugInternal, getArchivedPhaseDirs, getMilestoneInfo, getPhaseTree, cachedReaddirSync, resolveModelSelectionFromConfig } = require('../lib/helpers');
+const { safeReadFile, cachedReadFile, normalizePhaseName, findPhaseInternal, generateSlugInternal, getArchivedPhaseDirs, getMilestoneInfo, getPhaseTree, cachedReaddirSync, resolveConfiguredModelStateFromConfig } = require('../lib/helpers');
 const { extractFrontmatter, reconstructFrontmatter, spliceFrontmatter } = require('../lib/frontmatter');
 const { execGit, structuredLog, diffSummary } = require('../lib/git');
 const { getDb } = require('../lib/db');
@@ -545,15 +545,17 @@ function cmdResolveModel(cwd, agentType, raw) {
   }
 
   const config = loadConfig(cwd);
-  const resolved = resolveModelSelectionFromConfig(config, agentType);
+  const resolved = resolveConfiguredModelStateFromConfig(config, agentType);
   const result = {
-    model: resolved.model,
+    configured: resolved.configured,
     selected_profile: resolved.selected_profile,
     profile: resolved.selected_profile,
+    resolved_model: resolved.resolved_model,
+    model: resolved.resolved_model,
     source: resolved.source,
     unknown_agent: resolved.unknown_agent,
   };
-  output(result, raw, resolved.model);
+  output(result, raw, resolved.resolved_model);
 }
 
 function cmdFindPhase(cwd, phase, raw) {
@@ -2121,6 +2123,7 @@ function cmdSettingsList(cwd, raw) {
   // Group keys by category
   const categories = {
     'General': ['model_profile', 'mode', 'depth', 'commit_docs', 'test_gate', 'context_window', 'context_target_percent'],
+    'Model Settings': ['model_settings'],
     'Workflow': ['research', 'plan_checker', 'verifier', 'parallelization', 'brave_search'],
     'Git': ['branching_strategy', 'phase_branch_template', 'milestone_branch_template'],
     'Research': ['rag_enabled', 'rag_timeout', 'ytdlp_path', 'nlm_path', 'mcp_config_path'],

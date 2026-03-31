@@ -1283,14 +1283,14 @@ Examples:
 
   'util:resolve-model': `Usage: bgsd-tools util:resolve-model <agent-type>
 
-Resolve which model to use for a given agent type based on profile settings.
+Resolve configured-versus-resolved model state for a given agent type.
 
 Arguments:
   agent-type    Agent type (e.g., "bgsd-planner", "bgsd-executor")
 
-Uses model_profile config (quality/balanced/budget) to select appropriate model.
+Shows configured, selected_profile, resolved_model, and source for the active agent.
 
-Output: { agent_type, profile, resolved_model, quality_model, balanced_model, budget_model }
+Output: { configured, selected_profile, resolved_model, source, ...compatibility aliases }
 
 Examples:
   bgsd-tools util:resolve-model bgsd-planner
