@@ -56,7 +56,7 @@ This is the canonical six-pass milestone audit for Phase 173. It is the only fin
 
 ## Deferred Adjacent Work
 
-- Define actual gate names, prerequisites, and per-finding stage placement in `173-02-PLAN.md`; this file only preserves the placeholders and dependencies needed for that follow-up.
+- Carry these stage gates and per-finding placements into Phase 174-176 cleanup plans instead of re-deriving sequencing from scratch once execution work begins.
 - Convert high-confidence findings into execution plans that group low-blast-radius deletes separately from router/global-state refactors instead of batching the whole audit into one cleanup pass.
 - Re-run targeted regression proof only for the touched command families when Phase 174-176 cleanup starts; avoid broad milestone-wide revalidation unless a later plan explicitly asks for it.
 
