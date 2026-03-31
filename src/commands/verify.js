@@ -10,6 +10,8 @@ const { banner, sectionHeader, formatTable, summaryLine, color, SYMBOLS, colorBy
 const { refreshToolStatus } = require('../lib/cli-tools');
 const { createPlanMetadataContext } = require('../lib/plan-metadata');
 const { validateCommandIntegrity } = require('../lib/commandDiscovery');
+const { buildDefaultConfig, isPlainObject } = require('../lib/config-contract');
+const { MODEL_SETTING_PROFILES, VALID_MODEL_OVERRIDE_AGENTS } = require('../lib/constants');
 
 function getMissingMetadataMessage(sectionName) {
   return `must_haves.${sectionName} metadata missing from frontmatter`;
@@ -21,6 +23,88 @@ function getInconclusiveMetadataMessage(sectionName) {
 
 function getPlanMetadataContext(cwd) {
   return createPlanMetadataContext({ cwd });
+}
+
+function validateModelSettingsContract(rawConfig) {
+  const issues = [];
+  const modelSettings = rawConfig && isPlainObject(rawConfig.model_settings) ? rawConfig.model_settings : null;
+  if (!modelSettings) return issues;
+
+  if (Object.prototype.hasOwnProperty.call(modelSettings, 'default_profile')) {
+    const defaultProfile = typeof modelSettings.default_profile === 'string' ? modelSettings.default_profile.trim() : '';
+    if (!defaultProfile || !MODEL_SETTING_PROFILES.includes(defaultProfile)) {
+      issues.push({
+        code: 'W004',
+        message: `config.json: model_settings.default_profile must be one of ${MODEL_SETTING_PROFILES.join(', ')}`,
+        fix: `Set model_settings.default_profile to one of: ${MODEL_SETTING_PROFILES.join(', ')}`,
+      });
+    }
+  }
+
+  if (Object.prototype.hasOwnProperty.call(modelSettings, 'profiles')) {
+    if (!isPlainObject(modelSettings.profiles)) {
+      issues.push({
+        code: 'W005',
+        message: 'config.json: model_settings.profiles must be an object keyed by quality, balanced, and budget',
+        fix: 'Set model_settings.profiles to an object with quality/balanced/budget entries containing model ids',
+      });
+    } else {
+      for (const [profileName, profileValue] of Object.entries(modelSettings.profiles)) {
+        if (!MODEL_SETTING_PROFILES.includes(profileName)) {
+          issues.push({
+            code: 'W005',
+            message: `config.json: model_settings.profiles.${profileName} is not supported`,
+            fix: `Use only built-in profile keys: ${MODEL_SETTING_PROFILES.join(', ')}`,
+          });
+          continue;
+        }
+
+        const modelId = typeof profileValue === 'string'
+          ? profileValue.trim()
+          : isPlainObject(profileValue) && typeof profileValue.model === 'string'
+            ? profileValue.model.trim()
+            : '';
+        if (!modelId) {
+          issues.push({
+            code: 'W005',
+            message: `config.json: model_settings.profiles.${profileName} must define a non-empty model id`,
+            fix: `Set model_settings.profiles.${profileName}.model to the concrete model id to use for ${profileName}`,
+          });
+        }
+      }
+    }
+  }
+
+  if (Object.prototype.hasOwnProperty.call(modelSettings, 'agent_overrides')) {
+    if (!isPlainObject(modelSettings.agent_overrides)) {
+      issues.push({
+        code: 'W006',
+        message: 'config.json: model_settings.agent_overrides must be an object keyed by canonical agent ids',
+        fix: 'Set model_settings.agent_overrides to an object like { "bgsd-executor": "ollama/qwen3-coder:latest" }',
+      });
+    } else {
+      for (const [agentId, overrideValue] of Object.entries(modelSettings.agent_overrides)) {
+        if (!VALID_MODEL_OVERRIDE_AGENTS.includes(agentId)) {
+          issues.push({
+            code: 'W006',
+            message: `config.json: model_settings.agent_overrides.${agentId} is not a recognized canonical agent id`,
+            fix: `Use one of: ${VALID_MODEL_OVERRIDE_AGENTS.join(', ')}`,
+          });
+          continue;
+        }
+
+        if (typeof overrideValue !== 'string' || !overrideValue.trim()) {
+          issues.push({
+            code: 'W006',
+            message: `config.json: model_settings.agent_overrides.${agentId} must be a non-empty concrete model id`,
+            fix: `Set model_settings.agent_overrides.${agentId} to a non-empty model id string`,
+          });
+        }
+      }
+    }
+  }
+
+  return issues;
 }
 
 function verifyArtifactEntries(context, artifacts) {
@@ -839,9 +923,8 @@ function cmdValidateHealth(cwd, options, raw) {
   } else {
     try {
       const parsed = JSON.parse(configContent);
-      const validProfiles = ['quality', 'balanced', 'budget'];
-      if (parsed.model_profile && !validProfiles.includes(parsed.model_profile)) {
-        addIssue('warning', 'W004', `config.json: invalid model_profile "${parsed.model_profile}"`, `Valid values: ${validProfiles.join(', ')}`);
+      for (const issue of validateModelSettingsContract(parsed)) {
+        addIssue('warning', issue.code, issue.message, issue.fix);
       }
     } catch (err) {
       debugLog('validate.health', 'JSON parse failed', err);
@@ -924,16 +1007,7 @@ function cmdValidateHealth(cwd, options, raw) {
         switch (repair) {
           case 'createConfig':
           case 'resetConfig': {
-            const defaults = {
-              model_profile: 'balanced',
-              commit_docs: true,
-              search_gitignored: false,
-              branching_strategy: 'none',
-              research: true,
-              plan_checker: true,
-              verifier: true,
-              parallelization: true,
-            };
+            const defaults = buildDefaultConfig();
             fs.writeFileSync(configPath, JSON.stringify(defaults, null, 2), 'utf-8');
             repairActions.push({ action: repair, success: true, path: 'config.json' });
             break;

@@ -659,6 +659,8 @@ describe('Phase 158 inspect family contracts', () => {
     assert.match(inspect, /\/bgsd-health` -> `\/bgsd-inspect health`/);
     assert.match(inspect, /Mutating actions and repair flows/);
     assert.match(inspect, /Review, security, readiness, and release families/);
+    assert.match(inspect, /Do not preload sibling inspect-family workflows into context/i);
+    assert.match(inspect, /Do not read non-selected sibling workflows unless the selected workflow explicitly requires them/i);
   });
 
   test('remaining inspect aliases preserve canonical parity through shared workflow contracts', () => {
@@ -700,6 +702,8 @@ describe('Phase 158 planning family alias normalization contracts', () => {
     assert.match(plan, /Normalize the first argument onto the existing planning-family workflow contract:/i);
     assert.match(plan, /Legacy planning aliases should resolve through these same normalized sub-actions rather than owning separate behavior\./i);
     assert.match(plan, /Representative compatibility shims that must stay equivalent to this contract:/i);
+    assert.match(plan, /Do not preload sibling planning-family workflows into context/i);
+    assert.match(plan, /Do not read non-selected sibling workflows unless the selected workflow explicitly requires them/i);
     assert.doesNotMatch(plan, /preferred alias wording/i, 'canonical contract should not encode legacy-preferred wording');
 
     for (const [fileName, canonicalPattern, boundaryPattern] of expectations) {
@@ -723,6 +727,8 @@ describe('Phase 158 settings family reference contracts', () => {
     assert.match(settings, /workflows\/settings\.md/);
     assert.match(settings, /workflows\/set-profile\.md/);
     assert.match(settings, /workflows\/cmd-validate-config\.md/);
+    assert.match(settings, /Do not preload sibling settings-family workflows into context/i);
+    assert.match(settings, /Do not read non-selected sibling workflows unless the selected workflow explicitly requires them/i);
 
     assert.match(setProfile, /Compatibility alias for `\/bgsd-settings profile`/i);
     assert.match(setProfile, /\/bgsd-settings profile \$ARGUMENTS/i);
@@ -740,5 +746,56 @@ describe('Phase 158 settings family reference contracts', () => {
     assert.match(commandsDoc, /`phase`, `discuss`, `research`, and `assumptions` are family labels inside `\/bgsd-plan`/i);
     assert.match(commandsDoc, /Preferred canonical roadmap routes: `\/bgsd-plan roadmap add`/i);
     assert.match(commandsDoc, /Preferred canonical todo routes: `\/bgsd-plan todo add` and `\/bgsd-plan todo check`/i);
+  });
+});
+
+describe('Phase 168 model settings contract', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'PROJECT.md'), `# Test Project
+
+## What This Is
+
+Fixture.
+
+## Core Value
+
+Fixture.
+
+## Requirements
+
+- MODEL-01
+`, 'utf-8');
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'STATE.md'), '# Project State\n', 'utf-8');
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'ROADMAP.md'), '# Roadmap\n', 'utf-8');
+  });
+
+  afterEach(() => { cleanup(tmpDir); });
+
+  test('validate health warns on malformed canonical model settings', () => {
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'config.json'), JSON.stringify({
+      model_settings: {
+        default_profile: 'fast',
+        profiles: {
+          quality: {},
+        },
+        agent_overrides: {
+          'bgsd-executor': '',
+          'not-an-agent': '',
+        },
+      },
+    }, null, 2), 'utf-8');
+
+    const result = runGsdTools('verify:validate health', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+    const actual = JSON.parse(result.output);
+
+    assert.strictEqual(actual.status, 'degraded');
+    assert.ok(actual.warnings.some((issue) => /model_settings\.default_profile/.test(issue.message)), 'should warn on invalid default_profile');
+    assert.ok(actual.warnings.some((issue) => /model_settings\.profiles\.quality/.test(issue.message)), 'should warn on missing profile model id');
+    assert.ok(actual.warnings.some((issue) => /model_settings\.agent_overrides\.bgsd-executor/.test(issue.message)), 'should warn on empty override model id');
+    assert.ok(actual.warnings.some((issue) => /model_settings\.agent_overrides\.not-an-agent/.test(issue.message)), 'should warn on invalid agent override key');
   });
 });
