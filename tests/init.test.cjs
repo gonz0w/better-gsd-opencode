@@ -10,6 +10,8 @@ const { execSync } = require('child_process');
 
 const { TOOLS_PATH, runGsdTools, runGsdToolsInRepo, createTempProject, cleanup } = require('./helpers.cjs');
 const { getEffectiveIntent } = require('../src/commands/intent.js');
+const { getDb, closeAll } = require('../src/lib/db');
+const { PlanningCache } = require('../src/lib/planning-cache');
 
 describe('init commands', () => {
   let tmpDir;
@@ -432,6 +434,49 @@ Add compact milestone and phase intent so planning flows can refine current focu
     assert.strictEqual(output.runtime_freshness.stale_runtime, true, 'stale runtime should be surfaced for downstream flows');
     assert.strictEqual(output.runtime_freshness.build_command, 'npm run build');
     assert.ok(output.runtime_freshness.artifacts.some((entry) => entry.path === 'bin/bgsd-tools.cjs' && entry.stale), 'CLI runtime artifact should be marked stale');
+  });
+
+  test('init memory leaves legacy JSON memory stores inactive on first access while current store data still works', () => {
+    const memDir = path.join(tmpDir, '.planning', 'memory');
+    fs.mkdirSync(memDir, { recursive: true });
+    fs.writeFileSync(path.join(memDir, 'decisions.json'), JSON.stringify([
+      { summary: 'Legacy decision only', phase: '03', timestamp: '2026-01-01T00:00:00Z' },
+    ]));
+    fs.writeFileSync(path.join(memDir, 'bookmarks.json'), JSON.stringify([
+      { phase: '99', plan: '09', task: 9, total_tasks: 9, git_head: 'legacy', timestamp: '2026-01-01T00:00:00Z' },
+    ]));
+
+    closeAll();
+    const db = getDb(tmpDir);
+    const cache = new PlanningCache(db);
+    cache.writeMemoryEntry(tmpDir, 'decisions', {
+      summary: 'Canonical decision',
+      phase: '03',
+      timestamp: '2026-01-02T00:00:00Z',
+    });
+    cache.writeMemoryEntry(tmpDir, 'bookmarks', {
+      phase: '03',
+      plan: '02',
+      task: 1,
+      total_tasks: 2,
+      git_head: 'canon123',
+      timestamp: '2026-01-02T00:00:00Z',
+    });
+
+    const result = runGsdTools('init:memory --phase 03', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.decisions.length, 1, 'init memory should return the supported current store decision only');
+    assert.strictEqual(output.decisions[0].summary, 'Canonical decision');
+    assert.ok(output.bookmark, 'current store bookmark should still be available');
+    assert.strictEqual(output.bookmark.phase, '03');
+    assert.strictEqual(output.bookmark.plan, '02');
+
+    const decisionCount = db.prepare('SELECT COUNT(*) AS cnt FROM memory_decisions WHERE cwd = ?').get(tmpDir);
+    const bookmarkCount = db.prepare('SELECT COUNT(*) AS cnt FROM memory_bookmarks WHERE cwd = ?').get(tmpDir);
+    assert.strictEqual(decisionCount.cnt, 1, 'first access should not auto-import legacy JSON memory stores into decisions');
+    assert.strictEqual(bookmarkCount.cnt, 1, 'first access should not auto-import legacy JSON memory stores into bookmarks');
   });
 
   test('init plan-phase returns file paths', () => {

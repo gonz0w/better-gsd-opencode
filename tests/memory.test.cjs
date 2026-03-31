@@ -98,6 +98,54 @@ describe('memory commands', () => {
     assert.strictEqual(output.total, 3, 'total should be 3');
   });
 
+  test('memory read ignores legacy JSON memory stores and keeps search results out of SQLite', () => {
+    const memDir = path.join(tmpDir, '.planning', 'memory');
+    fs.mkdirSync(memDir, { recursive: true });
+    fs.writeFileSync(path.join(memDir, 'decisions.json'), JSON.stringify([
+      { summary: 'Legacy decision only', phase: '03', timestamp: '2026-01-01T00:00:00Z' },
+    ]));
+
+    closeAll();
+    const result = runGsdTools('util:memory read --store decisions --query Legacy', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.count, 0, 'legacy JSON memory stores should be ignored by active search paths');
+    assert.strictEqual(output.source, 'json', 'search should fall back to an empty read without importing legacy JSON');
+
+    const db = getDb(tmpDir);
+    const countRow = db.prepare('SELECT COUNT(*) AS cnt FROM memory_decisions WHERE cwd = ?').get(tmpDir);
+    assert.strictEqual(countRow.cnt, 0, 'active search should not auto-import legacy JSON memory stores into SQLite');
+  });
+
+  test('memory read returns current store entries without reviving legacy JSON memory stores', () => {
+    const memDir = path.join(tmpDir, '.planning', 'memory');
+    fs.mkdirSync(memDir, { recursive: true });
+    fs.writeFileSync(path.join(memDir, 'decisions.json'), JSON.stringify([
+      { summary: 'Legacy decision only', phase: '03', timestamp: '2026-01-01T00:00:00Z' },
+    ]));
+
+    closeAll();
+    const db = getDb(tmpDir);
+    const cache = new PlanningCache(db);
+    cache.writeMemoryEntry(tmpDir, 'decisions', {
+      summary: 'Canonical decision',
+      phase: '03',
+      timestamp: '2026-01-02T00:00:00Z',
+    });
+
+    const result = runGsdTools('util:memory read --store decisions', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.count, 1, 'read should return the supported current store entry');
+    assert.strictEqual(output.entries[0].summary, 'Canonical decision');
+    assert.strictEqual(output.source, 'sql', 'read should prefer the canonical store over legacy JSON');
+
+    const countRow = db.prepare('SELECT COUNT(*) AS cnt FROM memory_decisions WHERE cwd = ?').get(tmpDir);
+    assert.strictEqual(countRow.cnt, 1, 'canonical read should not duplicate or import legacy JSON entries');
+  });
+
   test('memory read with phase filter', () => {
     const memDir = path.join(tmpDir, '.planning', 'memory');
     fs.mkdirSync(memDir, { recursive: true });
