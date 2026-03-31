@@ -5,7 +5,7 @@
 See: .planning/PROJECT.md (updated 2026-03-30)
 
 **Core value:** Manage and deliver high-quality software with high-quality documentation, while continuously reducing token usage and improving performance.
-**Current focus:** Phase 168 Plan 01 completed — ready to continue model-settings execution with Plan 02.
+**Current focus:** Phase 168 Plan 02 completed — ready to continue model-settings execution with Plan 03.
 
 ## Current Position
 
