@@ -30,6 +30,7 @@ const {
   DECISION_REGISTRY,
   evaluateDecisions,
 } = require('../src/lib/decision-rules');
+const { resolveConfiguredModelStateFromConfig: resolveModelState } = require('../src/lib/helpers');
 
 // ─── Decision contract fields ────────────────────────────────────────────────
 
@@ -523,6 +524,31 @@ describe('decisions: confidence distribution', () => {
 // ─── Phase 122: New Decision Function Tests ───────────────────────────────────
 
 describe('decisions: resolveModelSelection contract', () => {
+  it('shared helper returns configured-versus-resolved model state', () => {
+    const result = resolveModelState({
+      model_settings: {
+        default_profile: 'quality',
+        profiles: {
+          quality: { model: 'gpt-5.4' },
+          balanced: { model: 'gpt-5.4-mini' },
+          budget: { model: 'gpt-5.4-nano' },
+        },
+        agent_overrides: {
+          'bgsd-executor': 'ollama/qwen3-coder:latest',
+        },
+      },
+    }, 'bgsd-executor');
+
+    assert.deepStrictEqual(result, {
+      agent_type: 'bgsd-executor',
+      configured: 'ollama/qwen3-coder:latest',
+      selected_profile: 'quality',
+      resolved_model: 'ollama/qwen3-coder:latest',
+      source: 'agent_override',
+      unknown_agent: false,
+    });
+  });
+
   it('contract check: returns {value, confidence, rule_id}', () => {
     const result = resolveModelSelection({ agent_type: 'bgsd-planner', model_profile: 'balanced' });
     const contract = contractCheck(result, DECISION_CONTRACT, 'model-selection');
@@ -531,40 +557,43 @@ describe('decisions: resolveModelSelection contract', () => {
     assert.strictEqual(result.confidence, 'HIGH');
   });
 
-  it('returns { tier, model } shape in value', () => {
+  it('returns configured-versus-resolved shape in value', () => {
     const result = resolveModelSelection({ agent_type: 'bgsd-executor', model_profile: 'balanced' });
     assert.ok(typeof result.value === 'object', 'value should be an object');
-    assert.ok(typeof result.value.tier === 'string', 'value.tier should be a string');
+    assert.ok(typeof result.value.configured === 'string', 'value.configured should be a string');
+    assert.ok(typeof result.value.selected_profile === 'string', 'value.selected_profile should be a string');
     assert.ok(typeof result.value.profile === 'string', 'value.profile should be a string');
+    assert.ok(typeof result.value.resolved_model === 'string', 'value.resolved_model should be a string');
     assert.ok(typeof result.value.model === 'string', 'value.model should be a string');
   });
 
   it('falls back to shipped profile defaults when contract details are absent', () => {
     const result = resolveModelSelection({ agent_type: 'bgsd-executor', model_profile: 'balanced' });
-    assert.ok(result.value.model, 'Should return a model');
+    assert.ok(result.value.resolved_model, 'Should return a resolved model');
     assert.strictEqual(result.confidence, 'HIGH');
   });
 
   it('uses the selected default profile even when agent_type is unknown', () => {
     const result = resolveModelSelection({ agent_type: 'bgsd-unknown-agent', model_profile: 'balanced' });
-    assert.strictEqual(result.value.model, 'gpt-5.4-mini');
+    assert.strictEqual(result.value.resolved_model, 'gpt-5.4-mini');
     assert.strictEqual(result.value.unknown_agent, true);
   });
 
   it('uses model_profile default when not provided', () => {
     const result = resolveModelSelection({ agent_type: 'bgsd-executor' });
-    assert.strictEqual(result.value.tier, 'balanced');
+    assert.strictEqual(result.value.configured, 'balanced');
+    assert.strictEqual(result.value.selected_profile, 'balanced');
   });
 
   it('handles undefined state gracefully', () => {
     const result = resolveModelSelection(undefined);
     assert.strictEqual(result.rule_id, 'model-selection');
-    assert.ok(result.value.model, 'Should return a model');
+    assert.ok(result.value.resolved_model, 'Should return a resolved model');
   });
 
-  it('returns correct tier in value', () => {
+  it('returns correct selected profile in value', () => {
     const result = resolveModelSelection({ agent_type: 'bgsd-planner', model_profile: 'quality' });
-    assert.strictEqual(result.value.tier, 'quality');
+    assert.strictEqual(result.value.selected_profile, 'quality');
   });
 
   it('prefers direct agent overrides over the selected profile', () => {
@@ -582,8 +611,9 @@ describe('decisions: resolveModelSelection contract', () => {
         },
       },
     });
+    assert.strictEqual(result.value.configured, 'ollama/qwen3-coder:latest');
     assert.strictEqual(result.value.profile, 'quality');
-    assert.strictEqual(result.value.model, 'ollama/qwen3-coder:latest');
+    assert.strictEqual(result.value.resolved_model, 'ollama/qwen3-coder:latest');
     assert.strictEqual(result.value.source, 'agent_override');
   });
 
@@ -598,8 +628,9 @@ describe('decisions: resolveModelSelection contract', () => {
         agent_overrides: {},
       },
     });
+    assert.strictEqual(result.value.configured, 'budget');
     assert.strictEqual(result.value.profile, 'budget');
-    assert.strictEqual(result.value.model, 'gpt-5.4-nano');
+    assert.strictEqual(result.value.resolved_model, 'gpt-5.4-nano');
     assert.strictEqual(result.value.source, 'default_profile');
   });
 });

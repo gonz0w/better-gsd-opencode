@@ -412,24 +412,26 @@ describe('enricher-decisions: CLI integration', () => {
 // ─── Phase 122: New Rules Integration Tests ───────────────────────────────────
 
 describe('enricher-decisions: model-selection fires with agent_type + model_profile', () => {
-  it('returns { tier, model } when agent_type and model_profile provided', () => {
+  it('returns configured-versus-resolved fields when agent_type and model_profile provided', () => {
     const result = resolveModelSelection({ agent_type: 'bgsd-executor', model_profile: 'balanced' });
     assert.ok(typeof result.value === 'object', 'value should be object');
-    assert.ok(typeof result.value.tier === 'string', 'value.tier should be string');
-    assert.ok(typeof result.value.model === 'string', 'value.model should be string');
+    assert.ok(typeof result.value.configured === 'string', 'value.configured should be string');
+    assert.ok(typeof result.value.selected_profile === 'string', 'value.selected_profile should be string');
+    assert.ok(typeof result.value.resolved_model === 'string', 'value.resolved_model should be string');
     assert.strictEqual(result.rule_id, 'model-selection');
   });
 
   it('appears in evaluateDecisions output when agent_type is present', () => {
     const results = evaluateDecisions('bgsd-execute-phase', { agent_type: 'bgsd-executor', model_profile: 'balanced' });
     assert.ok(results['model-selection'], 'model-selection should appear in results');
-    assert.ok(results['model-selection'].value.model, 'model-selection should have model in value');
+    assert.ok(results['model-selection'].value.resolved_model, 'model-selection should have resolved model in value');
   });
 
   it('appears in evaluateDecisions output when model_profile is present', () => {
     const results = evaluateDecisions('bgsd-plan-phase', { agent_type: 'bgsd-planner', model_profile: 'quality' });
     assert.ok(results['model-selection'], 'model-selection should appear in results');
-    assert.strictEqual(results['model-selection'].value.tier, 'quality');
+    assert.strictEqual(results['model-selection'].value.configured, 'quality');
+    assert.strictEqual(results['model-selection'].value.selected_profile, 'quality');
   });
 
   it('prefers canonical agent overrides from model_settings', () => {
@@ -448,8 +450,9 @@ describe('enricher-decisions: model-selection fires with agent_type + model_prof
       },
     });
     assert.ok(results['model-selection'], 'model-selection should appear in results');
+    assert.strictEqual(results['model-selection'].value.configured, 'ollama/qwen3-coder:latest');
     assert.strictEqual(results['model-selection'].value.profile, 'quality');
-    assert.strictEqual(results['model-selection'].value.model, 'ollama/qwen3-coder:latest');
+    assert.strictEqual(results['model-selection'].value.resolved_model, 'ollama/qwen3-coder:latest');
     assert.strictEqual(results['model-selection'].value.source, 'agent_override');
   });
 
@@ -464,8 +467,9 @@ describe('enricher-decisions: model-selection fires with agent_type + model_prof
       },
     });
     assert.ok(results['model-selection'], 'model-selection should appear in results');
+    assert.strictEqual(results['model-selection'].value.configured, 'budget');
     assert.strictEqual(results['model-selection'].value.profile, 'budget');
-    assert.strictEqual(results['model-selection'].value.model, 'gpt-5.4-nano');
+    assert.strictEqual(results['model-selection'].value.resolved_model, 'gpt-5.4-nano');
     assert.strictEqual(results['model-selection'].value.source, 'default_profile');
   });
 });
