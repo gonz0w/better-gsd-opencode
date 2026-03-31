@@ -1952,17 +1952,6 @@ function cmdInitMemory(cwd, args, raw) {
   const maxChars = compact ? 4000 : 8000;
   const trimmed = [];
 
-  // Trigger memory store migration on first access
-  try {
-    const db = getDb(cwd);
-    if (db.backend === 'sqlite') {
-      const cache = new PlanningCache(db);
-      cache.migrateMemoryStores(cwd);
-    }
-  } catch (e) {
-    debugLog('init.memory', 'memory migration failed', e);
-  }
-
   // 1. Position — parse STATE.md
   const statePath = path.join(cwd, '.planning', 'STATE.md');
   const stateContent = safeReadFile(statePath);
@@ -1997,10 +1986,12 @@ function cmdInitMemory(cwd, args, raw) {
     debugLog('init.memory', 'SQLite bookmark read failed', e);
   }
 
-  // Fall back to JSON read if bookmark is still null
+  // Fall back to JSON read only for map-backed runtimes
   if (!bookmark) {
     const bookmarksPath = path.join(cwd, '.planning', 'memory', 'bookmarks.json');
-    const bookmarksContent = safeReadFile(bookmarksPath);
+    let db = null;
+    try { db = getDb(cwd); } catch (e) { debugLog('init.memory', 'bookmark backend detection failed', e); }
+    const bookmarksContent = db && db.backend !== 'sqlite' ? safeReadFile(bookmarksPath) : null;
     if (bookmarksContent) {
       try {
         const bookmarks = JSON.parse(bookmarksContent);
@@ -2057,16 +2048,18 @@ function cmdInitMemory(cwd, args, raw) {
       limit: compact ? 5 : 10,
     });
     if (sqlResult && sqlResult.entries.length > 0) {
-      decisions = sqlResult.entries.reverse(); // Most recent first
+      decisions = sqlResult.entries;
     }
   } catch (e) {
     debugLog('init.memory', 'SQLite decision read failed', e);
   }
 
-  // Fall back to JSON if decisions is still empty
+  // Fall back to JSON only for map-backed runtimes
   if (decisions.length === 0) {
     const decisionsPath = path.join(cwd, '.planning', 'memory', 'decisions.json');
-    const decisionsContent = safeReadFile(decisionsPath);
+    let db = null;
+    try { db = getDb(cwd); } catch (e) { debugLog('init.memory', 'decision backend detection failed', e); }
+    const decisionsContent = db && db.backend !== 'sqlite' ? safeReadFile(decisionsPath) : null;
     if (decisionsContent) {
       try {
         let all = JSON.parse(decisionsContent);
@@ -2121,10 +2114,12 @@ function cmdInitMemory(cwd, args, raw) {
     debugLog('init.memory', 'SQLite lessons read failed', e);
   }
 
-  // Fall back to JSON if lessons is still empty
+  // Fall back to JSON only for map-backed runtimes
   if (lessons.length === 0) {
     const lessonsPath = path.join(cwd, '.planning', 'memory', 'lessons.json');
-    const lessonsContent = safeReadFile(lessonsPath);
+    let db = null;
+    try { db = getDb(cwd); } catch (e) { debugLog('init.memory', 'lesson backend detection failed', e); }
+    const lessonsContent = db && db.backend !== 'sqlite' ? safeReadFile(lessonsPath) : null;
     if (lessonsContent) {
       try {
         let all = JSON.parse(lessonsContent);

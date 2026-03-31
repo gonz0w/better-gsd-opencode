@@ -42,6 +42,7 @@ const DEFAULT_PRUNE_THRESHOLD_DAYS = 90;
 
 // Store name → filename overrides (default: `${store}.json`)
 const STORE_FILES = { trajectories: 'trajectory.json' };
+const SQLITE_MEMORY_STORES = new Set(['decisions', 'bookmarks', 'lessons', 'trajectories']);
 
 function storeFilename(store) {
   return STORE_FILES[store] || `${store}.json`;
@@ -484,34 +485,47 @@ function cmdMemoryRead(cwd, options, raw) {
   const filePath = path.join(cwd, '.planning', 'memory', storeFilename(store));
 
   let entries = [];
+  let total = 0;
+  let source = 'json';
+  let db = null;
   try {
-    const raw = fs.readFileSync(filePath, 'utf-8');
-    entries = JSON.parse(raw);
-    if (!Array.isArray(entries)) entries = [];
+    db = getDb(cwd);
   } catch (e) {
-    debugLog('memory.read', 'read failed', e);
-    entries = [];
+    debugLog('memory.read', 'backend detection failed', e);
   }
 
-  const total = entries.length;
-
-  if (query) {
+  const useSqlite = db && db.backend === 'sqlite' && SQLITE_MEMORY_STORES.has(store);
+  if (useSqlite) {
     try {
-      const db = getDb(cwd);
       const cache = new PlanningCache(db);
-      cache.migrateMemoryStores(cwd);
-      const sqlResult = cache.searchMemory(cwd, store, query, {
+      const sqlResult = cache.searchMemory(cwd, store, query || null, {
         phase: phase || null,
-        category: (store === 'trajectories') ? category : null,
-        limit: limit ? parseInt(limit, 10) : null,
+        category: store === 'trajectories' ? category : null,
+        limit: 10000,
       });
-      if (sqlResult && sqlResult.entries.length > 0) {
-        output({ entries: sqlResult.entries, count: sqlResult.entries.length, store, total, source: 'sql' });
-        return;
+      if (sqlResult) {
+        entries = sqlResult.entries;
+        total = sqlResult.total;
+        source = 'sql';
       }
     } catch (e) {
-      debugLog('memory.read', 'SQL search failed, falling back to JSON', e);
+      debugLog('memory.read', 'SQL read failed, falling back to JSON', e);
+      entries = [];
+      total = 0;
+      source = 'json';
     }
+  }
+
+  if (!useSqlite || source === 'json') {
+    try {
+      const raw = fs.readFileSync(filePath, 'utf-8');
+      entries = JSON.parse(raw);
+      if (!Array.isArray(entries)) entries = [];
+    } catch (e) {
+      debugLog('memory.read', 'read failed', e);
+      entries = [];
+    }
+    total = entries.length;
   }
 
   if (phase) {
@@ -537,9 +551,11 @@ function cmdMemoryRead(cwd, options, raw) {
     if (to) {
       entries = entries.filter(e => e.timestamp && e.timestamp <= to + 'T23:59:59.999Z');
     }
-    if (!asc) {
-      entries = entries.slice().reverse();
-    }
+    entries = entries.slice().sort((a, b) => {
+      const left = a.timestamp || '';
+      const right = b.timestamp || '';
+      return asc ? left.localeCompare(right) : right.localeCompare(left);
+    });
   }
 
   if (store === 'lessons') {
@@ -565,7 +581,12 @@ function cmdMemoryRead(cwd, options, raw) {
     entries = entries.slice(0, parseInt(limit, 10));
   }
 
-  output({ entries, count: entries.length, store, total, source: 'json' });
+  if (store === 'bookmarks' && (!limit || parseInt(limit, 10) <= 0)) {
+    entries = entries.slice(0, BOOKMARKS_MAX);
+    total = Math.min(total, BOOKMARKS_MAX);
+  }
+
+  output({ entries, count: entries.length, store, total, source });
 }
 
 /**

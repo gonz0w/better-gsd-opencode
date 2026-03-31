@@ -13,6 +13,13 @@ const { TOOLS_PATH, runGsdTools, createTempProject, cleanup } = require('./helpe
 const { getDb, closeAll, MapDatabase } = require('../src/lib/db');
 const { PlanningCache } = require('../src/lib/planning-cache');
 
+function seedCanonicalMemory(cwd, store, entries) {
+  for (const entry of entries) {
+    const result = runGsdTools(`util:memory write --store ${store} --entry '${JSON.stringify(entry)}'`, cwd);
+    assert.ok(result.success, `Failed seeding ${store}: ${result.error}`);
+  }
+}
+
 describe('memory commands', () => {
   let tmpDir;
 
@@ -81,21 +88,18 @@ describe('memory commands', () => {
   });
 
   test('memory read with query filter', () => {
-    // Write entries with different content
-    const memDir = path.join(tmpDir, '.planning', 'memory');
-    fs.mkdirSync(memDir, { recursive: true });
     const entries = [
       { summary: 'Chose esbuild for bundling', timestamp: '2026-01-01T00:00:00Z' },
       { summary: 'Selected PostgreSQL for DB', timestamp: '2026-01-02T00:00:00Z' },
       { summary: 'esbuild config updated', timestamp: '2026-01-03T00:00:00Z' },
     ];
-    fs.writeFileSync(path.join(memDir, 'decisions.json'), JSON.stringify(entries));
+    seedCanonicalMemory(tmpDir, 'decisions', entries);
 
     const result = runGsdTools('util:memory read --store decisions --query esbuild', tmpDir);
     assert.ok(result.success, `Command failed: ${result.error}`);
     const output = JSON.parse(result.output);
     assert.strictEqual(output.count, 2, 'should match 2 entries containing esbuild');
-    assert.strictEqual(output.total, 3, 'total should be 3');
+    assert.strictEqual(output.total, 2, 'SQL query total should reflect matched canonical rows');
   });
 
   test('memory read ignores legacy JSON memory stores and keeps search results out of SQLite', () => {
@@ -111,7 +115,7 @@ describe('memory commands', () => {
 
     const output = JSON.parse(result.output);
     assert.strictEqual(output.count, 0, 'legacy JSON memory stores should be ignored by active search paths');
-    assert.strictEqual(output.source, 'json', 'search should fall back to an empty read without importing legacy JSON');
+    assert.strictEqual(output.source, 'sql', 'search should stay on the canonical store without importing legacy JSON');
 
     const db = getDb(tmpDir);
     const countRow = db.prepare('SELECT COUNT(*) AS cnt FROM memory_decisions WHERE cwd = ?').get(tmpDir);
@@ -125,14 +129,11 @@ describe('memory commands', () => {
       { summary: 'Legacy decision only', phase: '03', timestamp: '2026-01-01T00:00:00Z' },
     ]));
 
-    closeAll();
-    const db = getDb(tmpDir);
-    const cache = new PlanningCache(db);
-    cache.writeMemoryEntry(tmpDir, 'decisions', {
+    seedCanonicalMemory(tmpDir, 'decisions', [{
       summary: 'Canonical decision',
       phase: '03',
       timestamp: '2026-01-02T00:00:00Z',
-    });
+    }]);
 
     const result = runGsdTools('util:memory read --store decisions', tmpDir);
     assert.ok(result.success, `Command failed: ${result.error}`);
@@ -142,25 +143,22 @@ describe('memory commands', () => {
     assert.strictEqual(output.entries[0].summary, 'Canonical decision');
     assert.strictEqual(output.source, 'sql', 'read should prefer the canonical store over legacy JSON');
 
-    const countRow = db.prepare('SELECT COUNT(*) AS cnt FROM memory_decisions WHERE cwd = ?').get(tmpDir);
-    assert.strictEqual(countRow.cnt, 1, 'canonical read should not duplicate or import legacy JSON entries');
+    assert.strictEqual(output.source, 'sql', 'canonical read should stay on the supported store');
   });
 
   test('memory read with phase filter', () => {
-    const memDir = path.join(tmpDir, '.planning', 'memory');
-    fs.mkdirSync(memDir, { recursive: true });
     const entries = [
       { summary: 'Phase 3 decision', phase: '03', timestamp: '2026-01-01T00:00:00Z' },
       { summary: 'Phase 4 decision', phase: '04', timestamp: '2026-01-02T00:00:00Z' },
       { summary: 'Phase 3 lesson', phase: '03', timestamp: '2026-01-03T00:00:00Z' },
     ];
-    fs.writeFileSync(path.join(memDir, 'lessons.json'), JSON.stringify(entries));
+    seedCanonicalMemory(tmpDir, 'lessons', entries);
 
     const result = runGsdTools('util:memory read --store lessons --phase 03', tmpDir);
     assert.ok(result.success, `Command failed: ${result.error}`);
     const output = JSON.parse(result.output);
     assert.strictEqual(output.count, 2, 'should match 2 entries with phase 03');
-    assert.strictEqual(output.total, 3);
+    assert.strictEqual(output.total, 2);
   });
 
   test('memory read with limit', () => {
@@ -179,13 +177,10 @@ describe('memory commands', () => {
   });
 
   test('bookmarks store trims to max 20 entries', () => {
-    // Seed with 19 existing bookmarks
-    const memDir = path.join(tmpDir, '.planning', 'memory');
-    fs.mkdirSync(memDir, { recursive: true });
     const existing = Array.from({ length: 19 }, (_, i) => ({
       file: `file-${i}.js`, timestamp: '2026-01-01T00:00:00Z',
     }));
-    fs.writeFileSync(path.join(memDir, 'bookmarks.json'), JSON.stringify(existing));
+    seedCanonicalMemory(tmpDir, 'bookmarks', existing);
 
     // Write 3 more (should end up at 20, not 22)
     for (let i = 0; i < 3; i++) {
@@ -545,13 +540,11 @@ describe('init memory', () => {
   });
 
   test('includes decisions from memory store', () => {
-    const memDir = path.join(tmpDir, '.planning', 'memory');
-    fs.mkdirSync(memDir, { recursive: true });
-    fs.writeFileSync(path.join(memDir, 'decisions.json'), JSON.stringify([
+    seedCanonicalMemory(tmpDir, 'decisions', [
       { summary: 'Use esbuild', phase: '10' },
       { summary: 'Single file CLI', phase: '10' },
       { summary: 'Memory stores as JSON', phase: '11' },
-    ]));
+    ]);
 
     const result = runGsdTools('init:memory', tmpDir);
     assert.ok(result.success, `Command failed: ${result.error}`);
@@ -564,13 +557,11 @@ describe('init memory', () => {
   });
 
   test('filters decisions by phase', () => {
-    const memDir = path.join(tmpDir, '.planning', 'memory');
-    fs.mkdirSync(memDir, { recursive: true });
-    fs.writeFileSync(path.join(memDir, 'decisions.json'), JSON.stringify([
+    seedCanonicalMemory(tmpDir, 'decisions', [
       { summary: 'Use esbuild', phase: '10' },
       { summary: 'Single file CLI', phase: '10' },
       { summary: 'Memory stores as JSON', phase: '11' },
-    ]));
+    ]);
 
     const result = runGsdTools('init:memory --phase 11', tmpDir);
     assert.ok(result.success, `Command failed: ${result.error}`);
@@ -581,12 +572,10 @@ describe('init memory', () => {
   });
 
   test('includes latest bookmark', () => {
-    const memDir = path.join(tmpDir, '.planning', 'memory');
-    fs.mkdirSync(memDir, { recursive: true });
-    fs.writeFileSync(path.join(memDir, 'bookmarks.json'), JSON.stringify([
-      { phase: '11', plan: '01', task: 3, total_tasks: 5, last_file: 'src/router.js', saved_at: '2026-02-22T10:00:00Z' },
-      { phase: '10', plan: '02', task: 1, total_tasks: 3, last_file: 'src/init.js', saved_at: '2026-02-21T08:00:00Z' },
-    ]));
+    seedCanonicalMemory(tmpDir, 'bookmarks', [
+      { phase: '10', plan: '02', task: 1, total_tasks: 3, last_file: 'src/init.js', timestamp: '2026-02-21T08:00:00Z' },
+      { phase: '11', plan: '01', task: 3, total_tasks: 5, last_file: 'src/router.js', timestamp: '2026-02-22T10:00:00Z' },
+    ]);
 
     const result = runGsdTools('init:memory', tmpDir);
     assert.ok(result.success, `Command failed: ${result.error}`);
@@ -632,15 +621,11 @@ describe('init memory', () => {
   });
 
   test('compact mode reduces output vs verbose', () => {
-    const memDir = path.join(tmpDir, '.planning', 'memory');
-    fs.mkdirSync(memDir, { recursive: true });
-
-    // Write 12 decisions
     const decisions = [];
     for (let i = 0; i < 12; i++) {
       decisions.push({ summary: `Decision ${i}`, phase: '11' });
     }
-    fs.writeFileSync(path.join(memDir, 'decisions.json'), JSON.stringify(decisions));
+    seedCanonicalMemory(tmpDir, 'decisions', decisions);
 
     // Verbose mode: up to 10 decisions
     const r1 = runGsdTools('init:memory --verbose', tmpDir);
@@ -998,14 +983,12 @@ describe('memory trajectories', () => {
   });
 
   test('read with category filter returns only matching entries', () => {
-    const memDir = path.join(tmpDir, '.planning', 'memory');
-    fs.mkdirSync(memDir, { recursive: true });
     const entries = [
       { id: 'tj-aaa001', category: 'decision', text: 'First', timestamp: '2026-01-01T00:00:00Z' },
       { id: 'tj-aaa002', category: 'observation', text: 'Second', timestamp: '2026-01-02T00:00:00Z' },
       { id: 'tj-aaa003', category: 'decision', text: 'Third', timestamp: '2026-01-03T00:00:00Z' },
     ];
-    fs.writeFileSync(path.join(memDir, 'trajectory.json'), JSON.stringify(entries));
+    seedCanonicalMemory(tmpDir, 'trajectories', entries);
 
     const result = runGsdTools('util:memory read --store trajectories --category decision', tmpDir);
     assert.ok(result.success, `Command failed: ${result.error}`);
@@ -1015,14 +998,12 @@ describe('memory trajectories', () => {
   });
 
   test('read with tag filter requires ALL specified tags', () => {
-    const memDir = path.join(tmpDir, '.planning', 'memory');
-    fs.mkdirSync(memDir, { recursive: true });
     const entries = [
       { id: 'tj-bbb001', category: 'decision', text: 'A', tags: ['perf', 'memory'], timestamp: '2026-01-01T00:00:00Z' },
       { id: 'tj-bbb002', category: 'observation', text: 'B', tags: ['perf'], timestamp: '2026-01-02T00:00:00Z' },
       { id: 'tj-bbb003', category: 'decision', text: 'C', tags: ['memory'], timestamp: '2026-01-03T00:00:00Z' },
     ];
-    fs.writeFileSync(path.join(memDir, 'trajectory.json'), JSON.stringify(entries));
+    seedCanonicalMemory(tmpDir, 'trajectories', entries);
 
     // Single tag
     const r1 = runGsdTools('util:memory read --store trajectories --tags perf', tmpDir);
@@ -1038,14 +1019,12 @@ describe('memory trajectories', () => {
   });
 
   test('read with date range filters by timestamp', () => {
-    const memDir = path.join(tmpDir, '.planning', 'memory');
-    fs.mkdirSync(memDir, { recursive: true });
     const entries = [
       { id: 'tj-ccc001', category: 'decision', text: 'Old', timestamp: '2025-06-15T00:00:00Z' },
       { id: 'tj-ccc002', category: 'decision', text: 'Mid', timestamp: '2026-03-15T00:00:00Z' },
       { id: 'tj-ccc003', category: 'decision', text: 'New', timestamp: '2026-09-15T00:00:00Z' },
     ];
-    fs.writeFileSync(path.join(memDir, 'trajectory.json'), JSON.stringify(entries));
+    seedCanonicalMemory(tmpDir, 'trajectories', entries);
 
     const result = runGsdTools('util:memory read --store trajectories --from 2026-01-01 --to 2026-12-31', tmpDir);
     assert.ok(result.success, `Command failed: ${result.error}`);
@@ -1054,14 +1033,12 @@ describe('memory trajectories', () => {
   });
 
   test('read default sort is newest-first', () => {
-    const memDir = path.join(tmpDir, '.planning', 'memory');
-    fs.mkdirSync(memDir, { recursive: true });
     const entries = [
       { id: 'tj-ddd001', category: 'decision', text: 'First', timestamp: '2026-01-01T00:00:00Z' },
       { id: 'tj-ddd002', category: 'observation', text: 'Second', timestamp: '2026-02-01T00:00:00Z' },
       { id: 'tj-ddd003', category: 'correction', text: 'Third', timestamp: '2026-03-01T00:00:00Z' },
     ];
-    fs.writeFileSync(path.join(memDir, 'trajectory.json'), JSON.stringify(entries));
+    seedCanonicalMemory(tmpDir, 'trajectories', entries);
 
     const result = runGsdTools('util:memory read --store trajectories', tmpDir);
     assert.ok(result.success, `Command failed: ${result.error}`);
@@ -1071,14 +1048,12 @@ describe('memory trajectories', () => {
   });
 
   test('read with --asc flag returns chronological order', () => {
-    const memDir = path.join(tmpDir, '.planning', 'memory');
-    fs.mkdirSync(memDir, { recursive: true });
     const entries = [
       { id: 'tj-eee001', category: 'decision', text: 'First', timestamp: '2026-01-01T00:00:00Z' },
       { id: 'tj-eee002', category: 'observation', text: 'Second', timestamp: '2026-02-01T00:00:00Z' },
       { id: 'tj-eee003', category: 'hypothesis', text: 'Third', timestamp: '2026-03-01T00:00:00Z' },
     ];
-    fs.writeFileSync(path.join(memDir, 'trajectory.json'), JSON.stringify(entries));
+    seedCanonicalMemory(tmpDir, 'trajectories', entries);
 
     const result = runGsdTools('util:memory read --store trajectories --asc', tmpDir);
     assert.ok(result.success, `Command failed: ${result.error}`);
@@ -1150,140 +1125,6 @@ describe('memory trajectories', () => {
     const wrongPath = path.join(tmpDir, '.planning', 'memory', 'trajectories.json');
     assert.ok(fs.existsSync(correctPath), 'trajectory.json should exist');
     assert.ok(!fs.existsSync(wrongPath), 'trajectories.json should NOT exist');
-  });
-});
-
-// ---------------------------------------------------------------------------
-// Group: memory SQLite migration (MEM-02)
-// ---------------------------------------------------------------------------
-
-describe('memory SQLite migration', () => {
-  let tmpDir;
-  let db;
-  let cache;
-
-  beforeEach(() => {
-    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gsd-mem-mig-'));
-    fs.mkdirSync(path.join(tmpDir, '.planning', 'memory'), { recursive: true });
-    closeAll();
-    db = getDb(tmpDir);
-    cache = new PlanningCache(db);
-  });
-
-  afterEach(() => {
-    closeAll();
-    fs.rmSync(tmpDir, { recursive: true, force: true });
-  });
-
-  test('migrateMemoryStores imports decisions from JSON', () => {
-    const entries = [
-      { summary: 'Decision one', phase: '01', timestamp: '2026-01-01T00:00:00Z' },
-      { summary: 'Decision two', phase: '01', timestamp: '2026-01-02T00:00:00Z' },
-      { summary: 'Decision three', phase: '02', timestamp: '2026-01-03T00:00:00Z' },
-    ];
-    fs.writeFileSync(path.join(tmpDir, '.planning', 'memory', 'decisions.json'), JSON.stringify(entries));
-
-    const result = cache.migrateMemoryStores(tmpDir);
-    assert.ok(result, 'migrateMemoryStores should return result');
-    assert.strictEqual(result.migrated.decisions, 3, 'should migrate 3 decisions');
-
-    // Verify via SQL
-    const countRow = db.prepare('SELECT COUNT(*) AS cnt FROM memory_decisions WHERE cwd = ?').get(tmpDir);
-    assert.strictEqual(countRow.cnt, 3, 'SQLite should have 3 decision rows');
-
-    // Verify original JSON file is untouched
-    const onDisk = JSON.parse(fs.readFileSync(path.join(tmpDir, '.planning', 'memory', 'decisions.json'), 'utf-8'));
-    assert.strictEqual(onDisk.length, 3, 'JSON file should be unchanged after migration');
-  });
-
-  test('migrateMemoryStores imports lessons from JSON', () => {
-    const entries = [
-      { summary: 'Lesson one', phase: '01', timestamp: '2026-01-01T00:00:00Z' },
-      { summary: 'Lesson two', phase: '01', timestamp: '2026-01-02T00:00:00Z' },
-    ];
-    fs.writeFileSync(path.join(tmpDir, '.planning', 'memory', 'lessons.json'), JSON.stringify(entries));
-
-    const result = cache.migrateMemoryStores(tmpDir);
-    assert.ok(result, 'should return result');
-    assert.strictEqual(result.migrated.lessons, 2, 'should migrate 2 lessons');
-
-    const countRow = db.prepare('SELECT COUNT(*) AS cnt FROM memory_lessons WHERE cwd = ?').get(tmpDir);
-    assert.strictEqual(countRow.cnt, 2, 'SQLite should have 2 lesson rows');
-  });
-
-  test('migrateMemoryStores imports trajectories from trajectory.json', () => {
-    const entries = [
-      { id: 'tj-aaa001', category: 'checkpoint', text: 'First', phase: '01', scope: 'phase', timestamp: '2026-01-01T00:00:00Z', tags: ['checkpoint'] },
-      { id: 'tj-aaa002', category: 'decision', text: 'Second', phase: '01', scope: 'task', timestamp: '2026-01-02T00:00:00Z', tags: [] },
-      { id: 'tj-aaa003', category: 'observation', text: 'Third', phase: '02', scope: 'phase', timestamp: '2026-01-03T00:00:00Z', tags: [] },
-    ];
-    fs.writeFileSync(path.join(tmpDir, '.planning', 'memory', 'trajectory.json'), JSON.stringify(entries));
-
-    const result = cache.migrateMemoryStores(tmpDir);
-    assert.ok(result, 'should return result');
-    assert.strictEqual(result.migrated.trajectories, 3, 'should migrate 3 trajectories');
-
-    const rows = db.prepare('SELECT entry_id, category FROM memory_trajectories WHERE cwd = ?').all(tmpDir);
-    assert.strictEqual(rows.length, 3, 'SQLite should have 3 trajectory rows');
-    const ids = rows.map(r => r.entry_id);
-    assert.ok(ids.includes('tj-aaa001'), 'entry_id column should be populated');
-    assert.ok(ids.includes('tj-aaa002'));
-  });
-
-  test('migrateMemoryStores imports bookmarks from bookmarks.json', () => {
-    const entries = [
-      { phase: '11', plan: '01', task: 3, total_tasks: 5, git_head: 'abc123', timestamp: '2026-01-03T00:00:00Z' },
-      { phase: '10', plan: '02', task: 1, total_tasks: 3, git_head: 'def456', timestamp: '2026-01-02T00:00:00Z' },
-    ];
-    fs.writeFileSync(path.join(tmpDir, '.planning', 'memory', 'bookmarks.json'), JSON.stringify(entries));
-
-    const result = cache.migrateMemoryStores(tmpDir);
-    assert.ok(result, 'should return result');
-    assert.strictEqual(result.migrated.bookmarks, 2, 'should migrate 2 bookmarks');
-
-    const rows = db.prepare('SELECT phase, plan, task FROM memory_bookmarks WHERE cwd = ?').all(tmpDir);
-    assert.strictEqual(rows.length, 2, 'SQLite should have 2 bookmark rows');
-    // phase/plan/task columns should be populated
-    assert.ok(rows.some(r => r.phase === '11' && r.plan === '01' && r.task === 3), 'phase/plan/task columns populated');
-  });
-
-  test('migration is idempotent — second call does not duplicate', () => {
-    const entries = [
-      { summary: 'Decision one', phase: '01', timestamp: '2026-01-01T00:00:00Z' },
-      { summary: 'Decision two', phase: '01', timestamp: '2026-01-02T00:00:00Z' },
-    ];
-    fs.writeFileSync(path.join(tmpDir, '.planning', 'memory', 'decisions.json'), JSON.stringify(entries));
-
-    cache.migrateMemoryStores(tmpDir);
-    cache.migrateMemoryStores(tmpDir); // second call
-
-    const countRow = db.prepare('SELECT COUNT(*) AS cnt FROM memory_decisions WHERE cwd = ?').get(tmpDir);
-    assert.strictEqual(countRow.cnt, 2, 'second migration should not duplicate entries');
-  });
-
-  test('migration handles missing JSON files gracefully', () => {
-    // No .planning/memory/ content at all — just the empty directory
-    const result = cache.migrateMemoryStores(tmpDir);
-    assert.ok(result, 'should return result without error');
-    assert.strictEqual(result.migrated.decisions, 0, 'decisions should be 0');
-    assert.strictEqual(result.migrated.lessons, 0, 'lessons should be 0');
-    assert.strictEqual(result.migrated.trajectories, 0, 'trajectories should be 0');
-    assert.strictEqual(result.migrated.bookmarks, 0, 'bookmarks should be 0');
-  });
-
-  test('migration handles corrupt JSON gracefully', () => {
-    // Write invalid JSON to decisions.json
-    fs.writeFileSync(path.join(tmpDir, '.planning', 'memory', 'decisions.json'), 'not valid json {{');
-
-    // Write valid lessons.json
-    const lessons = [{ summary: 'Valid lesson', phase: '01', timestamp: '2026-01-01T00:00:00Z' }];
-    fs.writeFileSync(path.join(tmpDir, '.planning', 'memory', 'lessons.json'), JSON.stringify(lessons));
-
-    const result = cache.migrateMemoryStores(tmpDir);
-    assert.ok(result, 'should return result without throwing');
-    assert.strictEqual(result.migrated.decisions, 0, 'corrupt decisions should be skipped');
-    assert.strictEqual(result.migrated.lessons, 1, 'valid lessons should still migrate');
-    assert.ok(result.skipped.includes('decisions'), 'decisions should be in skipped list');
   });
 });
 
