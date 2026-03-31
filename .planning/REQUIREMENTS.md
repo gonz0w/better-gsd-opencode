@@ -17,7 +17,7 @@ Make bGSD easier to maintain and safer for agents to modify by removing compatib
 
 ### CLEAN - Greenfield Compatibility Cleanup
 
-- [ ] **CLEAN-01** Maintainer can remove migration-only commands and helpers that exist only for legacy installs, storage transitions, or obsolete local-state upgrades.
+- [x] **CLEAN-01** Maintainer can remove migration-only commands and helpers that exist only for legacy installs, storage transitions, or obsolete local-state upgrades.
 - [ ] **CLEAN-02** Maintainer can remove planning and config normalization paths that only support superseded file shapes while current canonical `.planning/` artifacts still parse and validate.
 - [ ] **CLEAN-03** Users see docs, templates, and help text that match the supported JJ/workspace-first model rather than stale worktree-era or compatibility-era guidance.
 

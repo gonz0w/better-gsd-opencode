@@ -5,24 +5,24 @@
 See: .planning/PROJECT.md (updated 2026-03-31)
 
 **Core value:** Manage and deliver high-quality software with high-quality documentation, while continuously reducing token usage and improving performance.
-**Current focus:** Phase 173 verified complete — ready for next phase planning
+**Current focus:** Phase 174 — greenfield-compatibility-surface-cleanup plan 02 of 5
 
 ## Current Position
 
-**Phase:** 173
+**Phase:** 174
 **Current Plan:** 2
-**Total Plans in Phase:** 2
-**Status:** Verification passed — ready for next phase
-**Last Activity:** 2026-03-31 — Verified Phase 173 goal achievement and marked roadmap complete
+**Total Plans in Phase:** 5
+**Status:** Ready to execute
+**Last Activity:** 2026-03-31 — Completed Phase 174 Plan 01 and advanced to plan 02
 
-**Progress:** [██████████] 100%
+**Progress:** [██████████] 96%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 355 (through Phase 173 P02)
+- Total plans completed: 356 (through Phase 174 P01)
 - Average duration: ~12 min/plan
-- Total execution time: ~54.7 hours
+- Total execution time: ~54.8 hours
 
 **By Phase:**
 
@@ -35,12 +35,15 @@ See: .planning/PROJECT.md (updated 2026-03-31)
 - Last shipped milestone: v18.0 completed 5 phases (168-172)
 - Trend: Stable
 | Phase 173 P02 | 3 min | 3 tasks | 1 files |
+| Phase 174 P01 | 6 min | 2 tasks | 12 files |
 
 ## Accumulated Context
 
 ### Decisions
 
 - [Phase 173]: Defined gate-based cleanup sequencing and staged router/ambient-global hot spots last — Phase 173 now needs explicit safety boundaries so later cleanup plans can start with proven low-blast-radius work and defer router, argv, and oversized command hotspots until earlier reductions land.
+- [Phase 173]: Defined gate-based cleanup sequencing and staged router/ambient-global hot spots last — Phase 173 now needs explicit safety boundaries so later cleanup plans can start with proven low-blast-radius work and defer router, argv, and oversized command hotspots until earlier reductions land.
+- [Phase 174]: Removed util:config-migrate from the supported CLI surface and docs — Phase 174 requires migration-only config helpers to disappear so maintainers follow canonical validate/edit workflows.
 
 ### Pending Todos
 
@@ -52,6 +55,6 @@ None
 
 ## Session Continuity
 
-Last session: 2026-03-31T23:03:50Z
-Stopped at: Verified Phase 173 goal achievement
-Resume file: .planning/milestones/v18.1-phases/173-simplification-audit-safe-sequencing/173-VERIFICATION.md
+Last session: 2026-03-31T23:54:50.766Z
+Stopped at: Completed 174-01-PLAN.md
+Resume file: None
