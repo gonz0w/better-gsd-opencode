@@ -2,15 +2,17 @@
 
 const { describe, test } = require('node:test');
 const assert = require('node:assert');
+const fs = require('fs');
 const path = require('path');
 
 const snapshotModulePath = path.join(__dirname, '..', 'src', 'plugin', 'cmux-sidebar-snapshot.js');
 
 async function loadSnapshotModule() {
   try {
-    return await import(snapshotModulePath);
+    const source = fs.readFileSync(snapshotModulePath, 'utf-8');
+    return await import(`data:text/javascript;charset=utf-8,${encodeURIComponent(source)}`);
   } catch (error) {
-    if (error && error.code === 'ERR_MODULE_NOT_FOUND') {
+    if (error && (error.code === 'ERR_MODULE_NOT_FOUND' || error.code === 'ENOENT')) {
       return {};
     }
     throw error;
