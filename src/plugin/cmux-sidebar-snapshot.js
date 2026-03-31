@@ -6,6 +6,10 @@ function hasPattern(value, pattern) {
   return pattern.test(normalizeText(value));
 }
 
+function getSignalText(state) {
+  return `${normalizeText(state?.status)} ${extractContinuityText(state)}`.trim();
+}
+
 function extractSection(state, sectionName) {
   if (!state) return null;
   if (typeof state.getSection === 'function') {
@@ -46,9 +50,7 @@ function parsePlanNumber(state) {
 }
 
 function deriveWorkflowLabel(state) {
-  const status = normalizeText(state?.status);
-  const continuity = extractContinuityText(state);
-  const signal = `${status} ${continuity}`;
+  const signal = getSignalText(state);
 
   if (/\bverif(?:y|ying|ication)\b/.test(signal)) return 'Verifying';
   if (/\bplan(?:ning)?\b/.test(signal) || /ready to plan/.test(signal)) return 'Planning';
@@ -60,7 +62,7 @@ function deriveWorkflowLabel(state) {
 }
 
 function isHumanGate(state) {
-  const signal = `${normalizeText(state?.status)} ${extractContinuityText(state)} ${extractBlockerLines(state).join(' ')}`;
+  const signal = `${getSignalText(state)} ${extractBlockerLines(state).join(' ')}`.trim();
   return /(ready to plan|input needed|await(?:ing)? (?:reply|response|approval|review|decision)|needs? (?:reply|response|approval|review|decision)|checkpoint|manual (?:setup|action|step)|auth|login|sign in|required reply|human action)/.test(signal);
 }
 
