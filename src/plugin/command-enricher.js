@@ -1,6 +1,7 @@
 import { getProjectState } from './project-state.js';
 import { parsePlans } from './parsers/index.js';
 import { evaluateDecisions } from '../lib/decision-rules.js';
+import { resolveModelSelectionFromConfig } from '../lib/helpers.js';
 import { getDb, PlanningCache } from './lib/db-cache.js';
 import { isDebugEnabled, writeDebugDiagnostic } from './debug-contract.js';
 import { computeCapabilityLevel, getToolAvailability } from './tool-availability.js';
@@ -363,11 +364,13 @@ export function enrichCommand(input, output, cwd) {
     if (agentType) {
       enrichment.agent_type = agentType;
     }
+    enrichment.model_settings = config ? config.model_settings : undefined;
     enrichment.model_profile = config ? (config.model_profile || 'balanced') : 'balanced';
-    // db handle passed to model-selection rule for SQLite-backed lookup
-    try {
-      enrichment.db = getDb(resolvedCwd);
-    } catch { /* db unavailable — rule falls back to static */ }
+    enrichment.selected_profile = enrichment.model_settings?.default_profile || enrichment.model_profile;
+    if (agentType) {
+      const resolvedModel = resolveModelSelectionFromConfig(config || {}, agentType);
+      enrichment.resolved_model = resolvedModel.model;
+    }
   } catch { /* model-selection inputs failed */ }
 
   // verification-routing (DEC-02): files_modified_count from first incomplete plan frontmatter
@@ -536,6 +539,11 @@ export function enrichCommand(input, output, cwd) {
     const decisions = evaluateDecisions(command, enrichment);
     if (decisions && Object.keys(decisions).length > 0) {
       enrichment.decisions = decisions;
+      const modelDecision = decisions['model-selection']?.value;
+      if (modelDecision) {
+        enrichment.selected_profile = modelDecision.profile || modelDecision.tier || enrichment.selected_profile;
+        enrichment.resolved_model = modelDecision.model || enrichment.resolved_model;
+      }
     }
   } catch { /* decision evaluation failure is non-fatal */ }
 

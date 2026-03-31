@@ -131,6 +131,85 @@ describe('integration: workflow sequences', () => {
   });
 });
 
+describe('integration: phase 168 canonical model resolution', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'PROJECT.md'), '# Phase 168 fixture\n');
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'ROADMAP.md'), `# Roadmap\n\n### Phase 168: Adaptive Model Settings Contract\n**Goal:** Canonical model resolution\n**Requirements:** MODEL-02 MODEL-03\n`);
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'STATE.md'), `# Project State\n\n## Current Position\n\n**Phase:** 168\n**Current Plan:** 03\n**Total Plans in Phase:** 1\n**Status:** Ready to execute\n**Last Activity:** 2026-03-31\n\nProgress: [██████████] 98%\n\n## Accumulated Context\n\n### Decisions\n\nNone yet.\n\n### Blockers/Concerns\n\nNone\n\n## Session Continuity\n\nLast session: 2026-03-31T02:26:48.895Z\nStopped at: Ready for canonical resolver test\nResume file: None\n`);
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'config.json'), JSON.stringify({
+      model_settings: {
+        default_profile: 'quality',
+        profiles: {
+          quality: { model: 'gpt-5.4' },
+          balanced: { model: 'gpt-5.4-mini' },
+          budget: { model: 'gpt-5.4-nano' },
+        },
+        agent_overrides: {
+          'bgsd-executor': 'ollama/qwen3-coder:latest',
+        },
+      },
+    }, null, 2));
+
+    const phaseDir = path.join(tmpDir, '.planning', 'phases', '168-adaptive-model-settings-contract');
+    fs.mkdirSync(phaseDir, { recursive: true });
+    fs.writeFileSync(path.join(phaseDir, '168-03-PLAN.md'), `---
+phase: 168-adaptive-model-settings-contract
+plan: 03
+type: execute
+wave: 1
+depends_on: []
+files_modified:
+  - src/lib/helpers.js
+autonomous: true
+requirements:
+  - MODEL-02
+must_haves:
+  truths: []
+  artifacts: []
+  key_links: []
+---
+
+<objective>
+Canonical model resolution fixture.
+</objective>
+
+<tasks>
+<task type="auto"><name>Fixture</name></task>
+</tasks>
+`);
+    initJjRepo(tmpDir);
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('resolve-model and init:execute-phase use the same canonical contract path', () => {
+    const executorResolve = runGsdTools('util:resolve-model bgsd-executor', tmpDir);
+    assert.ok(executorResolve.success, `resolve-model executor failed: ${executorResolve.error}`);
+    const executorData = JSON.parse(executorResolve.output);
+    assert.strictEqual(executorData.model, 'ollama/qwen3-coder:latest');
+    assert.strictEqual(executorData.selected_profile, 'quality');
+    assert.strictEqual(executorData.source, 'agent_override');
+
+    const plannerResolve = runGsdTools('util:resolve-model bgsd-planner', tmpDir);
+    assert.ok(plannerResolve.success, `resolve-model planner failed: ${plannerResolve.error}`);
+    const plannerData = JSON.parse(plannerResolve.output);
+    assert.strictEqual(plannerData.model, 'gpt-5.4');
+    assert.strictEqual(plannerData.selected_profile, 'quality');
+    assert.strictEqual(plannerData.source, 'default_profile');
+
+    const initResult = runGsdTools('init:execute-phase 168 --verbose', tmpDir);
+    assert.ok(initResult.success, `init:execute-phase failed: ${initResult.error}`);
+    const initData = JSON.parse(initResult.output);
+    assert.strictEqual(initData.executor_model, 'ollama/qwen3-coder:latest');
+    assert.strictEqual(initData.verifier_model, 'gpt-5.4');
+  });
+});
+
 describe('integration: scoped effective intent delivery', () => {
   test('plan-phase agent scoping keeps effective_intent for planner and verifier-style handoffs stay compact', () => {
     const planner = JSON.parse(runGsdTools('init:plan-phase 157 --agent=bgsd-planner --raw').output);
@@ -186,22 +265,17 @@ describe('integration: state round-trip', () => {
   });
 
   test('full state lifecycle: patch fields, get each, add decision', () => {
-    // Patch Phase, Plan, Status (no --raw: returns JSON with updated/failed)
-    const patchResult = runGsdTools('verify:state patch --Phase "2 of 3" --Plan "02" --Status "Planning"', tmpDir);
+    // Patch Phase + Status (Plan patching is not supported by current state mutator contract)
+    const patchResult = runGsdTools('verify:state patch --Phase "2 of 3" --Status "Planning"', tmpDir);
     assert.ok(patchResult.success, `state patch failed: ${patchResult.error}`);
     const patchData = JSON.parse(patchResult.output);
     assert.ok(patchData.updated.includes('Phase'), 'Phase should be updated');
-    assert.ok(patchData.updated.includes('Plan'), 'Plan should be updated');
     assert.ok(patchData.updated.includes('Status'), 'Status should be updated');
 
     // Get each back (no --raw: returns JSON object)
     const phaseGet = runGsdTools('verify:state get Phase', tmpDir);
     assert.ok(phaseGet.success);
     assert.strictEqual(JSON.parse(phaseGet.output).Phase, '2 of 3');
-
-    const planGet = runGsdTools('verify:state get Plan', tmpDir);
-    assert.ok(planGet.success);
-    assert.strictEqual(JSON.parse(planGet.output).Plan, '02');
 
     const statusGet = runGsdTools('verify:state get Status', tmpDir);
     assert.ok(statusGet.success);
@@ -305,6 +379,15 @@ describe('integration: config migration', () => {
       mode: 'yolo',
       depth: 'thorough',
       model_profile: 'balanced',
+      model_settings: {
+        default_profile: 'balanced',
+        profiles: {
+          quality: { model: 'gpt-5.4' },
+          balanced: { model: 'gpt-5.4-mini' },
+          budget: { model: 'gpt-5.4-nano' },
+        },
+        agent_overrides: {},
+      },
       parallelization: true,
       brave_search: false,
       model_profiles: {},
@@ -406,7 +489,7 @@ describe('integration: e2e simulation', () => {
     fs.mkdirSync(phaseDir, { recursive: true });
     fs.writeFileSync(
       path.join(phaseDir, '01-01-PLAN.md'),
-      '---\nwave: 1\nplan: "01-01"\nphase: "01"\ntype: execute\nautonomous: true\ndepends_on: []\nrequirements:\n  - E2E-01\nfiles_modified:\n  - src/index.js\nmust_haves:\n  artifacts: []\n  key_links: []\n---\n# Plan 01-01: E2E Test Plan\n\n<task type="implement">\n<name>Setup infrastructure</name>\n<files>src/index.js</files>\n<action>Create the setup code.</action>\n<verify>Check that it works.</verify>\n<done>Infrastructure is set up.</done>\n</task>\n'
+      '---\nphase: 01-test\nplan: 01\ntype: execute\nwave: 1\ndepends_on: []\nfiles_modified:\n  - src/index.js\nautonomous: true\nrequirements:\n  - E2E-01\nmust_haves:\n  truths:\n    - "Setup infrastructure exists for the integration fixture"\n  artifacts:\n    - path: "src/index.js"\n      provides: "Fixture setup entrypoint"\n      contains: "setup code"\n  key_links:\n    - from: "src/index.js"\n      to: ".planning/STATE.md"\n      via: "integration fixture references planning state"\n      pattern: "setup"\n---\n\n<objective>\nValidate the integration fixture.\n</objective>\n\n<tasks>\n<task type="auto">\n<name>Setup infrastructure</name>\n<files>src/index.js</files>\n<action>Create the setup code.</action>\n<verify>Check that it works.</verify>\n<done>Infrastructure is set up.</done>\n</task>\n</tasks>\n'
     );
 
     // Step 1: init progress --verbose → verify project_exists

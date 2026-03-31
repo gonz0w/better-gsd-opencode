@@ -1822,8 +1822,31 @@ var require_constants = __commonJS({
       "bgsd-verifier": { quality: "sonnet", balanced: "sonnet", budget: "haiku" },
       "bgsd-plan-checker": { quality: "sonnet", balanced: "sonnet", budget: "haiku" }
     };
+    var MODEL_SETTING_PROFILES = Object.freeze(["quality", "balanced", "budget"]);
+    var DEFAULT_MODEL_SETTINGS = Object.freeze({
+      default_profile: "balanced",
+      profiles: Object.freeze({
+        quality: Object.freeze({ model: "gpt-5.4" }),
+        balanced: Object.freeze({ model: "gpt-5.4-mini" }),
+        budget: Object.freeze({ model: "gpt-5.4-nano" })
+      }),
+      agent_overrides: Object.freeze({})
+    });
+    var VALID_MODEL_OVERRIDE_AGENTS = Object.freeze([
+      "bgsd-planner",
+      "bgsd-roadmapper",
+      "bgsd-executor",
+      "bgsd-phase-researcher",
+      "bgsd-project-researcher",
+      "bgsd-debugger",
+      "bgsd-codebase-mapper",
+      "bgsd-verifier",
+      "bgsd-plan-checker",
+      "bgsd-reviewer",
+      "bgsd-github-ci"
+    ]);
     var CONFIG_SCHEMA = {
-      model_profile: { type: "string", default: "balanced", description: "Active model profile (quality/balanced/budget)", aliases: [], nested: null },
+      model_settings: { type: "object", default: DEFAULT_MODEL_SETTINGS, description: "Shared model settings contract (default profile, profile models, agent overrides)", aliases: [], nested: null },
       commit_docs: { type: "boolean", default: true, description: "Auto-commit planning docs", aliases: [], nested: { section: "planning", field: "commit_docs" } },
       search_gitignored: { type: "boolean", default: false, description: "Include gitignored files in searches", aliases: [], nested: { section: "planning", field: "search_gitignored" } },
       branching_strategy: { type: "string", default: "none", description: "Git branching strategy", aliases: [], nested: { section: "git", field: "branching_strategy" } },
@@ -3662,14 +3685,26 @@ Examples:
   bgsd-tools questions:validate
   bgsd-tools questions:validate --json`
     };
-    module.exports = { MODEL_PROFILES, CONFIG_SCHEMA, COMMAND_HELP, VALID_TRAJECTORY_SCOPES };
+    module.exports = {
+      MODEL_PROFILES,
+      MODEL_SETTING_PROFILES,
+      DEFAULT_MODEL_SETTINGS,
+      VALID_MODEL_OVERRIDE_AGENTS,
+      CONFIG_SCHEMA,
+      COMMAND_HELP,
+      VALID_TRAJECTORY_SCOPES
+    };
   }
 });
 
 // src/lib/config-contract.js
 var require_config_contract = __commonJS({
   "src/lib/config-contract.js"(exports, module) {
-    var { CONFIG_SCHEMA } = require_constants();
+    var {
+      CONFIG_SCHEMA,
+      DEFAULT_MODEL_SETTINGS,
+      MODEL_SETTING_PROFILES
+    } = require_constants();
     function isPlainObject(value) {
       return !!value && typeof value === "object" && !Array.isArray(value);
     }
@@ -3727,6 +3762,55 @@ var require_config_contract = __commonJS({
         return cloneValue(def.default);
       }
       return cloneValue(rawValue);
+    }
+    function normalizeProfileDefinition(rawValue, fallback) {
+      const fallbackEntry = cloneValue(fallback);
+      if (typeof rawValue === "string") {
+        const model = rawValue.trim();
+        return model ? { model } : fallbackEntry;
+      }
+      if (isPlainObject(rawValue)) {
+        const model = typeof rawValue.model === "string" ? rawValue.model.trim() : "";
+        if (model) return { model };
+      }
+      return fallbackEntry;
+    }
+    function normalizeAgentOverrides(rawValue) {
+      if (!isPlainObject(rawValue)) return {};
+      const overrides = {};
+      for (const [agentId, modelValue] of Object.entries(rawValue)) {
+        if (typeof modelValue === "string") {
+          const model = modelValue.trim();
+          if (model) overrides[agentId] = model;
+          continue;
+        }
+        if (isPlainObject(modelValue) && typeof modelValue.model === "string") {
+          const model = modelValue.model.trim();
+          if (model) overrides[agentId] = model;
+        }
+      }
+      return overrides;
+    }
+    function normalizeModelSettings(rawValue) {
+      const defaults = cloneValue(DEFAULT_MODEL_SETTINGS);
+      if (!isPlainObject(rawValue)) return defaults;
+      const normalized = {
+        default_profile: typeof rawValue.default_profile === "string" && rawValue.default_profile.trim() ? rawValue.default_profile.trim() : defaults.default_profile,
+        profiles: {},
+        agent_overrides: normalizeAgentOverrides(rawValue.agent_overrides)
+      };
+      const rawProfiles = isPlainObject(rawValue.profiles) ? rawValue.profiles : {};
+      for (const profileName of MODEL_SETTING_PROFILES) {
+        normalized.profiles[profileName] = normalizeProfileDefinition(rawProfiles[profileName], defaults.profiles[profileName]);
+      }
+      return normalized;
+    }
+    function applyDerivedModelSettings(result) {
+      const modelSettings = normalizeModelSettings(result.model_settings);
+      result.model_settings = modelSettings;
+      result.model_profile = modelSettings.default_profile;
+      result.model_overrides = cloneValue(modelSettings.agent_overrides);
+      return result;
     }
     function preferredSchemaPath(key, def) {
       return def.nested ? `${def.nested.section}.${def.nested.field}` : key;
@@ -3789,6 +3873,7 @@ var require_config_contract = __commonJS({
           result[key] = cloneValue(rawValue);
         }
       }
+      applyDerivedModelSettings(result);
       return options.freeze === false ? result : deepFreeze(result);
     }
     function migrateConfig(rawConfig) {
@@ -4082,1587 +4167,2310 @@ var init_parsers = __esm({
   }
 });
 
-// src/lib/planning-cache.js
-var require_planning_cache = __commonJS({
-  "src/lib/planning-cache.js"(exports, module) {
-    "use strict";
-    var fs = __require("fs");
-    var PlanningCache2 = class {
-      /**
-       * @param {import('./db').SQLiteDatabase|import('./db').MapDatabase} db
-       */
-      constructor(db) {
-        this._db = db;
-        this._stmts = {};
-      }
-      // -------------------------------------------------------------------------
-      // Private helpers
-      // -------------------------------------------------------------------------
-      /**
-       * Whether the backend is a MapDatabase (no persistent storage).
-       * @returns {boolean}
-       * @private
-       */
-      _isMap() {
-        return this._db.backend === "map";
-      }
-      /**
-       * Get or create a lazy prepared statement.
-       * @param {string} key - Unique identifier for caching
-       * @param {string} sql
-       * @returns {import('node:sqlite').StatementSync}
-       * @private
-       */
-      _stmt(key, sql) {
-        if (!this._stmts[key]) {
-          this._stmts[key] = this._db.prepare(sql);
-        }
-        return this._stmts[key];
-      }
-      // -------------------------------------------------------------------------
-      // Mtime Invalidation
-      // -------------------------------------------------------------------------
-      /**
-       * Check whether a file's cached mtime matches its current mtime.
-       *
-       * @param {string} filePath - Absolute or relative file path
-       * @returns {'fresh'|'stale'|'missing'} - missing if no cache entry or any error
-       */
-      checkFreshness(filePath) {
-        if (this._isMap()) return "missing";
+// src/lib/output.js
+var require_output = __commonJS({
+  "src/lib/output.js"(exports, module) {
+    var _tmpFiles = [];
+    process.on("exit", () => {
+      for (const f of _tmpFiles) {
         try {
-          const row = this._stmt(
-            "file_cache_get",
-            "SELECT mtime_ms FROM file_cache WHERE file_path = ?"
-          ).get(filePath);
-          if (!row) return "missing";
-          const currentMtime = fs.statSync(filePath).mtimeMs;
-          return currentMtime === row.mtime_ms ? "fresh" : "stale";
-        } catch {
-          return "missing";
-        }
-      }
-      /**
-       * Store the current mtime of a file in file_cache.
-       *
-       * @param {string} filePath
-       */
-      updateMtime(filePath) {
-        if (this._isMap()) return;
-        try {
-          const mtime_ms = fs.statSync(filePath).mtimeMs;
-          this._stmt(
-            "file_cache_upsert",
-            "INSERT OR REPLACE INTO file_cache (file_path, mtime_ms, parsed_at) VALUES (?, ?, ?)"
-          ).run(filePath, mtime_ms, (/* @__PURE__ */ new Date()).toISOString());
+          fs.unlinkSync(f);
         } catch {
         }
       }
-      /**
-       * Bulk freshness check for multiple files.
-       *
-       * @param {string[]} filePaths
-       * @returns {{ fresh: string[], stale: string[], missing: string[] }}
-       */
-      checkAllFreshness(filePaths) {
-        const result = { fresh: [], stale: [], missing: [] };
-        for (const fp of filePaths) {
-          const status = this.checkFreshness(fp);
-          result[status].push(fp);
-        }
-        return result;
+    });
+    function filterFields(obj, fields) {
+      if (obj === null || obj === void 0) return obj;
+      if (Array.isArray(obj)) {
+        return obj.map((item) => filterFields(item, fields));
       }
-      /**
-       * Remove file_cache entry for a file and all dependent data.
-       * For roadmap files: removes phases, milestones, progress, requirements.
-       * For plan files: removes plan + tasks.
-       *
-       * @param {string} filePath
-       */
-      invalidateFile(filePath) {
-        if (this._isMap()) return;
-        try {
-          this._db.exec("BEGIN");
-          this._stmt(
-            "file_cache_delete",
-            "DELETE FROM file_cache WHERE file_path = ?"
-          ).run(filePath);
-          this._stmt(
-            "plans_delete_by_path",
-            "DELETE FROM plans WHERE path = ?"
-          ).run(filePath);
-          this._db.exec("COMMIT");
-        } catch {
-          try {
-            this._db.exec("ROLLBACK");
-          } catch {
-          }
-        }
-      }
-      // -------------------------------------------------------------------------
-      // Store Operations (write-through)
-      // -------------------------------------------------------------------------
-      /**
-       * Store parsed roadmap data for a project.
-       * Deletes all existing phases/milestones/progress/requirements for cwd,
-       * then inserts fresh data. Updates file_cache mtime for roadmapPath.
-       *
-       * @param {string} cwd - Project root directory
-       * @param {string} roadmapPath - Path to ROADMAP.md
-       * @param {object} parsed - Output from roadmap parser
-       * @param {Array} [parsed.phases]
-       * @param {Array} [parsed.milestones]
-       * @param {Array} [parsed.progress]
-       * @param {Array} [parsed.requirements]
-       */
-      storeRoadmap(cwd, roadmapPath, parsed) {
-        if (this._isMap()) return;
-        try {
-          this._db.exec("BEGIN");
-          this._stmt("phases_delete_cwd", "DELETE FROM phases WHERE cwd = ?").run(cwd);
-          this._stmt("milestones_delete_cwd", "DELETE FROM milestones WHERE cwd = ?").run(cwd);
-          this._stmt("progress_delete_cwd", "DELETE FROM progress WHERE cwd = ?").run(cwd);
-          this._stmt("requirements_delete_cwd", "DELETE FROM requirements WHERE cwd = ?").run(cwd);
-          const phaseInsert = this._stmt(
-            "phases_insert",
-            `INSERT OR REPLACE INTO phases
-         (number, cwd, name, status, plan_count, goal, depends_on, requirements, section)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
-          );
-          for (const phase of parsed.phases || []) {
-            phaseInsert.run(
-              phase.number || "",
-              cwd,
-              phase.name || "",
-              phase.status || "incomplete",
-              phase.plan_count != null ? phase.plan_count : 0,
-              phase.goal || null,
-              phase.depends_on ? JSON.stringify(phase.depends_on) : null,
-              phase.requirements ? JSON.stringify(phase.requirements) : null,
-              phase.section || null
-            );
-          }
-          const msInsert = this._stmt(
-            "milestones_insert",
-            `INSERT INTO milestones (cwd, name, version, status, phase_start, phase_end)
-         VALUES (?, ?, ?, ?, ?, ?)`
-          );
-          for (const ms of parsed.milestones || []) {
-            msInsert.run(
-              cwd,
-              ms.name || "",
-              ms.version || null,
-              ms.status || "pending",
-              ms.phase_start != null ? ms.phase_start : null,
-              ms.phase_end != null ? ms.phase_end : null
-            );
-          }
-          const progInsert = this._stmt(
-            "progress_insert",
-            `INSERT OR REPLACE INTO progress
-         (phase, cwd, plans_complete, plans_total, status, completed_date)
-         VALUES (?, ?, ?, ?, ?, ?)`
-          );
-          for (const prog of parsed.progress || []) {
-            progInsert.run(
-              prog.phase || "",
-              cwd,
-              prog.plans_complete != null ? prog.plans_complete : 0,
-              prog.plans_total != null ? prog.plans_total : 0,
-              prog.status || null,
-              prog.completed_date || null
-            );
-          }
-          const reqInsert = this._stmt(
-            "requirements_insert",
-            `INSERT OR REPLACE INTO requirements (req_id, cwd, phase_number, description)
-         VALUES (?, ?, ?, ?)`
-          );
-          const requirements = parsed.requirements || _extractRequirementsFromPhases2(parsed.phases || []);
-          for (const req of requirements) {
-            reqInsert.run(
-              req.req_id || req.id || "",
-              cwd,
-              req.phase_number || req.phase || null,
-              req.description || null
-            );
-          }
-          if (roadmapPath) {
-            this._updateMtimeInTx(roadmapPath);
-          }
-          this._db.exec("COMMIT");
-        } catch (e) {
-          try {
-            this._db.exec("ROLLBACK");
-          } catch {
-          }
-        }
-      }
-      /**
-       * Store a parsed plan and its tasks.
-       * Deletes existing plan+tasks for planPath, then inserts fresh data.
-       * Updates file_cache mtime for planPath.
-       *
-       * @param {string} planPath - Absolute path to the plan file
-       * @param {string} cwd - Project root directory
-       * @param {object} parsed - Output from plan parser
-       * @param {object} [parsed.frontmatter]
-       * @param {Array} [parsed.tasks]
-       * @param {string} [parsed.objective]
-       * @param {string} [parsed.raw]
-       */
-      storePlan(planPath, cwd, parsed) {
-        if (this._isMap()) return;
-        try {
-          this._db.exec("BEGIN");
-          this._stmt(
-            "plans_delete_path",
-            "DELETE FROM plans WHERE path = ?"
-          ).run(planPath);
-          const fm = parsed.frontmatter || {};
-          this._stmt(
-            "plans_insert",
-            `INSERT OR REPLACE INTO plans
-         (path, cwd, phase_number, plan_number, wave, autonomous, objective, task_count, frontmatter_json, raw)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-          ).run(
-            planPath,
-            cwd,
-            fm.phase ? String(fm.phase).split("-")[0] : null,
-            fm.plan != null ? String(fm.plan) : null,
-            fm.wave != null ? fm.wave : null,
-            fm.autonomous != null ? fm.autonomous ? 1 : 0 : null,
-            parsed.objective || null,
-            (parsed.tasks || []).length,
-            JSON.stringify(fm),
-            parsed.raw || null
-          );
-          const taskInsert = this._stmt(
-            "tasks_insert",
-            `INSERT OR REPLACE INTO tasks
-         (plan_path, idx, type, name, files_json, action, verify, done)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
-          );
-          for (let i = 0; i < (parsed.tasks || []).length; i++) {
-            const task = parsed.tasks[i];
-            taskInsert.run(
-              planPath,
-              i,
-              task.type || "auto",
-              task.name || null,
-              task.files ? JSON.stringify(task.files) : null,
-              task.action || null,
-              task.verify || null,
-              task.done || null
-            );
-          }
-          this._updateMtimeInTx(planPath);
-          this._db.exec("COMMIT");
-        } catch (e) {
-          try {
-            this._db.exec("ROLLBACK");
-          } catch {
-          }
-        }
-      }
-      /**
-       * Update file_cache mtime inside an existing transaction.
-       * @param {string} filePath
-       * @private
-       */
-      _updateMtimeInTx(filePath) {
-        try {
-          const mtime_ms = fs.statSync(filePath).mtimeMs;
-          this._stmt(
-            "file_cache_upsert_tx",
-            "INSERT OR REPLACE INTO file_cache (file_path, mtime_ms, parsed_at) VALUES (?, ?, ?)"
-          ).run(filePath, mtime_ms, (/* @__PURE__ */ new Date()).toISOString());
-        } catch {
-        }
-      }
-      // -------------------------------------------------------------------------
-      // Query Operations (cache reads)
-      // -------------------------------------------------------------------------
-      /**
-       * Get all phases for a project.
-       * @param {string} cwd
-       * @returns {Array|null} - Array of phase rows, or null if none cached
-       */
-      getPhases(cwd) {
-        if (this._isMap()) return null;
-        try {
-          const rows = this._stmt(
-            "phases_all",
-            "SELECT * FROM phases WHERE cwd = ? ORDER BY number"
-          ).all(cwd);
-          return rows.length > 0 ? rows : null;
-        } catch {
-          return null;
-        }
-      }
-      /**
-       * Get a single phase by number and cwd.
-       * @param {string} number
-       * @param {string} cwd
-       * @returns {object|null}
-       */
-      getPhase(number, cwd) {
-        if (this._isMap()) return null;
-        try {
-          const row = this._stmt(
-            "phase_by_number",
-            "SELECT * FROM phases WHERE number = ? AND cwd = ?"
-          ).get(number, cwd);
-          return row || null;
-        } catch {
-          return null;
-        }
-      }
-      /**
-       * Get all plans for a project.
-       * @param {string} cwd
-       * @returns {Array|null}
-       */
-      getPlans(cwd) {
-        if (this._isMap()) return null;
-        try {
-          const rows = this._stmt(
-            "plans_all",
-            "SELECT * FROM plans WHERE cwd = ? ORDER BY phase_number, plan_number"
-          ).all(cwd);
-          return rows.length > 0 ? rows : null;
-        } catch {
-          return null;
-        }
-      }
-      /**
-       * Get a single plan with its tasks.
-       * @param {string} planPath
-       * @returns {object|null} - Plan row with `.tasks` array, or null on miss
-       */
-      getPlan(planPath) {
-        if (this._isMap()) return null;
-        try {
-          const plan = this._stmt(
-            "plan_by_path",
-            "SELECT * FROM plans WHERE path = ?"
-          ).get(planPath);
-          if (!plan) return null;
-          const tasks = this._stmt(
-            "tasks_for_plan",
-            "SELECT * FROM tasks WHERE plan_path = ? ORDER BY idx"
-          ).all(planPath);
-          return { ...plan, tasks };
-        } catch {
-          return null;
-        }
-      }
-      /**
-       * Get all plans for a specific phase.
-       * @param {string} phaseNumber
-       * @param {string} cwd
-       * @returns {Array|null}
-       */
-      getPlansForPhase(phaseNumber, cwd) {
-        if (this._isMap()) return null;
-        try {
-          const rows = this._stmt(
-            "plans_for_phase",
-            "SELECT * FROM plans WHERE phase_number = ? AND cwd = ? ORDER BY plan_number"
-          ).all(phaseNumber, cwd);
-          return rows.length > 0 ? rows : null;
-        } catch {
-          return null;
-        }
-      }
-      /**
-       * Get all requirements for a project.
-       * @param {string} cwd
-       * @returns {Array|null}
-       */
-      getRequirements(cwd) {
-        if (this._isMap()) return null;
-        try {
-          const rows = this._stmt(
-            "requirements_all",
-            "SELECT * FROM requirements WHERE cwd = ? ORDER BY req_id"
-          ).all(cwd);
-          return rows.length > 0 ? rows : null;
-        } catch {
-          return null;
-        }
-      }
-      /**
-       * Get a single requirement by req_id and cwd.
-       * @param {string} reqId
-       * @param {string} cwd
-       * @returns {object|null}
-       */
-      getRequirement(reqId, cwd) {
-        if (this._isMap()) return null;
-        try {
-          const row = this._stmt(
-            "requirement_by_id",
-            "SELECT * FROM requirements WHERE req_id = ? AND cwd = ?"
-          ).get(reqId, cwd);
-          return row || null;
-        } catch {
-          return null;
-        }
-      }
-      /**
-       * Get all milestones for a project.
-       * @param {string} cwd
-       * @returns {Array|null}
-       */
-      getMilestones(cwd) {
-        if (this._isMap()) return null;
-        try {
-          const rows = this._stmt(
-            "milestones_all",
-            "SELECT * FROM milestones WHERE cwd = ? ORDER BY id"
-          ).all(cwd);
-          return rows.length > 0 ? rows : null;
-        } catch {
-          return null;
-        }
-      }
-      /**
-       * Get all progress entries for a project.
-       * @param {string} cwd
-       * @returns {Array|null}
-       */
-      getProgress(cwd) {
-        if (this._isMap()) return null;
-        try {
-          const rows = this._stmt(
-            "progress_all",
-            "SELECT * FROM progress WHERE cwd = ? ORDER BY phase"
-          ).all(cwd);
-          return rows.length > 0 ? rows : null;
-        } catch {
-          return null;
-        }
-      }
-      // -------------------------------------------------------------------------
-      // Memory Store Operations (decisions, lessons, trajectories, bookmarks)
-      // -------------------------------------------------------------------------
-      /**
-       * One-time JSON → SQLite migration for memory stores.
-       * Reads .planning/memory/{decisions,lessons,trajectory,bookmarks}.json and
-       * inserts all entries into the corresponding memory_* tables.
-       * Idempotent — skips migration if any entries already exist for this cwd.
-       *
-       * @param {string} cwd - Project root directory
-       * @returns {{ migrated: { decisions: number, lessons: number, trajectories: number, bookmarks: number }, skipped: string[] }|null}
-       */
-      migrateMemoryStores(cwd) {
-        if (this._isMap()) return null;
-        const result = { migrated: { decisions: 0, lessons: 0, trajectories: 0, bookmarks: 0 }, skipped: [] };
-        try {
-          const existing = this._stmt(
-            "mem_dec_count",
-            "SELECT COUNT(*) AS cnt FROM memory_decisions WHERE cwd = ?"
-          ).get(cwd);
-          if (existing && existing.cnt > 0) {
-            return result;
-          }
-          const memoryDir = __require("path").join(cwd, ".planning", "memory");
-          try {
-            const raw = __require("fs").readFileSync(__require("path").join(memoryDir, "decisions.json"), "utf8");
-            const entries = JSON.parse(raw);
-            if (Array.isArray(entries) && entries.length > 0) {
-              const ins = this._stmt(
-                "mem_dec_ins",
-                "INSERT INTO memory_decisions (cwd, summary, phase, timestamp, data_json) VALUES (?, ?, ?, ?, ?)"
-              );
-              this._db.exec("BEGIN");
-              for (const entry of entries) {
-                ins.run(cwd, entry.summary || null, entry.phase || null, entry.timestamp || null, JSON.stringify(entry));
-                result.migrated.decisions++;
-              }
-              this._db.exec("COMMIT");
-            }
-          } catch {
-            result.skipped.push("decisions");
-          }
-          try {
-            const raw = __require("fs").readFileSync(__require("path").join(memoryDir, "lessons.json"), "utf8");
-            const entries = JSON.parse(raw);
-            if (Array.isArray(entries) && entries.length > 0) {
-              const ins = this._stmt(
-                "mem_les_ins",
-                "INSERT INTO memory_lessons (cwd, summary, phase, timestamp, data_json) VALUES (?, ?, ?, ?, ?)"
-              );
-              this._db.exec("BEGIN");
-              for (const entry of entries) {
-                ins.run(cwd, entry.summary || null, entry.phase || null, entry.timestamp || null, JSON.stringify(entry));
-                result.migrated.lessons++;
-              }
-              this._db.exec("COMMIT");
-            }
-          } catch {
-            result.skipped.push("lessons");
-          }
-          try {
-            const raw = __require("fs").readFileSync(__require("path").join(memoryDir, "trajectory.json"), "utf8");
-            const entries = JSON.parse(raw);
-            if (Array.isArray(entries) && entries.length > 0) {
-              const ins = this._stmt(
-                "mem_trj_ins",
-                "INSERT INTO memory_trajectories (cwd, entry_id, category, text, phase, scope, checkpoint_name, attempt, confidence, timestamp, tags_json, data_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
-              );
-              this._db.exec("BEGIN");
-              for (const entry of entries) {
-                ins.run(
-                  cwd,
-                  entry.id || null,
-                  entry.category || null,
-                  entry.text || null,
-                  entry.phase || null,
-                  entry.scope || null,
-                  entry.checkpoint_name || null,
-                  entry.attempt != null ? entry.attempt : null,
-                  entry.confidence || null,
-                  entry.timestamp || null,
-                  entry.tags ? JSON.stringify(entry.tags) : null,
-                  JSON.stringify(entry)
-                );
-                result.migrated.trajectories++;
-              }
-              this._db.exec("COMMIT");
-            }
-          } catch {
-            result.skipped.push("trajectories");
-          }
-          try {
-            const raw = __require("fs").readFileSync(__require("path").join(memoryDir, "bookmarks.json"), "utf8");
-            const entries = JSON.parse(raw);
-            if (Array.isArray(entries) && entries.length > 0) {
-              const ins = this._stmt(
-                "mem_bkm_ins",
-                "INSERT INTO memory_bookmarks (cwd, phase, plan, task, total_tasks, git_head, timestamp, data_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
-              );
-              this._db.exec("BEGIN");
-              for (let i = entries.length - 1; i >= 0; i--) {
-                const entry = entries[i];
-                ins.run(
-                  cwd,
-                  entry.phase || null,
-                  entry.plan || null,
-                  entry.task != null ? entry.task : null,
-                  entry.total_tasks != null ? entry.total_tasks : null,
-                  entry.git_head || null,
-                  entry.timestamp || null,
-                  JSON.stringify(entry)
-                );
-                result.migrated.bookmarks++;
-              }
-              this._db.exec("COMMIT");
-            }
-          } catch {
-            result.skipped.push("bookmarks");
-          }
-        } catch {
-        }
-        return result;
-      }
-      /**
-       * LIKE-based SQL search across a memory store.
-       *
-       * @param {string} cwd - Project root directory
-       * @param {'decisions'|'lessons'|'trajectories'|'bookmarks'} store
-       * @param {string} query - Text to search (uses %query% LIKE pattern)
-       * @param {{ phase?: string, category?: string, limit?: number, offset?: number }} [options]
-       * @returns {{ entries: object[], total: number }|null}
-       */
-      searchMemory(cwd, store, query, options) {
-        if (this._isMap()) return null;
-        const opts = options || {};
-        const limit = opts.limit != null ? opts.limit : 50;
-        const offset = opts.offset != null ? opts.offset : 0;
-        try {
-          let table, searchCols, orderBy;
-          switch (store) {
-            case "decisions":
-              table = "memory_decisions";
-              searchCols = "(summary LIKE ? OR data_json LIKE ?)";
-              orderBy = "timestamp DESC";
-              break;
-            case "lessons":
-              table = "memory_lessons";
-              searchCols = "(summary LIKE ? OR data_json LIKE ?)";
-              orderBy = "timestamp DESC";
-              break;
-            case "trajectories":
-              table = "memory_trajectories";
-              searchCols = "(text LIKE ? OR data_json LIKE ?)";
-              orderBy = "id DESC";
-              break;
-            case "bookmarks":
-              table = "memory_bookmarks";
-              searchCols = "(phase LIKE ? OR data_json LIKE ?)";
-              orderBy = "timestamp DESC";
-              break;
-            default:
-              return null;
-          }
-          let params, whereClauses;
-          if (query) {
-            const likePattern = "%" + query + "%";
-            params = [cwd, likePattern, likePattern];
-            whereClauses = `cwd = ? AND ${searchCols}`;
+      if (typeof obj !== "object") return obj;
+      const result = {};
+      for (const field of fields) {
+        const parts = field.split(".");
+        if (parts.length === 1) {
+          result[field] = field in obj ? obj[field] : null;
+        } else {
+          const topKey = parts[0];
+          const rest = parts.slice(1).join(".");
+          if (!(topKey in obj)) {
+            result[topKey] = null;
           } else {
-            params = [cwd];
-            whereClauses = "cwd = ?";
-          }
-          if (opts.phase) {
-            whereClauses += " AND phase = ?";
-            params.push(opts.phase);
-          }
-          if (opts.category && store === "trajectories") {
-            whereClauses += " AND category = ?";
-            params.push(opts.category);
-          }
-          const countSql = `SELECT COUNT(*) AS cnt FROM ${table} WHERE ${whereClauses}`;
-          const countRow = this._db.prepare(countSql).get(...params);
-          const total = countRow ? countRow.cnt : 0;
-          const dataSql = `SELECT * FROM ${table} WHERE ${whereClauses} ORDER BY ${orderBy} LIMIT ? OFFSET ?`;
-          const rows = this._db.prepare(dataSql).all(...params, limit, offset);
-          const entries = rows.map((row) => {
-            try {
-              const parsed = JSON.parse(row.data_json);
-              return { ...parsed, _id: row.id };
-            } catch {
-              return { ...row };
-            }
-          });
-          return { entries, total };
-        } catch {
-          return null;
-        }
-      }
-      /**
-       * Insert a single entry into a memory store table (for dual-write).
-       * Does NOT touch JSON files — caller's responsibility.
-       *
-       * @param {string} cwd - Project root directory
-       * @param {'decisions'|'lessons'|'trajectories'|'bookmarks'} store
-       * @param {object} entry - Entry to insert
-       * @returns {{ inserted: boolean }|null}
-       */
-      writeMemoryEntry(cwd, store, entry) {
-        if (this._isMap()) return null;
-        try {
-          switch (store) {
-            case "decisions":
-              this._stmt(
-                "mem_dec_write",
-                "INSERT INTO memory_decisions (cwd, summary, phase, timestamp, data_json) VALUES (?, ?, ?, ?, ?)"
-              ).run(cwd, entry.summary || null, entry.phase || null, entry.timestamp || null, JSON.stringify(entry));
-              break;
-            case "lessons":
-              this._stmt(
-                "mem_les_write",
-                "INSERT INTO memory_lessons (cwd, summary, phase, timestamp, data_json) VALUES (?, ?, ?, ?, ?)"
-              ).run(cwd, entry.summary || null, entry.phase || null, entry.timestamp || null, JSON.stringify(entry));
-              break;
-            case "trajectories":
-              this._stmt(
-                "mem_trj_write",
-                "INSERT INTO memory_trajectories (cwd, entry_id, category, text, phase, scope, checkpoint_name, attempt, confidence, timestamp, tags_json, data_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
-              ).run(
-                cwd,
-                entry.id || null,
-                entry.category || null,
-                entry.text || null,
-                entry.phase || null,
-                entry.scope || null,
-                entry.checkpoint_name || null,
-                entry.attempt != null ? entry.attempt : null,
-                entry.confidence || null,
-                entry.timestamp || null,
-                entry.tags ? JSON.stringify(entry.tags) : null,
-                JSON.stringify(entry)
-              );
-              break;
-            case "bookmarks":
-              this._stmt(
-                "mem_bkm_write",
-                "INSERT INTO memory_bookmarks (cwd, phase, plan, task, total_tasks, git_head, timestamp, data_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
-              ).run(
-                cwd,
-                entry.phase || null,
-                entry.plan || null,
-                entry.task != null ? entry.task : null,
-                entry.total_tasks != null ? entry.total_tasks : null,
-                entry.git_head || null,
-                entry.timestamp || null,
-                JSON.stringify(entry)
-              );
-              break;
-            default:
-              return null;
-          }
-          return { inserted: true };
-        } catch {
-          return null;
-        }
-      }
-      /**
-       * Delete all entries for a memory store and cwd.
-       * Used for re-migration or test cleanup.
-       *
-       * @param {string} cwd - Project root directory
-       * @param {'decisions'|'lessons'|'trajectories'|'bookmarks'} store
-       */
-      clearMemoryStore(cwd, store) {
-        if (this._isMap()) return;
-        const tableMap = {
-          decisions: "memory_decisions",
-          lessons: "memory_lessons",
-          trajectories: "memory_trajectories",
-          bookmarks: "memory_bookmarks"
-        };
-        const table = tableMap[store];
-        if (!table) return;
-        try {
-          this._db.prepare(`DELETE FROM ${table} WHERE cwd = ?`).run(cwd);
-        } catch {
-        }
-      }
-      /**
-       * Get the most recent bookmark for a project.
-       *
-       * @param {string} cwd - Project root directory
-       * @returns {object|null}
-       */
-      getBookmarkTop(cwd) {
-        if (this._isMap()) return null;
-        try {
-          const row = this._stmt(
-            "mem_bkm_top",
-            "SELECT * FROM memory_bookmarks WHERE cwd = ? ORDER BY id DESC LIMIT 1"
-          ).get(cwd);
-          if (!row) return null;
-          try {
-            return JSON.parse(row.data_json);
-          } catch {
-            return { ...row };
-          }
-        } catch {
-          return null;
-        }
-      }
-      // -------------------------------------------------------------------------
-      // Model Profile Operations (Phase 122)
-      // -------------------------------------------------------------------------
-      /**
-       * Get model profile row for a specific cwd and agent type.
-       * Falls back to '__defaults__' cwd if no project-specific override exists.
-       *
-       * @param {string} cwd - Project root directory
-       * @param {string} agentType - Agent type (e.g. 'bgsd-planner')
-       * @returns {{ quality_model: string, balanced_model: string, budget_model: string, override_model: string|null }|null}
-       */
-      getModelProfile(cwd, agentType) {
-        if (this._isMap()) return null;
-        try {
-          const row = this._stmt(
-            "mp_get_cwd",
-            "SELECT * FROM model_profiles WHERE agent_type = ? AND cwd = ?"
-          ).get(agentType, cwd);
-          if (row) return row;
-          const defaultRow = this._stmt(
-            "mp_get_default",
-            "SELECT * FROM model_profiles WHERE agent_type = ? AND cwd = '__defaults__'"
-          ).get(agentType);
-          return defaultRow || null;
-        } catch {
-          return null;
-        }
-      }
-      /**
-       * Upsert a model profile row for a specific cwd and agent type.
-       *
-       * @param {string} cwd - Project root directory
-       * @param {string} agentType - Agent type
-       * @param {{ quality_model?: string, balanced_model?: string, budget_model?: string, override_model?: string }} profile
-       */
-      storeModelProfile(cwd, agentType, profile) {
-        if (this._isMap()) return;
-        try {
-          this._stmt(
-            "mp_upsert",
-            `INSERT OR REPLACE INTO model_profiles
-         (agent_type, cwd, quality_model, balanced_model, budget_model, override_model)
-         VALUES (?, ?, ?, ?, ?, ?)`
-          ).run(
-            agentType,
-            cwd,
-            profile.quality_model || "opus",
-            profile.balanced_model || "sonnet",
-            profile.budget_model || "haiku",
-            profile.override_model || null
-          );
-        } catch {
-        }
-      }
-      /**
-       * Get all model profiles for a cwd.
-       * Falls back to '__defaults__' rows for any agent type without a cwd-specific row.
-       *
-       * @param {string} cwd - Project root directory
-       * @returns {Array|null} Array of model profile rows, or null on miss/error
-       */
-      getModelProfiles(cwd) {
-        if (this._isMap()) return null;
-        try {
-          const rows = this._stmt(
-            "mp_all_cwd",
-            "SELECT * FROM model_profiles WHERE cwd = ? ORDER BY agent_type"
-          ).all(cwd);
-          if (rows && rows.length > 0) return rows;
-          const defaults = this._stmt(
-            "mp_all_defaults",
-            "SELECT * FROM model_profiles WHERE cwd = '__defaults__' ORDER BY agent_type"
-          ).all();
-          return defaults && defaults.length > 0 ? defaults : null;
-        } catch {
-          return null;
-        }
-      }
-      /**
-       * Seed model profile defaults for a project cwd from '__defaults__' rows.
-       * No-op if project-specific rows already exist for this cwd.
-       *
-       * @param {string} cwd - Project root directory
-       */
-      seedModelDefaults(cwd) {
-        if (this._isMap()) return;
-        try {
-          const existing = this._stmt(
-            "mp_count_cwd",
-            "SELECT COUNT(*) AS cnt FROM model_profiles WHERE cwd = ?"
-          ).get(cwd);
-          if (existing && existing.cnt > 0) return;
-          const defaults = this._stmt(
-            "mp_seed_defaults",
-            "SELECT * FROM model_profiles WHERE cwd = '__defaults__'"
-          ).all();
-          if (!defaults || defaults.length === 0) return;
-          const ins = this._stmt(
-            "mp_seed_insert",
-            `INSERT OR IGNORE INTO model_profiles
-         (agent_type, cwd, quality_model, balanced_model, budget_model, override_model)
-         VALUES (?, ?, ?, ?, ?, ?)`
-          );
-          this._db.exec("BEGIN");
-          for (const row of defaults) {
-            ins.run(row.agent_type, cwd, row.quality_model, row.balanced_model, row.budget_model, row.override_model || null);
-          }
-          this._db.exec("COMMIT");
-        } catch {
-          try {
-            this._db.exec("ROLLBACK");
-          } catch {
-          }
-        }
-      }
-      /**
-       * Clear all cached data for a given project root directory.
-       * Removes all rows from phases, milestones, progress, requirements, plans, tasks,
-       * and file_cache where cwd matches. Used for full cache reset (e.g. invalidateAll).
-       *
-       * @param {string} cwd - Project root directory
-       */
-      clearForCwd(cwd) {
-        if (this._isMap()) return;
-        try {
-          this._db.exec("BEGIN");
-          this._stmt("clear_phases_cwd", "DELETE FROM phases WHERE cwd = ?").run(cwd);
-          this._stmt("clear_milestones_cwd", "DELETE FROM milestones WHERE cwd = ?").run(cwd);
-          this._stmt("clear_progress_cwd", "DELETE FROM progress WHERE cwd = ?").run(cwd);
-          this._stmt("clear_requirements_cwd", "DELETE FROM requirements WHERE cwd = ?").run(cwd);
-          const planPaths = this._stmt(
-            "clear_plan_paths",
-            "SELECT path FROM plans WHERE cwd = ?"
-          ).all(cwd).map((r) => r.path);
-          for (const planPath of planPaths) {
-            this._stmt(
-              "clear_tasks_for_plan",
-              "DELETE FROM tasks WHERE plan_path = ?"
-            ).run(planPath);
-          }
-          this._stmt("clear_plans_cwd", "DELETE FROM plans WHERE cwd = ?").run(cwd);
-          this._stmt(
-            "clear_file_cache_cwd",
-            "DELETE FROM file_cache WHERE file_path LIKE ? || '%'"
-          ).run(cwd);
-          this._db.exec("COMMIT");
-        } catch {
-          try {
-            this._db.exec("ROLLBACK");
-          } catch {
-          }
-        }
-      }
-      // -------------------------------------------------------------------------
-      // Session State Operations (Phase 123)
-      // -------------------------------------------------------------------------
-      /**
-       * Upsert current position into session_state.
-       *
-       * @param {string} cwd - Project root directory
-       * @param {object} state - Position state fields:
-       *   { phase_number, phase_name, total_phases, current_plan, status, last_activity, progress, milestone }
-       */
-      storeSessionState(cwd, state) {
-        if (this._isMap()) return null;
-        try {
-          this._stmt(
-            "ss_upsert",
-            `INSERT OR REPLACE INTO session_state
-         (cwd, phase_number, phase_name, total_phases, current_plan, status, last_activity, progress, milestone, data_json)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-          ).run(
-            cwd,
-            state.phase_number || null,
-            state.phase_name || null,
-            state.total_phases != null ? state.total_phases : null,
-            state.current_plan || null,
-            state.status || null,
-            state.last_activity || null,
-            state.progress != null ? state.progress : null,
-            state.milestone || null,
-            JSON.stringify(state)
-          );
-          return { stored: true };
-        } catch {
-          return null;
-        }
-      }
-      /**
-       * Get session_state row for cwd.
-       *
-       * @param {string} cwd - Project root directory
-       * @returns {object|null} State row, or null on miss
-       */
-      getSessionState(cwd) {
-        if (this._isMap()) return null;
-        try {
-          const row = this._stmt(
-            "ss_get",
-            "SELECT * FROM session_state WHERE cwd = ?"
-          ).get(cwd);
-          return row || null;
-        } catch {
-          return null;
-        }
-      }
-      /**
-       * One-time import from parsed STATE.md data.
-       * Populates session_state, session_decisions, session_metrics, session_todos,
-       * session_blockers, session_continuity from the parsed object.
-       * Idempotent — skips if session_state row already exists for cwd.
-       *
-       * @param {string} cwd - Project root directory
-       * @param {object} parsed - Parsed STATE.md data with fields:
-       *   { phase_number, phase_name, total_phases, current_plan, status, last_activity, progress, milestone,
-       *     decisions, metrics, todos, blockers, continuity }
-       * @returns {{ migrated: boolean }|null}
-       */
-      migrateStateFromMarkdown(cwd, parsed) {
-        if (this._isMap()) return null;
-        try {
-          const existing = this._stmt(
-            "ss_check",
-            "SELECT cwd FROM session_state WHERE cwd = ?"
-          ).get(cwd);
-          if (existing) return { migrated: false, reason: "already_exists" };
-          this._db.exec("BEGIN");
-          this._stmt(
-            "ss_upsert2",
-            `INSERT OR REPLACE INTO session_state
-         (cwd, phase_number, phase_name, total_phases, current_plan, status, last_activity, progress, milestone, data_json)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-          ).run(
-            cwd,
-            parsed.phase_number || null,
-            parsed.phase_name || null,
-            parsed.total_phases != null ? parsed.total_phases : null,
-            parsed.current_plan || null,
-            parsed.status || null,
-            parsed.last_activity || null,
-            parsed.progress != null ? parsed.progress : null,
-            parsed.milestone || null,
-            JSON.stringify(parsed)
-          );
-          if (Array.isArray(parsed.decisions) && parsed.decisions.length > 0) {
-            const decIns = this._stmt(
-              "ss_dec_ins",
-              "INSERT INTO session_decisions (cwd, milestone, phase, summary, rationale, timestamp, data_json) VALUES (?, ?, ?, ?, ?, ?, ?)"
-            );
-            for (const d of parsed.decisions) {
-              decIns.run(cwd, d.milestone || null, d.phase || null, d.summary || null, d.rationale || null, d.timestamp || null, JSON.stringify(d));
-            }
-          }
-          if (Array.isArray(parsed.metrics) && parsed.metrics.length > 0) {
-            const metIns = this._stmt(
-              "ss_met_ins",
-              "INSERT INTO session_metrics (cwd, milestone, phase, plan, duration, tasks, files, test_count, timestamp, data_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
-            );
-            for (const m of parsed.metrics) {
-              metIns.run(cwd, m.milestone || null, m.phase || null, m.plan || null, m.duration || null, m.tasks != null ? m.tasks : null, m.files != null ? m.files : null, m.test_count != null ? m.test_count : null, m.timestamp || null, JSON.stringify(m));
-            }
-          }
-          if (Array.isArray(parsed.todos) && parsed.todos.length > 0) {
-            const todoIns = this._stmt(
-              "ss_todo_ins",
-              "INSERT INTO session_todos (cwd, text, priority, category, status, created_at, data_json) VALUES (?, ?, ?, ?, ?, ?, ?)"
-            );
-            for (const t of parsed.todos) {
-              todoIns.run(cwd, t.text || "", t.priority || null, t.category || null, t.status || "pending", t.created_at || null, JSON.stringify(t));
-            }
-          }
-          if (Array.isArray(parsed.blockers) && parsed.blockers.length > 0) {
-            const blkIns = this._stmt(
-              "ss_blk_ins",
-              "INSERT INTO session_blockers (cwd, text, status, created_at, data_json) VALUES (?, ?, ?, ?, ?)"
-            );
-            for (const b of parsed.blockers) {
-              blkIns.run(cwd, b.text || "", b.status || "open", b.created_at || null, JSON.stringify(b));
-            }
-          }
-          if (parsed.continuity) {
-            const c = parsed.continuity;
-            this._stmt(
-              "ss_cont_ins",
-              "INSERT OR REPLACE INTO session_continuity (cwd, last_session, stopped_at, next_step, data_json) VALUES (?, ?, ?, ?, ?)"
-            ).run(cwd, c.last_session || null, c.stopped_at || null, c.next_step || null, JSON.stringify(c));
-          }
-          this._db.exec("COMMIT");
-          return { migrated: true };
-        } catch {
-          try {
-            this._db.exec("ROLLBACK");
-          } catch {
-          }
-          return null;
-        }
-      }
-      /**
-       * Insert a performance metric row.
-       *
-       * @param {string} cwd - Project root directory
-       * @param {object} metric - { milestone, phase, plan, duration, tasks, files, test_count, timestamp }
-       * @returns {{ inserted: boolean }|null}
-       */
-      writeSessionMetric(cwd, metric) {
-        if (this._isMap()) return null;
-        try {
-          this._stmt(
-            "sm_ins",
-            "INSERT INTO session_metrics (cwd, milestone, phase, plan, duration, tasks, files, test_count, timestamp, data_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
-          ).run(
-            cwd,
-            metric.milestone || null,
-            metric.phase || null,
-            metric.plan || null,
-            metric.duration || null,
-            metric.tasks != null ? metric.tasks : null,
-            metric.files != null ? metric.files : null,
-            metric.test_count != null ? metric.test_count : null,
-            metric.timestamp || null,
-            JSON.stringify(metric)
-          );
-          return { inserted: true };
-        } catch {
-          return null;
-        }
-      }
-      /**
-       * Query session_metrics for cwd.
-       *
-       * @param {string} cwd - Project root directory
-       * @param {{ phase?: string, limit?: number }} [options]
-       * @returns {{ entries: object[], total: number }|null}
-       */
-      getSessionMetrics(cwd, options) {
-        if (this._isMap()) return null;
-        try {
-          const opts = options || {};
-          const limit = opts.limit != null ? opts.limit : 100;
-          let whereClauses = "cwd = ?";
-          const params = [cwd];
-          if (opts.phase) {
-            whereClauses += " AND phase = ?";
-            params.push(opts.phase);
-          }
-          const countRow = this._db.prepare("SELECT COUNT(*) AS cnt FROM session_metrics WHERE " + whereClauses).get(...params);
-          const total = countRow ? countRow.cnt : 0;
-          const rows = this._db.prepare("SELECT * FROM session_metrics WHERE " + whereClauses + " ORDER BY id DESC LIMIT ?").all(...params, limit);
-          const entries = rows.map((r) => {
-            try {
-              return JSON.parse(r.data_json);
-            } catch {
-              return r;
-            }
-          });
-          return { entries, total };
-        } catch {
-          return null;
-        }
-      }
-      /**
-       * Insert a decision row.
-       *
-       * @param {string} cwd - Project root directory
-       * @param {object} decision - { milestone, phase, summary, rationale, timestamp }
-       * @returns {{ inserted: boolean }|null}
-       */
-      writeSessionDecision(cwd, decision) {
-        if (this._isMap()) return null;
-        try {
-          this._stmt(
-            "sd_ins",
-            "INSERT INTO session_decisions (cwd, milestone, phase, summary, rationale, timestamp, data_json) VALUES (?, ?, ?, ?, ?, ?, ?)"
-          ).run(
-            cwd,
-            decision.milestone || null,
-            decision.phase || null,
-            decision.summary || null,
-            decision.rationale || null,
-            decision.timestamp || null,
-            JSON.stringify(decision)
-          );
-          return { inserted: true };
-        } catch {
-          return null;
-        }
-      }
-      /**
-       * Replace the touched session bundle in one SQLite transaction.
-       *
-       * Used by canonical mutators that compute one next model before writing
-       * STATE.md and SQLite.
-       *
-       * @param {string} cwd
-       * @param {{ state?: object, decisions?: object[], blockers?: object[], continuity?: object|null }} bundle
-       * @returns {{ stored: boolean }|null}
-       */
-      storeSessionBundle(cwd, bundle) {
-        if (this._isMap()) return null;
-        try {
-          this._db.exec("BEGIN");
-          if (bundle && Object.prototype.hasOwnProperty.call(bundle, "state")) {
-            const state = bundle.state || {};
-            this._stmt(
-              "ss_upsert_bundle",
-              `INSERT OR REPLACE INTO session_state
-           (cwd, phase_number, phase_name, total_phases, current_plan, status, last_activity, progress, milestone, data_json)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-            ).run(
-              cwd,
-              state.phase_number || null,
-              state.phase_name || null,
-              state.total_phases != null ? state.total_phases : null,
-              state.current_plan || null,
-              state.status || null,
-              state.last_activity || null,
-              state.progress != null ? state.progress : null,
-              state.milestone || null,
-              JSON.stringify(state)
-            );
-          }
-          if (bundle && Object.prototype.hasOwnProperty.call(bundle, "decisions")) {
-            this._stmt("sd_delete_bundle", "DELETE FROM session_decisions WHERE cwd = ?").run(cwd);
-            const decisions = Array.isArray(bundle.decisions) ? bundle.decisions : [];
-            if (decisions.length > 0) {
-              const insertDecision = this._stmt(
-                "sd_insert_bundle",
-                "INSERT INTO session_decisions (cwd, milestone, phase, summary, rationale, timestamp, data_json) VALUES (?, ?, ?, ?, ?, ?, ?)"
-              );
-              for (const decision of decisions) {
-                insertDecision.run(
-                  cwd,
-                  decision.milestone || null,
-                  decision.phase || null,
-                  decision.summary || null,
-                  decision.rationale || null,
-                  decision.timestamp || null,
-                  JSON.stringify(decision)
-                );
-              }
-            }
-          }
-          if (bundle && Object.prototype.hasOwnProperty.call(bundle, "blockers")) {
-            this._stmt("sb_delete_bundle", "DELETE FROM session_blockers WHERE cwd = ?").run(cwd);
-            const blockers = Array.isArray(bundle.blockers) ? bundle.blockers : [];
-            if (blockers.length > 0) {
-              const insertBlocker = this._stmt(
-                "sb_insert_bundle",
-                "INSERT INTO session_blockers (cwd, text, status, created_at, data_json) VALUES (?, ?, ?, ?, ?)"
-              );
-              for (const blocker of blockers) {
-                insertBlocker.run(
-                  cwd,
-                  blocker.text || "",
-                  blocker.status || "open",
-                  blocker.created_at || null,
-                  JSON.stringify(blocker)
-                );
-              }
-            }
-          }
-          if (bundle && Object.prototype.hasOwnProperty.call(bundle, "continuity")) {
-            if (bundle.continuity) {
-              this._stmt(
-                "sc_upsert_bundle",
-                "INSERT OR REPLACE INTO session_continuity (cwd, last_session, stopped_at, next_step, data_json) VALUES (?, ?, ?, ?, ?)"
-              ).run(
-                cwd,
-                bundle.continuity.last_session || null,
-                bundle.continuity.stopped_at || null,
-                bundle.continuity.next_step || null,
-                JSON.stringify(bundle.continuity)
-              );
+            const val = obj[topKey];
+            if (Array.isArray(val)) {
+              result[topKey] = val.map((item) => {
+                if (typeof item === "object" && item !== null) {
+                  return filterFields(item, [rest]);
+                }
+                return item;
+              });
+            } else if (typeof val === "object" && val !== null) {
+              const existing = result[topKey] || {};
+              const nested = filterFields(val, [rest]);
+              result[topKey] = typeof existing === "object" && !Array.isArray(existing) ? { ...existing, ...nested } : nested;
             } else {
-              this._stmt("sc_delete_bundle", "DELETE FROM session_continuity WHERE cwd = ?").run(cwd);
+              result[topKey] = val;
             }
           }
-          this._db.exec("COMMIT");
-          return { stored: true };
-        } catch {
+        }
+      }
+      return result;
+    }
+    function outputMode() {
+      return global._gsdOutputMode || "json";
+    }
+    function outputJSON(result, rawValue) {
+      const fs2 = __require("fs");
+      const path = __require("path");
+      const mode = global._gsdOutputMode || "json";
+      if (rawValue !== void 0 && mode !== "json") {
+        process.stdout.write(String(rawValue));
+        return;
+      }
+      let filtered = result;
+      if (global._gsdRequestedFields && typeof result === "object" && result !== null) {
+        filtered = filterFields(result, global._gsdRequestedFields);
+      }
+      const json = JSON.stringify(filtered, null, 2);
+      if (json.length > 5e4 && !process.env.BGSD_NO_TMPFILE) {
+        const crypto = __require("crypto");
+        const tmpPath = path.join(__require("os").tmpdir(), `gsd-${crypto.randomBytes(8).toString("hex")}.json`);
+        fs2.writeFileSync(tmpPath, json, "utf-8", { mode: 384 });
+        _tmpFiles.push(tmpPath);
+        process.stdout.write("@file:" + tmpPath);
+      } else {
+        process.stdout.write(json);
+      }
+    }
+    function output(result, options) {
+      if (typeof options === "boolean") {
+        outputJSON(result, arguments[2]);
+        process.exit(process.exitCode || 0);
+        return;
+      }
+      const opts = options || {};
+      const mode = outputMode();
+      if (mode === "json") {
+        outputJSON(result, opts.rawValue);
+      } else {
+        if (opts.formatter) {
+          const formatted = opts.formatter(result);
+          process.stdout.write(formatted + "\n");
+        } else {
+          outputJSON(result, opts.rawValue);
+        }
+      }
+      process.exit(process.exitCode || 0);
+    }
+    function status(message) {
+      process.stderr.write(message + "\n");
+    }
+    function error(message) {
+      process.stderr.write("Error: " + message + "\n");
+      process.exit(1);
+    }
+    function isTruthyDebugValue2(value) {
+      if (value === void 0 || value === null) return false;
+      if (typeof value === "boolean") return value;
+      const normalized = String(value).trim().toLowerCase();
+      return normalized !== "" && normalized !== "0" && normalized !== "false" && normalized !== "off";
+    }
+    function isVerboseModeEnabled() {
+      return global._gsdCompactMode === false;
+    }
+    function isDebugEnabled2(options = {}) {
+      const env = options.env || process.env;
+      if (isTruthyDebugValue2(env && env.BGSD_DEBUG)) {
+        return true;
+      }
+      if (options.allowVerbose === false) {
+        return false;
+      }
+      return isVerboseModeEnabled();
+    }
+    function writeDebugDiagnostic3(prefix, message, options = {}) {
+      if (!isDebugEnabled2(options)) {
+        return false;
+      }
+      process.stderr.write(`${prefix} ${message}
+`);
+      return true;
+    }
+    function debugLog(context, message, err) {
+      writeDebugDiagnostic3("[BGSD_DEBUG]", `${context}: ${message}${err ? ` | ${err.message || err}` : ""}`);
+    }
+    module.exports = {
+      filterFields,
+      output,
+      status,
+      error,
+      debugLog,
+      isDebugEnabled: isDebugEnabled2,
+      isVerboseModeEnabled,
+      writeDebugDiagnostic: writeDebugDiagnostic3
+    };
+  }
+});
+
+// src/lib/config.js
+var require_config = __commonJS({
+  "src/lib/config.js"(exports, module) {
+    var fs2 = __require("fs");
+    var path = __require("path");
+    var { execFileSync: execFileSync3 } = __require("child_process");
+    var { normalizeConfig: normalizeConfig2 } = require_config_contract();
+    var { debugLog, error } = require_output();
+    var _configCache = /* @__PURE__ */ new Map();
+    function readRawConfig(cwd) {
+      const configPath = path.join(cwd, ".planning", "config.json");
+      const raw = fs2.readFileSync(configPath, "utf-8");
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === "object" && Object.prototype.hasOwnProperty.call(parsed, "worktree")) {
+        error("Legacy `.planning/config.json.worktree` is no longer supported. Migrate to `.planning/config.json.workspace` with supported JJ settings like `base_path` and `max_concurrent` before running bGSD commands.");
+      }
+      return parsed;
+    }
+    function loadConfig(cwd) {
+      if (_configCache.has(cwd)) {
+        debugLog("config.load", `cache hit: ${cwd}`);
+        return _configCache.get(cwd);
+      }
+      try {
+        const result = normalizeConfig2(readRawConfig(cwd), { freeze: false });
+        _configCache.set(cwd, result);
+        return result;
+      } catch (e) {
+        debugLog("config.load", "parse config.json failed, using defaults", e);
+        const defaults = normalizeConfig2({}, { freeze: false });
+        _configCache.set(cwd, defaults);
+        return defaults;
+      }
+    }
+    function invalidateConfigCache(cwd) {
+      if (cwd) {
+        _configCache.delete(cwd);
+      } else {
+        _configCache.clear();
+      }
+    }
+    function isGitIgnored(cwd, targetPath) {
+      try {
+        execFileSync3("git", ["check-ignore", "-q", "--", targetPath], {
+          cwd,
+          stdio: "pipe"
+        });
+        return true;
+      } catch (e) {
+        debugLog("git.checkIgnore", "exec failed", e);
+        return false;
+      }
+    }
+    module.exports = { loadConfig, readRawConfig, isGitIgnored, invalidateConfigCache };
+  }
+});
+
+// src/lib/regex-cache.js
+var require_regex_cache = __commonJS({
+  "src/lib/regex-cache.js"(exports, module) {
+    var MAX_CACHE_SIZE = 200;
+    var _dynamicRegexCache = /* @__PURE__ */ new Map();
+    function cachedRegex(pattern, flags = "") {
+      const key = `${pattern}|||${flags}`;
+      if (_dynamicRegexCache.has(key)) {
+        const regex2 = _dynamicRegexCache.get(key);
+        _dynamicRegexCache.delete(key);
+        _dynamicRegexCache.set(key, regex2);
+        return regex2;
+      }
+      if (_dynamicRegexCache.size >= MAX_CACHE_SIZE) {
+        const oldest = _dynamicRegexCache.keys().next().value;
+        _dynamicRegexCache.delete(oldest);
+      }
+      const regex = new RegExp(pattern, flags);
+      _dynamicRegexCache.set(key, regex);
+      return regex;
+    }
+    var PHASE_DIR_NUMBER = /^(\d+(?:\.\d+)?)-?(.*)/;
+    module.exports = {
+      cachedRegex,
+      PHASE_DIR_NUMBER
+    };
+  }
+});
+
+// src/lib/cache.js
+var require_cache = __commonJS({
+  "src/lib/cache.js"(exports, module) {
+    "use strict";
+    var fs2 = __require("fs");
+    var path = __require("path");
+    var stats = { hits: 0, misses: 0 };
+    var researchStats = { hits: 0, misses: 0 };
+    var SQLiteBackend2 = class {
+      constructor(options = {}) {
+        this.maxSize = options.maxSize || 1e3;
+        this.ttl = options.ttl || 36e5;
+        const configHome = process.env.XDG_CONFIG_HOME || path.join(process.env.HOME || "/root", ".config");
+        const bgsdConfigDir = path.join(configHome, "oc", "bgsd-oc");
+        this.dbPath = path.join(bgsdConfigDir, "cache.db");
+        if (!fs2.existsSync(bgsdConfigDir)) {
+          fs2.mkdirSync(bgsdConfigDir, { recursive: true });
+        }
+        const { DatabaseSync } = __require("node:sqlite");
+        this.db = new DatabaseSync(this.dbPath);
+        this._initSchema();
+        this.statementCache = null;
+        this._initStatementCache();
+      }
+      /**
+       * Initialize statement caching using createTagStore().
+       * The tag store uses template literal tags for cached prepared statements.
+       */
+      _initStatementCache() {
+        const envValue = process.env.BGSD_SQLITE_STATEMENT_CACHE;
+        let enabled = true;
+        if (envValue === "0") {
+          enabled = false;
+        } else if (envValue === "1") {
+          enabled = true;
+        } else {
+          const nodeVersion = parseInt(process.version.slice(1).split(".")[0], 10);
+          const nodeMinor = parseInt(process.version.split(".")[1], 10);
+          enabled = nodeVersion > 22 || nodeVersion === 22 && nodeMinor >= 5;
+        }
+        if (!enabled) {
+          if (process.env.BGSD_DEBUG === "1") {
+            console.log("[Cache] Statement caching disabled via BGSD_SQLITE_STATEMENT_CACHE");
+          }
+          return;
+        }
+        try {
+          this.statementCache = this.db.createTagStore();
+          this._cachedStatements = {
+            // File cache operations
+            getFile: (key) => this.statementCache.get`SELECT * FROM file_cache WHERE key = ${key}`,
+            updateAccess: (accessed, key) => this.statementCache.run`UPDATE file_cache SET accessed = ${accessed} WHERE key = ${key}`,
+            countFile: () => this.statementCache.get`SELECT COUNT(*) as cnt FROM file_cache`,
+            getOldest: () => this.statementCache.get`SELECT key FROM file_cache ORDER BY accessed ASC LIMIT 1`,
+            deleteFile: (key) => this.statementCache.run`DELETE FROM file_cache WHERE key = ${key}`,
+            insertFile: (key, value, mtime, created, accessed) => this.statementCache.run`INSERT OR REPLACE INTO file_cache (key, value, mtime, created, accessed) VALUES (${key}, ${value}, ${mtime}, ${created}, ${accessed})`,
+            // Research cache operations
+            getResearch: (key) => this.statementCache.get`SELECT * FROM research_cache WHERE key = ${key}`,
+            deleteResearch: (key) => this.statementCache.run`DELETE FROM research_cache WHERE key = ${key}`,
+            countResearch: () => this.statementCache.get`SELECT COUNT(*) as cnt FROM research_cache`,
+            getOldestResearch: () => this.statementCache.get`SELECT key FROM research_cache ORDER BY accessed ASC LIMIT 1`,
+            insertResearch: (key, value, created, accessed, expires) => this.statementCache.run`INSERT OR REPLACE INTO research_cache (key, value, created, accessed, expires) VALUES (${key}, ${value}, ${created}, ${accessed}, ${expires})`,
+            updateResearchAccess: (accessed, key) => this.statementCache.run`UPDATE research_cache SET accessed = ${accessed} WHERE key = ${key}`,
+            // Clear operations
+            clearFile: () => this.statementCache.run`DELETE FROM file_cache`,
+            clearResearch: () => this.statementCache.run`DELETE FROM research_cache`
+          };
+          if (process.env.BGSD_DEBUG === "1") {
+            console.log("[Cache] Statement caching enabled via createTagStore()");
+          }
+        } catch (e) {
+          this.statementCache = null;
+          if (process.env.BGSD_DEBUG === "1") {
+            console.log("[Cache] Statement caching unavailable:", e.message);
+          }
+        }
+      }
+      _initSchema() {
+        this.db.exec(`
+      CREATE TABLE IF NOT EXISTS file_cache (
+        key TEXT PRIMARY KEY,
+        value TEXT NOT NULL,
+        mtime REAL NOT NULL,
+        created REAL NOT NULL,
+        accessed REAL NOT NULL
+      )
+    `);
+        this.db.exec(`
+      CREATE TABLE IF NOT EXISTS research_cache (
+        key TEXT PRIMARY KEY,
+        value TEXT NOT NULL,
+        created REAL NOT NULL,
+        accessed REAL NOT NULL,
+        expires REAL NOT NULL
+      )
+    `);
+      }
+      /**
+       * Get value from cache with staleness check.
+       * Returns null if not found or stale.
+       */
+      get(key) {
+        try {
+          const stmt = this._cachedStatements?.getFile || this.db.prepare("SELECT * FROM file_cache WHERE key = ?");
+          const row = stmt.get(key);
+          if (!row) {
+            stats.misses++;
+            return null;
+          }
           try {
-            this._db.exec("ROLLBACK");
-          } catch {
+            const fileStats = fs2.statSync(key);
+            if (fileStats.mtimeMs > row.mtime) {
+              this.invalidate(key);
+              stats.misses++;
+              return null;
+            }
+          } catch (e) {
+            this.invalidate(key);
+            stats.misses++;
+            return null;
           }
+          if (this._cachedStatements?.updateAccess) {
+            this._cachedStatements.updateAccess(Date.now(), key);
+          } else {
+            this.db.prepare("UPDATE file_cache SET accessed = ? WHERE key = ?").run(Date.now(), key);
+          }
+          stats.hits++;
+          return row.value;
+        } catch (e) {
+          stats.misses++;
           return null;
         }
       }
       /**
-       * Write the durable plan-completion core in one SQLite transaction.
-       * Upserts session_state and appends any provided decision rows together.
-       *
-       * @param {string} cwd
-       * @param {{ state: object, decisions?: object[] }} payload
-       * @returns {{ stored: boolean, decisions_written: number }|null}
+       * Set value in cache with LRU eviction.
        */
-      storeSessionCompletionCore(cwd, payload) {
-        if (this._isMap()) return null;
+      set(key, value) {
         try {
-          const state = payload?.state || {};
-          const decisions = Array.isArray(payload?.decisions) ? payload.decisions : [];
-          this._db.exec("BEGIN");
-          this._stmt(
-            "ss_upsert_completion_core",
-            `INSERT OR REPLACE INTO session_state
-         (cwd, phase_number, phase_name, total_phases, current_plan, status, last_activity, progress, milestone, data_json)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-          ).run(
-            cwd,
-            state.phase_number || null,
-            state.phase_name || null,
-            state.total_phases != null ? state.total_phases : null,
-            state.current_plan || null,
-            state.status || null,
-            state.last_activity || null,
-            state.progress != null ? state.progress : null,
-            state.milestone || null,
-            JSON.stringify(state)
-          );
-          if (decisions.length > 0) {
-            const insertDecision = this._stmt(
-              "sd_ins_completion_core",
-              "INSERT INTO session_decisions (cwd, milestone, phase, summary, rationale, timestamp, data_json) VALUES (?, ?, ?, ?, ?, ?, ?)"
-            );
-            for (const decision of decisions) {
-              insertDecision.run(
-                cwd,
-                decision.milestone || null,
-                decision.phase || null,
-                decision.summary || null,
-                decision.rationale || null,
-                decision.timestamp || null,
-                JSON.stringify(decision)
-              );
-            }
-          }
-          this._db.exec("COMMIT");
-          return { stored: true, decisions_written: decisions.length };
-        } catch {
+          let mtime = Date.now();
           try {
-            this._db.exec("ROLLBACK");
-          } catch {
+            const fileStats = fs2.statSync(key);
+            mtime = fileStats.mtimeMs;
+          } catch (e) {
           }
-          return null;
-        }
-      }
-      /**
-       * Query session_decisions for cwd.
-       *
-       * @param {string} cwd - Project root directory
-       * @param {{ phase?: string, limit?: number, offset?: number }} [options]
-       * @returns {{ entries: object[], total: number }|null}
-       */
-      getSessionDecisions(cwd, options) {
-        if (this._isMap()) return null;
-        try {
-          const opts = options || {};
-          const limit = opts.limit != null ? opts.limit : 100;
-          const offset = opts.offset != null ? opts.offset : 0;
-          let whereClauses = "cwd = ?";
-          const params = [cwd];
-          if (opts.phase) {
-            whereClauses += " AND phase = ?";
-            params.push(opts.phase);
-          }
-          const countRow = this._db.prepare("SELECT COUNT(*) AS cnt FROM session_decisions WHERE " + whereClauses).get(...params);
-          const total = countRow ? countRow.cnt : 0;
-          const rows = this._db.prepare("SELECT * FROM session_decisions WHERE " + whereClauses + " ORDER BY id DESC LIMIT ? OFFSET ?").all(...params, limit, offset);
-          const entries = rows.map((r) => {
-            try {
-              return JSON.parse(r.data_json);
-            } catch {
-              return r;
+          const now = Date.now();
+          const countResult = this._cachedStatements?.countFile ? this._cachedStatements.countFile() : this.db.prepare("SELECT COUNT(*) as cnt FROM file_cache").get();
+          if (countResult.cnt >= this.maxSize) {
+            const oldest = this._cachedStatements?.getOldest ? this._cachedStatements.getOldest() : this.db.prepare("SELECT key FROM file_cache ORDER BY accessed ASC LIMIT 1").get();
+            if (oldest) {
+              if (this._cachedStatements?.deleteFile) {
+                this._cachedStatements.deleteFile(oldest.key);
+              } else {
+                this.db.prepare("DELETE FROM file_cache WHERE key = ?").run(oldest.key);
+              }
             }
-          });
-          return { entries, total };
-        } catch {
-          return null;
-        }
-      }
-      /**
-       * Insert a todo row.
-       *
-       * @param {string} cwd - Project root directory
-       * @param {object} todo - { text, priority, category, status, created_at }
-       * @returns {{ inserted: boolean, id: number }|null}
-       */
-      writeSessionTodo(cwd, todo) {
-        if (this._isMap()) return null;
-        try {
-          const result = this._stmt(
-            "st_ins",
-            "INSERT INTO session_todos (cwd, text, priority, category, status, created_at, data_json) VALUES (?, ?, ?, ?, ?, ?, ?)"
-          ).run(
-            cwd,
-            todo.text || "",
-            todo.priority || null,
-            todo.category || null,
-            todo.status || "pending",
-            todo.created_at || null,
-            JSON.stringify(todo)
-          );
-          return { inserted: true, id: result ? result.lastInsertRowid : null };
-        } catch {
-          return null;
-        }
-      }
-      /**
-       * Query session_todos for cwd.
-       *
-       * @param {string} cwd - Project root directory
-       * @param {{ status?: string, limit?: number }} [options]
-       * @returns {{ entries: object[], total: number }|null}
-       */
-      getSessionTodos(cwd, options) {
-        if (this._isMap()) return null;
-        try {
-          const opts = options || {};
-          const limit = opts.limit != null ? opts.limit : 100;
-          let whereClauses = "cwd = ?";
-          const params = [cwd];
-          if (opts.status) {
-            whereClauses += " AND status = ?";
-            params.push(opts.status);
           }
-          const countRow = this._db.prepare("SELECT COUNT(*) AS cnt FROM session_todos WHERE " + whereClauses).get(...params);
-          const total = countRow ? countRow.cnt : 0;
-          const rows = this._db.prepare("SELECT * FROM session_todos WHERE " + whereClauses + " ORDER BY id DESC LIMIT ?").all(...params, limit);
-          const entries = rows.map((r) => {
-            try {
-              return JSON.parse(r.data_json);
-            } catch {
-              return r;
-            }
-          });
-          return { entries, total };
-        } catch {
-          return null;
-        }
-      }
-      /**
-       * Mark a todo as completed.
-       *
-       * @param {string} cwd - Project root directory
-       * @param {number} id - Todo row ID
-       * @returns {{ updated: boolean }|null}
-       */
-      completeSessionTodo(cwd, id) {
-        if (this._isMap()) return null;
-        try {
-          this._stmt(
-            "st_complete",
-            "UPDATE session_todos SET status='completed', completed_at=? WHERE id=? AND cwd=?"
-          ).run((/* @__PURE__ */ new Date()).toISOString(), id, cwd);
-          return { updated: true };
-        } catch {
-          return null;
-        }
-      }
-      /**
-       * Insert a blocker row.
-       *
-       * @param {string} cwd - Project root directory
-       * @param {object} blocker - { text, status, created_at }
-       * @returns {{ inserted: boolean, id: number }|null}
-       */
-      writeSessionBlocker(cwd, blocker) {
-        if (this._isMap()) return null;
-        try {
-          const result = this._stmt(
-            "sb_ins",
-            "INSERT INTO session_blockers (cwd, text, status, created_at, data_json) VALUES (?, ?, ?, ?, ?)"
-          ).run(
-            cwd,
-            blocker.text || "",
-            blocker.status || "open",
-            blocker.created_at || null,
-            JSON.stringify(blocker)
-          );
-          return { inserted: true, id: result ? result.lastInsertRowid : null };
-        } catch {
-          return null;
-        }
-      }
-      /**
-       * Query session_blockers for cwd.
-       *
-       * @param {string} cwd - Project root directory
-       * @param {{ status?: string, limit?: number }} [options]
-       * @returns {{ entries: object[], total: number }|null}
-       */
-      getSessionBlockers(cwd, options) {
-        if (this._isMap()) return null;
-        try {
-          const opts = options || {};
-          const limit = opts.limit != null ? opts.limit : 100;
-          let whereClauses = "cwd = ?";
-          const params = [cwd];
-          if (opts.status) {
-            whereClauses += " AND status = ?";
-            params.push(opts.status);
+          if (this._cachedStatements?.insertFile) {
+            this._cachedStatements.insertFile(key, value, mtime, now, now);
+          } else {
+            this.db.prepare(`
+          INSERT OR REPLACE INTO file_cache (key, value, mtime, created, accessed)
+          VALUES (?, ?, ?, ?, ?)
+        `).run(key, value, mtime, now, now);
           }
-          const countRow = this._db.prepare("SELECT COUNT(*) AS cnt FROM session_blockers WHERE " + whereClauses).get(...params);
-          const total = countRow ? countRow.cnt : 0;
-          const rows = this._db.prepare("SELECT * FROM session_blockers WHERE " + whereClauses + " ORDER BY id DESC LIMIT ?").all(...params, limit);
-          const entries = rows.map((r) => {
-            try {
-              return JSON.parse(r.data_json);
-            } catch {
-              return r;
+        } catch (e) {
+        }
+      }
+      /**
+       * Invalidate a specific cache entry.
+       */
+      invalidate(key) {
+        try {
+          if (this._cachedStatements?.deleteFile) {
+            this._cachedStatements.deleteFile(key);
+          } else {
+            this.db.prepare("DELETE FROM file_cache WHERE key = ?").run(key);
+          }
+        } catch (e) {
+        }
+      }
+      /**
+       * Clear all cache entries.
+       */
+      clear() {
+        try {
+          if (this._cachedStatements?.clearFile) {
+            this._cachedStatements.clearFile();
+          } else {
+            this.db.prepare("DELETE FROM file_cache").run();
+          }
+        } catch (e) {
+        }
+      }
+      /**
+       * Get cache status.
+       */
+      status() {
+        try {
+          const countResult = this._cachedStatements?.countFile ? this._cachedStatements.countFile() : this.db.prepare("SELECT COUNT(*) as cnt FROM file_cache").get();
+          return {
+            backend: "SQLite",
+            count: countResult.cnt,
+            hits: stats.hits,
+            misses: stats.misses,
+            dbPath: this.dbPath,
+            statementCache: this.statementCache !== null
+          };
+        } catch (e) {
+          return {
+            backend: "SQLite",
+            count: 0,
+            hits: stats.hits,
+            misses: stats.misses,
+            error: e.message,
+            statementCache: false
+          };
+        }
+      }
+      /**
+       * Warm cache with files.
+       */
+      warm(files) {
+        let warmed = 0;
+        for (const filePath of files) {
+          try {
+            if (fs2.existsSync(filePath)) {
+              const content = fs2.readFileSync(filePath, "utf-8");
+              this.set(filePath, content);
+              warmed++;
             }
-          });
-          return { entries, total };
-        } catch {
+          } catch (e) {
+          }
+        }
+        return warmed;
+      }
+      /**
+       * Get research result from cache.
+       * Returns null if not found or expired.
+       */
+      getResearch(key) {
+        try {
+          const row = this._cachedStatements?.getResearch ? this._cachedStatements.getResearch(key) : this.db.prepare("SELECT * FROM research_cache WHERE key = ?").get(key);
+          if (!row) {
+            researchStats.misses++;
+            return null;
+          }
+          if (Date.now() > row.expires) {
+            if (this._cachedStatements?.deleteResearch) {
+              this._cachedStatements.deleteResearch(key);
+            } else {
+              this.db.prepare("DELETE FROM research_cache WHERE key = ?").run(key);
+            }
+            researchStats.misses++;
+            return null;
+          }
+          if (this._cachedStatements?.updateResearchAccess) {
+            this._cachedStatements.updateResearchAccess(Date.now(), key);
+          } else {
+            this.db.prepare("UPDATE research_cache SET accessed = ? WHERE key = ?").run(Date.now(), key);
+          }
+          researchStats.hits++;
+          return JSON.parse(row.value);
+        } catch (e) {
+          researchStats.misses++;
           return null;
         }
       }
       /**
-       * Mark a blocker as resolved.
-       *
-       * @param {string} cwd - Project root directory
-       * @param {number} id - Blocker row ID
-       * @param {string} resolution - Resolution description
-       * @returns {{ updated: boolean }|null}
+       * Set research result in cache with TTL and LRU eviction.
        */
-      resolveSessionBlocker(cwd, id, resolution) {
-        if (this._isMap()) return null;
+      setResearch(key, value, ttlMs = 36e5) {
         try {
-          this._stmt(
-            "sb_resolve",
-            "UPDATE session_blockers SET status='resolved', resolved_at=?, resolution=? WHERE id=? AND cwd=?"
-          ).run((/* @__PURE__ */ new Date()).toISOString(), resolution || null, id, cwd);
-          return { updated: true };
-        } catch {
-          return null;
+          const serialized = JSON.stringify(value);
+          const now = Date.now();
+          const countResult = this._cachedStatements?.countResearch ? this._cachedStatements.countResearch() : this.db.prepare("SELECT COUNT(*) as cnt FROM research_cache").get();
+          if (countResult.cnt >= this.maxSize) {
+            const oldest = this._cachedStatements?.getOldestResearch ? this._cachedStatements.getOldestResearch() : this.db.prepare("SELECT key FROM research_cache ORDER BY accessed ASC LIMIT 1").get();
+            if (oldest) {
+              if (this._cachedStatements?.deleteResearch) {
+                this._cachedStatements.deleteResearch(oldest.key);
+              } else {
+                this.db.prepare("DELETE FROM research_cache WHERE key = ?").run(oldest.key);
+              }
+            }
+          }
+          if (this._cachedStatements?.insertResearch) {
+            this._cachedStatements.insertResearch(key, serialized, now, now, now + ttlMs);
+          } else {
+            this.db.prepare(`
+          INSERT OR REPLACE INTO research_cache (key, value, created, accessed, expires)
+          VALUES (?, ?, ?, ?, ?)
+        `).run(key, serialized, now, now, now + ttlMs);
+          }
+        } catch (e) {
         }
       }
       /**
-       * Upsert session continuity data.
-       *
-       * @param {string} cwd - Project root directory
-       * @param {object} continuity - { last_session, stopped_at, next_step }
-       * @returns {{ stored: boolean }|null}
+       * Clear all research cache entries.
        */
-      recordSessionContinuity(cwd, continuity) {
-        if (this._isMap()) return null;
+      clearResearch() {
         try {
-          this._stmt(
-            "sc_upsert",
-            "INSERT OR REPLACE INTO session_continuity (cwd, last_session, stopped_at, next_step, data_json) VALUES (?, ?, ?, ?, ?)"
-          ).run(
-            cwd,
-            continuity.last_session || null,
-            continuity.stopped_at || null,
-            continuity.next_step || null,
-            JSON.stringify(continuity)
-          );
-          return { stored: true };
-        } catch {
-          return null;
+          if (this._cachedStatements?.clearResearch) {
+            this._cachedStatements.clearResearch();
+          } else {
+            this.db.prepare("DELETE FROM research_cache").run();
+          }
+        } catch (e) {
         }
       }
       /**
-       * Get session_continuity row for cwd.
-       *
-       * @param {string} cwd - Project root directory
-       * @returns {object|null}
+       * Get research cache status.
        */
-      getSessionContinuity(cwd) {
-        if (this._isMap()) return null;
+      statusResearch() {
         try {
-          const row = this._stmt(
-            "sc_get",
-            "SELECT * FROM session_continuity WHERE cwd = ?"
-          ).get(cwd);
-          return row || null;
-        } catch {
-          return null;
+          const countResult = this._cachedStatements?.countResearch ? this._cachedStatements.countResearch() : this.db.prepare("SELECT COUNT(*) as cnt FROM research_cache").get();
+          return {
+            count: countResult.cnt,
+            hits: researchStats.hits,
+            misses: researchStats.misses
+          };
+        } catch (e) {
+          return { count: 0, hits: researchStats.hits, misses: researchStats.misses };
         }
       }
     };
-    function _extractRequirementsFromPhases2(phases) {
-      const requirements = [];
-      for (const phase of phases) {
-        const section = phase.section || "";
-        if (!section) continue;
-        const inlineMatch = section.match(/\*\*Requirements?\*\*:\s*([^\n]+)/i);
-        if (inlineMatch) {
-          const ids = inlineMatch[1].split(/[,\s]+/).filter((id) => /^[A-Z]+-\d+/.test(id));
-          for (const id of ids) {
-            requirements.push({
-              req_id: id,
-              phase_number: phase.number || "",
-              description: null
+    var MapBackend2 = class {
+      constructor(options = {}) {
+        this.maxSize = options.maxSize || 1e3;
+        this.ttl = options.ttl || 36e5;
+        this.cache = /* @__PURE__ */ new Map();
+        this.researchMap = /* @__PURE__ */ new Map();
+      }
+      /**
+       * Get value from cache with staleness check.
+       * Returns null if not found or stale.
+       */
+      get(key) {
+        const entry = this.cache.get(key);
+        if (!entry) {
+          stats.misses++;
+          return null;
+        }
+        try {
+          const fileStats = fs2.statSync(key);
+          if (fileStats.mtimeMs > entry.mtime) {
+            this.cache.delete(key);
+            stats.misses++;
+            return null;
+          }
+        } catch (e) {
+          this.cache.delete(key);
+          stats.misses++;
+          return null;
+        }
+        const value = entry.value;
+        this.cache.delete(key);
+        this.cache.set(key, {
+          value,
+          mtime: entry.mtime,
+          created: entry.created,
+          accessed: Date.now()
+        });
+        stats.hits++;
+        return value;
+      }
+      /**
+       * Set value in cache with LRU eviction.
+       */
+      set(key, value) {
+        let mtime = Date.now();
+        try {
+          const fileStats = fs2.statSync(key);
+          mtime = fileStats.mtimeMs;
+        } catch (e) {
+        }
+        const now = Date.now();
+        if (this.cache.has(key)) {
+          this.cache.delete(key);
+        }
+        if (this.cache.size >= this.maxSize) {
+          const oldestKey = this.cache.keys().next().value;
+          if (oldestKey) {
+            this.cache.delete(oldestKey);
+          }
+        }
+        this.cache.set(key, {
+          value,
+          mtime,
+          created: now,
+          accessed: now
+        });
+      }
+      /**
+       * Invalidate a specific cache entry.
+       */
+      invalidate(key) {
+        this.cache.delete(key);
+      }
+      /**
+       * Clear all cache entries.
+       */
+      clear() {
+        this.cache.clear();
+      }
+      /**
+       * Get cache status.
+       */
+      status() {
+        return {
+          backend: "Map",
+          count: this.cache.size,
+          hits: stats.hits,
+          misses: stats.misses,
+          maxSize: this.maxSize
+        };
+      }
+      /**
+       * Warm cache with files.
+       */
+      warm(files) {
+        let warmed = 0;
+        for (const filePath of files) {
+          try {
+            if (fs2.existsSync(filePath)) {
+              const content = fs2.readFileSync(filePath, "utf-8");
+              this.set(filePath, content);
+              warmed++;
+            }
+          } catch (e) {
+          }
+        }
+        return warmed;
+      }
+      /**
+       * Get research result from cache.
+       * Returns null if not found or expired.
+       */
+      getResearch(key) {
+        const entry = this.researchMap.get(key);
+        if (!entry) {
+          researchStats.misses++;
+          return null;
+        }
+        if (Date.now() > entry.expires) {
+          this.researchMap.delete(key);
+          researchStats.misses++;
+          return null;
+        }
+        this.researchMap.delete(key);
+        this.researchMap.set(key, { ...entry, accessed: Date.now() });
+        researchStats.hits++;
+        return JSON.parse(entry.value);
+      }
+      /**
+       * Set research result in cache with TTL and LRU eviction.
+       */
+      setResearch(key, value, ttlMs = 36e5) {
+        const now = Date.now();
+        if (this.researchMap.has(key)) {
+          this.researchMap.delete(key);
+        }
+        if (this.researchMap.size >= this.maxSize) {
+          const oldestKey = this.researchMap.keys().next().value;
+          if (oldestKey) {
+            this.researchMap.delete(oldestKey);
+          }
+        }
+        this.researchMap.set(key, {
+          value: JSON.stringify(value),
+          created: now,
+          accessed: now,
+          expires: now + ttlMs
+        });
+      }
+      /**
+       * Clear all research cache entries.
+       */
+      clearResearch() {
+        this.researchMap.clear();
+      }
+      /**
+       * Get research cache status.
+       */
+      statusResearch() {
+        return {
+          count: this.researchMap.size,
+          hits: researchStats.hits,
+          misses: researchStats.misses
+        };
+      }
+    };
+    var CacheEngine = class {
+      /**
+       * Create a new CacheEngine instance.
+       * @param {Object} options - Configuration options
+       * @param {number} options.maxSize - Maximum cache entries (default: 1000)
+       * @param {number} options.ttl - Time to live in ms (default: 3600000 = 1 hour)
+       */
+      constructor(options = {}) {
+        this.maxSize = options.maxSize || 1e3;
+        this.ttl = options.ttl || 36e5;
+        this.backend = this._selectBackend();
+      }
+      /**
+       * Select the appropriate backend based on Node version and environment.
+       */
+      _selectBackend() {
+        if (process.env.BGSD_CACHE_FORCE_MAP === "1") {
+          return new MapBackend2({ maxSize: this.maxSize, ttl: this.ttl });
+        }
+        const nodeVersion = parseInt(process.version.slice(1).split(".")[0], 10);
+        const nodeMinor = parseInt(process.version.split(".")[1], 10);
+        const supportsSQLite = nodeVersion > 22 || nodeVersion === 22 && nodeMinor >= 5;
+        if (supportsSQLite) {
+          try {
+            return new SQLiteBackend2({ maxSize: this.maxSize, ttl: this.ttl });
+          } catch (e) {
+            return new MapBackend2({ maxSize: this.maxSize, ttl: this.ttl });
+          }
+        }
+        return new MapBackend2({ maxSize: this.maxSize, ttl: this.ttl });
+      }
+      /**
+       * Get value from cache.
+       * @param {string} key - Cache key (typically file path)
+       * @returns {string|null} Cached value or null if not found/stale
+       */
+      get(key) {
+        return this.backend.get(key);
+      }
+      /**
+       * Set value in cache.
+       * @param {string} key - Cache key (typically file path)
+       * @param {string} value - Value to cache
+       */
+      set(key, value) {
+        this.backend.set(key, value);
+      }
+      /**
+       * Invalidate a specific cache entry.
+       * @param {string} key - Cache key to invalidate
+       */
+      invalidate(key) {
+        this.backend.invalidate(key);
+      }
+      /**
+       * Clear all cache entries.
+       */
+      clear() {
+        this.backend.clear();
+      }
+      /**
+       * Get cache status information.
+       * @returns {Object} Status object with backend type, count, and stats
+       */
+      status() {
+        return this.backend.status();
+      }
+      /**
+       * Warm cache with files.
+       * @param {string[]} files - Array of file paths to cache
+       * @returns {number} Number of files warmed
+       */
+      warm(files) {
+        return this.backend.warm(files);
+      }
+      /**
+       * Get research result from cache.
+       * @param {string} key - Cache key (query string)
+       * @returns {object|null} Cached research result or null
+       */
+      getResearch(key) {
+        return this.backend.getResearch(key);
+      }
+      /**
+       * Set research result in cache.
+       * @param {string} key - Cache key (query string)
+       * @param {object} value - Research result to cache
+       * @param {number} [ttlMs] - TTL in milliseconds (default: 1 hour)
+       */
+      setResearch(key, value, ttlMs) {
+        this.backend.setResearch(key, value, ttlMs);
+      }
+      /**
+       * Clear all research cache entries.
+       */
+      clearResearch() {
+        this.backend.clearResearch();
+      }
+      /**
+       * Get research cache status.
+       * @returns {{ count: number, hits: number, misses: number }}
+       */
+      statusResearch() {
+        return this.backend.statusResearch();
+      }
+    };
+    module.exports = { CacheEngine };
+  }
+});
+
+// src/lib/frontmatter.js
+var require_frontmatter = __commonJS({
+  "src/lib/frontmatter.js"(exports, module) {
+    var FM_DELIMITERS2 = /^---\n([\s\S]+?)\n---/;
+    var FM_INDENT = /^(\s*)/;
+    var FM_KEY_VALUE2 = /^(\s*)([a-zA-Z0-9_-]+):\s*(.*)/;
+    var _fmCache = /* @__PURE__ */ new Map();
+    var FM_CACHE_MAX = 100;
+    function extractFrontmatter2(content) {
+      if (!content || typeof content !== "string") return {};
+      if (!content.startsWith("---\n")) return {};
+      const cacheKey = content.length + ":" + content.slice(0, 200);
+      if (_fmCache.has(cacheKey)) {
+        return _fmCache.get(cacheKey);
+      }
+      const frontmatter = {};
+      const match = content.match(FM_DELIMITERS2);
+      if (!match) return frontmatter;
+      const yaml = match[1];
+      const lines = yaml.split("\n");
+      let stack = [{ obj: frontmatter, key: null, indent: -1 }];
+      for (const line of lines) {
+        if (line.trim() === "") continue;
+        const indentMatch = line.match(FM_INDENT);
+        const indent = indentMatch ? indentMatch[1].length : 0;
+        while (stack.length > 1 && indent <= stack[stack.length - 1].indent) {
+          stack.pop();
+        }
+        const current = stack[stack.length - 1];
+        const keyMatch = line.match(FM_KEY_VALUE2);
+        if (keyMatch) {
+          const key = keyMatch[2];
+          const value = keyMatch[3].trim();
+          if (value === "" || value === "[") {
+            current.obj[key] = value === "[" ? [] : {};
+            current.key = null;
+            stack.push({ obj: current.obj[key], key: null, indent });
+          } else if (value.startsWith("[") && value.endsWith("]")) {
+            current.obj[key] = value.slice(1, -1).split(",").map((s) => s.trim().replace(/^["']|["']$/g, "")).filter(Boolean);
+            current.key = null;
+          } else {
+            current.obj[key] = value.replace(/^["']|["']$/g, "");
+            current.key = null;
+          }
+        } else if (line.trim().startsWith("- ")) {
+          const itemValue = line.trim().slice(2).replace(/^["']|["']$/g, "");
+          if (typeof current.obj === "object" && !Array.isArray(current.obj) && Object.keys(current.obj).length === 0) {
+            const parent = stack.length > 1 ? stack[stack.length - 2] : null;
+            if (parent) {
+              for (const k of Object.keys(parent.obj)) {
+                if (parent.obj[k] === current.obj) {
+                  parent.obj[k] = [itemValue];
+                  current.obj = parent.obj[k];
+                  break;
+                }
+              }
+            }
+          } else if (Array.isArray(current.obj)) {
+            current.obj.push(itemValue);
+          }
+        }
+      }
+      if (_fmCache.size >= FM_CACHE_MAX) {
+        const oldest = _fmCache.keys().next().value;
+        _fmCache.delete(oldest);
+      }
+      _fmCache.set(cacheKey, frontmatter);
+      return frontmatter;
+    }
+    function reconstructFrontmatter(obj) {
+      const lines = [];
+      for (const [key, value] of Object.entries(obj)) {
+        if (value === null || value === void 0) continue;
+        if (Array.isArray(value)) {
+          if (value.length === 0) {
+            lines.push(`${key}: []`);
+          } else if (value.every((v) => typeof v === "string") && value.length <= 3 && value.join(", ").length < 60) {
+            lines.push(`${key}: [${value.join(", ")}]`);
+          } else {
+            lines.push(`${key}:`);
+            for (const item of value) {
+              lines.push(`  - ${typeof item === "string" && (item.includes(":") || item.includes("#")) ? `"${item}"` : item}`);
+            }
+          }
+        } else if (typeof value === "object") {
+          lines.push(`${key}:`);
+          for (const [subkey, subval] of Object.entries(value)) {
+            if (subval === null || subval === void 0) continue;
+            if (Array.isArray(subval)) {
+              if (subval.length === 0) {
+                lines.push(`  ${subkey}: []`);
+              } else if (subval.every((v) => typeof v === "string") && subval.length <= 3 && subval.join(", ").length < 60) {
+                lines.push(`  ${subkey}: [${subval.join(", ")}]`);
+              } else {
+                lines.push(`  ${subkey}:`);
+                for (const item of subval) {
+                  lines.push(`    - ${typeof item === "string" && (item.includes(":") || item.includes("#")) ? `"${item}"` : item}`);
+                }
+              }
+            } else if (typeof subval === "object") {
+              lines.push(`  ${subkey}:`);
+              for (const [subsubkey, subsubval] of Object.entries(subval)) {
+                if (subsubval === null || subsubval === void 0) continue;
+                if (Array.isArray(subsubval)) {
+                  if (subsubval.length === 0) {
+                    lines.push(`    ${subsubkey}: []`);
+                  } else {
+                    lines.push(`    ${subsubkey}:`);
+                    for (const item of subsubval) {
+                      lines.push(`      - ${item}`);
+                    }
+                  }
+                } else {
+                  lines.push(`    ${subsubkey}: ${subsubval}`);
+                }
+              }
+            } else {
+              const sv = String(subval);
+              lines.push(`  ${subkey}: ${sv.includes(":") || sv.includes("#") ? `"${sv}"` : sv}`);
+            }
+          }
+        } else {
+          const sv = String(value);
+          if (sv.includes(":") || sv.includes("#") || sv.startsWith("[") || sv.startsWith("{")) {
+            lines.push(`${key}: "${sv}"`);
+          } else {
+            lines.push(`${key}: ${sv}`);
+          }
+        }
+      }
+      return lines.join("\n");
+    }
+    function spliceFrontmatter(content, newObj) {
+      const yamlStr = reconstructFrontmatter(newObj);
+      const match = content.match(/^---\n[\s\S]+?\n---/);
+      if (match) {
+        return `---
+${yamlStr}
+---` + content.slice(match[0].length);
+      }
+      return `---
+${yamlStr}
+---
+
+` + content;
+    }
+    module.exports = { extractFrontmatter: extractFrontmatter2, reconstructFrontmatter, spliceFrontmatter };
+  }
+});
+
+// src/lib/helpers.js
+var require_helpers = __commonJS({
+  "src/lib/helpers.js"(exports, module) {
+    var crypto = __require("crypto");
+    var fs2 = __require("fs");
+    var path = __require("path");
+    var { debugLog } = require_output();
+    var { loadConfig } = require_config();
+    var { DEFAULT_MODEL_SETTINGS, MODEL_SETTING_PROFILES, VALID_MODEL_OVERRIDE_AGENTS } = require_constants();
+    var { cachedRegex, PHASE_DIR_NUMBER } = require_regex_cache();
+    var _cacheEngine = null;
+    function getCacheEngine() {
+      if (!_cacheEngine) {
+        try {
+          const { CacheEngine } = require_cache();
+          _cacheEngine = new CacheEngine();
+        } catch (e) {
+          debugLog("cache", "failed to load CacheEngine, using in-memory fallback", e);
+          _cacheEngine = {
+            get: () => null,
+            set: () => {
+            },
+            invalidate: () => {
+            },
+            clear: () => {
+            },
+            status: () => ({ backend: "fallback", count: 0, hits: 0, misses: 0 }),
+            warm: () => 0
+          };
+        }
+      }
+      return _cacheEngine;
+    }
+    var dirCache = /* @__PURE__ */ new Map();
+    function safeReadFile(filePath) {
+      try {
+        return fs2.readFileSync(filePath, "utf-8");
+      } catch (e) {
+        debugLog("file.read", "read failed", e);
+        return null;
+      }
+    }
+    function normalizeTddHintValue2(value) {
+      if (value === null || value === void 0) return null;
+      const raw = String(value).trim().toLowerCase().replace(/^['"]|['"]$/g, "");
+      if (!raw) return null;
+      const tokenMatch = raw.match(/^(required|require|mandatory|must|enforced|recommended|recommend|suggested|prefer(?:red)?|true|yes|y|false|no|n|skip(?:ped)?|omit(?:ted)?|none|n\/a|na|not applicable)\b/);
+      const token = tokenMatch ? tokenMatch[1] : raw;
+      if (["required", "require", "mandatory", "must", "enforced"].includes(token)) return "required";
+      if (["recommended", "recommend", "suggested", "prefer", "preferred", "true", "yes", "y"].includes(token)) return "recommended";
+      if (["false", "no", "n", "skip", "skipped", "omit", "omitted", "none", "n/a", "na", "not applicable"].includes(token)) return null;
+      return null;
+    }
+    function normalizePlanTddDecisionValue(value) {
+      if (value === null || value === void 0) return null;
+      const raw = String(value).trim().toLowerCase().replace(/^['"]|['"]$/g, "");
+      if (!raw) return null;
+      const tokenMatch = raw.match(/^(selected|select|tdd|true|yes|required|recommended|skipped|skip|false|no|none|omit(?:ted)?)\b/);
+      const token = tokenMatch ? tokenMatch[1] : raw;
+      if (["selected", "select", "tdd", "true", "yes", "required", "recommended"].includes(token)) return "selected";
+      if (["skipped", "skip", "false", "no", "none", "omit", "omitted"].includes(token)) return "skipped";
+      return null;
+    }
+    function buildCanonicalTddDecisionCallout(decision, rationale) {
+      if (!decision) return null;
+      const label = decision === "selected" ? "Selected" : "Skipped";
+      const fallback = decision === "selected" ? "this legacy plan already marked testable behavior for TDD, so it now uses the canonical visible decision callout." : "this legacy plan already marked TDD as not selected, so it now uses the canonical visible decision callout.";
+      return `> **TDD Decision:** ${label} \u2014 ${String(rationale || fallback).trim()}`;
+    }
+    function normalizeRoadmapTddMetadata2(content) {
+      if (!content || typeof content !== "string") return { content, changed: false };
+      let changed = false;
+      const next = content.replace(/^(\*\*TDD:?\*\*:?\s*)([^\n]*)$/gim, (match, _prefix, rawValue) => {
+        const normalized = normalizeTddHintValue2(rawValue);
+        const canonical = normalized ? `**TDD:** ${normalized}` : "";
+        if (canonical !== match) changed = true;
+        return canonical;
+      }).replace(/\n{3,}/g, "\n\n");
+      return { content: next, changed };
+    }
+    function readRoadmapWithTddNormalization2(cwd) {
+      const roadmapPath = path.join(cwd, ".planning", "ROADMAP.md");
+      const original = cachedReadFile(roadmapPath);
+      if (!original) return null;
+      const normalized = normalizeRoadmapTddMetadata2(original);
+      if (normalized.changed) {
+        fs2.writeFileSync(roadmapPath, normalized.content, "utf-8");
+        invalidateFileCache(roadmapPath);
+        return normalized.content;
+      }
+      return original;
+    }
+    function normalizePlanTddMetadata(content) {
+      if (!content || typeof content !== "string") return { content, changed: false, decision: null };
+      const frontmatter = require_frontmatter().extractFrontmatter(content);
+      const newFrontmatter = { ...frontmatter };
+      let changed = false;
+      const canonicalMatch = content.match(/^>\s*\*\*TDD Decision:\*\*\s*(Selected|Skipped)\s*[—-]\s*(.+)$/im);
+      const legacyCalloutMatch = content.match(/^>\s*\*\*TDD(?: Decision)?\*\*\s*:?\s*(.+)$/im);
+      let decision = canonicalMatch ? canonicalMatch[1].toLowerCase() : null;
+      if (!decision) {
+        decision = normalizePlanTddDecisionValue(
+          newFrontmatter.tdd_decision ?? newFrontmatter.tddDecision ?? newFrontmatter.tdd ?? newFrontmatter["tdd-decision"] ?? newFrontmatter["tdd_decision"] ?? newFrontmatter["tddDecision"] ?? newFrontmatter["tdd-hint"] ?? newFrontmatter["tdd_hint"]
+        );
+      }
+      if (!decision && String(newFrontmatter.type || "").trim().toLowerCase() === "tdd") {
+        decision = "selected";
+      }
+      const rationale = canonicalMatch?.[2]?.trim() || newFrontmatter.tdd_rationale || newFrontmatter.tddRationale || newFrontmatter["tdd-rationale"] || newFrontmatter.tdd_reason || newFrontmatter.tddReason || newFrontmatter["tdd-reason"] || (legacyCalloutMatch ? legacyCalloutMatch[1].trim() : null);
+      for (const key of ["tdd", "tdd_decision", "tddDecision", "tdd_rationale", "tddRationale", "tdd_reason", "tddReason", "tdd-hint", "tdd_hint", "tdd-rationale", "tdd-reason"]) {
+        if (Object.prototype.hasOwnProperty.call(newFrontmatter, key)) {
+          delete newFrontmatter[key];
+          changed = true;
+        }
+      }
+      if (decision === "selected" && newFrontmatter.type !== "tdd") {
+        newFrontmatter.type = "tdd";
+        changed = true;
+      }
+      if (decision === "skipped" && (!newFrontmatter.type || newFrontmatter.type === "tdd")) {
+        newFrontmatter.type = "execute";
+        changed = true;
+      }
+      let next = content;
+      if (JSON.stringify(frontmatter) !== JSON.stringify(newFrontmatter)) {
+        next = require_frontmatter().spliceFrontmatter(next, newFrontmatter);
+        changed = true;
+      }
+      if (decision) {
+        const canonicalCallout = buildCanonicalTddDecisionCallout(decision, rationale);
+        if (canonicalMatch) {
+          if (canonicalMatch[0] !== canonicalCallout) {
+            next = next.replace(canonicalMatch[0], canonicalCallout);
+            changed = true;
+          }
+        } else if (legacyCalloutMatch) {
+          next = next.replace(legacyCalloutMatch[0], canonicalCallout);
+          changed = true;
+        } else {
+          const objectiveClose = next.indexOf("</objective>");
+          if (objectiveClose !== -1) {
+            const insertAt = objectiveClose + "</objective>".length;
+            next = `${next.slice(0, insertAt)}
+
+${canonicalCallout}${next.slice(insertAt)}`;
+            changed = true;
+          }
+        }
+      }
+      return { content: next, changed, decision };
+    }
+    function normalizePlanFileTddMetadata(filePath) {
+      const original = safeReadFile(filePath);
+      if (!original) return { changed: false, decision: null };
+      const normalized = normalizePlanTddMetadata(original);
+      if (normalized.changed) {
+        fs2.writeFileSync(filePath, normalized.content, "utf-8");
+        invalidateFileCache(filePath);
+      }
+      return { changed: normalized.changed, decision: normalized.decision };
+    }
+    function normalizePhasePlanFilesTddMetadata(cwd, phaseInfo) {
+      const results = [];
+      if (!phaseInfo?.directory || !Array.isArray(phaseInfo.plans)) return results;
+      for (const planFile of phaseInfo.plans) {
+        const filePath = path.join(cwd, phaseInfo.directory, planFile);
+        const result = normalizePlanFileTddMetadata(filePath);
+        if (result.changed) results.push({ file: filePath, decision: result.decision });
+      }
+      return results;
+    }
+    function cachedReadFile(filePath) {
+      const cacheEngine = getCacheEngine();
+      const cached = cacheEngine.get(filePath);
+      if (cached !== null) {
+        debugLog("file.cache", `cache hit: ${filePath}`);
+        return cached;
+      }
+      const content = safeReadFile(filePath);
+      if (content !== null) {
+        const status = cacheEngine.status();
+        if (status.count === 0 && !_autoWarmMessageShown) {
+          _autoWarmMessageShown = true;
+          const fileCount = countPlanningFiles();
+          writeDebugDiagnostic("[bGSD:cache]", `Warming cache... ${fileCount} files`);
+        }
+        cacheEngine.set(filePath, content);
+      }
+      return content;
+    }
+    var _autoWarmMessageShown = false;
+    function countPlanningFiles() {
+      const fs3 = __require("fs");
+      const path2 = __require("path");
+      const cwd = process.cwd();
+      const planningDir = path2.join(cwd, ".planning");
+      let count = 0;
+      function walk(dir) {
+        try {
+          const entries = fs3.readdirSync(dir, { withFileTypes: true });
+          for (const entry of entries) {
+            const fullPath = path2.join(dir, entry.name);
+            if (entry.isDirectory()) {
+              walk(fullPath);
+            } else if (entry.isFile() && entry.name.endsWith(".md")) {
+              count++;
+            }
+          }
+        } catch (e) {
+        }
+      }
+      if (fs3.existsSync(planningDir)) {
+        walk(planningDir);
+      }
+      return count;
+    }
+    function invalidateFileCache(filePath) {
+      const cacheEngine = getCacheEngine();
+      if (filePath) {
+        cacheEngine.invalidate(filePath);
+      } else {
+        cacheEngine.clear();
+      }
+      if (!filePath || String(filePath).includes(`${path.sep}.planning${path.sep}`)) {
+        dirCache.clear();
+        _phaseTreeCache = null;
+        _phaseTreeCwd = null;
+        invalidateMilestoneCache();
+      }
+    }
+    function cachedReaddirSync(dirPath, options) {
+      const optKey = options?.withFileTypes ? ":wt" : "";
+      const key = dirPath + optKey;
+      if (dirCache.has(key)) {
+        return dirCache.get(key);
+      }
+      try {
+        const entries = fs2.readdirSync(dirPath, options);
+        dirCache.set(key, entries);
+        return entries;
+      } catch (e) {
+        debugLog("dir.cache", `readdir failed: ${dirPath}`, e);
+        dirCache.set(key, null);
+        return null;
+      }
+    }
+    var _phaseTreeCache = null;
+    var _phaseTreeCwd = null;
+    function getPhaseTree(cwd) {
+      if (_phaseTreeCache && _phaseTreeCwd === cwd) {
+        return _phaseTreeCache;
+      }
+      const phasesDir = path.join(cwd, ".planning", "phases");
+      const tree = /* @__PURE__ */ new Map();
+      try {
+        const entries = fs2.readdirSync(phasesDir, { withFileTypes: true });
+        const dirs = entries.filter((e) => e.isDirectory()).map((e) => e.name).sort();
+        for (const dir of dirs) {
+          const dirMatch = dir.match(PHASE_DIR_NUMBER);
+          const phaseNumber = dirMatch ? dirMatch[1] : dir;
+          const normalized = normalizePhaseName(phaseNumber);
+          const phaseName = dirMatch && dirMatch[2] ? dirMatch[2] : null;
+          const phaseDir = path.join(phasesDir, dir);
+          const phaseFiles = fs2.readdirSync(phaseDir);
+          const plans = phaseFiles.filter((f) => f.endsWith("-PLAN.md") || f === "PLAN.md").sort();
+          const summaries = phaseFiles.filter((f) => f.endsWith("-SUMMARY.md") || f === "SUMMARY.md").sort();
+          const hasResearch = phaseFiles.some((f) => f.endsWith("-RESEARCH.md") || f === "RESEARCH.md");
+          const hasContext = phaseFiles.some((f) => f.endsWith("-CONTEXT.md") || f === "CONTEXT.md");
+          const hasVerification = phaseFiles.some((f) => f.endsWith("-VERIFICATION.md") || f === "VERIFICATION.md");
+          const completedPlanIds = new Set(
+            summaries.map((s) => s.replace("-SUMMARY.md", "").replace("SUMMARY.md", ""))
+          );
+          const incompletePlans = plans.filter((p) => {
+            const planId = p.replace("-PLAN.md", "").replace("PLAN.md", "");
+            return !completedPlanIds.has(planId);
+          });
+          tree.set(normalized, {
+            dirName: dir,
+            fullPath: phaseDir,
+            relPath: path.join(".planning", "phases", dir),
+            phaseNumber,
+            phaseName,
+            phaseSlug: phaseName ? phaseName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") : null,
+            files: phaseFiles,
+            plans,
+            summaries,
+            incompletePlans,
+            hasResearch,
+            hasContext,
+            hasVerification
+          });
+        }
+      } catch (e) {
+        debugLog("phase.tree", "scan failed", e);
+      }
+      _phaseTreeCache = tree;
+      _phaseTreeCwd = cwd;
+      return tree;
+    }
+    function normalizePhaseName(phase) {
+      const match = phase.match(/^(\d+(?:\.\d+)?)/);
+      if (!match) return phase;
+      const num = match[1];
+      const parts = num.split(".");
+      const stripped = parts[0].replace(/^0+/, "") || "0";
+      const padded = stripped.padStart(2, "0");
+      return parts.length > 1 ? `${padded}.${parts[1]}` : padded;
+    }
+    function buildPhaseHandoffRunId(phase, timestamp = /* @__PURE__ */ new Date()) {
+      const normalizedPhase = normalizePhaseName(String(phase || "")).trim() || "unknown";
+      const iso = timestamp instanceof Date ? timestamp.toISOString() : new Date(timestamp || Date.now()).toISOString();
+      return `${normalizedPhase}-${iso.replace(/[:.]/g, "-")}`;
+    }
+    function buildPhaseHandoffSourceFingerprint(phase, runId) {
+      const normalizedPhase = normalizePhaseName(String(phase || "")).trim() || "unknown";
+      const seed = `${normalizedPhase}:${String(runId || "").trim()}`;
+      return crypto.createHash("sha256").update(seed).digest("hex").slice(0, 16);
+    }
+    function normalizePhaseHandoffFingerprintContent(content) {
+      if (!content || typeof content !== "string") return "";
+      return content.replace(/\r\n/g, "\n").split("\n").map((line) => line.replace(/\s+$/g, "")).filter((line) => !/^\*\*(?:Date|Generated|Updated|Last updated|Completed|Last Activity|Status):\*\*/i.test(line.trim())).join("\n").trim();
+    }
+    function getPhaseRequirementFingerprintEntries(cwd, requirementIds = []) {
+      if (!Array.isArray(requirementIds) || requirementIds.length === 0) return [];
+      const requirementsPath = path.join(cwd, ".planning", "REQUIREMENTS.md");
+      const requirementsContent = safeReadFile(requirementsPath);
+      if (!requirementsContent) return [];
+      return requirementIds.map((requirementId) => {
+        const safeId = String(requirementId || "").trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        if (!safeId) return null;
+        const match = requirementsContent.match(new RegExp(`^\\s*-\\s+\\[[ x]\\]\\s+\\*\\*${safeId}\\*\\*:\\s*(.+)$`, "im"));
+        return match ? `${safeId}: ${match[1].trim()}` : null;
+      }).filter(Boolean);
+    }
+    function buildPhaseHandoffExpectedFingerprint(cwd, phase) {
+      const normalizedPhase = normalizePhaseName(String(phase || "")).trim() || "unknown";
+      const fingerprintInputs = [`phase:${normalizedPhase}`];
+      const roadmapPhase = getRoadmapPhaseInternal(cwd, normalizedPhase);
+      const roadmapSection = normalizePhaseHandoffFingerprintContent(roadmapPhase?.section || "");
+      if (roadmapSection) fingerprintInputs.push(`roadmap:
+${roadmapSection}`);
+      const requirementEntries = getPhaseRequirementFingerprintEntries(cwd, roadmapPhase?.requirements || []);
+      if (requirementEntries.length > 0) {
+        fingerprintInputs.push(`requirements:
+${requirementEntries.sort().join("\n")}`);
+      }
+      const phaseInfo = findPhaseInternal(cwd, normalizedPhase);
+      const phaseFiles = phaseInfo?.directory ? cachedReaddirSync(path.join(cwd, phaseInfo.directory)) || [] : [];
+      const canonicalFiles = phaseFiles.length > 0 ? phaseFiles.filter((file) => file === "CONTEXT.md" || file === "RESEARCH.md" || file === "PLAN.md" || file.endsWith("-CONTEXT.md") || file.endsWith("-RESEARCH.md") || file.endsWith("-PLAN.md")).sort() : [];
+      for (const file of canonicalFiles) {
+        const content = normalizePhaseHandoffFingerprintContent(safeReadFile(path.join(cwd, phaseInfo.directory, file)));
+        if (content) fingerprintInputs.push(`file:${file}
+${content}`);
+      }
+      const seed = fingerprintInputs.join("\n---\n");
+      return crypto.createHash("sha256").update(seed).digest("hex").slice(0, 16);
+    }
+    function buildDefaultPhaseHandoffSummary(step, status) {
+      const normalizedStep = String(step || "").trim() || "workflow";
+      const label = normalizedStep.charAt(0).toUpperCase() + normalizedStep.slice(1);
+      if (String(status || "").trim() === "blocked") return `${label} blocked`;
+      if (String(status || "").trim() === "pending") return `${label} pending`;
+      return `${label} ready`;
+    }
+    function parseMustHavesBlock(content, blockName) {
+      const fmMatch = content.match(/^---\n([\s\S]+?)\n---/);
+      if (!fmMatch) return [];
+      const yaml = fmMatch[1];
+      const blockPattern = cachedRegex(`^\\s{4}${blockName}:\\s*$`, "m");
+      const blockStart = yaml.search(blockPattern);
+      if (blockStart === -1) return [];
+      const afterBlock = yaml.slice(blockStart);
+      const blockLines = afterBlock.split("\n").slice(1);
+      const items = [];
+      let current = null;
+      for (const line of blockLines) {
+        if (line.trim() === "") continue;
+        const indent = line.match(/^(\s*)/)[1].length;
+        if (indent <= 4 && line.trim() !== "") break;
+        if (line.match(/^\s{6}-\s+/)) {
+          if (current) items.push(current);
+          current = {};
+          const simpleMatch = line.match(/^\s{6}-\s+"?([^"]+)"?\s*$/);
+          if (simpleMatch && !line.includes(":")) {
+            current = simpleMatch[1];
+          } else {
+            const kvMatch = line.match(/^\s{6}-\s+(\w+):\s*"?([^"]*)"?\s*$/);
+            if (kvMatch) {
+              current = {};
+              current[kvMatch[1]] = kvMatch[2];
+            }
+          }
+        } else if (current && typeof current === "object") {
+          const kvMatch = line.match(/^\s{8,}(\w+):\s*"?([^"]*)"?\s*$/);
+          if (kvMatch) {
+            const val = kvMatch[2];
+            current[kvMatch[1]] = /^\d+$/.test(val) ? parseInt(val, 10) : val;
+          }
+          const arrMatch = line.match(/^\s{10,}-\s+"?([^"]+)"?\s*$/);
+          if (arrMatch) {
+            const keys = Object.keys(current);
+            const lastKey = keys[keys.length - 1];
+            if (lastKey && !Array.isArray(current[lastKey])) {
+              current[lastKey] = current[lastKey] ? [current[lastKey]] : [];
+            }
+            if (lastKey) current[lastKey].push(arrMatch[1]);
+          }
+        }
+      }
+      if (current) items.push(current);
+      return items;
+    }
+    function sanitizeShellArg(arg) {
+      return "'" + String(arg).replace(/'/g, "'\\''") + "'";
+    }
+    function isValidDateString(str) {
+      return /^\d{4}-\d{2}-\d{2}$/.test(str);
+    }
+    function normalizeModelOverrideValue(value) {
+      if (typeof value === "string") {
+        const model = value.trim();
+        return model || null;
+      }
+      if (value && typeof value === "object" && typeof value.model === "string") {
+        const model = value.model.trim();
+        return model || null;
+      }
+      return null;
+    }
+    function buildCanonicalModelSettings(config) {
+      const rawConfig = config && typeof config === "object" ? config : {};
+      const rawModelSettings = rawConfig.model_settings && typeof rawConfig.model_settings === "object" ? rawConfig.model_settings : {};
+      const rawProfiles = rawModelSettings.profiles && typeof rawModelSettings.profiles === "object" ? rawModelSettings.profiles : {};
+      const profiles = {};
+      for (const profileName of MODEL_SETTING_PROFILES) {
+        const fallbackModel = DEFAULT_MODEL_SETTINGS.profiles[profileName].model;
+        const rawProfile = rawProfiles[profileName];
+        const configuredModel = normalizeModelOverrideValue(rawProfile);
+        profiles[profileName] = { model: configuredModel || fallbackModel };
+      }
+      const requestedProfile = typeof rawModelSettings.default_profile === "string" && rawModelSettings.default_profile.trim() ? rawModelSettings.default_profile.trim() : typeof rawConfig.model_profile === "string" && rawConfig.model_profile.trim() ? rawConfig.model_profile.trim() : DEFAULT_MODEL_SETTINGS.default_profile;
+      const defaultProfile = MODEL_SETTING_PROFILES.includes(requestedProfile) ? requestedProfile : DEFAULT_MODEL_SETTINGS.default_profile;
+      const rawOverrides = rawModelSettings.agent_overrides && typeof rawModelSettings.agent_overrides === "object" ? rawModelSettings.agent_overrides : rawConfig.model_overrides && typeof rawConfig.model_overrides === "object" ? rawConfig.model_overrides : {};
+      const agentOverrides = {};
+      for (const [agentId, rawValue] of Object.entries(rawOverrides)) {
+        const model = normalizeModelOverrideValue(rawValue);
+        if (model) agentOverrides[agentId] = model;
+      }
+      return {
+        default_profile: defaultProfile,
+        profiles,
+        agent_overrides: agentOverrides
+      };
+    }
+    function normalizeResolvedModel(model) {
+      const fallbackModel = DEFAULT_MODEL_SETTINGS.profiles[DEFAULT_MODEL_SETTINGS.default_profile].model;
+      const resolved = typeof model === "string" && model.trim() ? model.trim() : fallbackModel;
+      return resolved === "opus" ? "inherit" : resolved;
+    }
+    function resolveModelSelectionFromConfig2(config, agentType) {
+      const modelSettings = buildCanonicalModelSettings(config);
+      const selectedProfile = modelSettings.default_profile;
+      const overrideModel = agentType ? modelSettings.agent_overrides[agentType] : null;
+      const profileModel = modelSettings.profiles[selectedProfile]?.model;
+      const model = normalizeResolvedModel(overrideModel || profileModel);
+      return {
+        agent_type: agentType || null,
+        selected_profile: selectedProfile,
+        model,
+        source: overrideModel ? "agent_override" : "default_profile",
+        unknown_agent: Boolean(agentType) && !VALID_MODEL_OVERRIDE_AGENTS.includes(agentType)
+      };
+    }
+    function resolveModelInternal(cwd, agentType) {
+      return resolveModelSelectionFromConfig2(loadConfig(cwd), agentType).model;
+    }
+    function getArchivedPhaseDirs(cwd) {
+      const milestonesDir = path.join(cwd, ".planning", "milestones");
+      const results = [];
+      if (!fs2.existsSync(milestonesDir)) return results;
+      try {
+        const milestoneEntries = fs2.readdirSync(milestonesDir, { withFileTypes: true });
+        const phaseDirs = milestoneEntries.filter((e) => e.isDirectory() && /^v[\d.]+-phases$/.test(e.name)).map((e) => e.name).sort().reverse();
+        for (const archiveName of phaseDirs) {
+          const version = archiveName.match(/^(v[\d.]+)-phases$/)[1];
+          const archivePath = path.join(milestonesDir, archiveName);
+          const entries = fs2.readdirSync(archivePath, { withFileTypes: true });
+          const dirs = entries.filter((e) => e.isDirectory()).map((e) => e.name).sort();
+          for (const dir of dirs) {
+            results.push({
+              name: dir,
+              milestone: version,
+              basePath: path.join(".planning", "milestones", archiveName),
+              fullPath: path.join(archivePath, dir)
             });
           }
         }
-        const checkboxPattern = /- \[[ x]\] \*\*([A-Z]+-\d+)\*\*:?\s*([^\n]*)/g;
-        let match;
-        while ((match = checkboxPattern.exec(section)) !== null) {
-          requirements.push({
-            req_id: match[1],
-            phase_number: phase.number || "",
-            description: match[2].trim() || null
-          });
+      } catch (e) {
+        debugLog("phase.getArchived", "readdir failed", e);
+      }
+      return results;
+    }
+    function searchPhaseInDir(baseDir, relBase, normalized) {
+      try {
+        const entries = fs2.readdirSync(baseDir, { withFileTypes: true });
+        const dirs = entries.filter((e) => e.isDirectory()).map((e) => e.name).sort();
+        const match = dirs.find((d) => {
+          const dm = d.match(PHASE_DIR_NUMBER);
+          return dm ? normalizePhaseName(dm[1]) === normalized : d.startsWith(normalized);
+        });
+        if (!match) return null;
+        const dirMatch = match.match(PHASE_DIR_NUMBER);
+        const phaseNumber = dirMatch ? dirMatch[1] : normalized;
+        const phaseName = dirMatch && dirMatch[2] ? dirMatch[2] : null;
+        const phaseDir = path.join(baseDir, match);
+        const phaseFiles = fs2.readdirSync(phaseDir);
+        const plans = phaseFiles.filter((f) => f.endsWith("-PLAN.md") || f === "PLAN.md").sort();
+        const summaries = phaseFiles.filter((f) => f.endsWith("-SUMMARY.md") || f === "SUMMARY.md").sort();
+        const hasResearch = phaseFiles.some((f) => f.endsWith("-RESEARCH.md") || f === "RESEARCH.md");
+        const hasContext = phaseFiles.some((f) => f.endsWith("-CONTEXT.md") || f === "CONTEXT.md");
+        const hasVerification = phaseFiles.some((f) => f.endsWith("-VERIFICATION.md") || f === "VERIFICATION.md");
+        const completedPlanIds = new Set(
+          summaries.map((s) => s.replace("-SUMMARY.md", "").replace("SUMMARY.md", ""))
+        );
+        const incompletePlans = plans.filter((p) => {
+          const planId = p.replace("-PLAN.md", "").replace("PLAN.md", "");
+          return !completedPlanIds.has(planId);
+        });
+        return {
+          found: true,
+          directory: path.join(relBase, match),
+          phase_number: phaseNumber,
+          phase_name: phaseName,
+          phase_slug: phaseName ? phaseName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") : null,
+          plans,
+          summaries,
+          incomplete_plans: incompletePlans,
+          has_research: hasResearch,
+          has_context: hasContext,
+          has_verification: hasVerification
+        };
+      } catch (e) {
+        debugLog("phase.searchDir", "search directory failed", e);
+        return null;
+      }
+    }
+    function findPhaseInternal(cwd, phase) {
+      if (!phase) return null;
+      const normalized = normalizePhaseName(phase);
+      const tree = getPhaseTree(cwd);
+      const cached = tree.get(normalized);
+      if (cached) {
+        return {
+          found: true,
+          directory: cached.relPath,
+          phase_number: cached.phaseNumber,
+          phase_name: cached.phaseName,
+          phase_slug: cached.phaseSlug,
+          plans: cached.plans,
+          summaries: cached.summaries,
+          incomplete_plans: cached.incompletePlans,
+          has_research: cached.hasResearch,
+          has_context: cached.hasContext,
+          has_verification: cached.hasVerification
+        };
+      }
+      const milestonesDir = path.join(cwd, ".planning", "milestones");
+      if (!fs2.existsSync(milestonesDir)) return null;
+      try {
+        const milestoneEntries = fs2.readdirSync(milestonesDir, { withFileTypes: true });
+        const archiveDirs = milestoneEntries.filter((e) => e.isDirectory() && /^v[\d.]+-phases$/.test(e.name)).map((e) => e.name).sort().reverse();
+        for (const archiveName of archiveDirs) {
+          const version = archiveName.match(/^(v[\d.]+)-phases$/)[1];
+          const archivePath = path.join(milestonesDir, archiveName);
+          const relBase = path.join(".planning", "milestones", archiveName);
+          const result = searchPhaseInDir(archivePath, relBase, normalized);
+          if (result) {
+            result.archived = version;
+            return result;
+          }
+        }
+      } catch (e) {
+        debugLog("phase.findInternal", "search archived phases failed", e);
+      }
+      return null;
+    }
+    function getRoadmapPhaseInternal(cwd, phaseNum) {
+      if (!phaseNum) return null;
+      const roadmapPath = path.join(cwd, ".planning", "ROADMAP.md");
+      try {
+        const content = readRoadmapWithTddNormalization2(cwd);
+        if (!content) return null;
+        const phaseStr = phaseNum.toString();
+        const normalizedPhase = normalizePhaseName(phaseStr);
+        const phaseAlternates = Array.from(/* @__PURE__ */ new Set([phaseStr, normalizedPhase, normalizedPhase.replace(/^0+/, "") || "0"])).map((v) => v.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+        const phasePattern = cachedRegex(`#{2,4}\\s*Phase\\s+(?:${phaseAlternates.join("|")}):\\s*([^\\n]+)`, "i");
+        const headerMatch = content.match(phasePattern);
+        if (!headerMatch) return null;
+        const phaseName = headerMatch[1].trim();
+        const headerIndex = headerMatch.index;
+        const restOfContent = content.slice(headerIndex);
+        const nextHeaderMatch = restOfContent.match(/\n#{2,4}\s+Phase\s+\d/i);
+        const sectionEnd = nextHeaderMatch ? headerIndex + nextHeaderMatch.index : content.length;
+        const section = content.slice(headerIndex, sectionEnd).trim();
+        const goalMatch = section.match(/\*\*Goal:?\*\*:?\s*([^\n]+)/i);
+        const goal = goalMatch ? goalMatch[1].trim() : null;
+        const requirementsMatch = section.match(/\*\*Requirements:?\*\*:?\s*([^\n]+)/i);
+        const requirements = requirementsMatch ? requirementsMatch[1].split(/[\s,]+/).map((item) => item.replace(/[\[\]]/g, "").trim()).filter(Boolean) : [];
+        const tddMatch = section.match(/\*\*TDD:?\*\*:?\s*([^\n]+)/i);
+        const tdd = tddMatch ? normalizeTddHintValue2(tddMatch[1]) : null;
+        return {
+          found: true,
+          phase_number: phaseNum.toString(),
+          phase_name: phaseName,
+          goal,
+          requirements,
+          tdd,
+          section
+        };
+      } catch (e) {
+        debugLog("roadmap.getPhaseInternal", "read roadmap phase failed", e);
+        return null;
+      }
+    }
+    function buildPhaseSnapshotInternal(cwd, phase) {
+      if (!phase) return null;
+      const normalized = normalizePhaseName(String(phase));
+      const phaseInfo = findPhaseInternal(cwd, phase);
+      const roadmapPhase = getRoadmapPhaseInternal(cwd, phase);
+      if (!phaseInfo && !roadmapPhase) {
+        return {
+          found: false,
+          phase: normalized,
+          error: "Phase not found",
+          requirements: [],
+          artifacts: {
+            phase_dir: null,
+            context: null,
+            research: null,
+            verification: null,
+            uat: null,
+            plans: [],
+            summaries: []
+          },
+          plan_index: {
+            plans: [],
+            waves: {},
+            incomplete: [],
+            has_checkpoints: false
+          }
+        };
+      }
+      const phaseNumber = phaseInfo?.phase_number || normalized;
+      const phaseName = roadmapPhase?.phase_name || phaseInfo?.phase_name || null;
+      const phaseSlug = phaseInfo?.phase_slug || (phaseName ? generateSlugInternal(phaseName) : null);
+      const phaseDir = phaseInfo?.directory || null;
+      const phaseDirAbs = phaseDir ? path.join(cwd, phaseDir) : null;
+      const plans = phaseInfo?.plans || [];
+      const summaries = phaseInfo?.summaries || [];
+      const incompletePlans = phaseInfo?.incomplete_plans || [];
+      const waves = {};
+      const planInventory = [];
+      let hasCheckpoints = false;
+      for (const planFile of plans) {
+        const planPath = phaseDirAbs ? path.join(phaseDirAbs, planFile) : null;
+        const content = planPath ? cachedReadFile(planPath) : null;
+        const fm = content ? require_frontmatter().extractFrontmatter(content) : {};
+        const wave = parseInt(fm.wave, 10) || 1;
+        const autonomous = fm.autonomous !== void 0 ? fm.autonomous === true || fm.autonomous === "true" : true;
+        if (!autonomous) hasCheckpoints = true;
+        const id = planFile.replace("-PLAN.md", "").replace("PLAN.md", "");
+        const entry = {
+          id,
+          file: phaseDir ? path.join(phaseDir, planFile) : planFile,
+          wave,
+          autonomous,
+          has_summary: summaries.some((summary) => summary.replace("-SUMMARY.md", "").replace("SUMMARY.md", "") === id)
+        };
+        if (fm.objective) entry.objective = fm.objective;
+        if (fm["files-modified"]) {
+          entry.files_modified = Array.isArray(fm["files-modified"]) ? fm["files-modified"] : [fm["files-modified"]];
+        }
+        planInventory.push(entry);
+        const waveKey = String(wave);
+        if (!waves[waveKey]) waves[waveKey] = [];
+        waves[waveKey].push(id);
+      }
+      const artifactFromDir = (suffix) => {
+        if (!phaseDirAbs) return null;
+        try {
+          const entries = cachedReaddirSync(phaseDirAbs) || [];
+          const match = entries.find((file) => file.endsWith(suffix) || file === suffix.replace(/^.*-/, ""));
+          return match ? path.join(phaseDir, match) : null;
+        } catch {
+          return null;
+        }
+      };
+      return {
+        found: true,
+        phase: phaseNumber,
+        metadata: {
+          number: phaseNumber,
+          normalized,
+          name: phaseName,
+          slug: phaseSlug,
+          directory: phaseDir,
+          on_disk: !!phaseInfo,
+          roadmap_only: !phaseInfo && !!roadmapPhase,
+          archived: phaseInfo?.archived || null,
+          goal: roadmapPhase?.goal || null,
+          requirements: roadmapPhase?.requirements || []
+        },
+        requirements: roadmapPhase?.requirements || [],
+        artifacts: {
+          phase_dir: phaseDir,
+          context: artifactFromDir("-CONTEXT.md"),
+          research: artifactFromDir("-RESEARCH.md"),
+          verification: artifactFromDir("-VERIFICATION.md"),
+          uat: artifactFromDir("-UAT.md"),
+          plans: phaseDir ? plans.map((file) => path.join(phaseDir, file)) : [],
+          summaries: phaseDir ? summaries.map((file) => path.join(phaseDir, file)) : []
+        },
+        plan_index: {
+          plans: planInventory,
+          waves,
+          incomplete: incompletePlans.map((file) => file.replace("-PLAN.md", "").replace("PLAN.md", "")),
+          has_checkpoints: hasCheckpoints
+        },
+        execution_context: {
+          plan_count: plans.length,
+          summary_count: summaries.length,
+          incomplete_count: incompletePlans.length,
+          has_context: !!phaseInfo?.has_context,
+          has_research: !!phaseInfo?.has_research,
+          has_verification: !!phaseInfo?.has_verification,
+          incomplete_plans: incompletePlans
+        },
+        roadmap: roadmapPhase ? {
+          found: true,
+          goal: roadmapPhase.goal,
+          requirements: roadmapPhase.requirements || []
+        } : {
+          found: false,
+          goal: null,
+          requirements: []
+        }
+      };
+    }
+    function pathExistsInternal(cwd, targetPath) {
+      const fullPath = path.isAbsolute(targetPath) ? targetPath : path.join(cwd, targetPath);
+      try {
+        fs2.statSync(fullPath);
+        return true;
+      } catch (e) {
+        debugLog("file.exists", "stat failed", e);
+        return false;
+      }
+    }
+    function createWorkspaceEvidenceIndex(cwd, overrides = {}) {
+      const existsSync10 = overrides.existsSync || fs2.existsSync;
+      const readFile = overrides.readFile || safeReadFile;
+      const cache = /* @__PURE__ */ new Map();
+      return {
+        get(targetPath, options = {}) {
+          const includeContent = options.includeContent !== false;
+          const fullPath = path.isAbsolute(targetPath) ? targetPath : path.join(cwd, targetPath);
+          const cacheKey = `${fullPath}:${includeContent ? "content" : "stat"}`;
+          if (cache.has(cacheKey)) return cache.get(cacheKey);
+          const exists = !!existsSync10(fullPath);
+          const evidence = {
+            path: targetPath,
+            fullPath,
+            exists,
+            content: null
+          };
+          if (includeContent && exists) {
+            evidence.content = readFile(fullPath);
+          }
+          cache.set(cacheKey, evidence);
+          return evidence;
+        },
+        clear() {
+          cache.clear();
+        }
+      };
+    }
+    var RUNTIME_FRESHNESS_RULES = [
+      {
+        id: "cli-bundle",
+        sourcePrefixes: ["src/"],
+        artifactPath: "bin/bgsd-tools.cjs",
+        buildCommand: "npm run build",
+        description: "rebuilt local CLI runtime"
+      },
+      {
+        id: "plugin-bundle",
+        sourcePrefixes: ["src/plugin/"],
+        artifactPath: "plugin.js",
+        buildCommand: "npm run build",
+        description: "rebuilt local plugin runtime"
+      }
+    ];
+    function toIso(value) {
+      return value ? new Date(value).toISOString() : null;
+    }
+    function getRuntimeFreshness(cwd, changedFiles = []) {
+      const normalizedFiles = Array.from(new Set(
+        (Array.isArray(changedFiles) ? changedFiles : []).map((file) => String(file || "").trim().replace(/^\.\//, "")).filter(Boolean)
+      ));
+      const ruleSources = /* @__PURE__ */ new Map();
+      for (const file of normalizedFiles) {
+        let selectedRule = null;
+        let selectedPrefixLength = -1;
+        for (const rule of RUNTIME_FRESHNESS_RULES) {
+          for (const prefix of rule.sourcePrefixes) {
+            if (!file.startsWith(prefix)) continue;
+            if (prefix.length > selectedPrefixLength) {
+              selectedRule = rule;
+              selectedPrefixLength = prefix.length;
+            }
+          }
+        }
+        if (!selectedRule) continue;
+        const existing = ruleSources.get(selectedRule.id) || [];
+        existing.push(file);
+        ruleSources.set(selectedRule.id, existing);
+      }
+      const relevantChecks = [];
+      for (const rule of RUNTIME_FRESHNESS_RULES) {
+        const relevantSources = ruleSources.get(rule.id) || [];
+        if (relevantSources.length === 0) continue;
+        const artifactFullPath = path.join(cwd, rule.artifactPath);
+        const artifactExists = fs2.existsSync(artifactFullPath);
+        const artifactMtimeMs = artifactExists ? fs2.statSync(artifactFullPath).mtimeMs : null;
+        const sourceEntries = relevantSources.map((sourcePath) => {
+          const sourceFullPath = path.join(cwd, sourcePath);
+          if (!fs2.existsSync(sourceFullPath)) return null;
+          const stat = fs2.statSync(sourceFullPath);
+          return {
+            path: sourcePath,
+            mtime_ms: stat.mtimeMs,
+            mtime: toIso(stat.mtimeMs)
+          };
+        }).filter(Boolean).sort((a, b) => b.mtime_ms - a.mtime_ms);
+        const newestSource = sourceEntries[0] || null;
+        if (!newestSource) continue;
+        let stale = false;
+        let reason = null;
+        if (!artifactExists) {
+          stale = true;
+          reason = "missing_artifact";
+        } else if (artifactMtimeMs < newestSource.mtime_ms) {
+          stale = true;
+          reason = "source_newer_than_artifact";
+        } else {
+          reason = "fresh";
+        }
+        relevantChecks.push({
+          id: rule.id,
+          path: rule.artifactPath,
+          description: rule.description,
+          build_command: rule.buildCommand,
+          exists: artifactExists,
+          artifact_mtime: toIso(artifactMtimeMs),
+          stale,
+          reason,
+          sources: sourceEntries.map((entry) => entry.path),
+          newest_source: newestSource.path,
+          newest_source_mtime: newestSource.mtime
+        });
+      }
+      if (relevantChecks.length === 0) {
+        return {
+          checked: false,
+          stale: false,
+          stale_sources: false,
+          stale_runtime: false,
+          build_command: null,
+          artifacts: [],
+          sources: [],
+          message: null
+        };
+      }
+      const staleChecks = relevantChecks.filter((entry) => entry.stale);
+      const buildCommand = staleChecks[0]?.build_command || relevantChecks[0]?.build_command || null;
+      const uniqueSources = Array.from(new Set(relevantChecks.flatMap((entry) => entry.sources))).sort();
+      return {
+        checked: true,
+        stale: staleChecks.length > 0,
+        stale_sources: staleChecks.length > 0,
+        stale_runtime: staleChecks.length > 0,
+        build_command: buildCommand,
+        artifacts: relevantChecks,
+        sources: uniqueSources,
+        message: staleChecks.length > 0 ? `Local runtime artifacts are stale for the active checkout. Run \`${buildCommand}\` before trusting deliverables verification.` : "Local runtime artifacts are fresh for the active checkout."
+      };
+    }
+    function generateSlugInternal(text) {
+      if (!text) return null;
+      return text.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+    }
+    var _milestoneCache = null;
+    var _milestoneCwd = null;
+    function getMilestoneInfo(cwd) {
+      if (_milestoneCache && _milestoneCwd === cwd) {
+        return _milestoneCache;
+      }
+      const result = _getMilestoneInfoUncached(cwd);
+      _milestoneCache = result;
+      _milestoneCwd = cwd;
+      return result;
+    }
+    function _getMilestoneInfoUncached(cwd) {
+      try {
+        let extractPhaseRange2 = function(line) {
+          const rangeMatch = line.match(/Phases?\s+(\d+)\s*[-–]\s*(\d+)/i);
+          if (rangeMatch) return { start: parseInt(rangeMatch[1]), end: parseInt(rangeMatch[2]) };
+          return null;
+        };
+        var extractPhaseRange = extractPhaseRange2;
+        const roadmap = cachedReadFile(path.join(cwd, ".planning", "ROADMAP.md"));
+        if (!roadmap) return { version: "v1.0", name: "milestone", phaseRange: null };
+        let version = null;
+        let name = null;
+        let phaseRange = null;
+        const activeMatch = roadmap.match(/[-*]\s*🔵\s*\*\*v(\d+(?:\.\d+)*)\s+([^*]+)\*\*([^\n]*)/);
+        if (activeMatch) {
+          version = "v" + activeMatch[1];
+          name = activeMatch[2].trim();
+          phaseRange = extractPhaseRange2(activeMatch[0]);
+        }
+        if (!version) {
+          const activeTagMatch = roadmap.match(/[-*]\s*(?:🔵\s*)?\*\*v(\d+(?:\.\d+)*)\s+([^*]+)\*\*([^\n]*\(active\)[^\n]*)/i);
+          if (activeTagMatch) {
+            version = "v" + activeTagMatch[1];
+            name = activeTagMatch[2].trim();
+            phaseRange = extractPhaseRange2(activeTagMatch[0]);
+          }
+        }
+        if (!version) {
+          const currentWorkMatch = roadmap.match(/\*\*Active Milestone\*\*\s*[-—]+\s*v(\d+(?:\.\d+)*)[\s:]+([^\n]+)/i);
+          if (currentWorkMatch) {
+            version = "v" + currentWorkMatch[1];
+            name = currentWorkMatch[2].trim();
+            const listMatch = roadmap.match(cachedRegex("v" + currentWorkMatch[1].replace(".", "\\.") + "[^\\n]*Phases?\\s+(\\d+)\\s*[-\u2013]\\s*(\\d+)", "i"));
+            if (listMatch) phaseRange = { start: parseInt(listMatch[1]), end: parseInt(listMatch[2]) };
+          }
+        }
+        if (!version) {
+          const milestoneLines = [...roadmap.matchAll(/[-*]\s*(?!✅)[^\n]*\*\*v(\d+(?:\.\d+)*)\s+([^*]+)\*\*([^\n]*)/g)];
+          if (milestoneLines.length > 0) {
+            const last = milestoneLines[milestoneLines.length - 1];
+            version = "v" + last[1];
+            name = last[2].trim();
+            phaseRange = extractPhaseRange2(last[0]);
+          }
+        }
+        if (!version) {
+          const versionMatch = roadmap.match(/v(\d+\.\d+)/);
+          const nameMatch = roadmap.match(/## .*v\d+\.\d+[:\s]+([^\n(]+)/);
+          version = versionMatch ? versionMatch[0] : "v1.0";
+          name = nameMatch ? nameMatch[1].trim() : "milestone";
+        }
+        return { version, name, phaseRange };
+      } catch (e) {
+        debugLog("milestone.info", "read roadmap for milestone failed", e);
+        return { version: "v1.0", name: "milestone", phaseRange: null };
+      }
+    }
+    function invalidateMilestoneCache() {
+      _milestoneCache = null;
+      _milestoneCwd = null;
+    }
+    function extractAtReferences(content) {
+      if (!content || typeof content !== "string") return [];
+      const refs = /* @__PURE__ */ new Set();
+      const atPattern = /@((?:\/[\w.+\-/]+|\.[\w.+\-/]+|[\w][\w.+\-]*\/[\w.+\-/]+)(?:\.\w+)?)/g;
+      let match;
+      while ((match = atPattern.exec(content)) !== null) {
+        const ref = match[1];
+        if (ref.includes("/") && !ref.includes("@") && ref.length > 2) {
+          refs.add(ref);
         }
       }
-      return requirements;
+      return Array.from(refs);
     }
-    module.exports = { PlanningCache: PlanningCache2 };
+    function parseIntentMd(content) {
+      if (!content || typeof content !== "string") {
+        return {
+          revision: null,
+          created: null,
+          updated: null,
+          objective: { statement: "", elaboration: "" },
+          users: [],
+          outcomes: [],
+          criteria: [],
+          constraints: { technical: [], business: [], timeline: [] },
+          health: { quantitative: [], qualitative: "" },
+          history: []
+        };
+      }
+      const revisionMatch = content.match(/\*\*Revision:\*\*\s*(\d+)/);
+      const createdMatch = content.match(/\*\*Created:\*\*\s*(\S+)/);
+      const updatedMatch = content.match(/\*\*Updated:\*\*\s*(\S+)/);
+      const revision = revisionMatch ? parseInt(revisionMatch[1], 10) : null;
+      const created = createdMatch ? createdMatch[1] : null;
+      const updated = updatedMatch ? updatedMatch[1] : null;
+      function extractSection2(tag) {
+        const pattern = new RegExp(`<${tag}>([\\s\\S]*?)<\\/${tag}>`);
+        const match = content.match(pattern);
+        return match ? match[1].trim() : null;
+      }
+      const objectiveRaw = extractSection2("objective");
+      const objective = { statement: "", elaboration: "" };
+      if (objectiveRaw) {
+        const lines = objectiveRaw.split("\n");
+        objective.statement = lines[0].trim();
+        objective.elaboration = lines.slice(1).join("\n").trim();
+      }
+      const usersRaw = extractSection2("users");
+      const users = [];
+      if (usersRaw) {
+        const userLines = usersRaw.split("\n").filter((l) => l.match(/^\s*-\s+/));
+        for (const line of userLines) {
+          const text = line.replace(/^\s*-\s+/, "").trim();
+          if (text) users.push({ text });
+        }
+      }
+      const outcomesRaw = extractSection2("outcomes");
+      const outcomes = [];
+      if (outcomesRaw) {
+        const outcomePattern = /^\s*-\s+(DO-\d+)\s+\[(P[123])\]:\s*(.+)/;
+        for (const line of outcomesRaw.split("\n")) {
+          const match = line.match(outcomePattern);
+          if (match) {
+            outcomes.push({ id: match[1], priority: match[2], text: match[3].trim() });
+          }
+        }
+      }
+      const criteriaRaw = extractSection2("criteria");
+      const criteria = [];
+      if (criteriaRaw) {
+        const criteriaPattern = /^\s*-\s+(SC-\d+):\s*(.+)/;
+        for (const line of criteriaRaw.split("\n")) {
+          const match = line.match(criteriaPattern);
+          if (match) {
+            criteria.push({ id: match[1], text: match[2].trim() });
+          }
+        }
+      }
+      const constraintsRaw = extractSection2("constraints");
+      const constraints = { technical: [], business: [], timeline: [] };
+      if (constraintsRaw) {
+        const constraintPattern = /^\s*-\s+(C-\d+):\s*(.+)/;
+        let currentType = null;
+        for (const line of constraintsRaw.split("\n")) {
+          if (/^###\s*Technical/i.test(line)) {
+            currentType = "technical";
+            continue;
+          }
+          if (/^###\s*Business/i.test(line)) {
+            currentType = "business";
+            continue;
+          }
+          if (/^###\s*Timeline/i.test(line)) {
+            currentType = "timeline";
+            continue;
+          }
+          if (currentType) {
+            const match = line.match(constraintPattern);
+            if (match) {
+              constraints[currentType].push({ id: match[1], text: match[2].trim() });
+            }
+          }
+        }
+      }
+      const healthRaw = extractSection2("health");
+      const health = { quantitative: [], qualitative: "" };
+      if (healthRaw) {
+        const healthPattern = /^\s*-\s+(HM-\d+):\s*(.+)/;
+        let inQuantitative = false;
+        let inQualitative = false;
+        const qualLines = [];
+        for (const line of healthRaw.split("\n")) {
+          if (/^###\s*Quantitative/i.test(line)) {
+            inQuantitative = true;
+            inQualitative = false;
+            continue;
+          }
+          if (/^###\s*Qualitative/i.test(line)) {
+            inQualitative = true;
+            inQuantitative = false;
+            continue;
+          }
+          if (inQuantitative) {
+            const match = line.match(healthPattern);
+            if (match) {
+              health.quantitative.push({ id: match[1], text: match[2].trim() });
+            }
+          }
+          if (inQualitative && line.trim()) {
+            qualLines.push(line.trim());
+          }
+        }
+        health.qualitative = qualLines.join("\n");
+      }
+      const historyRaw = extractSection2("history");
+      const history = [];
+      if (historyRaw) {
+        let currentEntry = null;
+        let currentChange = null;
+        for (const line of historyRaw.split("\n")) {
+          const milestoneMatch = line.match(/^###\s+(v[\d.]+)\s+[—–-]\s+(\d{4}-\d{2}-\d{2})/);
+          if (milestoneMatch) {
+            if (currentChange && currentEntry) currentEntry.changes.push(currentChange);
+            currentChange = null;
+            if (currentEntry) history.push(currentEntry);
+            currentEntry = { milestone: milestoneMatch[1], date: milestoneMatch[2], changes: [] };
+            continue;
+          }
+          const changeMatch = line.match(/^\s*-\s+\*\*(Added|Modified|Removed)\*\*\s+(.+?):\s*(.+)/);
+          if (changeMatch && currentEntry) {
+            if (currentChange) currentEntry.changes.push(currentChange);
+            currentChange = { type: changeMatch[1], target: changeMatch[2], description: changeMatch[3].trim() };
+            continue;
+          }
+          const reasonMatch = line.match(/^\s+-\s+Reason:\s*(.+)/);
+          if (reasonMatch && currentChange) {
+            currentChange.reason = reasonMatch[1].trim();
+            continue;
+          }
+        }
+        if (currentChange && currentEntry) currentEntry.changes.push(currentChange);
+        if (currentEntry) history.push(currentEntry);
+      }
+      return {
+        revision,
+        created,
+        updated,
+        objective,
+        users,
+        outcomes,
+        criteria,
+        constraints,
+        health,
+        history
+      };
+    }
+    function generateIntentMd(data) {
+      const lines = [];
+      lines.push(`**Revision:** ${data.revision || 1}`);
+      lines.push(`**Created:** ${data.created || (/* @__PURE__ */ new Date()).toISOString().split("T")[0]}`);
+      lines.push(`**Updated:** ${data.updated || (/* @__PURE__ */ new Date()).toISOString().split("T")[0]}`);
+      lines.push("");
+      lines.push("<objective>");
+      if (data.objective && data.objective.statement) {
+        lines.push(data.objective.statement);
+        if (data.objective.elaboration) {
+          lines.push("");
+          lines.push(data.objective.elaboration);
+        }
+      } else {
+        lines.push("<!-- Single statement: what this project does and why -->");
+      }
+      lines.push("</objective>");
+      lines.push("");
+      lines.push("<users>");
+      if (data.users && data.users.length > 0) {
+        for (const u of data.users) {
+          lines.push(`- ${u.text}`);
+        }
+      } else {
+        lines.push("<!-- Brief audience descriptions, one per line -->");
+      }
+      lines.push("</users>");
+      lines.push("");
+      lines.push("<outcomes>");
+      if (data.outcomes && data.outcomes.length > 0) {
+        for (const o of data.outcomes) {
+          lines.push(`- ${o.id} [${o.priority}]: ${o.text}`);
+        }
+      } else {
+        lines.push("<!-- Bullet list: - DO-XX [PX]: description -->");
+      }
+      lines.push("</outcomes>");
+      lines.push("");
+      lines.push("<criteria>");
+      if (data.criteria && data.criteria.length > 0) {
+        for (const c of data.criteria) {
+          lines.push(`- ${c.id}: ${c.text}`);
+        }
+      } else {
+        lines.push("<!-- Bullet list: - SC-XX: launch gate -->");
+      }
+      lines.push("</criteria>");
+      lines.push("");
+      lines.push("<constraints>");
+      const hasTech = data.constraints && data.constraints.technical && data.constraints.technical.length > 0;
+      const hasBiz = data.constraints && data.constraints.business && data.constraints.business.length > 0;
+      const hasTime = data.constraints && data.constraints.timeline && data.constraints.timeline.length > 0;
+      if (hasTech || hasBiz || hasTime) {
+        if (hasTech) {
+          lines.push("### Technical");
+          for (const c of data.constraints.technical) {
+            lines.push(`- ${c.id}: ${c.text}`);
+          }
+          lines.push("");
+        }
+        if (hasBiz) {
+          lines.push("### Business");
+          for (const c of data.constraints.business) {
+            lines.push(`- ${c.id}: ${c.text}`);
+          }
+          lines.push("");
+        }
+        if (hasTime) {
+          lines.push("### Timeline");
+          for (const c of data.constraints.timeline) {
+            lines.push(`- ${c.id}: ${c.text}`);
+          }
+          lines.push("");
+        }
+      } else {
+        lines.push("<!-- Sub-headers: ### Technical, ### Business, ### Timeline. Items: - C-XX: constraint -->");
+      }
+      lines.push("</constraints>");
+      lines.push("");
+      lines.push("<health>");
+      const hasQuant = data.health && data.health.quantitative && data.health.quantitative.length > 0;
+      const hasQual = data.health && data.health.qualitative && data.health.qualitative.trim();
+      if (hasQuant || hasQual) {
+        if (hasQuant) {
+          lines.push("### Quantitative");
+          for (const m of data.health.quantitative) {
+            lines.push(`- ${m.id}: ${m.text}`);
+          }
+          lines.push("");
+        }
+        if (hasQual) {
+          lines.push("### Qualitative");
+          lines.push(data.health.qualitative);
+        }
+      } else {
+        lines.push("<!-- Sub-headers: ### Quantitative (- HM-XX: metric) and ### Qualitative (prose) -->");
+      }
+      lines.push("</health>");
+      lines.push("");
+      if (data.history && data.history.length > 0) {
+        lines.push("<history>");
+        for (const entry of data.history) {
+          lines.push(`### ${entry.milestone} \u2014 ${entry.date}`);
+          for (const change of entry.changes) {
+            lines.push(`- **${change.type}** ${change.target}: ${change.description}`);
+            if (change.reason) {
+              lines.push(`  - Reason: ${change.reason}`);
+            }
+          }
+          lines.push("");
+        }
+        lines.push("</history>");
+        lines.push("");
+      }
+      return lines.join("\n");
+    }
+    function parsePlanIntent(content) {
+      if (!content || typeof content !== "string") return null;
+      const { extractFrontmatter: extractFrontmatter2 } = require_frontmatter();
+      const fm = extractFrontmatter2(content);
+      if (!fm || !fm.intent) return null;
+      const intent = fm.intent;
+      let outcomeIds = [];
+      let rationale = "";
+      const rawIds = intent.outcome_ids || intent["outcome_ids"];
+      if (rawIds) {
+        if (Array.isArray(rawIds)) {
+          outcomeIds = rawIds;
+        } else if (typeof rawIds === "string") {
+          outcomeIds = rawIds.split(",").map((s) => s.trim()).filter(Boolean);
+        }
+      }
+      const doPattern = /^DO-\d+$/;
+      outcomeIds = outcomeIds.filter((id) => doPattern.test(id));
+      rationale = intent.rationale || "";
+      if (outcomeIds.length === 0 && !rationale) return null;
+      return { outcome_ids: outcomeIds, rationale };
+    }
+    module.exports = {
+      safeReadFile,
+      cachedReadFile,
+      invalidateFileCache,
+      cachedReaddirSync,
+      getPhaseTree,
+      normalizePhaseName,
+      buildPhaseHandoffRunId,
+      buildPhaseHandoffExpectedFingerprint,
+      buildPhaseHandoffSourceFingerprint,
+      buildDefaultPhaseHandoffSummary,
+      parseMustHavesBlock,
+      sanitizeShellArg,
+      isValidDateString,
+      buildCanonicalModelSettings,
+      resolveModelSelectionFromConfig: resolveModelSelectionFromConfig2,
+      resolveModelInternal,
+      getArchivedPhaseDirs,
+      findPhaseInternal,
+      getRoadmapPhaseInternal,
+      buildPhaseSnapshotInternal,
+      pathExistsInternal,
+      createWorkspaceEvidenceIndex,
+      getRuntimeFreshness,
+      generateSlugInternal,
+      getMilestoneInfo,
+      extractAtReferences,
+      normalizeTddHintValue: normalizeTddHintValue2,
+      readRoadmapWithTddNormalization: readRoadmapWithTddNormalization2,
+      normalizePlanTddMetadata,
+      normalizePlanFileTddMetadata,
+      normalizePhasePlanFilesTddMetadata,
+      parseIntentMd,
+      generateIntentMd,
+      parsePlanIntent
+    };
   }
 });
 
@@ -6455,32 +7263,21 @@ var require_decision_rules = __commonJS({
       const {
         agent_type,
         model_profile = "balanced",
-        db
+        model_settings
       } = state || {};
-      if (db && agent_type) {
-        try {
-          const { PlanningCache: PlanningCache2 } = require_planning_cache();
-          const cache = new PlanningCache2(db);
-          const profile = cache.getModelProfile(process.cwd(), agent_type);
-          if (profile) {
-            if (profile.override_model) {
-              return { value: { tier: model_profile, model: profile.override_model }, confidence: "HIGH", rule_id: "model-selection" };
-            }
-            const tierKey = model_profile + "_model";
-            if (profile[tierKey]) {
-              return { value: { tier: model_profile, model: profile[tierKey] }, confidence: "HIGH", rule_id: "model-selection" };
-            }
-          }
-        } catch {
-        }
-      }
-      const { MODEL_PROFILES } = require_constants();
-      if (agent_type && MODEL_PROFILES[agent_type]) {
-        const agentProfile = MODEL_PROFILES[agent_type];
-        const model = agentProfile[model_profile] || agentProfile.balanced || "sonnet";
-        return { value: { tier: model_profile, model }, confidence: "HIGH", rule_id: "model-selection" };
-      }
-      return { value: { tier: model_profile, model: "sonnet" }, confidence: "HIGH", rule_id: "model-selection" };
+      const { resolveModelSelectionFromConfig: resolveModelSelectionFromConfig2 } = require_helpers();
+      const resolved = resolveModelSelectionFromConfig2({ model_settings, model_profile }, agent_type);
+      return {
+        value: {
+          tier: resolved.selected_profile,
+          profile: resolved.selected_profile,
+          model: resolved.model,
+          source: resolved.source,
+          unknown_agent: resolved.unknown_agent
+        },
+        confidence: "HIGH",
+        rule_id: "model-selection"
+      };
     }
     function resolveVerificationRouting(state) {
       const {
@@ -6686,9 +7483,9 @@ var require_decision_rules = __commonJS({
         id: "model-selection",
         name: "Model Selection",
         category: "configuration",
-        description: "Resolves concrete model string for an agent type and tier, SQLite-backed with static fallback",
-        inputs: ["agent_type", "model_profile", "db"],
-        outputs: ["{ tier, model }"],
+        description: "Resolves concrete model string for an agent type from canonical model settings",
+        inputs: ["agent_type", "model_profile", "model_settings"],
+        outputs: ["{ profile, model }"],
         confidence_range: ["HIGH"],
         resolve: resolveModelSelection
       },
@@ -7076,13 +7873,13 @@ function safeHook(name, fn, options = {}) {
     return randomBytes2(4).toString("hex");
   }
   function withTimeout(promise, ms) {
-    return new Promise((resolve3, reject) => {
+    return new Promise((resolve4, reject) => {
       const timer = setTimeout(() => {
         reject(new Error(`Hook "${name}" timed out after ${ms}ms`));
       }, ms);
       promise.then((result) => {
         clearTimeout(timer);
-        resolve3(result);
+        resolve4(result);
       }).catch((err) => {
         clearTimeout(timer);
         reject(err);
@@ -7158,7 +7955,7 @@ function isDebugEnabled(options = {}) {
   }
   return global._gsdCompactMode === false;
 }
-function writeDebugDiagnostic(prefix, message, options = {}) {
+function writeDebugDiagnostic2(prefix, message, options = {}) {
   if (!isDebugEnabled(options)) {
     return false;
   }
@@ -7181,7 +7978,7 @@ function createToolRegistry(safeHookFn) {
       throw new Error(`Tool name must be snake_case: ${normalized}`);
     }
     if (registry.has(normalized)) {
-      writeDebugDiagnostic("[bGSD:tool-registry]", `Tool '${normalized}' already registered \u2014 overwriting`);
+      writeDebugDiagnostic2("[bGSD:tool-registry]", `Tool '${normalized}' already registered \u2014 overwriting`);
     }
     const wrappedDefinition = { ...definition };
     if (typeof wrappedDefinition.execute === "function") {
@@ -7686,7 +8483,7 @@ Phase ${phaseNum}: ${phaseName}${planInfo}${milestoneInfo}${goalLine}${blockerLi
 ${memorySnapshot}` : ""}`;
   const tokenCount = countTokens(prompt);
   if (tokenCount > TOKEN_BUDGET) {
-    writeDebugDiagnostic("[bGSD:context-budget]", `System prompt injection exceeds budget: ${tokenCount} tokens (budget: ${TOKEN_BUDGET})`);
+    writeDebugDiagnostic2("[bGSD:context-budget]", `System prompt injection exceeds budget: ${tokenCount} tokens (budget: ${TOKEN_BUDGET})`);
   }
   return prompt;
 }
@@ -7813,13 +8610,56 @@ ${parts.join("\n")}
 // src/plugin/command-enricher.js
 await init_parsers();
 var import_decision_rules = __toESM(require_decision_rules());
+var import_helpers = __toESM(require_helpers());
 await init_db_cache();
 
 // src/plugin/tool-availability.js
 import { execFileSync } from "child_process";
-import { existsSync as existsSync4, readFileSync as readFileSync8 } from "fs";
-import { dirname as dirname2, join as join12 } from "path";
+import { existsSync as existsSync5, readFileSync as readFileSync8 } from "fs";
+import { join as join13 } from "path";
+
+// src/plugin/cli-path.js
+import { existsSync as existsSync4 } from "fs";
+import { dirname as dirname2, join as join12, resolve as resolve2 } from "path";
 import { fileURLToPath } from "url";
+var LEGACY_INSTALL_DIRS = ["bgsd-oc", "get-shit-done"];
+var MAX_ANCESTOR_DEPTH = 4;
+function uniquePaths(paths) {
+  return [...new Set(paths.filter(Boolean).map((candidate) => resolve2(candidate)))];
+}
+function collectAncestorDirs(startDir, maxDepth = MAX_ANCESTOR_DEPTH) {
+  const dirs = [];
+  let current = resolve2(startDir);
+  for (let depth = 0; depth <= maxDepth; depth += 1) {
+    dirs.push(current);
+    const parent = dirname2(current);
+    if (parent === current) break;
+    current = parent;
+  }
+  return dirs;
+}
+function resolveBundledCliPath(options = {}) {
+  const moduleUrl = options.moduleUrl || import.meta.url;
+  const envPluginDir = options.envPluginDir === void 0 ? process.env.BGSD_PLUGIN_DIR : options.envPluginDir;
+  const currentDir = dirname2(fileURLToPath(moduleUrl));
+  const roots = uniquePaths([
+    envPluginDir,
+    ...collectAncestorDirs(currentDir)
+  ]);
+  const candidates = [];
+  for (const root of roots) {
+    candidates.push(join12(root, "bin", "bgsd-tools.cjs"));
+    for (const installDir of LEGACY_INSTALL_DIRS) {
+      candidates.push(join12(root, installDir, "bin", "bgsd-tools.cjs"));
+    }
+  }
+  for (const candidate of uniquePaths(candidates)) {
+    if (existsSync4(candidate)) return candidate;
+  }
+  throw new Error("Could not locate bgsd-tools.cjs");
+}
+
+// src/plugin/tool-availability.js
 var TOOL_NAMES = ["ripgrep", "fd", "jq", "yq", "ast_grep", "sd", "hyperfine", "bat", "gh"];
 var TOOL_CACHE_TTL_MS = 30 * 60 * 1e3;
 function createUnknownToolAvailability() {
@@ -7835,20 +8675,10 @@ function computeCapabilityLevel(toolAvailability) {
   return "MEDIUM";
 }
 function getCachePath(projectDir) {
-  return join12(projectDir, ".planning", ".cache", "tools.json");
+  return join13(projectDir, ".planning", ".cache", "tools.json");
 }
 function resolveCliPath() {
-  const currentDir = dirname2(fileURLToPath(import.meta.url));
-  const candidates = [
-    process.env.BGSD_PLUGIN_DIR ? join12(process.env.BGSD_PLUGIN_DIR, "bin", "bgsd-tools.cjs") : null,
-    join12(currentDir, "..", "..", "bin", "bgsd-tools.cjs"),
-    join12(currentDir, "bin", "bgsd-tools.cjs"),
-    join12(currentDir, "..", "bin", "bgsd-tools.cjs")
-  ];
-  for (const candidate of candidates) {
-    if (candidate && existsSync4(candidate)) return candidate;
-  }
-  throw new Error("Could not locate bgsd-tools.cjs");
+  return resolveBundledCliPath({ moduleUrl: import.meta.url });
 }
 function mapResultsToAvailability(results) {
   const availability = createUnknownToolAvailability();
@@ -7872,7 +8702,7 @@ function mapDetectToolsOutput(entries) {
 }
 function inspectToolCache(projectDir) {
   const cachePath = getCachePath(projectDir);
-  if (!existsSync4(cachePath)) {
+  if (!existsSync5(cachePath)) {
     return { state: "missing", cachePath, timestamp: null, ageMs: null, results: null };
   }
   try {
@@ -7964,8 +8794,8 @@ function getToolAvailability(projectDir, options = {}) {
 }
 
 // src/plugin/command-enricher.js
-import { readdirSync as readdirSync3, existsSync as existsSync5, readFileSync as readFileSync9 } from "fs";
-import { join as join13 } from "path";
+import { readdirSync as readdirSync3, existsSync as existsSync6, readFileSync as readFileSync9 } from "fs";
+import { join as join14 } from "path";
 function enrichCommand(input, output, cwd) {
   if (!input || !output) return;
   const command = input.command || input.parts && input.parts[0] || "";
@@ -8062,7 +8892,7 @@ function enrichCommand(input, output, cwd) {
           const p = ensurePlans(phaseNum);
           if (p && p.length > 0) {
             enrichment.plans = p.map((pl) => pl.path ? pl.path.split("/").pop() : null).filter(Boolean);
-            const phaseDirFull = join13(resolvedCwd, phaseDir);
+            const phaseDirFull = join14(resolvedCwd, phaseDir);
             const sf = ensureSummaryFiles(phaseDirFull);
             enrichment.incomplete_plans = enrichment.plans.filter((planFile) => {
               const summaryFile = planFile.replace("-PLAN.md", "-SUMMARY.md");
@@ -8093,7 +8923,7 @@ function enrichCommand(input, output, cwd) {
   }
   try {
     if (enrichment.phase_dir) {
-      const phaseDirFull = join13(resolvedCwd, enrichment.phase_dir);
+      const phaseDirFull = join14(resolvedCwd, enrichment.phase_dir);
       if (!enrichment.plans) {
         let sqlUsed = false;
         try {
@@ -8134,8 +8964,8 @@ function enrichCommand(input, output, cwd) {
   try {
     if (enrichment.phase_dir && effectivePhaseNum) {
       const paddedPhase = String(effectivePhaseNum).padStart(4, "0");
-      enrichment.has_research = existsSync5(join13(resolvedCwd, enrichment.phase_dir, paddedPhase + "-RESEARCH.md"));
-      enrichment.has_context = existsSync5(join13(resolvedCwd, enrichment.phase_dir, paddedPhase + "-CONTEXT.md"));
+      enrichment.has_research = existsSync6(join14(resolvedCwd, enrichment.phase_dir, paddedPhase + "-RESEARCH.md"));
+      enrichment.has_context = existsSync6(join14(resolvedCwd, enrichment.phase_dir, paddedPhase + "-CONTEXT.md"));
     }
   } catch {
   }
@@ -8153,9 +8983,9 @@ function enrichCommand(input, output, cwd) {
   } catch {
   }
   try {
-    enrichment.state_exists = existsSync5(join13(resolvedCwd, ".planning/STATE.md"));
-    enrichment.project_exists = existsSync5(join13(resolvedCwd, ".planning/PROJECT.md"));
-    enrichment.roadmap_exists = existsSync5(join13(resolvedCwd, ".planning/ROADMAP.md"));
+    enrichment.state_exists = existsSync6(join14(resolvedCwd, ".planning/STATE.md"));
+    enrichment.project_exists = existsSync6(join14(resolvedCwd, ".planning/PROJECT.md"));
+    enrichment.roadmap_exists = existsSync6(join14(resolvedCwd, ".planning/ROADMAP.md"));
   } catch {
   }
   try {
@@ -8172,12 +9002,12 @@ function enrichCommand(input, output, cwd) {
   }
   try {
     if (enrichment.phase_dir) {
-      const phaseDirFull = join13(resolvedCwd, enrichment.phase_dir);
+      const phaseDirFull = join14(resolvedCwd, enrichment.phase_dir);
       const sf = ensureSummaryFiles(phaseDirFull);
       enrichment.has_previous_summary = sf.length > 0;
       if (sf.length > 0) {
         const lastSummary = [...sf].sort().pop();
-        const content = readFileSync9(join13(phaseDirFull, lastSummary), "utf-8");
+        const content = readFileSync9(join14(phaseDirFull, lastSummary), "utf-8");
         enrichment.has_unresolved_issues = content.includes("unresolved") || content.includes("Unresolved");
         enrichment.has_blockers = content.includes("blocker") || content.includes("Blocker");
       } else {
@@ -8216,10 +9046,12 @@ function enrichCommand(input, output, cwd) {
     if (agentType) {
       enrichment.agent_type = agentType;
     }
+    enrichment.model_settings = config ? config.model_settings : void 0;
     enrichment.model_profile = config ? config.model_profile || "balanced" : "balanced";
-    try {
-      enrichment.db = getDb(resolvedCwd);
-    } catch {
+    enrichment.selected_profile = enrichment.model_settings?.default_profile || enrichment.model_profile;
+    if (agentType) {
+      const resolvedModel = (0, import_helpers.resolveModelSelectionFromConfig)(config || {}, agentType);
+      enrichment.resolved_model = resolvedModel.model;
     }
   } catch {
   }
@@ -8313,8 +9145,8 @@ function enrichCommand(input, output, cwd) {
     enrichment.tool_availability_meta = { state: "unknown", source: "fallback" };
   }
   try {
-    const localAgentsDir = join13(resolvedCwd, ".opencode", "agents");
-    if (existsSync5(localAgentsDir)) {
+    const localAgentsDir = join14(resolvedCwd, ".opencode", "agents");
+    if (existsSync6(localAgentsDir)) {
       const localAgentFiles = readdirSync3(localAgentsDir).filter((f) => f.endsWith(".md"));
       enrichment.local_agent_overrides = localAgentFiles.map((f) => f.replace(".md", ""));
     } else {
@@ -8324,13 +9156,13 @@ function enrichCommand(input, output, cwd) {
     enrichment.local_agent_overrides = [];
   }
   try {
-    const skillsDir = join13(resolvedCwd, ".agents", "skills");
-    if (existsSync5(skillsDir)) {
+    const skillsDir = join14(resolvedCwd, ".agents", "skills");
+    if (existsSync6(skillsDir)) {
       const skillEntries = readdirSync3(skillsDir, { withFileTypes: true }).filter((d) => d.isDirectory());
       const skills = [];
       for (const entry of skillEntries) {
-        const skillMdPath = join13(skillsDir, entry.name, "SKILL.md");
-        if (existsSync5(skillMdPath)) {
+        const skillMdPath = join14(skillsDir, entry.name, "SKILL.md");
+        if (existsSync6(skillMdPath)) {
           let description = "";
           try {
             const content = readFileSync9(skillMdPath, "utf8");
@@ -8364,12 +9196,17 @@ function enrichCommand(input, output, cwd) {
     const decisions = (0, import_decision_rules.evaluateDecisions)(command, enrichment);
     if (decisions && Object.keys(decisions).length > 0) {
       enrichment.decisions = decisions;
+      const modelDecision = decisions["model-selection"]?.value;
+      if (modelDecision) {
+        enrichment.selected_profile = modelDecision.profile || modelDecision.tier || enrichment.selected_profile;
+        enrichment.resolved_model = modelDecision.model || enrichment.resolved_model;
+      }
     }
   } catch {
   }
   const _elapsed = typeof performance !== "undefined" && performance.now ? performance.now() - _t0 : Date.now() - _t0;
   enrichment._enrichment_ms = parseFloat(_elapsed.toFixed(3));
-  writeDebugDiagnostic("[bgsd-enricher]", `${command} enriched in ${_elapsed.toFixed(1)}ms`);
+  writeDebugDiagnostic2("[bgsd-enricher]", `${command} enriched in ${_elapsed.toFixed(1)}ms`);
   if (output.parts) {
     output.parts.unshift({
       type: "text",
@@ -8421,13 +9258,13 @@ ${JSON.stringify(enrichment, null, 2)}
 </bgsd-context>`;
       }
       if (isDebugEnabled()) {
-        writeDebugDiagnostic("[bgsd-enricher]", `elision: removed ${sectionsElided} sections (${allElidedNames.join(", ")}) ~${totalTokensSaved} tokens saved`);
+        writeDebugDiagnostic2("[bgsd-enricher]", `elision: removed ${sectionsElided} sections (${allElidedNames.join(", ")}) ~${totalTokensSaved} tokens saved`);
         if (allDanglingWarnings.length > 0) {
-          writeDebugDiagnostic("[bgsd-enricher]", `dangling references found: ${allDanglingWarnings.map((w) => w.section).join(", ")}`);
+          writeDebugDiagnostic2("[bgsd-enricher]", `dangling references found: ${allDanglingWarnings.map((w) => w.section).join(", ")}`);
         }
       }
     } else if (allDanglingWarnings.length > 0 && isDebugEnabled()) {
-      writeDebugDiagnostic("[bgsd-enricher]", `dangling references found (no elision): ${allDanglingWarnings.map((w) => w.section).join(", ")}`);
+      writeDebugDiagnostic2("[bgsd-enricher]", `dangling references found (no elision): ${allDanglingWarnings.map((w) => w.section).join(", ")}`);
     }
   }
 }
@@ -8464,7 +9301,7 @@ function detectPhaseArg(parts, commandStr, argumentsStr) {
 }
 function resolvePhaseDir(phaseNum, cwd) {
   const normalized = String(phaseNum).replace(/^0+/, "") || "0";
-  const phasesDir = join13(cwd, ".planning", "phases");
+  const phasesDir = join14(cwd, ".planning", "phases");
   try {
     const entries = readdirSync3(phasesDir, { withFileTypes: true });
     for (const entry of entries) {
@@ -8482,7 +9319,7 @@ function resolvePhaseDir(phaseNum, cwd) {
 }
 function listSummaryFiles(phaseDir) {
   try {
-    if (!existsSync5(phaseDir)) return [];
+    if (!existsSync6(phaseDir)) return [];
     const files = readdirSync3(phaseDir);
     return files.filter((f) => f.endsWith("-SUMMARY.md"));
   } catch {
@@ -8491,13 +9328,13 @@ function listSummaryFiles(phaseDir) {
 }
 function countDiagnosedUatGaps(phaseDir) {
   try {
-    if (!existsSync5(phaseDir)) return 0;
+    if (!existsSync6(phaseDir)) return 0;
     const allFiles = readdirSync3(phaseDir);
     const uatFiles = allFiles.filter((f) => f.endsWith("-UAT.md"));
     let count = 0;
     for (const uf of uatFiles) {
       try {
-        const content = readFileSync9(join13(phaseDir, uf), "utf-8");
+        const content = readFileSync9(join14(phaseDir, uf), "utf-8");
         if (content.includes("status: diagnosed")) count++;
       } catch {
       }
@@ -8976,24 +9813,11 @@ var bgsd_validate = {
 // src/plugin/tools/bgsd-progress.js
 import { z as z3 } from "zod";
 import { execFileSync as execFileSync2 } from "child_process";
-import { existsSync as existsSync6 } from "fs";
-import { dirname as dirname3, join as join14 } from "path";
-import { fileURLToPath as fileURLToPath2 } from "url";
 await init_state();
 await init_plan();
 var VALID_ACTIONS = ["complete-task", "uncomplete-task", "add-blocker", "remove-blocker", "record-decision", "advance"];
 function resolveCliPath2() {
-  const currentDir = dirname3(fileURLToPath2(import.meta.url));
-  const candidates = [
-    process.env.BGSD_PLUGIN_DIR ? join14(process.env.BGSD_PLUGIN_DIR, "bin", "bgsd-tools.cjs") : null,
-    join14(currentDir, "..", "..", "..", "bin", "bgsd-tools.cjs"),
-    join14(currentDir, "bin", "bgsd-tools.cjs"),
-    join14(currentDir, "..", "bin", "bgsd-tools.cjs")
-  ];
-  for (const candidate of candidates) {
-    if (candidate && existsSync6(candidate)) return candidate;
-  }
-  throw new Error("Could not locate bgsd-tools.cjs");
+  return resolveBundledCliPath({ moduleUrl: import.meta.url });
 }
 function runCanonicalStateCommand(projectDir, args) {
   const cliPath = resolveCliPath2();
@@ -9684,7 +10508,7 @@ function createStuckDetector(notifier, config) {
 
 // src/plugin/advisory-guardrails.js
 import { readFileSync as readFileSync11, statSync as statSync3 } from "fs";
-import { join as join19, basename, extname, isAbsolute, resolve as resolve2 } from "path";
+import { join as join19, basename, extname, isAbsolute, resolve as resolve3 } from "path";
 import { homedir as homedir6 } from "os";
 var NAMING_PATTERNS = {
   camelCase: /^[a-z][a-z0-9]*[A-Z][a-zA-Z0-9]*$/,
@@ -9960,7 +10784,7 @@ function createAdvisoryGuardrails(cwd, notifier, config) {
       if (!WRITE_TOOLS.has(toolName)) return;
       const filePath = input?.args?.filePath;
       if (!filePath) return;
-      const absPath = isAbsolute(filePath) ? filePath : resolve2(cwd, filePath);
+      const absPath = isAbsolute(filePath) ? filePath : resolve3(cwd, filePath);
       if (absPath.includes("node_modules") || !absPath.startsWith(cwd)) {
         return;
       }
@@ -10133,7 +10957,7 @@ var BgsdPlugin = async ({ directory, $ }) => {
     try {
       getProjectState(projectDir);
     } catch {
-      writeDebugDiagnostic("[bgsd-plugin]", "background warm-up failed (non-fatal)");
+      writeDebugDiagnostic2("[bgsd-plugin]", "background warm-up failed (non-fatal)");
     }
   }, 0);
   const compacting = safeHook("compacting", async (input, output) => {

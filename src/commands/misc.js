@@ -6,10 +6,10 @@ const { execSync } = require('child_process');
 const { output, error, debugLog } = require('../lib/output');
 const { loadConfig, isGitIgnored, invalidateConfigCache } = require('../lib/config');
 const { applyConfigValue, buildDefaultConfig, deepMerge, migrateConfig, serializeConfig } = require('../lib/config-contract');
-const { MODEL_PROFILES, CONFIG_SCHEMA } = require('../lib/constants');
+const { CONFIG_SCHEMA } = require('../lib/constants');
 const { writeFileAtomic } = require('../lib/atomic-write');
 const { execJj, classifyPathScopedCommitFallback } = require('../lib/jj');
-const { safeReadFile, cachedReadFile, normalizePhaseName, findPhaseInternal, generateSlugInternal, getArchivedPhaseDirs, getMilestoneInfo, getPhaseTree, cachedReaddirSync } = require('../lib/helpers');
+const { safeReadFile, cachedReadFile, normalizePhaseName, findPhaseInternal, generateSlugInternal, getArchivedPhaseDirs, getMilestoneInfo, getPhaseTree, cachedReaddirSync, resolveModelSelectionFromConfig } = require('../lib/helpers');
 const { extractFrontmatter, reconstructFrontmatter, spliceFrontmatter } = require('../lib/frontmatter');
 const { execGit, structuredLog, diffSummary } = require('../lib/git');
 const { getDb } = require('../lib/db');
@@ -545,19 +545,15 @@ function cmdResolveModel(cwd, agentType, raw) {
   }
 
   const config = loadConfig(cwd);
-  const profile = config.model_profile || 'balanced';
-
-  const agentModels = MODEL_PROFILES[agentType];
-  if (!agentModels) {
-    const result = { model: 'sonnet', profile, unknown_agent: true };
-    output(result, raw, 'sonnet');
-    return;
-  }
-
-  const resolved = agentModels[profile] || agentModels['balanced'] || 'sonnet';
-  const model = resolved === 'opus' ? 'inherit' : resolved;
-  const result = { model, profile };
-  output(result, raw, model);
+  const resolved = resolveModelSelectionFromConfig(config, agentType);
+  const result = {
+    model: resolved.model,
+    selected_profile: resolved.selected_profile,
+    profile: resolved.selected_profile,
+    source: resolved.source,
+    unknown_agent: resolved.unknown_agent,
+  };
+  output(result, raw, resolved.model);
 }
 
 function cmdFindPhase(cwd, phase, raw) {
