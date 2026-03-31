@@ -13,7 +13,7 @@ v18.0 makes bGSD easier to tune and easier to trust at a glance. The milestone f
 
 - [x] **Phase 168: Adaptive Model Settings Contract** (completed 2026-03-31) - Give users one provider-agnostic settings surface for built-in profiles, one global default, and sparse direct overrides.
 - [x] **Phase 169: Canonical Model Resolution & Visibility** (completed 2026-03-31) - Resolve every workflow spawn through one canonical model path and expose configured versus concrete model state.
-- [ ] **Phase 170: cmux Workspace Detection & Safe Targeting** - Detect reachable `cmux` workspaces, scope updates correctly, and stay silent when targeting is unsafe or unavailable.
+- [x] **Phase 170: cmux Workspace Detection & Safe Targeting** (completed 2026-03-31) - Detect reachable `cmux` workspaces, scope updates correctly, and stay silent when targeting is unsafe or unavailable.
 - [ ] **Phase 171: Ambient Workspace Status & Progress** - Surface trustworthy workspace state, context, and progress only when plugin signal quality is strong enough.
 - [ ] **Phase 172: Ambient Attention UX & Noise Control** - Show concise logs and notifications for meaningful moments without repetitive sidebar churn.
 
@@ -47,7 +47,7 @@ v18.0 makes bGSD easier to tune and easier to trust at a glance. The milestone f
   1. Users running inside or alongside `cmux` only see ambient integration when the active workspace can be targeted safely.
   2. Users with multiple active `cmux` workspaces see workspace-scoped updates that do not leak into or overwrite another workspace.
   3. Users outside `cmux`, or in unreachable `cmux` environments, experience unchanged plugin behavior with quiet fail-open fallback.
-**Plans**: 2/3 plans executed
+**Plans**: 3/3 plans complete
 
 ### Phase 171: Ambient Workspace Status & Progress
 **Goal**: Users can glance at `cmux` and trust the workspace status, compact context, and progress signals it shows
@@ -75,7 +75,7 @@ v18.0 makes bGSD easier to tune and easier to trust at a glance. The milestone f
 |-------|----------------|--------|-----------|
 | 168. Adaptive Model Settings Contract | 4/4 | Complete    | 2026-03-31 |
 | 169. Canonical Model Resolution & Visibility | 4/4 | Complete    | 2026-03-31 |
-| 170. cmux Workspace Detection & Safe Targeting | 2/3 | In Progress|  |
+| 170. cmux Workspace Detection & Safe Targeting | 3/3 | Complete   | 2026-03-31 |
 | 171. Ambient Workspace Status & Progress | 0/TBD | Not started | - |
 | 172. Ambient Attention UX & Noise Control | 0/TBD | Not started | - |
 

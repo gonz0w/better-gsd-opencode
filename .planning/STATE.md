@@ -5,17 +5,17 @@
 See: .planning/PROJECT.md (updated 2026-03-30)
 
 **Core value:** Manage and deliver high-quality software with high-quality documentation, while continuously reducing token usage and improving performance.
-**Current focus:** Phase 170 plan 03 ready — reversible write-path proof on top of exact workspace targeting
+**Current focus:** Phase 170 complete — ready for verification
 
 ## Current Position
 
 **Phase:** 170
 **Current Plan:** 3
 **Total Plans in Phase:** 3
-**Status:** Ready to execute
+**Status:** Phase complete — ready for verification
 **Last Activity:** 2026-03-31
 
-Progress: [██████████] 99%
+Progress: [██████████] 100%
 
 ## Performance Metrics
 
@@ -49,6 +49,7 @@ Progress: [██████████] 99%
 | Phase 169-canonical-model-resolution-visibility P04 | 9 min | 2 tasks | 9 files |
 | Phase 170 P01 | 24 min | 2 tasks | 6 files |
 | Phase 170 P02 | 5 min | 2 tasks | 3 files |
+| Phase 170 P03 | 14 min | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -393,6 +394,7 @@ Progress: [██████████] 99%
 - [Phase 169-canonical-model-resolution-visibility]: Legacy cache and SQLite model-profile surfaces are now compatibility-only; canonical config remains the only live model-selection truth. — Removing dead cache APIs and fresh default seeding prevents future reads from reviving provider-tier model selection outside canonical config.
 - [Phase 170]: cmux workspace targeting now trusts managed env only when identify agrees, while alongside callers must prove one exact allowAll cwd match before attachment is considered safe.
 - [Phase 170]: Conflicting managed evidence now suppresses immediately instead of falling back to cwd heuristics, preventing cross-workspace leakage in multi-workspace cmux sessions.
+- [Phase 170]: Require exact-target proof plus a reversible write probe before cmux attachment, then reuse one cached attached-or-suppressed adapter. — This keeps workspace-targeted writes silent and safe while later sidebar UX phases reuse the same trusted boundary instead of re-probing or guessing.
 
 ### Pending Todos
 
@@ -404,6 +406,6 @@ None
 
 ## Session Continuity
 
-Last session: 2026-03-31T13:18:24.591Z
-Stopped at: Completed 170-02-PLAN.md
+Last session: 2026-03-31T13:37:10.027Z
+Stopped at: Completed 170-03-PLAN.md
 Resume file: None
