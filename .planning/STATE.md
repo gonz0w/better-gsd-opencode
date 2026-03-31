@@ -5,17 +5,17 @@
 See: .planning/PROJECT.md (updated 2026-03-30)
 
 **Core value:** Manage and deliver high-quality software with high-quality documentation, while continuously reducing token usage and improving performance.
-**Current focus:** Phase 171 complete — ready for verification
+**Current focus:** Phase 172 — ambient-attention-ux-noise-control plan 02 of 2
 
 ## Current Position
 
-**Phase:** 171 — Ambient Workspace Status & Progress
+**Phase:** 172 — Ambient Attention UX & Noise Control
 **Current Plan:** 2
 **Total Plans in Phase:** 2
-**Status:** Phase complete — ready for verification
+**Status:** Ready to execute
 **Last Activity:** 2026-03-31
 
-**Progress:** [██████████] 100%
+**Progress:** [██████████] 99%
 
 ## Performance Metrics
 
@@ -54,12 +54,13 @@ See: .planning/PROJECT.md (updated 2026-03-30)
 | Phase 171 P01 | 67 min | 2 tasks | 2 files |
 | Phase 171 P02 | 11 min | 2 tasks | 4 files |
 | Phase 171 P02 | 11 min | 2 tasks | 4 files |
+| Phase 172 P01 | 15 min | 2 tasks | 5 files |
+| Phase 172-ambient-attention-ux-noise-control P01 | 15 min | 2 tasks | 5 files |
 
 ## Accumulated Context
 
 ### Decisions
 
-- [v18.0 Roadmap]: Kept dynamic model work provider-agnostic by separating settings contract work from canonical resolution and routing behavior.
 - [Phase 168-adaptive-model-settings-contract]: Phase 168 planning artifacts now center on built-in quality/balanced/budget profiles, one selected global profile, and sparse direct overrides instead of aliases or migration-safe legacy compatibility.
 - [Phase 168-adaptive-model-settings-contract]: Canonical model settings now normalize through one nested model_settings contract with shared profile definitions, one default profile, and sparse agent overrides.
 - [Phase 168-adaptive-model-settings-contract]: CLI and plugin config parsing now derive compatibility model_profile and model_overrides fields from the shared normalizer instead of separate parsing logic.
@@ -559,6 +560,8 @@ See: .planning/PROJECT.md (updated 2026-03-30)
 - [Phase 170]: Conflicting managed evidence now suppresses immediately instead of falling back to cwd heuristics, preventing cross-workspace leakage in multi-workspace cmux sessions.
 - [Phase 170]: Require exact-target proof plus a reversible write probe before cmux attachment, then reuse one cached attached-or-suppressed adapter. — This keeps workspace-targeted writes silent and safe while later sidebar UX phases reuse the same trusted boundary instead of re-probing or guessing.
 - [Phase 171]: Phase 171 now syncs attached cmux sidebar state through one lifecycle-driven helper that clears stale metadata conservatively. — One shared adapter boundary plus cache-invalidating refresh keeps lifecycle hooks truthful without making other plugin subsystems cmux-aware.
+- [Phase 172]: Kept lifecycle classification pure and routed notify through the existing attached cmux adapter boundary. — Pure policy plus trusted transport preserves quiet-by-default intent while keeping suppressed sessions silent and later hook wiring simple.
+- [Phase 172-ambient-attention-ux-noise-control]: Kept lifecycle classification pure and routed notify through the existing attached cmux adapter boundary. — Pure policy plus trusted transport preserves quiet-by-default intent while keeping suppressed sessions silent and later hook wiring simple.
 
 ### Pending Todos
 
@@ -570,6 +573,6 @@ None
 
 ## Session Continuity
 
-**Last session:** 2026-03-31T15:14:09.655Z
-**Stopped at:** Completed 171-02-PLAN.md
+**Last session:** 2026-03-31T19:08:36.843Z
+**Stopped at:** Completed 172-01-PLAN.md
 **Resume file:** None
