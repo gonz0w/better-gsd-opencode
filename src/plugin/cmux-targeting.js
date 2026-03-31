@@ -1,4 +1,6 @@
-import { capabilities, ping } from './cmux-cli.js';
+import fs from 'node:fs';
+import path from 'node:path';
+import { capabilities, identify, listWorkspaces, ping, sidebarState } from './cmux-cli.js';
 
 const REQUIRED_SIDEBAR_METHODS = ['set-status', 'clear-status', 'set-progress', 'clear-progress', 'log'];
 
@@ -54,6 +56,57 @@ function hasCompleteManagedEnv(env) {
   return Boolean(env?.CMUX_WORKSPACE_ID && env?.CMUX_SURFACE_ID);
 }
 
+function extractJsonPayload(result) {
+  if (!result?.json) return null;
+  return result.json.result || result.json;
+}
+
+function extractWorkspaceId(payload) {
+  return payload?.workspace?.id
+    || payload?.workspace_id
+    || payload?.workspaceId
+    || payload?.id
+    || null;
+}
+
+function extractSurfaceId(payload) {
+  return payload?.surface?.id
+    || payload?.surface_id
+    || payload?.surfaceId
+    || null;
+}
+
+function extractWorkspaceEntries(payload) {
+  const candidates = [
+    payload?.workspaces,
+    payload?.items,
+    payload?.results,
+  ];
+
+  for (const candidate of candidates) {
+    if (Array.isArray(candidate)) return candidate;
+  }
+
+  return [];
+}
+
+function extractSidebarCwd(payload) {
+  return payload?.cwd
+    || payload?.workspace?.cwd
+    || payload?.state?.cwd
+    || null;
+}
+
+function normalizeComparablePath(targetPath) {
+  if (!targetPath) return null;
+
+  try {
+    return fs.realpathSync.native(targetPath);
+  } catch {
+    return path.resolve(targetPath);
+  }
+}
+
 function buildVerdict(overrides = {}) {
   return Object.freeze({
     available: false,
@@ -92,6 +145,124 @@ function buildCmuxClient(options = {}) {
     identify: (callOptions = {}) => identify({ ...shared, ...callOptions }),
     listWorkspaces: (callOptions = {}) => listWorkspaces({ ...shared, ...callOptions }),
     sidebarState: (callOptions = {}) => sidebarState({ ...shared, ...callOptions }),
+  };
+}
+
+export async function resolveManagedWorkspaceTarget(options = {}) {
+  const env = options.env || process.env;
+  const workspaceId = env.CMUX_WORKSPACE_ID || null;
+  const surfaceId = env.CMUX_SURFACE_ID || null;
+
+  if (!workspaceId || !surfaceId) {
+    return {
+      ok: false,
+      mode: 'managed',
+      suppressionReason: 'missing-env',
+      workspaceId: null,
+      surfaceId: null,
+    };
+  }
+
+  const identifyResult = await options.cmux.identify();
+  if (!identifyResult.ok) {
+    return {
+      ok: false,
+      mode: 'managed',
+      suppressionReason: 'identify-unavailable',
+      workspaceId: null,
+      surfaceId: null,
+    };
+  }
+
+  const identifyPayload = extractJsonPayload(identifyResult);
+  const identifiedWorkspaceId = extractWorkspaceId(identifyPayload?.workspace ? identifyPayload : identifyPayload?.result || identifyPayload);
+  const identifiedSurfaceId = extractSurfaceId(identifyPayload?.surface ? identifyPayload : identifyPayload?.result || identifyPayload);
+
+  if (identifiedWorkspaceId !== workspaceId) {
+    return {
+      ok: false,
+      mode: 'managed',
+      suppressionReason: 'workspace-mismatch',
+      workspaceId: null,
+      surfaceId: null,
+    };
+  }
+
+  if (identifiedSurfaceId !== surfaceId) {
+    return {
+      ok: false,
+      mode: 'managed',
+      suppressionReason: 'surface-mismatch',
+      workspaceId: null,
+      surfaceId: null,
+    };
+  }
+
+  return {
+    ok: true,
+    mode: 'managed',
+    workspaceId,
+    surfaceId,
+    suppressionReason: null,
+  };
+}
+
+export async function resolveAlongsideWorkspaceTarget(options = {}) {
+  const projectDir = normalizeComparablePath(options.projectDir);
+  if (!projectDir) {
+    return {
+      ok: false,
+      mode: 'alongside',
+      suppressionReason: 'ambiguous-cwd',
+      workspaceId: null,
+      surfaceId: null,
+    };
+  }
+
+  const workspacesResult = await options.cmux.listWorkspaces();
+  if (!workspacesResult.ok) {
+    return {
+      ok: false,
+      mode: 'alongside',
+      suppressionReason: 'ambiguous-cwd',
+      workspaceId: null,
+      surfaceId: null,
+    };
+  }
+
+  const workspacesPayload = extractJsonPayload(workspacesResult);
+  const matches = [];
+
+  for (const workspace of extractWorkspaceEntries(workspacesPayload)) {
+    const workspaceId = extractWorkspaceId(workspace);
+    if (!workspaceId) continue;
+
+    const sidebarResult = await options.cmux.sidebarState({ workspace: workspaceId });
+    if (!sidebarResult.ok) continue;
+
+    const sidebarPayload = extractJsonPayload(sidebarResult);
+    const workspaceCwd = normalizeComparablePath(extractSidebarCwd(sidebarPayload));
+    if (workspaceCwd === projectDir) {
+      matches.push(workspaceId);
+    }
+  }
+
+  if (matches.length !== 1) {
+    return {
+      ok: false,
+      mode: 'alongside',
+      suppressionReason: 'ambiguous-cwd',
+      workspaceId: null,
+      surfaceId: null,
+    };
+  }
+
+  return {
+    ok: true,
+    mode: 'alongside',
+    workspaceId: matches[0],
+    surfaceId: null,
+    suppressionReason: null,
   };
 }
 
@@ -197,7 +368,30 @@ export async function resolveCmuxAvailability(options = {}) {
     });
   }
 
-  if (!hasManagedEnv(env) && accessMode && accessMode !== 'allowAll') {
+  if (hasManagedEnv(env)) {
+    const managedTarget = await resolveManagedWorkspaceTarget({ env, cmux });
+    if (!managedTarget.ok) {
+      return buildVerdict({
+        mode: 'managed',
+        accessMode,
+        methods,
+        workspaceId: null,
+        surfaceId: null,
+        suppressionReason: managedTarget.suppressionReason,
+      });
+    }
+
+    return buildVerdict({
+      available: true,
+      mode: 'managed',
+      workspaceId: managedTarget.workspaceId,
+      surfaceId: managedTarget.surfaceId,
+      accessMode,
+      methods,
+    });
+  }
+
+  if (accessMode && accessMode !== 'allowAll') {
     return buildVerdict({
       mode: 'alongside',
       accessMode,
@@ -206,11 +400,27 @@ export async function resolveCmuxAvailability(options = {}) {
     });
   }
 
+  const alongsideTarget = await resolveAlongsideWorkspaceTarget({
+    cmux,
+    projectDir: options.projectDir,
+  });
+
+  if (!alongsideTarget.ok) {
+    return buildVerdict({
+      mode: 'alongside',
+      accessMode,
+      methods,
+      workspaceId: null,
+      surfaceId: null,
+      suppressionReason: alongsideTarget.suppressionReason,
+    });
+  }
+
   return buildVerdict({
     available: true,
-    mode: hasManagedEnv(env) ? 'managed' : accessMode === 'allowAll' ? 'alongside' : 'none',
-    workspaceId: env.CMUX_WORKSPACE_ID || null,
-    surfaceId: env.CMUX_SURFACE_ID || null,
+    mode: 'alongside',
+    workspaceId: alongsideTarget.workspaceId,
+    surfaceId: null,
     accessMode,
     methods,
   });

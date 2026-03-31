@@ -4161,8 +4161,8 @@ var require_output = __commonJS({
       return global._gsdOutputMode || "json";
     }
     function outputJSON(result, rawValue) {
-      const fs2 = __require("fs");
-      const path = __require("path");
+      const fs3 = __require("fs");
+      const path2 = __require("path");
       const mode = global._gsdOutputMode || "json";
       if (rawValue !== void 0 && mode !== "json") {
         process.stdout.write(String(rawValue));
@@ -4175,8 +4175,8 @@ var require_output = __commonJS({
       const json = JSON.stringify(filtered, null, 2);
       if (json.length > 5e4 && !process.env.BGSD_NO_TMPFILE) {
         const crypto = __require("crypto");
-        const tmpPath = path.join(__require("os").tmpdir(), `gsd-${crypto.randomBytes(8).toString("hex")}.json`);
-        fs2.writeFileSync(tmpPath, json, "utf-8", { mode: 384 });
+        const tmpPath = path2.join(__require("os").tmpdir(), `gsd-${crypto.randomBytes(8).toString("hex")}.json`);
+        fs3.writeFileSync(tmpPath, json, "utf-8", { mode: 384 });
         _tmpFiles.push(tmpPath);
         process.stdout.write("@file:" + tmpPath);
       } else {
@@ -4256,15 +4256,15 @@ var require_output = __commonJS({
 // src/lib/config.js
 var require_config = __commonJS({
   "src/lib/config.js"(exports, module) {
-    var fs2 = __require("fs");
-    var path = __require("path");
+    var fs3 = __require("fs");
+    var path2 = __require("path");
     var { execFileSync: execFileSync4 } = __require("child_process");
     var { normalizeConfig: normalizeConfig2 } = require_config_contract();
     var { debugLog, error } = require_output();
     var _configCache = /* @__PURE__ */ new Map();
     function readRawConfig(cwd) {
-      const configPath = path.join(cwd, ".planning", "config.json");
-      const raw = fs2.readFileSync(configPath, "utf-8");
+      const configPath = path2.join(cwd, ".planning", "config.json");
+      const raw = fs3.readFileSync(configPath, "utf-8");
       const parsed = JSON.parse(raw);
       if (parsed && typeof parsed === "object" && Object.prototype.hasOwnProperty.call(parsed, "worktree")) {
         error("Legacy `.planning/config.json.worktree` is no longer supported. Migrate to `.planning/config.json.workspace` with supported JJ settings like `base_path` and `max_concurrent` before running bGSD commands.");
@@ -4343,19 +4343,19 @@ var require_regex_cache = __commonJS({
 var require_cache = __commonJS({
   "src/lib/cache.js"(exports, module) {
     "use strict";
-    var fs2 = __require("fs");
-    var path = __require("path");
+    var fs3 = __require("fs");
+    var path2 = __require("path");
     var stats = { hits: 0, misses: 0 };
     var researchStats = { hits: 0, misses: 0 };
     var SQLiteBackend2 = class {
       constructor(options = {}) {
         this.maxSize = options.maxSize || 1e3;
         this.ttl = options.ttl || 36e5;
-        const configHome = process.env.XDG_CONFIG_HOME || path.join(process.env.HOME || "/root", ".config");
-        const bgsdConfigDir = path.join(configHome, "oc", "bgsd-oc");
-        this.dbPath = path.join(bgsdConfigDir, "cache.db");
-        if (!fs2.existsSync(bgsdConfigDir)) {
-          fs2.mkdirSync(bgsdConfigDir, { recursive: true });
+        const configHome = process.env.XDG_CONFIG_HOME || path2.join(process.env.HOME || "/root", ".config");
+        const bgsdConfigDir = path2.join(configHome, "oc", "bgsd-oc");
+        this.dbPath = path2.join(bgsdConfigDir, "cache.db");
+        if (!fs3.existsSync(bgsdConfigDir)) {
+          fs3.mkdirSync(bgsdConfigDir, { recursive: true });
         }
         const { DatabaseSync } = __require("node:sqlite");
         this.db = new DatabaseSync(this.dbPath);
@@ -4449,7 +4449,7 @@ var require_cache = __commonJS({
             return null;
           }
           try {
-            const fileStats = fs2.statSync(key);
+            const fileStats = fs3.statSync(key);
             if (fileStats.mtimeMs > row.mtime) {
               this.invalidate(key);
               stats.misses++;
@@ -4479,7 +4479,7 @@ var require_cache = __commonJS({
         try {
           let mtime = Date.now();
           try {
-            const fileStats = fs2.statSync(key);
+            const fileStats = fs3.statSync(key);
             mtime = fileStats.mtimeMs;
           } catch (e) {
           }
@@ -4564,8 +4564,8 @@ var require_cache = __commonJS({
         let warmed = 0;
         for (const filePath of files) {
           try {
-            if (fs2.existsSync(filePath)) {
-              const content = fs2.readFileSync(filePath, "utf-8");
+            if (fs3.existsSync(filePath)) {
+              const content = fs3.readFileSync(filePath, "utf-8");
               this.set(filePath, content);
               warmed++;
             }
@@ -4682,7 +4682,7 @@ var require_cache = __commonJS({
           return null;
         }
         try {
-          const fileStats = fs2.statSync(key);
+          const fileStats = fs3.statSync(key);
           if (fileStats.mtimeMs > entry.mtime) {
             this.cache.delete(key);
             stats.misses++;
@@ -4710,7 +4710,7 @@ var require_cache = __commonJS({
       set(key, value) {
         let mtime = Date.now();
         try {
-          const fileStats = fs2.statSync(key);
+          const fileStats = fs3.statSync(key);
           mtime = fileStats.mtimeMs;
         } catch (e) {
         }
@@ -4762,8 +4762,8 @@ var require_cache = __commonJS({
         let warmed = 0;
         for (const filePath of files) {
           try {
-            if (fs2.existsSync(filePath)) {
-              const content = fs2.readFileSync(filePath, "utf-8");
+            if (fs3.existsSync(filePath)) {
+              const content = fs3.readFileSync(filePath, "utf-8");
               this.set(filePath, content);
               warmed++;
             }
@@ -5094,8 +5094,8 @@ ${yamlStr}
 var require_helpers = __commonJS({
   "src/lib/helpers.js"(exports, module) {
     var crypto = __require("crypto");
-    var fs2 = __require("fs");
-    var path = __require("path");
+    var fs3 = __require("fs");
+    var path2 = __require("path");
     var { debugLog } = require_output();
     var { loadConfig } = require_config();
     var { DEFAULT_MODEL_SETTINGS: DEFAULT_MODEL_SETTINGS2, MODEL_SETTING_PROFILES: MODEL_SETTING_PROFILES2, VALID_MODEL_OVERRIDE_AGENTS: VALID_MODEL_OVERRIDE_AGENTS2 } = require_constants();
@@ -5126,7 +5126,7 @@ var require_helpers = __commonJS({
     var dirCache = /* @__PURE__ */ new Map();
     function safeReadFile(filePath) {
       try {
-        return fs2.readFileSync(filePath, "utf-8");
+        return fs3.readFileSync(filePath, "utf-8");
       } catch (e) {
         debugLog("file.read", "read failed", e);
         return null;
@@ -5171,12 +5171,12 @@ var require_helpers = __commonJS({
       return { content: next, changed };
     }
     function readRoadmapWithTddNormalization2(cwd) {
-      const roadmapPath = path.join(cwd, ".planning", "ROADMAP.md");
+      const roadmapPath = path2.join(cwd, ".planning", "ROADMAP.md");
       const original = cachedReadFile(roadmapPath);
       if (!original) return null;
       const normalized = normalizeRoadmapTddMetadata2(original);
       if (normalized.changed) {
-        fs2.writeFileSync(roadmapPath, normalized.content, "utf-8");
+        fs3.writeFileSync(roadmapPath, normalized.content, "utf-8");
         invalidateFileCache(roadmapPath);
         return normalized.content;
       }
@@ -5246,7 +5246,7 @@ ${canonicalCallout}${next.slice(insertAt)}`;
       if (!original) return { changed: false, decision: null };
       const normalized = normalizePlanTddMetadata(original);
       if (normalized.changed) {
-        fs2.writeFileSync(filePath, normalized.content, "utf-8");
+        fs3.writeFileSync(filePath, normalized.content, "utf-8");
         invalidateFileCache(filePath);
       }
       return { changed: normalized.changed, decision: normalized.decision };
@@ -5255,7 +5255,7 @@ ${canonicalCallout}${next.slice(insertAt)}`;
       const results = [];
       if (!phaseInfo?.directory || !Array.isArray(phaseInfo.plans)) return results;
       for (const planFile of phaseInfo.plans) {
-        const filePath = path.join(cwd, phaseInfo.directory, planFile);
+        const filePath = path2.join(cwd, phaseInfo.directory, planFile);
         const result = normalizePlanFileTddMetadata(filePath);
         if (result.changed) results.push({ file: filePath, decision: result.decision });
       }
@@ -5282,16 +5282,16 @@ ${canonicalCallout}${next.slice(insertAt)}`;
     }
     var _autoWarmMessageShown = false;
     function countPlanningFiles() {
-      const fs3 = __require("fs");
-      const path2 = __require("path");
+      const fs4 = __require("fs");
+      const path3 = __require("path");
       const cwd = process.cwd();
-      const planningDir = path2.join(cwd, ".planning");
+      const planningDir = path3.join(cwd, ".planning");
       let count = 0;
       function walk(dir) {
         try {
-          const entries = fs3.readdirSync(dir, { withFileTypes: true });
+          const entries = fs4.readdirSync(dir, { withFileTypes: true });
           for (const entry of entries) {
-            const fullPath = path2.join(dir, entry.name);
+            const fullPath = path3.join(dir, entry.name);
             if (entry.isDirectory()) {
               walk(fullPath);
             } else if (entry.isFile() && entry.name.endsWith(".md")) {
@@ -5301,7 +5301,7 @@ ${canonicalCallout}${next.slice(insertAt)}`;
         } catch (e) {
         }
       }
-      if (fs3.existsSync(planningDir)) {
+      if (fs4.existsSync(planningDir)) {
         walk(planningDir);
       }
       return count;
@@ -5313,7 +5313,7 @@ ${canonicalCallout}${next.slice(insertAt)}`;
       } else {
         cacheEngine.clear();
       }
-      if (!filePath || String(filePath).includes(`${path.sep}.planning${path.sep}`)) {
+      if (!filePath || String(filePath).includes(`${path2.sep}.planning${path2.sep}`)) {
         dirCache.clear();
         _phaseTreeCache = null;
         _phaseTreeCwd = null;
@@ -5327,7 +5327,7 @@ ${canonicalCallout}${next.slice(insertAt)}`;
         return dirCache.get(key);
       }
       try {
-        const entries = fs2.readdirSync(dirPath, options);
+        const entries = fs3.readdirSync(dirPath, options);
         dirCache.set(key, entries);
         return entries;
       } catch (e) {
@@ -5342,18 +5342,18 @@ ${canonicalCallout}${next.slice(insertAt)}`;
       if (_phaseTreeCache && _phaseTreeCwd === cwd) {
         return _phaseTreeCache;
       }
-      const phasesDir = path.join(cwd, ".planning", "phases");
+      const phasesDir = path2.join(cwd, ".planning", "phases");
       const tree = /* @__PURE__ */ new Map();
       try {
-        const entries = fs2.readdirSync(phasesDir, { withFileTypes: true });
+        const entries = fs3.readdirSync(phasesDir, { withFileTypes: true });
         const dirs = entries.filter((e) => e.isDirectory()).map((e) => e.name).sort();
         for (const dir of dirs) {
           const dirMatch = dir.match(PHASE_DIR_NUMBER);
           const phaseNumber = dirMatch ? dirMatch[1] : dir;
           const normalized = normalizePhaseName(phaseNumber);
           const phaseName = dirMatch && dirMatch[2] ? dirMatch[2] : null;
-          const phaseDir = path.join(phasesDir, dir);
-          const phaseFiles = fs2.readdirSync(phaseDir);
+          const phaseDir = path2.join(phasesDir, dir);
+          const phaseFiles = fs3.readdirSync(phaseDir);
           const plans = phaseFiles.filter((f) => f.endsWith("-PLAN.md") || f === "PLAN.md").sort();
           const summaries = phaseFiles.filter((f) => f.endsWith("-SUMMARY.md") || f === "SUMMARY.md").sort();
           const hasResearch = phaseFiles.some((f) => f.endsWith("-RESEARCH.md") || f === "RESEARCH.md");
@@ -5369,7 +5369,7 @@ ${canonicalCallout}${next.slice(insertAt)}`;
           tree.set(normalized, {
             dirName: dir,
             fullPath: phaseDir,
-            relPath: path.join(".planning", "phases", dir),
+            relPath: path2.join(".planning", "phases", dir),
             phaseNumber,
             phaseName,
             phaseSlug: phaseName ? phaseName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") : null,
@@ -5414,7 +5414,7 @@ ${canonicalCallout}${next.slice(insertAt)}`;
     }
     function getPhaseRequirementFingerprintEntries(cwd, requirementIds = []) {
       if (!Array.isArray(requirementIds) || requirementIds.length === 0) return [];
-      const requirementsPath = path.join(cwd, ".planning", "REQUIREMENTS.md");
+      const requirementsPath = path2.join(cwd, ".planning", "REQUIREMENTS.md");
       const requirementsContent = safeReadFile(requirementsPath);
       if (!requirementsContent) return [];
       return requirementIds.map((requirementId) => {
@@ -5437,10 +5437,10 @@ ${roadmapSection}`);
 ${requirementEntries.sort().join("\n")}`);
       }
       const phaseInfo = findPhaseInternal(cwd, normalizedPhase);
-      const phaseFiles = phaseInfo?.directory ? cachedReaddirSync(path.join(cwd, phaseInfo.directory)) || [] : [];
+      const phaseFiles = phaseInfo?.directory ? cachedReaddirSync(path2.join(cwd, phaseInfo.directory)) || [] : [];
       const canonicalFiles = phaseFiles.length > 0 ? phaseFiles.filter((file) => file === "CONTEXT.md" || file === "RESEARCH.md" || file === "PLAN.md" || file.endsWith("-CONTEXT.md") || file.endsWith("-RESEARCH.md") || file.endsWith("-PLAN.md")).sort() : [];
       for (const file of canonicalFiles) {
-        const content = normalizePhaseHandoffFingerprintContent(safeReadFile(path.join(cwd, phaseInfo.directory, file)));
+        const content = normalizePhaseHandoffFingerprintContent(safeReadFile(path2.join(cwd, phaseInfo.directory, file)));
         if (content) fingerprintInputs.push(`file:${file}
 ${content}`);
       }
@@ -5580,23 +5580,23 @@ ${content}`);
       return resolveModelSelectionFromConfig(loadConfig(cwd), agentType).model;
     }
     function getArchivedPhaseDirs(cwd) {
-      const milestonesDir = path.join(cwd, ".planning", "milestones");
+      const milestonesDir = path2.join(cwd, ".planning", "milestones");
       const results = [];
-      if (!fs2.existsSync(milestonesDir)) return results;
+      if (!fs3.existsSync(milestonesDir)) return results;
       try {
-        const milestoneEntries = fs2.readdirSync(milestonesDir, { withFileTypes: true });
+        const milestoneEntries = fs3.readdirSync(milestonesDir, { withFileTypes: true });
         const phaseDirs = milestoneEntries.filter((e) => e.isDirectory() && /^v[\d.]+-phases$/.test(e.name)).map((e) => e.name).sort().reverse();
         for (const archiveName of phaseDirs) {
           const version = archiveName.match(/^(v[\d.]+)-phases$/)[1];
-          const archivePath = path.join(milestonesDir, archiveName);
-          const entries = fs2.readdirSync(archivePath, { withFileTypes: true });
+          const archivePath = path2.join(milestonesDir, archiveName);
+          const entries = fs3.readdirSync(archivePath, { withFileTypes: true });
           const dirs = entries.filter((e) => e.isDirectory()).map((e) => e.name).sort();
           for (const dir of dirs) {
             results.push({
               name: dir,
               milestone: version,
-              basePath: path.join(".planning", "milestones", archiveName),
-              fullPath: path.join(archivePath, dir)
+              basePath: path2.join(".planning", "milestones", archiveName),
+              fullPath: path2.join(archivePath, dir)
             });
           }
         }
@@ -5607,7 +5607,7 @@ ${content}`);
     }
     function searchPhaseInDir(baseDir, relBase, normalized) {
       try {
-        const entries = fs2.readdirSync(baseDir, { withFileTypes: true });
+        const entries = fs3.readdirSync(baseDir, { withFileTypes: true });
         const dirs = entries.filter((e) => e.isDirectory()).map((e) => e.name).sort();
         const match = dirs.find((d) => {
           const dm = d.match(PHASE_DIR_NUMBER);
@@ -5617,8 +5617,8 @@ ${content}`);
         const dirMatch = match.match(PHASE_DIR_NUMBER);
         const phaseNumber = dirMatch ? dirMatch[1] : normalized;
         const phaseName = dirMatch && dirMatch[2] ? dirMatch[2] : null;
-        const phaseDir = path.join(baseDir, match);
-        const phaseFiles = fs2.readdirSync(phaseDir);
+        const phaseDir = path2.join(baseDir, match);
+        const phaseFiles = fs3.readdirSync(phaseDir);
         const plans = phaseFiles.filter((f) => f.endsWith("-PLAN.md") || f === "PLAN.md").sort();
         const summaries = phaseFiles.filter((f) => f.endsWith("-SUMMARY.md") || f === "SUMMARY.md").sort();
         const hasResearch = phaseFiles.some((f) => f.endsWith("-RESEARCH.md") || f === "RESEARCH.md");
@@ -5633,7 +5633,7 @@ ${content}`);
         });
         return {
           found: true,
-          directory: path.join(relBase, match),
+          directory: path2.join(relBase, match),
           phase_number: phaseNumber,
           phase_name: phaseName,
           phase_slug: phaseName ? phaseName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") : null,
@@ -5669,15 +5669,15 @@ ${content}`);
           has_verification: cached.hasVerification
         };
       }
-      const milestonesDir = path.join(cwd, ".planning", "milestones");
-      if (!fs2.existsSync(milestonesDir)) return null;
+      const milestonesDir = path2.join(cwd, ".planning", "milestones");
+      if (!fs3.existsSync(milestonesDir)) return null;
       try {
-        const milestoneEntries = fs2.readdirSync(milestonesDir, { withFileTypes: true });
+        const milestoneEntries = fs3.readdirSync(milestonesDir, { withFileTypes: true });
         const archiveDirs = milestoneEntries.filter((e) => e.isDirectory() && /^v[\d.]+-phases$/.test(e.name)).map((e) => e.name).sort().reverse();
         for (const archiveName of archiveDirs) {
           const version = archiveName.match(/^(v[\d.]+)-phases$/)[1];
-          const archivePath = path.join(milestonesDir, archiveName);
-          const relBase = path.join(".planning", "milestones", archiveName);
+          const archivePath = path2.join(milestonesDir, archiveName);
+          const relBase = path2.join(".planning", "milestones", archiveName);
           const result = searchPhaseInDir(archivePath, relBase, normalized);
           if (result) {
             result.archived = version;
@@ -5691,7 +5691,7 @@ ${content}`);
     }
     function getRoadmapPhaseInternal(cwd, phaseNum) {
       if (!phaseNum) return null;
-      const roadmapPath = path.join(cwd, ".planning", "ROADMAP.md");
+      const roadmapPath = path2.join(cwd, ".planning", "ROADMAP.md");
       try {
         const content = readRoadmapWithTddNormalization2(cwd);
         if (!content) return null;
@@ -5759,7 +5759,7 @@ ${content}`);
       const phaseName = roadmapPhase?.phase_name || phaseInfo?.phase_name || null;
       const phaseSlug = phaseInfo?.phase_slug || (phaseName ? generateSlugInternal(phaseName) : null);
       const phaseDir = phaseInfo?.directory || null;
-      const phaseDirAbs = phaseDir ? path.join(cwd, phaseDir) : null;
+      const phaseDirAbs = phaseDir ? path2.join(cwd, phaseDir) : null;
       const plans = phaseInfo?.plans || [];
       const summaries = phaseInfo?.summaries || [];
       const incompletePlans = phaseInfo?.incomplete_plans || [];
@@ -5767,7 +5767,7 @@ ${content}`);
       const planInventory = [];
       let hasCheckpoints = false;
       for (const planFile of plans) {
-        const planPath = phaseDirAbs ? path.join(phaseDirAbs, planFile) : null;
+        const planPath = phaseDirAbs ? path2.join(phaseDirAbs, planFile) : null;
         const content = planPath ? cachedReadFile(planPath) : null;
         const fm = content ? require_frontmatter().extractFrontmatter(content) : {};
         const wave = parseInt(fm.wave, 10) || 1;
@@ -5776,7 +5776,7 @@ ${content}`);
         const id = planFile.replace("-PLAN.md", "").replace("PLAN.md", "");
         const entry = {
           id,
-          file: phaseDir ? path.join(phaseDir, planFile) : planFile,
+          file: phaseDir ? path2.join(phaseDir, planFile) : planFile,
           wave,
           autonomous,
           has_summary: summaries.some((summary) => summary.replace("-SUMMARY.md", "").replace("SUMMARY.md", "") === id)
@@ -5795,7 +5795,7 @@ ${content}`);
         try {
           const entries = cachedReaddirSync(phaseDirAbs) || [];
           const match = entries.find((file) => file.endsWith(suffix) || file === suffix.replace(/^.*-/, ""));
-          return match ? path.join(phaseDir, match) : null;
+          return match ? path2.join(phaseDir, match) : null;
         } catch {
           return null;
         }
@@ -5822,8 +5822,8 @@ ${content}`);
           research: artifactFromDir("-RESEARCH.md"),
           verification: artifactFromDir("-VERIFICATION.md"),
           uat: artifactFromDir("-UAT.md"),
-          plans: phaseDir ? plans.map((file) => path.join(phaseDir, file)) : [],
-          summaries: phaseDir ? summaries.map((file) => path.join(phaseDir, file)) : []
+          plans: phaseDir ? plans.map((file) => path2.join(phaseDir, file)) : [],
+          summaries: phaseDir ? summaries.map((file) => path2.join(phaseDir, file)) : []
         },
         plan_index: {
           plans: planInventory,
@@ -5852,9 +5852,9 @@ ${content}`);
       };
     }
     function pathExistsInternal(cwd, targetPath) {
-      const fullPath = path.isAbsolute(targetPath) ? targetPath : path.join(cwd, targetPath);
+      const fullPath = path2.isAbsolute(targetPath) ? targetPath : path2.join(cwd, targetPath);
       try {
-        fs2.statSync(fullPath);
+        fs3.statSync(fullPath);
         return true;
       } catch (e) {
         debugLog("file.exists", "stat failed", e);
@@ -5862,13 +5862,13 @@ ${content}`);
       }
     }
     function createWorkspaceEvidenceIndex(cwd, overrides = {}) {
-      const existsSync10 = overrides.existsSync || fs2.existsSync;
+      const existsSync10 = overrides.existsSync || fs3.existsSync;
       const readFile = overrides.readFile || safeReadFile;
       const cache = /* @__PURE__ */ new Map();
       return {
         get(targetPath, options = {}) {
           const includeContent = options.includeContent !== false;
-          const fullPath = path.isAbsolute(targetPath) ? targetPath : path.join(cwd, targetPath);
+          const fullPath = path2.isAbsolute(targetPath) ? targetPath : path2.join(cwd, targetPath);
           const cacheKey = `${fullPath}:${includeContent ? "content" : "stat"}`;
           if (cache.has(cacheKey)) return cache.get(cacheKey);
           const exists = !!existsSync10(fullPath);
@@ -5934,13 +5934,13 @@ ${content}`);
       for (const rule of RUNTIME_FRESHNESS_RULES) {
         const relevantSources = ruleSources.get(rule.id) || [];
         if (relevantSources.length === 0) continue;
-        const artifactFullPath = path.join(cwd, rule.artifactPath);
-        const artifactExists = fs2.existsSync(artifactFullPath);
-        const artifactMtimeMs = artifactExists ? fs2.statSync(artifactFullPath).mtimeMs : null;
+        const artifactFullPath = path2.join(cwd, rule.artifactPath);
+        const artifactExists = fs3.existsSync(artifactFullPath);
+        const artifactMtimeMs = artifactExists ? fs3.statSync(artifactFullPath).mtimeMs : null;
         const sourceEntries = relevantSources.map((sourcePath) => {
-          const sourceFullPath = path.join(cwd, sourcePath);
-          if (!fs2.existsSync(sourceFullPath)) return null;
-          const stat = fs2.statSync(sourceFullPath);
+          const sourceFullPath = path2.join(cwd, sourcePath);
+          if (!fs3.existsSync(sourceFullPath)) return null;
+          const stat = fs3.statSync(sourceFullPath);
           return {
             path: sourcePath,
             mtime_ms: stat.mtimeMs,
@@ -6023,7 +6023,7 @@ ${content}`);
           return null;
         };
         var extractPhaseRange = extractPhaseRange2;
-        const roadmap = cachedReadFile(path.join(cwd, ".planning", "ROADMAP.md"));
+        const roadmap = cachedReadFile(path2.join(cwd, ".planning", "ROADMAP.md"));
         if (!roadmap) return { version: "v1.0", name: "milestone", phaseRange: null };
         let version = null;
         let name = null;
@@ -10918,6 +10918,10 @@ function createAdvisoryGuardrails(cwd, notifier, config) {
   };
 }
 
+// src/plugin/cmux-targeting.js
+import fs2 from "node:fs";
+import path from "node:path";
+
 // src/plugin/cmux-cli.js
 import { execFile } from "node:child_process";
 var DEFAULT_CMUX_TIMEOUT_MS = 750;
@@ -11061,6 +11065,15 @@ function ping(options = {}) {
 function capabilities(options = {}) {
   return runCmuxJson("capabilities", [], options);
 }
+function identify(options = {}) {
+  return runCmuxJson("identify", [], options);
+}
+function listWorkspaces(options = {}) {
+  return runCmuxJson("list-workspaces", [], options);
+}
+function sidebarState(options = {}) {
+  return runCmuxJson("sidebar-state", [], options);
+}
 
 // src/plugin/cmux-targeting.js
 var REQUIRED_SIDEBAR_METHODS = ["set-status", "clear-status", "set-progress", "clear-progress", "log"];
@@ -11103,6 +11116,38 @@ function hasManagedEnv(env) {
 function hasCompleteManagedEnv(env) {
   return Boolean(env?.CMUX_WORKSPACE_ID && env?.CMUX_SURFACE_ID);
 }
+function extractJsonPayload(result) {
+  if (!result?.json) return null;
+  return result.json.result || result.json;
+}
+function extractWorkspaceId(payload) {
+  return payload?.workspace?.id || payload?.workspace_id || payload?.workspaceId || payload?.id || null;
+}
+function extractSurfaceId(payload) {
+  return payload?.surface?.id || payload?.surface_id || payload?.surfaceId || null;
+}
+function extractWorkspaceEntries(payload) {
+  const candidates = [
+    payload?.workspaces,
+    payload?.items,
+    payload?.results
+  ];
+  for (const candidate of candidates) {
+    if (Array.isArray(candidate)) return candidate;
+  }
+  return [];
+}
+function extractSidebarCwd(payload) {
+  return payload?.cwd || payload?.workspace?.cwd || payload?.state?.cwd || null;
+}
+function normalizeComparablePath(targetPath) {
+  if (!targetPath) return null;
+  try {
+    return fs2.realpathSync.native(targetPath);
+  } catch {
+    return path.resolve(targetPath);
+  }
+}
 function buildVerdict(overrides = {}) {
   return Object.freeze({
     available: false,
@@ -11137,6 +11182,109 @@ function buildCmuxClient(options = {}) {
     identify: (callOptions = {}) => identify({ ...shared, ...callOptions }),
     listWorkspaces: (callOptions = {}) => listWorkspaces({ ...shared, ...callOptions }),
     sidebarState: (callOptions = {}) => sidebarState({ ...shared, ...callOptions })
+  };
+}
+async function resolveManagedWorkspaceTarget(options = {}) {
+  const env = options.env || process.env;
+  const workspaceId = env.CMUX_WORKSPACE_ID || null;
+  const surfaceId = env.CMUX_SURFACE_ID || null;
+  if (!workspaceId || !surfaceId) {
+    return {
+      ok: false,
+      mode: "managed",
+      suppressionReason: "missing-env",
+      workspaceId: null,
+      surfaceId: null
+    };
+  }
+  const identifyResult = await options.cmux.identify();
+  if (!identifyResult.ok) {
+    return {
+      ok: false,
+      mode: "managed",
+      suppressionReason: "identify-unavailable",
+      workspaceId: null,
+      surfaceId: null
+    };
+  }
+  const identifyPayload = extractJsonPayload(identifyResult);
+  const identifiedWorkspaceId = extractWorkspaceId(identifyPayload?.workspace ? identifyPayload : identifyPayload?.result || identifyPayload);
+  const identifiedSurfaceId = extractSurfaceId(identifyPayload?.surface ? identifyPayload : identifyPayload?.result || identifyPayload);
+  if (identifiedWorkspaceId !== workspaceId) {
+    return {
+      ok: false,
+      mode: "managed",
+      suppressionReason: "workspace-mismatch",
+      workspaceId: null,
+      surfaceId: null
+    };
+  }
+  if (identifiedSurfaceId !== surfaceId) {
+    return {
+      ok: false,
+      mode: "managed",
+      suppressionReason: "surface-mismatch",
+      workspaceId: null,
+      surfaceId: null
+    };
+  }
+  return {
+    ok: true,
+    mode: "managed",
+    workspaceId,
+    surfaceId,
+    suppressionReason: null
+  };
+}
+async function resolveAlongsideWorkspaceTarget(options = {}) {
+  const projectDir = normalizeComparablePath(options.projectDir);
+  if (!projectDir) {
+    return {
+      ok: false,
+      mode: "alongside",
+      suppressionReason: "ambiguous-cwd",
+      workspaceId: null,
+      surfaceId: null
+    };
+  }
+  const workspacesResult = await options.cmux.listWorkspaces();
+  if (!workspacesResult.ok) {
+    return {
+      ok: false,
+      mode: "alongside",
+      suppressionReason: "ambiguous-cwd",
+      workspaceId: null,
+      surfaceId: null
+    };
+  }
+  const workspacesPayload = extractJsonPayload(workspacesResult);
+  const matches = [];
+  for (const workspace of extractWorkspaceEntries(workspacesPayload)) {
+    const workspaceId = extractWorkspaceId(workspace);
+    if (!workspaceId) continue;
+    const sidebarResult = await options.cmux.sidebarState({ workspace: workspaceId });
+    if (!sidebarResult.ok) continue;
+    const sidebarPayload = extractJsonPayload(sidebarResult);
+    const workspaceCwd = normalizeComparablePath(extractSidebarCwd(sidebarPayload));
+    if (workspaceCwd === projectDir) {
+      matches.push(workspaceId);
+    }
+  }
+  if (matches.length !== 1) {
+    return {
+      ok: false,
+      mode: "alongside",
+      suppressionReason: "ambiguous-cwd",
+      workspaceId: null,
+      surfaceId: null
+    };
+  }
+  return {
+    ok: true,
+    mode: "alongside",
+    workspaceId: matches[0],
+    surfaceId: null,
+    suppressionReason: null
   };
 }
 function createNoopCmuxAdapter(verdict = {}) {
@@ -11224,7 +11372,28 @@ async function resolveCmuxAvailability(options = {}) {
       suppressionReason: "missing-env"
     });
   }
-  if (!hasManagedEnv(env) && accessMode && accessMode !== "allowAll") {
+  if (hasManagedEnv(env)) {
+    const managedTarget = await resolveManagedWorkspaceTarget({ env, cmux });
+    if (!managedTarget.ok) {
+      return buildVerdict({
+        mode: "managed",
+        accessMode,
+        methods,
+        workspaceId: null,
+        surfaceId: null,
+        suppressionReason: managedTarget.suppressionReason
+      });
+    }
+    return buildVerdict({
+      available: true,
+      mode: "managed",
+      workspaceId: managedTarget.workspaceId,
+      surfaceId: managedTarget.surfaceId,
+      accessMode,
+      methods
+    });
+  }
+  if (accessMode && accessMode !== "allowAll") {
     return buildVerdict({
       mode: "alongside",
       accessMode,
@@ -11232,11 +11401,25 @@ async function resolveCmuxAvailability(options = {}) {
       suppressionReason: "access-mode-blocked"
     });
   }
+  const alongsideTarget = await resolveAlongsideWorkspaceTarget({
+    cmux,
+    projectDir: options.projectDir
+  });
+  if (!alongsideTarget.ok) {
+    return buildVerdict({
+      mode: "alongside",
+      accessMode,
+      methods,
+      workspaceId: null,
+      surfaceId: null,
+      suppressionReason: alongsideTarget.suppressionReason
+    });
+  }
   return buildVerdict({
     available: true,
-    mode: hasManagedEnv(env) ? "managed" : accessMode === "allowAll" ? "alongside" : "none",
-    workspaceId: env.CMUX_WORKSPACE_ID || null,
-    surfaceId: env.CMUX_SURFACE_ID || null,
+    mode: "alongside",
+    workspaceId: alongsideTarget.workspaceId,
+    surfaceId: null,
     accessMode,
     methods
   });
