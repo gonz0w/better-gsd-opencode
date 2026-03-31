@@ -15,7 +15,7 @@ v18.0 makes bGSD easier to tune and easier to trust at a glance. The milestone f
 - [x] **Phase 169: Canonical Model Resolution & Visibility** (completed 2026-03-31) - Resolve every workflow spawn through one canonical model path and expose configured versus concrete model state.
 - [x] **Phase 170: cmux Workspace Detection & Safe Targeting** (completed 2026-03-31) - Detect reachable `cmux` workspaces, scope updates correctly, and stay silent when targeting is unsafe or unavailable.
 - [x] **Phase 171: Ambient Workspace Status & Progress** (completed 2026-03-31) - Surface trustworthy workspace state, context, and progress only when plugin signal quality is strong enough.
-- [ ] **Phase 172: Ambient Attention UX & Noise Control** - Show concise logs and notifications for meaningful moments without repetitive sidebar churn.
+- [x] **Phase 172: Ambient Attention UX & Noise Control** (completed 2026-03-31) - Show concise logs and notifications for meaningful moments without repetitive sidebar churn.
 
 ## Phase Details
 
@@ -67,7 +67,7 @@ v18.0 makes bGSD easier to tune and easier to trust at a glance. The milestone f
   1. Users see concise sidebar log entries for major lifecycle moments like workflow start, task completion, waiting for input, blocker detection, and state warnings.
   2. Users receive `cmux` notifications for attention-worthy events such as checkpoints, blockers, warnings, and completion moments.
   3. Users do not get noisy or repetitive sidebar churn because non-essential updates are deduped and rate-limited.
-**Plans**: 1/2 plans executed
+**Plans**: 2/2 plans complete
 
 ## Progress
 
@@ -77,7 +77,7 @@ v18.0 makes bGSD easier to tune and easier to trust at a glance. The milestone f
 | 169. Canonical Model Resolution & Visibility | 4/4 | Complete    | 2026-03-31 |
 | 170. cmux Workspace Detection & Safe Targeting | 3/3 | Complete    | 2026-03-31 |
 | 171. Ambient Workspace Status & Progress | 2/2 | Complete   | 2026-03-31 |
-| 172. Ambient Attention UX & Noise Control | 1/2 | In Progress|  |
+| 172. Ambient Attention UX & Noise Control | 2/2 | Complete   | 2026-03-31 |
 
 ---
 
