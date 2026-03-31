@@ -1,4 +1,4 @@
-**Revision:** 29
+**Revision:** 30
 **Created:** 2026-02-25
 **Updated:** 2026-03-31
 
@@ -9,9 +9,9 @@ A high-performance agent orchestration engine that delivers enterprise-quality s
 <outcomes>
 ### Pending milestone candidates
 
-**DO-117:** Explore dynamic model configuration and smarter profile management using `.planning/research/DYNAMIC-MODEL-CONFIG-PRD.md`
+**DO-122:** Keep bGSD on one canonical greenfield support model by removing compatibility-only commands, normalization paths, and stale guidance using `.planning/research/GREENFIELD-COMPAT-CLEANUP-PRD.md`
 
-**DO-121:** Explore a CMUX-first OpenCode UX that surfaces working, waiting, blocked, and idle state through sidebar status, progress, logs, and notifications using `research/CMUX-FIRST-UX-PRD.md`
+**DO-123:** Make the CLI cheaper to reason about by simplifying routing, command metadata, oversized command hotspots, and ambient globals using `.planning/research/CLI-SIMPLIFICATION-PRD.md`
 </outcomes>
 
 <history>
@@ -44,7 +44,11 @@ A high-performance agent orchestration engine that delivers enterprise-quality s
 ### v18.0 complete — 2026-03-31
 - Archived delivered v18.0 outcomes and success criteria to `.planning/archive/INTENT-vv18.0.md`
 - Returned active intent to pending milestone candidates only
+
+### v18.1 init — 2026-03-31
+- Selected greenfield cleanup plus CLI simplification as the active milestone scope
+- Deferred multi-user repo coordination and Bun-first migration to later milestone candidates
 </history>
 
-<!-- Highest outcome ID: DO-121 -->
+<!-- Highest outcome ID: DO-123 -->
 <!-- Highest outcome ID: OUT-0 -->
