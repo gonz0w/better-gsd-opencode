@@ -325,14 +325,16 @@ function resolveModelSelection(state) {
     model_settings,
   } = state || {};
 
-  const { resolveModelSelectionFromConfig } = require('./helpers');
-  const resolved = resolveModelSelectionFromConfig({ model_settings, model_profile }, agent_type);
+  const { resolveConfiguredModelStateFromConfig } = require('./helpers');
+  const resolved = resolveConfiguredModelStateFromConfig({ model_settings, model_profile }, agent_type);
 
   return {
     value: {
-      tier: resolved.selected_profile,
+      configured: resolved.configured,
+      selected_profile: resolved.selected_profile,
       profile: resolved.selected_profile,
-      model: resolved.model,
+      resolved_model: resolved.resolved_model,
+      model: resolved.resolved_model,
       source: resolved.source,
       unknown_agent: resolved.unknown_agent,
     },

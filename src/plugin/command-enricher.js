@@ -1,7 +1,7 @@
 import { getProjectState } from './project-state.js';
 import { parsePlans } from './parsers/index.js';
 import { evaluateDecisions } from '../lib/decision-rules.js';
-import { resolveModelSelectionFromConfig } from '../lib/helpers.js';
+import { resolveConfiguredModelStateFromConfig } from '../lib/helpers.js';
 import { getDb, PlanningCache } from './lib/db-cache.js';
 import { isDebugEnabled, writeDebugDiagnostic } from './debug-contract.js';
 import { computeCapabilityLevel, getToolAvailability } from './tool-availability.js';
@@ -366,10 +366,12 @@ export function enrichCommand(input, output, cwd) {
     }
     enrichment.model_settings = config ? config.model_settings : undefined;
     enrichment.model_profile = config ? (config.model_profile || 'balanced') : 'balanced';
-    enrichment.selected_profile = enrichment.model_settings?.default_profile || enrichment.model_profile;
     if (agentType) {
-      const resolvedModel = resolveModelSelectionFromConfig(config || {}, agentType);
-      enrichment.resolved_model = resolvedModel.model;
+      const modelState = resolveConfiguredModelStateFromConfig(config || {}, agentType);
+      enrichment.configured = modelState.configured;
+      enrichment.selected_profile = modelState.selected_profile;
+      enrichment.resolved_model = modelState.resolved_model;
+      enrichment.source = modelState.source;
     }
   } catch { /* model-selection inputs failed */ }
 
@@ -541,8 +543,10 @@ export function enrichCommand(input, output, cwd) {
       enrichment.decisions = decisions;
       const modelDecision = decisions['model-selection']?.value;
       if (modelDecision) {
-        enrichment.selected_profile = modelDecision.profile || modelDecision.tier || enrichment.selected_profile;
-        enrichment.resolved_model = modelDecision.model || enrichment.resolved_model;
+        enrichment.configured = modelDecision.configured || enrichment.configured;
+        enrichment.selected_profile = modelDecision.selected_profile || modelDecision.profile || enrichment.selected_profile;
+        enrichment.resolved_model = modelDecision.resolved_model || modelDecision.model || enrichment.resolved_model;
+        enrichment.source = modelDecision.source || enrichment.source;
       }
     }
   } catch { /* decision evaluation failure is non-fatal */ }

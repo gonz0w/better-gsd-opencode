@@ -696,6 +696,23 @@ function resolveModelSelectionFromConfig(config, agentType) {
   };
 }
 
+function resolveConfiguredModelStateFromConfig(config, agentType) {
+  const modelSettings = buildCanonicalModelSettings(config);
+  const resolved = resolveModelSelectionFromConfig(config, agentType);
+  const configured = resolved.source === 'agent_override' && agentType
+    ? (modelSettings.agent_overrides[agentType] || resolved.model)
+    : resolved.selected_profile;
+
+  return {
+    agent_type: resolved.agent_type,
+    configured,
+    selected_profile: resolved.selected_profile,
+    resolved_model: resolved.model,
+    source: resolved.source,
+    unknown_agent: resolved.unknown_agent,
+  };
+}
+
 function resolveModelInternal(cwd, agentType) {
   return resolveModelSelectionFromConfig(loadConfig(cwd), agentType).model;
 }
@@ -1688,6 +1705,7 @@ module.exports = {
   sanitizeShellArg,
   isValidDateString,
   buildCanonicalModelSettings,
+  resolveConfiguredModelStateFromConfig,
   resolveModelSelectionFromConfig,
   resolveModelInternal,
   getArchivedPhaseDirs,
