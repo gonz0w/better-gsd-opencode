@@ -164,7 +164,18 @@ describe('Group 1: Schema and migration', () => {
     assert.strictEqual(db2.getSchemaVersion(), 5, 'Version should still be 5');
   });
 
-  it('existing data in v4 tables preserved after fresh migration', () => {
+  it('fresh migration leaves legacy model_profiles compatibility table empty', () => {
+    if (!hasSQLiteSupport()) return;
+
+    const dir = makeDir();
+    closeAll();
+    const db = getDb(dir);
+
+    const rows = db.prepare('SELECT agent_type, cwd FROM model_profiles').all();
+    assert.deepStrictEqual(rows, [], 'Fresh migrations should not seed legacy provider-tier defaults');
+  });
+
+  it('existing data in v4 compatibility tables preserved after fresh migration', () => {
     if (!hasSQLiteSupport()) return;
 
     const dir = makeDir();
@@ -172,12 +183,12 @@ describe('Group 1: Schema and migration', () => {
     const db = getDb(dir);
     const cache = new PlanningCache(db);
 
-    // Write some model_profiles data (v4 table)
+    // Write some model_profiles data (legacy v4 compatibility table)
     db.exec('BEGIN');
     db.prepare("INSERT OR IGNORE INTO model_profiles (agent_type, cwd, quality_model, balanced_model, budget_model) VALUES (?, ?, ?, ?, ?)").run('test-agent', dir, 'opus', 'sonnet', 'haiku');
     db.exec('COMMIT');
 
-    // Now write session data (v5 table) and verify v4 data still intact
+    // Now write session data (v5 table) and verify compatibility data still intact
     cache.storeSessionState(dir, { phase_number: '5', current_plan: '02', status: 'active' });
 
     const modelRow = db.prepare('SELECT quality_model FROM model_profiles WHERE agent_type = ? AND cwd = ?').get('test-agent', dir);

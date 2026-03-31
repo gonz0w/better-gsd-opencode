@@ -353,12 +353,13 @@ describe('config-migrate command', () => {
 
     const parsed = JSON.parse(result.output);
     assert.ok(parsed.migrated_keys.length > 0, 'Should have migrated keys');
-    assert.ok(parsed.unchanged_keys.includes('model_profile'), 'model_profile should be unchanged');
-    assert.ok(!parsed.migrated_keys.includes('model_profile'), 'model_profile should not be migrated');
+    assert.ok(parsed.migrated_keys.includes('model_settings'), 'canonical model_settings should be added for legacy-only config');
+    assert.ok(!parsed.migrated_keys.includes('model_profile'), 'legacy model_profile should remain preserved');
 
     // Verify the written config has the new keys
     const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
     assert.strictEqual(config.model_profile, 'quality', 'Existing value preserved');
+    assert.strictEqual(config.model_settings.default_profile, 'balanced', 'canonical model_settings should be present after migration');
     assert.strictEqual(config.test_gate, true, 'Missing key added with default');
   });
 
@@ -407,6 +408,15 @@ describe('config-migrate command', () => {
     const configPath = path.join(tmpDir, '.planning', 'config.json');
     const fullConfig = {
       model_profile: 'balanced',
+      model_settings: {
+        default_profile: 'balanced',
+        profiles: {
+          quality: { model: 'gpt-5.4' },
+          balanced: { model: 'gpt-5.4-mini' },
+          budget: { model: 'gpt-5.4-nano' },
+        },
+        agent_overrides: {},
+      },
       brave_search: false,
       mode: 'interactive',
       parallelization: true,
@@ -434,6 +444,9 @@ describe('config-migrate command', () => {
     const parsed = JSON.parse(result.output);
     assert.deepStrictEqual(parsed.migrated_keys, [], 'No keys should be migrated');
     assert.strictEqual(parsed.backup_path, null, 'No backup needed when nothing migrated');
+
+    const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+    assert.deepStrictEqual(config.model_profiles, {}, 'legacy model_profiles compatibility key should be preserved untouched');
   });
 
   test('config-migrate help text available', () => {

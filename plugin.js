@@ -696,68 +696,9 @@ var init_db_cache = __esm({
           return null;
         }
       }
-      /**
-       * Get model profile row for a specific cwd and agent type.
-       * Falls back to '__defaults__' cwd if no project-specific override exists.
-       *
-       * @param {string} cwd - Project root directory
-       * @param {string} agentType - Agent type (e.g. 'bgsd-planner')
-       * @returns {{ quality_model: string, balanced_model: string, budget_model: string, override_model: string|null }|null}
-       */
-      getModelProfile(cwd, agentType) {
-        if (this._isMap()) return null;
-        try {
-          const row = this._stmt("mp_get_cwd", "SELECT * FROM model_profiles WHERE agent_type = ? AND cwd = ?").get(agentType, cwd);
-          if (row) return row;
-          const defaultRow = this._stmt("mp_get_def", "SELECT * FROM model_profiles WHERE agent_type = ? AND cwd = '__defaults__'").get(agentType);
-          return defaultRow || null;
-        } catch {
-          return null;
-        }
-      }
-      /**
-       * Get all model profiles for a cwd. Falls back to '__defaults__' if none found.
-       *
-       * @param {string} cwd - Project root directory
-       * @returns {Array|null}
-       */
-      getModelProfiles(cwd) {
-        if (this._isMap()) return null;
-        try {
-          const rows = this._stmt("mp_all_cwd", "SELECT * FROM model_profiles WHERE cwd = ? ORDER BY agent_type").all(cwd);
-          if (rows && rows.length > 0) return rows;
-          const defaults = this._stmt("mp_all_def", "SELECT * FROM model_profiles WHERE cwd = '__defaults__' ORDER BY agent_type").all();
-          return defaults && defaults.length > 0 ? defaults : null;
-        } catch {
-          return null;
-        }
-      }
-      /**
-       * Seed model profile defaults for a project cwd from '__defaults__' rows.
-       * No-op if project-specific rows already exist for this cwd.
-       *
-       * @param {string} cwd - Project root directory
-       */
-      seedModelDefaults(cwd) {
-        if (this._isMap()) return;
-        try {
-          const existing = this._stmt("mp_count", "SELECT COUNT(*) AS cnt FROM model_profiles WHERE cwd = ?").get(cwd);
-          if (existing && existing.cnt > 0) return;
-          const defaults = this._stmt("mp_seed_def", "SELECT * FROM model_profiles WHERE cwd = '__defaults__'").all();
-          if (!defaults || defaults.length === 0) return;
-          const ins = this._stmt("mp_seed_ins", `INSERT OR IGNORE INTO model_profiles (agent_type, cwd, quality_model, balanced_model, budget_model, override_model) VALUES (?, ?, ?, ?, ?, ?)`);
-          this._db.exec("BEGIN");
-          for (const row of defaults) {
-            ins.run(row.agent_type, cwd, row.quality_model, row.balanced_model, row.budget_model, row.override_model || null);
-          }
-          this._db.exec("COMMIT");
-        } catch {
-          try {
-            this._db.exec("ROLLBACK");
-          } catch {
-          }
-        }
-      }
+      // Legacy model_profiles helpers were intentionally removed in Phase 169.
+      // The plugin cache still tolerates the compatibility table on disk, but live
+      // model resolution must go through canonical config helpers instead.
       // -------------------------------------------------------------------------
       // Session State Operations (Phase 123)
       // -------------------------------------------------------------------------
@@ -1822,8 +1763,8 @@ var require_constants = __commonJS({
       "bgsd-verifier": { quality: "sonnet", balanced: "sonnet", budget: "haiku" },
       "bgsd-plan-checker": { quality: "sonnet", balanced: "sonnet", budget: "haiku" }
     };
-    var MODEL_SETTING_PROFILES = Object.freeze(["quality", "balanced", "budget"]);
-    var DEFAULT_MODEL_SETTINGS = Object.freeze({
+    var MODEL_SETTING_PROFILES2 = Object.freeze(["quality", "balanced", "budget"]);
+    var DEFAULT_MODEL_SETTINGS2 = Object.freeze({
       default_profile: "balanced",
       profiles: Object.freeze({
         quality: Object.freeze({ model: "gpt-5.4" }),
@@ -1832,7 +1773,7 @@ var require_constants = __commonJS({
       }),
       agent_overrides: Object.freeze({})
     });
-    var VALID_MODEL_OVERRIDE_AGENTS = Object.freeze([
+    var VALID_MODEL_OVERRIDE_AGENTS2 = Object.freeze([
       "bgsd-planner",
       "bgsd-roadmapper",
       "bgsd-executor",
@@ -1846,7 +1787,7 @@ var require_constants = __commonJS({
       "bgsd-github-ci"
     ]);
     var CONFIG_SCHEMA = {
-      model_settings: { type: "object", default: DEFAULT_MODEL_SETTINGS, description: "Shared model settings contract (default profile, profile models, agent overrides)", aliases: [], nested: null },
+      model_settings: { type: "object", default: DEFAULT_MODEL_SETTINGS2, description: "Shared model settings contract (default profile, profile models, agent overrides)", aliases: [], nested: null },
       commit_docs: { type: "boolean", default: true, description: "Auto-commit planning docs", aliases: [], nested: { section: "planning", field: "commit_docs" } },
       search_gitignored: { type: "boolean", default: false, description: "Include gitignored files in searches", aliases: [], nested: { section: "planning", field: "search_gitignored" } },
       branching_strategy: { type: "string", default: "none", description: "Git branching strategy", aliases: [], nested: { section: "git", field: "branching_strategy" } },
@@ -2101,9 +2042,9 @@ Classify all tasks in a plan file with 1-5 complexity scores.
 Scoring factors: file count, cross-module blast radius, test requirements,
 checkpoint complexity, action length.
 
-Model mapping: score 1-2 \u2192 sonnet, score 3 \u2192 sonnet, score 4-5 \u2192 opus
+Profile mapping: score 1-2 \u2192 budget, score 3 \u2192 balanced, score 4-5 \u2192 quality
 
-Output: { plan, wave, autonomous, task_count, tasks: [{name, complexity}], plan_complexity, recommended_model }
+Output: { plan, wave, autonomous, task_count, tasks: [{name, complexity}], plan_complexity, recommended_profile }
 
 Examples:
   bgsd-tools util:classify plan .planning/phases/39-orchestration-intelligence/39-01-PLAN.md`,
@@ -3048,14 +2989,14 @@ Examples:
   bgsd-tools util:parity-check`,
       "util:resolve-model": `Usage: bgsd-tools util:resolve-model <agent-type>
 
-Resolve which model to use for a given agent type based on profile settings.
+Resolve configured-versus-resolved model state for a given agent type.
 
 Arguments:
   agent-type    Agent type (e.g., "bgsd-planner", "bgsd-executor")
 
-Uses model_profile config (quality/balanced/budget) to select appropriate model.
+Shows configured, selected_profile, resolved_model, and source for the active agent.
 
-Output: { agent_type, profile, resolved_model, quality_model, balanced_model, budget_model }
+Output: { configured, selected_profile, resolved_model, source, ...compatibility aliases }
 
 Examples:
   bgsd-tools util:resolve-model bgsd-planner
@@ -3687,9 +3628,9 @@ Examples:
     };
     module.exports = {
       MODEL_PROFILES,
-      MODEL_SETTING_PROFILES,
-      DEFAULT_MODEL_SETTINGS,
-      VALID_MODEL_OVERRIDE_AGENTS,
+      MODEL_SETTING_PROFILES: MODEL_SETTING_PROFILES2,
+      DEFAULT_MODEL_SETTINGS: DEFAULT_MODEL_SETTINGS2,
+      VALID_MODEL_OVERRIDE_AGENTS: VALID_MODEL_OVERRIDE_AGENTS2,
       CONFIG_SCHEMA,
       COMMAND_HELP,
       VALID_TRAJECTORY_SCOPES
@@ -3702,8 +3643,8 @@ var require_config_contract = __commonJS({
   "src/lib/config-contract.js"(exports, module) {
     var {
       CONFIG_SCHEMA,
-      DEFAULT_MODEL_SETTINGS,
-      MODEL_SETTING_PROFILES
+      DEFAULT_MODEL_SETTINGS: DEFAULT_MODEL_SETTINGS2,
+      MODEL_SETTING_PROFILES: MODEL_SETTING_PROFILES2
     } = require_constants();
     function isPlainObject(value) {
       return !!value && typeof value === "object" && !Array.isArray(value);
@@ -3792,7 +3733,7 @@ var require_config_contract = __commonJS({
       return overrides;
     }
     function normalizeModelSettings(rawValue) {
-      const defaults = cloneValue(DEFAULT_MODEL_SETTINGS);
+      const defaults = cloneValue(DEFAULT_MODEL_SETTINGS2);
       if (!isPlainObject(rawValue)) return defaults;
       const normalized = {
         default_profile: typeof rawValue.default_profile === "string" && rawValue.default_profile.trim() ? rawValue.default_profile.trim() : defaults.default_profile,
@@ -3800,7 +3741,7 @@ var require_config_contract = __commonJS({
         agent_overrides: normalizeAgentOverrides(rawValue.agent_overrides)
       };
       const rawProfiles = isPlainObject(rawValue.profiles) ? rawValue.profiles : {};
-      for (const profileName of MODEL_SETTING_PROFILES) {
+      for (const profileName of MODEL_SETTING_PROFILES2) {
         normalized.profiles[profileName] = normalizeProfileDefinition(rawProfiles[profileName], defaults.profiles[profileName]);
       }
       return normalized;
@@ -4317,7 +4258,7 @@ var require_config = __commonJS({
   "src/lib/config.js"(exports, module) {
     var fs2 = __require("fs");
     var path = __require("path");
-    var { execFileSync: execFileSync3 } = __require("child_process");
+    var { execFileSync: execFileSync4 } = __require("child_process");
     var { normalizeConfig: normalizeConfig2 } = require_config_contract();
     var { debugLog, error } = require_output();
     var _configCache = /* @__PURE__ */ new Map();
@@ -4355,7 +4296,7 @@ var require_config = __commonJS({
     }
     function isGitIgnored(cwd, targetPath) {
       try {
-        execFileSync3("git", ["check-ignore", "-q", "--", targetPath], {
+        execFileSync4("git", ["check-ignore", "-q", "--", targetPath], {
           cwd,
           stdio: "pipe"
         });
@@ -5157,7 +5098,7 @@ var require_helpers = __commonJS({
     var path = __require("path");
     var { debugLog } = require_output();
     var { loadConfig } = require_config();
-    var { DEFAULT_MODEL_SETTINGS, MODEL_SETTING_PROFILES, VALID_MODEL_OVERRIDE_AGENTS } = require_constants();
+    var { DEFAULT_MODEL_SETTINGS: DEFAULT_MODEL_SETTINGS2, MODEL_SETTING_PROFILES: MODEL_SETTING_PROFILES2, VALID_MODEL_OVERRIDE_AGENTS: VALID_MODEL_OVERRIDE_AGENTS2 } = require_constants();
     var { cachedRegex, PHASE_DIR_NUMBER } = require_regex_cache();
     var _cacheEngine = null;
     function getCacheEngine() {
@@ -5583,14 +5524,14 @@ ${content}`);
       const rawModelSettings = rawConfig.model_settings && typeof rawConfig.model_settings === "object" ? rawConfig.model_settings : {};
       const rawProfiles = rawModelSettings.profiles && typeof rawModelSettings.profiles === "object" ? rawModelSettings.profiles : {};
       const profiles = {};
-      for (const profileName of MODEL_SETTING_PROFILES) {
-        const fallbackModel = DEFAULT_MODEL_SETTINGS.profiles[profileName].model;
+      for (const profileName of MODEL_SETTING_PROFILES2) {
+        const fallbackModel = DEFAULT_MODEL_SETTINGS2.profiles[profileName].model;
         const rawProfile = rawProfiles[profileName];
         const configuredModel = normalizeModelOverrideValue(rawProfile);
         profiles[profileName] = { model: configuredModel || fallbackModel };
       }
-      const requestedProfile = typeof rawModelSettings.default_profile === "string" && rawModelSettings.default_profile.trim() ? rawModelSettings.default_profile.trim() : typeof rawConfig.model_profile === "string" && rawConfig.model_profile.trim() ? rawConfig.model_profile.trim() : DEFAULT_MODEL_SETTINGS.default_profile;
-      const defaultProfile = MODEL_SETTING_PROFILES.includes(requestedProfile) ? requestedProfile : DEFAULT_MODEL_SETTINGS.default_profile;
+      const requestedProfile = typeof rawModelSettings.default_profile === "string" && rawModelSettings.default_profile.trim() ? rawModelSettings.default_profile.trim() : typeof rawConfig.model_profile === "string" && rawConfig.model_profile.trim() ? rawConfig.model_profile.trim() : DEFAULT_MODEL_SETTINGS2.default_profile;
+      const defaultProfile = MODEL_SETTING_PROFILES2.includes(requestedProfile) ? requestedProfile : DEFAULT_MODEL_SETTINGS2.default_profile;
       const rawOverrides = rawModelSettings.agent_overrides && typeof rawModelSettings.agent_overrides === "object" ? rawModelSettings.agent_overrides : rawConfig.model_overrides && typeof rawConfig.model_overrides === "object" ? rawConfig.model_overrides : {};
       const agentOverrides = {};
       for (const [agentId, rawValue] of Object.entries(rawOverrides)) {
@@ -5603,27 +5544,40 @@ ${content}`);
         agent_overrides: agentOverrides
       };
     }
-    function normalizeResolvedModel(model) {
-      const fallbackModel = DEFAULT_MODEL_SETTINGS.profiles[DEFAULT_MODEL_SETTINGS.default_profile].model;
+    function normalizeResolvedModel2(model) {
+      const fallbackModel = DEFAULT_MODEL_SETTINGS2.profiles[DEFAULT_MODEL_SETTINGS2.default_profile].model;
       const resolved = typeof model === "string" && model.trim() ? model.trim() : fallbackModel;
       return resolved === "opus" ? "inherit" : resolved;
     }
-    function resolveModelSelectionFromConfig2(config, agentType) {
+    function resolveModelSelectionFromConfig(config, agentType) {
       const modelSettings = buildCanonicalModelSettings(config);
       const selectedProfile = modelSettings.default_profile;
       const overrideModel = agentType ? modelSettings.agent_overrides[agentType] : null;
       const profileModel = modelSettings.profiles[selectedProfile]?.model;
-      const model = normalizeResolvedModel(overrideModel || profileModel);
+      const model = normalizeResolvedModel2(overrideModel || profileModel);
       return {
         agent_type: agentType || null,
         selected_profile: selectedProfile,
         model,
         source: overrideModel ? "agent_override" : "default_profile",
-        unknown_agent: Boolean(agentType) && !VALID_MODEL_OVERRIDE_AGENTS.includes(agentType)
+        unknown_agent: Boolean(agentType) && !VALID_MODEL_OVERRIDE_AGENTS2.includes(agentType)
+      };
+    }
+    function resolveConfiguredModelStateFromConfig2(config, agentType) {
+      const modelSettings = buildCanonicalModelSettings(config);
+      const resolved = resolveModelSelectionFromConfig(config, agentType);
+      const configured = resolved.source === "agent_override" && agentType ? modelSettings.agent_overrides[agentType] || resolved.model : resolved.selected_profile;
+      return {
+        agent_type: resolved.agent_type,
+        configured,
+        selected_profile: resolved.selected_profile,
+        resolved_model: resolved.model,
+        source: resolved.source,
+        unknown_agent: resolved.unknown_agent
       };
     }
     function resolveModelInternal(cwd, agentType) {
-      return resolveModelSelectionFromConfig2(loadConfig(cwd), agentType).model;
+      return resolveModelSelectionFromConfig(loadConfig(cwd), agentType).model;
     }
     function getArchivedPhaseDirs(cwd) {
       const milestonesDir = path.join(cwd, ".planning", "milestones");
@@ -6450,7 +6404,8 @@ ${content}`);
       sanitizeShellArg,
       isValidDateString,
       buildCanonicalModelSettings,
-      resolveModelSelectionFromConfig: resolveModelSelectionFromConfig2,
+      resolveConfiguredModelStateFromConfig: resolveConfiguredModelStateFromConfig2,
+      resolveModelSelectionFromConfig,
       resolveModelInternal,
       getArchivedPhaseDirs,
       findPhaseInternal,
@@ -7265,13 +7220,15 @@ var require_decision_rules = __commonJS({
         model_profile = "balanced",
         model_settings
       } = state || {};
-      const { resolveModelSelectionFromConfig: resolveModelSelectionFromConfig2 } = require_helpers();
-      const resolved = resolveModelSelectionFromConfig2({ model_settings, model_profile }, agent_type);
+      const { resolveConfiguredModelStateFromConfig: resolveConfiguredModelStateFromConfig2 } = require_helpers();
+      const resolved = resolveConfiguredModelStateFromConfig2({ model_settings, model_profile }, agent_type);
       return {
         value: {
-          tier: resolved.selected_profile,
+          configured: resolved.configured,
+          selected_profile: resolved.selected_profile,
           profile: resolved.selected_profile,
-          model: resolved.model,
+          resolved_model: resolved.resolved_model,
+          model: resolved.resolved_model,
           source: resolved.source,
           unknown_agent: resolved.unknown_agent
         },
@@ -8610,11 +8567,10 @@ ${parts.join("\n")}
 // src/plugin/command-enricher.js
 await init_parsers();
 var import_decision_rules = __toESM(require_decision_rules());
-var import_helpers = __toESM(require_helpers());
 await init_db_cache();
 
 // src/plugin/tool-availability.js
-import { execFileSync } from "child_process";
+import { execFileSync as execFileSync2 } from "child_process";
 import { existsSync as existsSync5, readFileSync as readFileSync8 } from "fs";
 import { join as join13 } from "path";
 
@@ -8657,6 +8613,47 @@ function resolveBundledCliPath(options = {}) {
     if (existsSync4(candidate)) return candidate;
   }
   throw new Error("Could not locate bgsd-tools.cjs");
+}
+
+// src/plugin/node-runtime.js
+import { execFileSync } from "child_process";
+var NODE_PROBE_OUTPUT = "bgsd-node-runtime-ok";
+var cachedNodeRuntime = null;
+function probeNodeRuntime(candidate) {
+  if (!candidate || typeof candidate !== "string") return false;
+  try {
+    const output = execFileSync(candidate, [
+      "--input-type=module",
+      "--eval",
+      `process.stdout.write(${JSON.stringify(NODE_PROBE_OUTPUT)})`
+    ], {
+      encoding: "utf-8",
+      stdio: ["ignore", "pipe", "ignore"],
+      timeout: 3e3
+    });
+    return String(output || "").trim() === NODE_PROBE_OUTPUT;
+  } catch {
+    return false;
+  }
+}
+function resolveNodeRuntime(options = {}) {
+  const { useCache = true } = options;
+  if (useCache && cachedNodeRuntime) {
+    return cachedNodeRuntime;
+  }
+  const candidates = [
+    options.envNodePath === void 0 ? process.env.BGSD_NODE_PATH : options.envNodePath,
+    options.execPath === void 0 ? process.execPath : options.execPath,
+    options.argv0 === void 0 ? process.argv0 : options.argv0,
+    "node"
+  ];
+  for (const candidate of [...new Set(candidates.filter(Boolean))]) {
+    if (probeNodeRuntime(candidate)) {
+      if (useCache) cachedNodeRuntime = candidate;
+      return candidate;
+    }
+  }
+  throw new Error("Could not locate a usable Node.js runtime. Set BGSD_NODE_PATH to your node binary.");
 }
 
 // src/plugin/tool-availability.js
@@ -8724,7 +8721,8 @@ function inspectToolCache(projectDir) {
 }
 function refreshToolAvailability(projectDir) {
   const cliPath = resolveCliPath();
-  const output = execFileSync(process.execPath, [cliPath, "detect:tools", "--raw"], {
+  const nodeRuntime = resolveNodeRuntime();
+  const output = execFileSync2(nodeRuntime, [cliPath, "detect:tools", "--raw"], {
     cwd: projectDir,
     encoding: "utf-8",
     stdio: ["ignore", "pipe", "pipe"]
@@ -8796,6 +8794,50 @@ function getToolAvailability(projectDir, options = {}) {
 // src/plugin/command-enricher.js
 import { readdirSync as readdirSync3, existsSync as existsSync6, readFileSync as readFileSync9 } from "fs";
 import { join as join14 } from "path";
+var MODEL_SETTING_PROFILES = Object.freeze(["quality", "balanced", "budget"]);
+var DEFAULT_MODEL_SETTINGS = Object.freeze({
+  default_profile: "balanced",
+  profiles: Object.freeze({
+    quality: Object.freeze({ model: "gpt-5.4" }),
+    balanced: Object.freeze({ model: "gpt-5.4-mini" }),
+    budget: Object.freeze({ model: "gpt-5.4-nano" })
+  }),
+  agent_overrides: Object.freeze({})
+});
+var VALID_MODEL_OVERRIDE_AGENTS = Object.freeze([
+  "bgsd-planner",
+  "bgsd-roadmapper",
+  "bgsd-executor",
+  "bgsd-phase-researcher",
+  "bgsd-project-researcher",
+  "bgsd-debugger",
+  "bgsd-codebase-mapper",
+  "bgsd-verifier",
+  "bgsd-plan-checker",
+  "bgsd-reviewer",
+  "bgsd-github-ci"
+]);
+function normalizeResolvedModel(model) {
+  const fallbackModel = DEFAULT_MODEL_SETTINGS.profiles[DEFAULT_MODEL_SETTINGS.default_profile].model;
+  const resolved = typeof model === "string" && model.trim() ? model.trim() : fallbackModel;
+  return resolved === "opus" ? "inherit" : resolved;
+}
+function resolveConfiguredModelStateFromConfig(config, agentType) {
+  const rawModelSettings = config && typeof config.model_settings === "object" && config.model_settings ? config.model_settings : {};
+  const requestedProfile = typeof rawModelSettings.default_profile === "string" && rawModelSettings.default_profile.trim() ? rawModelSettings.default_profile.trim() : typeof config?.model_profile === "string" && config.model_profile.trim() ? config.model_profile.trim() : DEFAULT_MODEL_SETTINGS.default_profile;
+  const selectedProfile = MODEL_SETTING_PROFILES.includes(requestedProfile) ? requestedProfile : DEFAULT_MODEL_SETTINGS.default_profile;
+  const overrideModel = agentType && rawModelSettings.agent_overrides && typeof rawModelSettings.agent_overrides === "object" ? rawModelSettings.agent_overrides[agentType] : null;
+  const profileModel = rawModelSettings.profiles && typeof rawModelSettings.profiles === "object" ? rawModelSettings.profiles[selectedProfile]?.model : null;
+  const resolvedModel = normalizeResolvedModel(overrideModel || profileModel);
+  return {
+    agent_type: agentType || null,
+    configured: overrideModel || selectedProfile,
+    selected_profile: selectedProfile,
+    resolved_model: resolvedModel,
+    source: overrideModel ? "agent_override" : "default_profile",
+    unknown_agent: Boolean(agentType) && !VALID_MODEL_OVERRIDE_AGENTS.includes(agentType)
+  };
+}
 function enrichCommand(input, output, cwd) {
   if (!input || !output) return;
   const command = input.command || input.parts && input.parts[0] || "";
@@ -9048,10 +9090,12 @@ function enrichCommand(input, output, cwd) {
     }
     enrichment.model_settings = config ? config.model_settings : void 0;
     enrichment.model_profile = config ? config.model_profile || "balanced" : "balanced";
-    enrichment.selected_profile = enrichment.model_settings?.default_profile || enrichment.model_profile;
     if (agentType) {
-      const resolvedModel = (0, import_helpers.resolveModelSelectionFromConfig)(config || {}, agentType);
-      enrichment.resolved_model = resolvedModel.model;
+      const modelState = resolveConfiguredModelStateFromConfig(config || {}, agentType);
+      enrichment.configured = modelState.configured;
+      enrichment.selected_profile = modelState.selected_profile;
+      enrichment.resolved_model = modelState.resolved_model;
+      enrichment.source = modelState.source;
     }
   } catch {
   }
@@ -9198,8 +9242,10 @@ function enrichCommand(input, output, cwd) {
       enrichment.decisions = decisions;
       const modelDecision = decisions["model-selection"]?.value;
       if (modelDecision) {
-        enrichment.selected_profile = modelDecision.profile || modelDecision.tier || enrichment.selected_profile;
-        enrichment.resolved_model = modelDecision.model || enrichment.resolved_model;
+        enrichment.configured = modelDecision.configured || enrichment.configured;
+        enrichment.selected_profile = modelDecision.selected_profile || modelDecision.profile || enrichment.selected_profile;
+        enrichment.resolved_model = modelDecision.resolved_model || modelDecision.model || enrichment.resolved_model;
+        enrichment.source = modelDecision.source || enrichment.source;
       }
     }
   } catch {
@@ -9812,7 +9858,7 @@ var bgsd_validate = {
 
 // src/plugin/tools/bgsd-progress.js
 import { z as z3 } from "zod";
-import { execFileSync as execFileSync2 } from "child_process";
+import { execFileSync as execFileSync3 } from "child_process";
 await init_state();
 await init_plan();
 var VALID_ACTIONS = ["complete-task", "uncomplete-task", "add-blocker", "remove-blocker", "record-decision", "advance"];
@@ -9821,7 +9867,8 @@ function resolveCliPath2() {
 }
 function runCanonicalStateCommand(projectDir, args) {
   const cliPath = resolveCliPath2();
-  const output = execFileSync2(process.execPath, [cliPath, "verify:state", ...args], {
+  const nodeRuntime = resolveNodeRuntime();
+  const output = execFileSync3(nodeRuntime, [cliPath, "verify:state", ...args], {
     cwd: projectDir,
     encoding: "utf-8",
     stdio: ["ignore", "pipe", "pipe"]

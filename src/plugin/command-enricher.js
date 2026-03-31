@@ -1,12 +1,70 @@
 import { getProjectState } from './project-state.js';
 import { parsePlans } from './parsers/index.js';
 import { evaluateDecisions } from '../lib/decision-rules.js';
-import { resolveConfiguredModelStateFromConfig } from '../lib/helpers.js';
 import { getDb, PlanningCache } from './lib/db-cache.js';
 import { isDebugEnabled, writeDebugDiagnostic } from './debug-contract.js';
 import { computeCapabilityLevel, getToolAvailability } from './tool-availability.js';
 import { readdirSync, existsSync, readFileSync } from 'fs';
 import { join } from 'path';
+
+const MODEL_SETTING_PROFILES = Object.freeze(['quality', 'balanced', 'budget']);
+const DEFAULT_MODEL_SETTINGS = Object.freeze({
+  default_profile: 'balanced',
+  profiles: Object.freeze({
+    quality: Object.freeze({ model: 'gpt-5.4' }),
+    balanced: Object.freeze({ model: 'gpt-5.4-mini' }),
+    budget: Object.freeze({ model: 'gpt-5.4-nano' }),
+  }),
+  agent_overrides: Object.freeze({}),
+});
+const VALID_MODEL_OVERRIDE_AGENTS = Object.freeze([
+  'bgsd-planner',
+  'bgsd-roadmapper',
+  'bgsd-executor',
+  'bgsd-phase-researcher',
+  'bgsd-project-researcher',
+  'bgsd-debugger',
+  'bgsd-codebase-mapper',
+  'bgsd-verifier',
+  'bgsd-plan-checker',
+  'bgsd-reviewer',
+  'bgsd-github-ci',
+]);
+
+function normalizeResolvedModel(model) {
+  const fallbackModel = DEFAULT_MODEL_SETTINGS.profiles[DEFAULT_MODEL_SETTINGS.default_profile].model;
+  const resolved = typeof model === 'string' && model.trim() ? model.trim() : fallbackModel;
+  return resolved === 'opus' ? 'inherit' : resolved;
+}
+
+function resolveConfiguredModelStateFromConfig(config, agentType) {
+  const rawModelSettings = config && typeof config.model_settings === 'object' && config.model_settings
+    ? config.model_settings
+    : {};
+  const requestedProfile = typeof rawModelSettings.default_profile === 'string' && rawModelSettings.default_profile.trim()
+    ? rawModelSettings.default_profile.trim()
+    : typeof config?.model_profile === 'string' && config.model_profile.trim()
+      ? config.model_profile.trim()
+      : DEFAULT_MODEL_SETTINGS.default_profile;
+  const selectedProfile = MODEL_SETTING_PROFILES.includes(requestedProfile)
+    ? requestedProfile
+    : DEFAULT_MODEL_SETTINGS.default_profile;
+  const overrideModel = agentType && rawModelSettings.agent_overrides && typeof rawModelSettings.agent_overrides === 'object'
+    ? rawModelSettings.agent_overrides[agentType]
+    : null;
+  const profileModel = rawModelSettings.profiles && typeof rawModelSettings.profiles === 'object'
+    ? rawModelSettings.profiles[selectedProfile]?.model
+    : null;
+  const resolvedModel = normalizeResolvedModel(overrideModel || profileModel);
+  return {
+    agent_type: agentType || null,
+    configured: overrideModel || selectedProfile,
+    selected_profile: selectedProfile,
+    resolved_model: resolvedModel,
+    source: overrideModel ? 'agent_override' : 'default_profile',
+    unknown_agent: Boolean(agentType) && !VALID_MODEL_OVERRIDE_AGENTS.includes(agentType),
+  };
+}
 
 /**
  * Command enrichment for /bgsd-* slash commands.
