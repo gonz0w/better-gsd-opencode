@@ -5,17 +5,17 @@
 See: .planning/PROJECT.md (updated 2026-03-30)
 
 **Core value:** Manage and deliver high-quality software with high-quality documentation, while continuously reducing token usage and improving performance.
-**Current focus:** Phase 168 — adaptive-model-settings-contract plan 04 of 4
+**Current focus:** Phase 168 complete — ready for verification
 
 ## Current Position
 
 **Phase:** 168
 **Current Plan:** 4
 **Total Plans in Phase:** 4
-**Status:** Ready to execute
+**Status:** Phase complete — ready for verification
 **Last Activity:** 2026-03-31
 
-Progress: [██████████] 99%
+Progress: [██████████] 100%
 
 ## Performance Metrics
 
@@ -40,6 +40,7 @@ Progress: [██████████] 99%
 - Trend: Stable
 | Phase 168-adaptive-model-settings-contract P02 | 13 min | 2 tasks | 7 files |
 | Phase 168 P03 | 9 min | 2 tasks | 11 files |
+| Phase 168 P04 | 9 min | 1 tasks | 9 files |
 
 ## Accumulated Context
 
@@ -64,6 +65,7 @@ Progress: [██████████] 99%
 - [Phase 168-adaptive-model-settings-contract]: Canonical model settings now normalize through one nested model_settings contract with shared profile definitions, one default profile, and sparse agent overrides.
 - [Phase 168-adaptive-model-settings-contract]: CLI and plugin config parsing now derive compatibility model_profile and model_overrides fields from the shared normalizer instead of separate parsing logic.
 - [Phase 168]: Runtime model resolution now uses the canonical model_settings contract across helpers, decisions, init, enricher, and diagnostics. — A single config-first resolver removes legacy fallback drift so selected profiles and sparse overrides change live behavior consistently.
+- [Phase 168]: Settings guidance now uses the canonical model_settings contract with one selected default profile, shared quality/balanced/budget model definitions, and sparse direct overrides. — This makes /bgsd-settings and user-facing docs match the runtime/config contract without provider-specific tier wording.
 
 ### Pending Todos
 
@@ -75,6 +77,6 @@ None
 
 ## Session Continuity
 
-Last session: 2026-03-31T02:40:05.490Z
-Stopped at: Completed 168-03-PLAN.md
+Last session: 2026-03-31T02:51:19.830Z
+Stopped at: Completed 168-04-PLAN.md
 Resume file: None
