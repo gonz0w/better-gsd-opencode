@@ -24,9 +24,9 @@ describe('Phase 158 workflow guidance gaps', () => {
     assert.match(insertPhase, /`\/bgsd-plan phase \{decimal_phase\}`/, 'insert-phase should point users to /bgsd-plan phase for direct follow-up planning');
     assert.match(insertPhase, /Don't create plans yet \(that's \/bgsd-plan phase\)/, 'insert-phase should name the canonical planning command in anti-pattern guidance');
     assert.doesNotMatch(insertPhase, /\/bgsd-plan-phase \{decimal_phase\}/, 'insert-phase should not keep the legacy planning alias as the next step');
-    assert.match(milestoneGaps, /`\/bgsd-plan phase \{N\}`/, 'plan-milestone-gaps should route the next step through /bgsd-plan phase');
-    assert.match(milestoneGaps, /User knows to run `\/bgsd-plan phase` next/, 'plan-milestone-gaps should teach the canonical planning command');
-    assert.doesNotMatch(milestoneGaps, /\/bgsd-plan-phase \{N\}|`\/bgsd-plan-phase`/, 'plan-milestone-gaps should not keep /bgsd-plan-phase as the primary next step');
+    assert.match(milestoneGaps, /`\/bgsd-plan gaps \{N\}`/, 'plan-milestone-gaps should keep gap closure planning on /bgsd-plan gaps');
+    assert.match(milestoneGaps, /User knows to run `\/bgsd-plan gaps <phase>` next/, 'plan-milestone-gaps should teach the canonical gaps command for explicit gap closure');
+    assert.doesNotMatch(milestoneGaps, /\/bgsd-plan-phase \{N\}|`\/bgsd-plan-phase`/, 'plan-milestone-gaps should not regress to /bgsd-plan-phase guidance');
     assert.match(addPhase, /`\/bgsd-plan phase \{N\}`/, 'add-phase should point to the canonical planning-family command');
     assert.doesNotMatch(addPhase, /`\/bgsd-plan-phase \{N\}`/, 'add-phase should not regress to the legacy planning alias');
   });

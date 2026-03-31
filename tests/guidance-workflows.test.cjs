@@ -20,10 +20,12 @@ describe('canonical workflow guidance for planning follow-ups', () => {
     assert.match(workflow, /`\/bgsd-plan phase \{phase-number\}`/, 'progress should send ready-to-plan users to the canonical phase subcommand');
     assert.match(workflow, /- `\/bgsd-plan phase \{phase\}` — skip discussion, plan directly/, 'progress should keep skip-discussion guidance on the canonical phase subcommand');
     assert.match(workflow, /`\/bgsd-plan gaps \{phase\}`/, 'progress should send gap-planning guidance to the canonical gaps subcommand');
+    assert.match(workflow, /\/bgsd-plan todo check to review/, 'progress should route todo review through the canonical planning-family todo subcommand');
     assert.match(workflow, /- `\/bgsd-plan phase \{Z\+1\}` — skip discussion, plan directly/, 'progress should use the canonical phase subcommand for next-phase planning');
     assert.match(workflow, /offer `\/bgsd-plan phase \[next\]`/, 'progress edge-case guidance should mention the canonical phase subcommand');
     assert.doesNotMatch(workflow, /`\/bgsd-plan-phase \{phase-number\}`/, 'progress should not keep the legacy phase alias as the preferred ready-to-plan path');
     assert.doesNotMatch(workflow, /`\/bgsd-plan-phase \{phase\} --gaps`/, 'progress should not keep the legacy gap-planning alias as the preferred gap path');
+    assert.doesNotMatch(workflow, /\/bgsd-check-todos/, 'progress should not keep the legacy todo-check alias as surfaced guidance');
   });
 
   test('discuss workflow prefers canonical planning-family follow-ups and auto-advance prompts', () => {

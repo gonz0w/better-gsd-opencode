@@ -1,11 +1,9 @@
 import { z } from 'zod';
 import { execFileSync } from 'child_process';
-import { existsSync } from 'fs';
-import { dirname, join } from 'path';
-import { fileURLToPath } from 'url';
 import { getProjectState } from '../project-state.js';
 import { invalidateState } from '../parsers/state.js';
 import { invalidatePlans } from '../parsers/plan.js';
+import { resolveBundledCliPath } from '../cli-path.js';
 
 /**
  * bgsd_progress — State mutation tool.
@@ -21,19 +19,7 @@ import { invalidatePlans } from '../parsers/plan.js';
 const VALID_ACTIONS = ['complete-task', 'uncomplete-task', 'add-blocker', 'remove-blocker', 'record-decision', 'advance'];
 
 function resolveCliPath() {
-  const currentDir = dirname(fileURLToPath(import.meta.url));
-  const candidates = [
-    process.env.BGSD_PLUGIN_DIR ? join(process.env.BGSD_PLUGIN_DIR, 'bin', 'bgsd-tools.cjs') : null,
-    join(currentDir, '..', '..', '..', 'bin', 'bgsd-tools.cjs'),
-    join(currentDir, 'bin', 'bgsd-tools.cjs'),
-    join(currentDir, '..', 'bin', 'bgsd-tools.cjs'),
-  ];
-
-  for (const candidate of candidates) {
-    if (candidate && existsSync(candidate)) return candidate;
-  }
-
-  throw new Error('Could not locate bgsd-tools.cjs');
+  return resolveBundledCliPath({ moduleUrl: import.meta.url });
 }
 
 function runCanonicalStateCommand(projectDir, args) {

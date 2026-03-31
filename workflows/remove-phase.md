@@ -11,15 +11,15 @@ Read all files referenced by the invoking prompt's execution_context before star
 <step name="parse_arguments">
 Parse the command arguments:
 - Argument is the phase number to remove (integer or decimal)
-- Example: `/bgsd-remove-phase 17` → phase = 17
-- Example: `/bgsd-remove-phase 16.1` → phase = 16.1
+- Example: `/bgsd-plan roadmap remove 17` → phase = 17
+- Example: `/bgsd-plan roadmap remove 16.1` → phase = 16.1
 
 If no argument provided:
 
 ```
 ERROR: Phase number required
-Usage: /bgsd-remove-phase <phase-number>
-Example: /bgsd-remove-phase 17
+Usage: /bgsd-plan roadmap remove <phase-number>
+Example: /bgsd-plan roadmap remove 17
 ```
 
 Exit.

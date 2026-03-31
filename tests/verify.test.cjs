@@ -1013,6 +1013,97 @@ must_haves: []
       'should flag empty requirements');
   });
 
+  test('blocks execute plans whose visible TDD decision says Selected', () => {
+    const planContent = `---
+phase: "12"
+plan: "04"
+type: execute
+wave: 1
+depends_on: []
+files_modified: [src/lib/value.js, tests/value.test.cjs]
+autonomous: true
+requirements: [TDD-01]
+must_haves:
+  artifacts:
+    - path: src/lib/value.js
+---
+
+<objective>
+Implement deterministic value logic.
+</objective>
+
+> **TDD Decision:** Selected — deterministic value logic should be locked with a RED to GREEN cycle.
+
+<tasks>
+<task type="auto">
+<name>Implement value logic</name>
+<files>
+src/lib/value.js
+tests/value.test.cjs
+</files>
+<action>Add deterministic value logic</action>
+<verify>node --test tests/value.test.cjs</verify>
+<done>Behavior is implemented</done>
+</task>
+</tasks>
+`;
+    const planPath = path.join(tmpDir, 'selected-execute-PLAN.md');
+    fs.writeFileSync(planPath, planContent);
+
+    const result = runGsdTools(`verify:verify plan-structure ${planPath}`);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const data = JSON.parse(result.output);
+    assert.strictEqual(data.valid, false, 'selected execute plan should be rejected');
+    assert.ok(data.errors.some(i => i.includes('Selected') && i.includes('type: tdd')),
+      'should require Selected decisions to use type: tdd');
+  });
+
+  test('blocks tdd plans whose visible TDD decision says Skipped', () => {
+    const planContent = `---
+phase: "12"
+plan: "05"
+type: tdd
+wave: 1
+depends_on: []
+files_modified: [src/lib/value.js, tests/value.test.cjs]
+autonomous: true
+requirements: [TDD-02]
+must_haves:
+  artifacts:
+    - path: src/lib/value.js
+---
+
+<objective>
+Implement deterministic value logic.
+</objective>
+
+> **TDD Decision:** Skipped — this should stay a normal execute plan.
+
+<feature>
+  <name>Value logic</name>
+  <files>src/lib/value.js, tests/value.test.cjs</files>
+  <tdd-targets>
+    <red>node --test tests/value.test.cjs</red>
+    <green>node --test tests/value.test.cjs</green>
+    <refactor>node --test tests/value.test.cjs</refactor>
+  </tdd-targets>
+  <behavior>value behavior</behavior>
+  <implementation>minimal implementation</implementation>
+</feature>
+`;
+    const planPath = path.join(tmpDir, 'skipped-tdd-PLAN.md');
+    fs.writeFileSync(planPath, planContent);
+
+    const result = runGsdTools(`verify:verify plan-structure ${planPath}`);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const data = JSON.parse(result.output);
+    assert.strictEqual(data.valid, false, 'skipped tdd plan should be rejected');
+    assert.ok(data.errors.some(i => i.includes('Skipped') && i.includes('type: execute')),
+      'should require Skipped decisions to use type: execute');
+  });
+
   test('returns valid for well-formed plan', () => {
     const planContent = `---
 phase: "12"

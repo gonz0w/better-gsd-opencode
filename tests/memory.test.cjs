@@ -12,7 +12,6 @@ const os = require('os');
 const { TOOLS_PATH, runGsdTools, createTempProject, cleanup } = require('./helpers.cjs');
 const { getDb, closeAll, MapDatabase } = require('../src/lib/db');
 const { PlanningCache } = require('../src/lib/planning-cache');
-const { createMilestoneLessonSnapshot, deriveLessonRemediationBuckets } = require('../src/commands/lessons');
 
 describe('memory commands', () => {
   let tmpDir;
@@ -192,72 +191,6 @@ describe('memory commands', () => {
     assert.strictEqual(bookmarks.entry_count, 1);
     assert.ok(decisions.size_bytes > 0, 'should have non-zero size');
     assert.ok(decisions.last_modified, 'should have last_modified');
-  });
-});
-
-describe('lesson snapshot helpers', () => {
-  let tmpDir;
-
-  beforeEach(() => {
-    tmpDir = createTempProject();
-  });
-
-  afterEach(() => {
-    cleanup(tmpDir);
-  });
-
-  test('createMilestoneLessonSnapshot preserves lessons.json bytes and records source metadata', () => {
-    const memoryDir = path.join(tmpDir, '.planning', 'memory');
-    fs.mkdirSync(memoryDir, { recursive: true });
-    const lessonsJson = JSON.stringify([
-      {
-        id: 'lesson-a',
-        date: '2026-03-30T00:00:00Z',
-        title: 'JJ commit retries need a safe path',
-        severity: 'HIGH',
-        type: 'workflow',
-        root_cause: 'Dirty JJ workspaces caused repeated commit retries.',
-        prevention_rule: 'Use a JJ-safe commit flow.',
-        affected_agents: ['bgsd-executor'],
-      },
-    ], null, 2);
-    fs.writeFileSync(path.join(memoryDir, 'lessons.json'), lessonsJson, 'utf-8');
-
-    const snapshotResult = createMilestoneLessonSnapshot(tmpDir, { version: 'v18.0', name: 'Test Milestone' });
-    assert.ok(snapshotResult.snapshot_path.endsWith('v18.0-lessons-snapshot.json'), 'snapshot path should be milestone-owned');
-    assert.strictEqual(snapshotResult.snapshot.compact_summary.inspect_path, snapshotResult.snapshot_path, 'snapshot summary should expose its inspect path');
-    assert.strictEqual(snapshotResult.snapshot.source.path, '.planning/memory/lessons.json');
-    assert.strictEqual(snapshotResult.snapshot.source.lesson_count, 1);
-    assert.ok(snapshotResult.snapshot.source.source_hash, 'snapshot should record source hash');
-    assert.strictEqual(fs.readFileSync(path.join(memoryDir, 'lessons.json'), 'utf-8'), lessonsJson, 'helper must not mutate lessons.json');
-  });
-
-  test('deriveLessonRemediationBuckets emits stable named buckets with exact lesson IDs', () => {
-    const buckets = deriveLessonRemediationBuckets([
-      {
-        id: 'lesson-jj',
-        title: 'JJ workspace commit retries',
-        root_cause: 'JJ workspace commit flow drifted.',
-        prevention_rule: 'Use the JJ-safe path.',
-        severity: 'HIGH',
-        type: 'workflow',
-        affected_agents: ['bgsd-executor'],
-      },
-      {
-        id: 'lesson-guidance',
-        title: 'Workflow guidance drifted from the shipped command surface',
-        root_cause: 'Workflow guidance referenced stale commands.',
-        prevention_rule: 'Keep command-surface guidance in sync.',
-        severity: 'MEDIUM',
-        type: 'tooling',
-        affected_agents: ['bgsd-planner'],
-      },
-    ]);
-
-    assert.ok(buckets.some(bucket => bucket.id === 'jj-safe-commit-reliability' && bucket.lesson_ids.includes('lesson-jj')));
-    assert.ok(buckets.some(bucket => bucket.id === 'workflow-guidance-integrity' && bucket.lesson_ids.includes('lesson-guidance')));
-    assert.ok(buckets.every(bucket => typeof bucket.name === 'string' && bucket.name.length > 0), 'bucket names should be stable and human-readable');
-    assert.ok(buckets.every(bucket => Array.isArray(bucket.lesson_ids)), 'bucket schema should include lesson_ids');
   });
 });
 

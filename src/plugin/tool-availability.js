@@ -1,7 +1,7 @@
 import { execFileSync } from 'child_process';
 import { existsSync, readFileSync } from 'fs';
-import { dirname, join } from 'path';
-import { fileURLToPath } from 'url';
+import { join } from 'path';
+import { resolveBundledCliPath } from './cli-path.js';
 
 export const TOOL_NAMES = ['ripgrep', 'fd', 'jq', 'yq', 'ast_grep', 'sd', 'hyperfine', 'bat', 'gh'];
 export const TOOL_CACHE_TTL_MS = 30 * 60 * 1000;
@@ -27,19 +27,7 @@ function getCachePath(projectDir) {
 }
 
 function resolveCliPath() {
-  const currentDir = dirname(fileURLToPath(import.meta.url));
-  const candidates = [
-    process.env.BGSD_PLUGIN_DIR ? join(process.env.BGSD_PLUGIN_DIR, 'bin', 'bgsd-tools.cjs') : null,
-    join(currentDir, '..', '..', 'bin', 'bgsd-tools.cjs'),
-    join(currentDir, 'bin', 'bgsd-tools.cjs'),
-    join(currentDir, '..', 'bin', 'bgsd-tools.cjs'),
-  ];
-
-  for (const candidate of candidates) {
-    if (candidate && existsSync(candidate)) return candidate;
-  }
-
-  throw new Error('Could not locate bgsd-tools.cjs');
+  return resolveBundledCliPath({ moduleUrl: import.meta.url });
 }
 
 function mapResultsToAvailability(results) {

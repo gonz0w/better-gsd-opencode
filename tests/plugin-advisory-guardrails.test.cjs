@@ -198,7 +198,7 @@ describe('GARD-02: Planning file protection', () => {
 
   afterEach(() => cleanup(tmpDir));
 
-  test('direct write to .planning/ROADMAP.md triggers warning naming /bgsd-add-phase', async () => {
+  test('direct write to .planning/ROADMAP.md triggers warning naming canonical roadmap commands', async () => {
     const config = {};
     const guardrails = createAdvisoryGuardrails(tmpDir, notifier, config);
 
@@ -206,7 +206,7 @@ describe('GARD-02: Planning file protection', () => {
 
     const planningCalls = notifier.calls.filter(c => c.type === 'advisory-planning');
     assert.strictEqual(planningCalls.length, 1);
-    assert.ok(planningCalls[0].message.includes('/bgsd-add-phase'));
+    assert.ok(planningCalls[0].message.includes('/bgsd-plan roadmap add'));
     assert.strictEqual(planningCalls[0].severity, 'warning');
   });
 

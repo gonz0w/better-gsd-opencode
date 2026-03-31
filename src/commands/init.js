@@ -15,7 +15,6 @@ const { getQuestionTemplate } = require('../lib/questions');
 const { getIntentDriftData, getIntentSummary, getEffectiveIntent } = require('./intent');
 const { autoTriggerEnvScan, formatEnvSummary, readEnvManifest } = require('./env');
 const { autoTriggerCodebaseIntel, readCodebaseIntel } = require('./codebase');
-const { createMilestoneLessonSnapshot } = require('./lessons');
 const { requireJjForExecution, buildPlanningCapabilityContext } = require('../lib/jj');
 const { getPhaseFilesModified, listActiveWorkspaceInventory } = require('./workspace');
 const { getStalenessAge } = require('../lib/codebase-intel');
@@ -980,32 +979,6 @@ function cmdInitNewMilestone(cwd, raw) {
   };
 
   try {
-    const lessonSnapshot = createMilestoneLessonSnapshot(cwd, milestone);
-    result.lesson_snapshot_path = lessonSnapshot.snapshot_path;
-    result.lesson_snapshot_generated_at = lessonSnapshot.snapshot.generated_at;
-    result.lesson_snapshot_lesson_count = lessonSnapshot.snapshot.source?.lesson_count || 0;
-    result.lesson_snapshot_source_hash = lessonSnapshot.snapshot.source?.source_hash || null;
-    result.lesson_snapshot_metadata = {
-      milestone: lessonSnapshot.snapshot.milestone,
-      grouping_version: lessonSnapshot.snapshot.grouping_version,
-      source: lessonSnapshot.snapshot.source,
-      reused: lessonSnapshot.reused,
-    };
-    result.remediation_summary = lessonSnapshot.snapshot.compact_summary;
-    result.remediation_buckets = Array.isArray(lessonSnapshot.snapshot.buckets)
-      ? lessonSnapshot.snapshot.buckets.map(bucket => ({
-          id: bucket.id,
-          name: bucket.name,
-          summary: bucket.summary,
-          lesson_ids: Array.isArray(bucket.lesson_ids) ? bucket.lesson_ids : [],
-          counts: bucket.counts || null,
-        }))
-      : [];
-  } catch (e) {
-    debugLog('init.newMilestone', 'lesson snapshot creation failed (non-blocking)', e);
-  }
-
-  try {
     result.effective_intent = getEffectiveIntent(cwd);
   } catch (e) {
     debugLog('init.newMilestone', 'effective intent failed (non-blocking)', e);
@@ -1027,9 +1000,6 @@ function cmdInitNewMilestone(cwd, raw) {
     };
     if (result.effective_intent) compactResult.effective_intent = result.effective_intent;
     if (result.jj_planning_context) compactResult.jj_planning_context = result.jj_planning_context;
-    if (result.lesson_snapshot_path) compactResult.lesson_snapshot_path = result.lesson_snapshot_path;
-    if (result.lesson_snapshot_lesson_count != null) compactResult.lesson_snapshot_lesson_count = result.lesson_snapshot_lesson_count;
-    if (result.remediation_summary) compactResult.remediation_summary = result.remediation_summary;
     if (global._gsdManifestMode) {
       compactResult._manifest = { files: manifestFiles };
     }

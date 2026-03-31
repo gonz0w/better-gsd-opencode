@@ -1867,7 +1867,8 @@
         "src/lib/helpers.js"
       ],
       "tests/init.test.cjs": [
-        "tests/helpers.cjs"
+        "tests/helpers.cjs",
+        "src/commands/intent.js"
       ],
       "tests/integration.test.cjs": [
         "tests/helpers.cjs",
@@ -2058,7 +2059,6 @@
         "src/lib/cli-tools/index.js"
       ],
       "src/lib/config.js": [
-        "src/lib/constants.js",
         "src/lib/output.js"
       ],
       "src/lib/context.js": [
@@ -2100,6 +2100,9 @@
         "src/lib/deps.js",
         "src/lib/constants.js",
         "src/lib/helpers.js"
+      ],
+      "src/lib/runtime-capabilities.js": [
+        "src/lib/output.js"
       ],
       "src/plugin/advisory-guardrails.js": [
         "src/plugin/logger.js"
@@ -2282,7 +2285,6 @@
         "src/commands/features.js",
         "src/commands/misc.js",
         "src/commands/trajectory.js",
-        "src/lib/config.js",
         "src/lib/helpers.js",
         "src/lib/orchestration.js"
       ],
@@ -2315,6 +2317,7 @@
         "src/lib/helpers.js",
         "src/lib/lifecycle.js",
         "src/lib/orchestration.js",
+        "src/lib/runtime-capabilities.js",
         "src/lib/adapters/discovery.js"
       ],
       "src/lib/cli-tools/bun-runtime.js": [
@@ -2363,6 +2366,7 @@
       ],
       "src/commands/intent.js": [
         "src/router.js",
+        "tests/init.test.cjs",
         "tests/intent.test.cjs",
         "src/commands/init.js",
         "src/lib/codebase-intel.js"
@@ -2690,13 +2694,13 @@
     },
     "stats": {
       "total_files_parsed": 112,
-      "total_edges": 283,
+      "total_edges": 284,
       "languages_parsed": [
         "javascript"
       ],
       "parse_errors": 3
     },
-    "built_at": "2026-03-30T12:13:29.920Z"
+    "built_at": "2026-03-31T00:01:35.670Z"
   },
   "conventions": {
     "naming": {

@@ -17,8 +17,10 @@ const assert = require('node:assert');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
+const { pathToFileURL } = require('url');
 
 const PLUGIN_PATH = path.resolve(__dirname, '..', 'plugin.js');
+const CLI_PATH = path.resolve(__dirname, '..', 'bin', 'bgsd-tools.cjs');
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -551,6 +553,38 @@ describe('Tool availability refresh behavior', () => {
     const mod = await import(PLUGIN_PATH);
     enrichCommand = mod.enrichCommand;
     BgsdPlugin = mod.BgsdPlugin;
+  });
+
+  it('installed plugin bundle refreshes tool cache through sibling bgsd-oc CLI', async () => {
+    const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'bgsd-cli-path-'));
+    const opencodeDir = path.join(tempRoot, '.config', 'opencode');
+    const pluginDir = path.join(opencodeDir, 'plugin');
+    const installDir = path.join(opencodeDir, 'bgsd-oc', 'bin');
+    const pluginPath = path.join(pluginDir, 'bgsd.js');
+    const copiedCliPath = path.join(installDir, 'bgsd-tools.cjs');
+    const tempProject = makePlanningProject('bgsd-enr-installed-plugin-');
+
+    try {
+      fs.mkdirSync(pluginDir, { recursive: true });
+      fs.mkdirSync(installDir, { recursive: true });
+      fs.writeFileSync(path.join(opencodeDir, 'package.json'), '{"type":"module"}\n');
+      fs.symlinkSync(path.resolve(__dirname, '..', 'node_modules'), path.join(opencodeDir, 'node_modules'), 'dir');
+      fs.copyFileSync(PLUGIN_PATH, pluginPath);
+      fs.copyFileSync(CLI_PATH, copiedCliPath);
+
+      const installedMod = await import(`${pathToFileURL(pluginPath).href}?t=${Date.now()}`);
+      const { output } = runEnrich(installedMod.enrichCommand, tempProject);
+      const enrichment = parseEnrichmentOutput(output);
+      const cachePath = path.join(tempProject, '.planning', '.cache', 'tools.json');
+
+      assert.ok(fs.existsSync(cachePath), 'installed plugin should populate the tool cache');
+      assert.strictEqual(enrichment.tool_availability_meta.state, 'fresh', 'installed plugin should refresh tool availability');
+      assert.ok(['cache', 'cli-refresh'].includes(enrichment.tool_availability_meta.source), 'installed plugin should resolve the CLI instead of falling back');
+      assert.ok(Object.values(enrichment.tool_availability).some((value) => value !== null), 'installed plugin should expose known tool values');
+    } finally {
+      cleanupDir(tempRoot);
+      cleanupDir(tempProject);
+    }
   });
 
   it('enrichCommand refreshes missing tool cache and includes metadata', () => {

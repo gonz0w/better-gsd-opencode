@@ -90,6 +90,10 @@ Each task: **15-60 minutes** agent execution time.
 - Yes — Create a dedicated TDD plan (`type: tdd`)
 - No — Standard task in standard plan
 
+When the visible TDD decision is `Selected`, the plan itself should be `type: tdd`.
+When the visible TDD decision is `Skipped`, the plan should be `type: execute`.
+Do not produce a `Selected` decision on an `execute` plan.
+
 **TDD candidates (dedicated plans):** Business logic with defined I/O, API endpoints with request/response contracts, data transformations, validation rules, algorithms, state machines.
 
 **Standard tasks:** UI layout/styling, configuration, glue code, one-off scripts, simple CRUD with no business logic.

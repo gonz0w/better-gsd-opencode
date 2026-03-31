@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "kind": "phase-handoff",
+  "phase": "168",
+  "step": "discuss",
+  "status": "complete",
+  "run_id": "168-2026-03-31T01-24-18-186Z",
+  "source_fingerprint": "0182af895c92f057",
+  "created_at": "2026-03-31T01:24:18.186Z",
+  "updated_at": "2026-03-31T01:24:18.186Z",
+  "summary": "Discuss context ready for Phase 168",
+  "resume_target": {
+    "phase": "168",
+    "step": "discuss",
+    "plan": null,
+    "resume_file": ".planning/phases/168-adaptive-model-settings-contract/168-CONTEXT.md",
+    "next_command": "/bgsd-plan research 168"
+  },
+  "context": {}
+}

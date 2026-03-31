@@ -13,7 +13,7 @@ Parse the command arguments:
 - First argument: integer phase number to insert after
 - Remaining arguments: phase description
 
-Example: `/bgsd-insert-phase 72 Fix critical auth bug`
+Example: `/bgsd-plan roadmap insert 72 Fix critical auth bug`
 -> after = 72
 -> description = "Fix critical auth bug"
 
@@ -21,8 +21,8 @@ If arguments missing:
 
 ```
 ERROR: Both phase number and description required
-Usage: /bgsd-insert-phase <after> <description>
-Example: /bgsd-insert-phase 72 Fix critical auth bug
+Usage: /bgsd-plan roadmap insert <after> <description>
+Example: /bgsd-plan roadmap insert 72 Fix critical auth bug
 ```
 
 Exit.
@@ -104,7 +104,7 @@ Project state updated: .planning/STATE.md
 
 ```
 
-- Don't use this for planned work at end of milestone (use /bgsd-add-phase)
+- Don't use this for planned work at end of milestone (use /bgsd-plan roadmap add)
 - Don't insert before Phase 1 (decimal 0.1 makes no sense)
 - Don't renumber existing phases
 - Don't modify the target phase content

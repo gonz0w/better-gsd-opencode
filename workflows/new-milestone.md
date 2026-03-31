@@ -17,7 +17,6 @@ Read all execution_context files before starting.
 - Read MILESTONES.md (what shipped previously)
 - Read STATE.md (pending todos, blockers)
 - Check for MILESTONE-CONTEXT.md (reference-only: created by the milestone discuss flow, not a standalone command)
-- Use `init:new-milestone` lesson snapshot fields as the frozen milestone baseline when available (`lesson_snapshot_path`, `remediation_summary`, `remediation_buckets`) instead of rediscovering live lesson history.
 <!-- /section -->
 
 <!-- section: gather_goals -->
@@ -167,7 +166,6 @@ Use questionTemplate('new-milestone-skills', 'BINARY') to confirm installing the
 Use `.planning/INTENT.md` as the enduring north star and `.planning/MILESTONE-INTENT.md` as the milestone-local strategy source. Desired outcomes come from project intent; priorities and non-goals for this milestone come from milestone intent.
 
 Read PROJECT.md for core value, milestone goals, existing requirements. If research exists: read FEATURES.md, extract feature categories. If no research: gather requirements through conversation.
-When lesson snapshot metadata is available from init, treat that frozen artifact as the milestone-scoping source of truth; do not query live lessons again for scope definition.
 
 **Scope each category** via questionTemplate('new-milestone-scope-category', 'MULTI_CHOICE'):
 - Present features by category with table stakes / differentiators

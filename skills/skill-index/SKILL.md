@@ -7,7 +7,7 @@ agents: [all]
 
 # Skill Index
 
-**Generated:** 2026-03-31T02:34:24.189Z
+**Generated:** 2026-03-31T03:08:23.287Z
 **Total skills:** 31
 
 | Skill | Type | Agents | Description |
@@ -27,7 +27,7 @@ agents: [all]
 | executor-continuation | agent-specific | executor | Context window continuation handling for executors — saving execution state before context exhaustion, resumption protocol for fresh agents, and completed task verification on resume. |
 | git-integration | shared | executor, github-ci | VCS workflow patterns for bGSD using jj (Jujutsu, colocated with Git) — commit points (what to commit and when), commit message formats for initialization/task/plan/handoff, per-task commit rationale, example log, and anti-patterns to avoid. |
 | goal-backward | shared | planner, verifier, plan-checker, roadmapper | Goal-backward verification methodology — deriving observable truths, required artifacts, wiring connections, and key links from a stated goal. Used to create must-haves for plans and verify phase achievement. |
-| model-profiles | shared | planner, executor, verifier, debugger, roadmapper, project-researcher, phase-researcher, codebase-mapper, plan-checker, github-ci | AI model selection profiles for bGSD agents — quality/balanced/budget profile definitions, per-agent model assignments, resolution logic, per-agent overrides, and design rationale for why each agent uses its assigned model tier. |
+| model-profiles | shared | planner, executor, verifier, debugger, roadmapper, project-researcher, phase-researcher, codebase-mapper, plan-checker, github-ci | AI model selection profiles for bGSD agents — quality/balanced/budget profile definitions, one selected global default, sparse direct overrides, and provider-agnostic guidance for resolving concrete models. |
 | phase-argument-parsing | shared | planner, executor, verifier, roadmapper | Phase argument parsing and normalization — extracting phase numbers from user input, zero-padding, decimal suffix handling, validation via the `bgsd-tools plan:find-phase` route, and directory lookup patterns. |
 | planner-checkpoints | agent-specific | planner | Checkpoint planning guidelines for planners — when to use each checkpoint type (human-verify 90%, decision 9%, human-action 1%), XML templates, authentication gates, writing rules, and anti-patterns to avoid. |
 | planner-dependency-graph | agent-specific | planner | Dependency graph construction for planners — recording needs/creates per task, wave analysis, vertical slices vs horizontal layers, and file ownership rules for parallel execution. |

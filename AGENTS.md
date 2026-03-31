@@ -17,6 +17,10 @@ deploy.sh                  # Deploy changes to host editor config (dev workflow)
 build.cjs                  # Build script — bundles src/ into bin/bgsd-tools.cjs
 ```
 
+## MCP Usage
+Always use Context7 for up-to-date library/API docs before coding.
+Use web search (Brave) for current research, events, or unknown topics.
+
 ## Key Commands
 ```bash
 node bin/bgsd-tools.cjs <command> [args]   # Test locally

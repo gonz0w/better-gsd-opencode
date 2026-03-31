@@ -30,6 +30,8 @@ Purpose: [The specific problem being solved or capability being added.]
 Output: [Concrete deliverables when complete.]
 </objective>
 
+> **TDD Decision:** Skipped — [Why this work does not justify a dedicated RED -> GREEN -> REFACTOR plan.]
+
 <execution_context>
 @__OPENCODE_CONFIG__/bgsd-oc/workflows/execute-plan.md
 @__OPENCODE_CONFIG__/bgsd-oc/templates/summary.md

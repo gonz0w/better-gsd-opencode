@@ -6,17 +6,7 @@ Use the canonical diagnostics-family entrypoint for read-only inspection and ana
 </objective>
 
 <execution_context>
-@__OPENCODE_CONFIG__/bgsd-oc/workflows/progress.md
-@__OPENCODE_CONFIG__/bgsd-oc/workflows/cmd-codebase-impact.md
-@__OPENCODE_CONFIG__/bgsd-oc/workflows/cmd-trace-requirement.md
-@__OPENCODE_CONFIG__/bgsd-oc/workflows/cmd-search-decisions.md
-@__OPENCODE_CONFIG__/bgsd-oc/workflows/cmd-search-lessons.md
-@__OPENCODE_CONFIG__/bgsd-oc/workflows/health.md
-@__OPENCODE_CONFIG__/bgsd-oc/workflows/cmd-velocity.md
-@__OPENCODE_CONFIG__/bgsd-oc/workflows/cmd-context-budget.md
-@__OPENCODE_CONFIG__/bgsd-oc/workflows/cmd-session-diff.md
-@__OPENCODE_CONFIG__/bgsd-oc/workflows/cmd-rollback-info.md
-@__OPENCODE_CONFIG__/bgsd-oc/workflows/cmd-validate-deps.md
+Route first. Do not preload sibling inspect-family workflows into context.
 </execution_context>
 
 <context>
@@ -73,4 +63,20 @@ Excluded from `/bgsd-inspect` even if diagnostically adjacent:
 - Review, security, readiness, and release families
 
 Keep `/bgsd-inspect` limited to this read-only diagnostics boundary so a follow-on alias and regression slice can extend the family without changing its scope.
+
+After you determine the target route, use the Read tool to load only the selected workflow file:
+
+- `progress` -> `@__OPENCODE_CONFIG__/bgsd-oc/workflows/progress.md`
+- `impact` -> `@__OPENCODE_CONFIG__/bgsd-oc/workflows/cmd-codebase-impact.md`
+- `trace` -> `@__OPENCODE_CONFIG__/bgsd-oc/workflows/cmd-trace-requirement.md`
+- `search decisions` -> `@__OPENCODE_CONFIG__/bgsd-oc/workflows/cmd-search-decisions.md`
+- `search lessons` -> `@__OPENCODE_CONFIG__/bgsd-oc/workflows/cmd-search-lessons.md`
+- `health` -> `@__OPENCODE_CONFIG__/bgsd-oc/workflows/health.md`
+- `velocity` -> `@__OPENCODE_CONFIG__/bgsd-oc/workflows/cmd-velocity.md`
+- `context-budget` -> `@__OPENCODE_CONFIG__/bgsd-oc/workflows/cmd-context-budget.md`
+- `session-diff` -> `@__OPENCODE_CONFIG__/bgsd-oc/workflows/cmd-session-diff.md`
+- `rollback-info` -> `@__OPENCODE_CONFIG__/bgsd-oc/workflows/cmd-rollback-info.md`
+- `validate-deps` -> `@__OPENCODE_CONFIG__/bgsd-oc/workflows/cmd-validate-deps.md`
+
+Do not read non-selected sibling workflows unless the selected workflow explicitly requires them.
 </process>

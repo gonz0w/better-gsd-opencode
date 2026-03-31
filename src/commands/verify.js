@@ -25,6 +25,12 @@ function getPlanMetadataContext(cwd) {
   return createPlanMetadataContext({ cwd });
 }
 
+function extractCanonicalTddDecision(content) {
+  if (!content || typeof content !== 'string') return null;
+  const match = content.match(/^>\s*\*\*TDD Decision:\*\*\s*(Selected|Skipped)\b/im);
+  return match ? match[1].toLowerCase() : null;
+}
+
 function validateModelSettingsContract(rawConfig) {
   const issues = [];
   const modelSettings = rawConfig && isPlainObject(rawConfig.model_settings) ? rawConfig.model_settings : null;
@@ -261,6 +267,116 @@ function parsePlanTasks(content) {
   return tasks;
 }
 
+function extractTaggedBlock(content, tagName) {
+  if (!content || !tagName) return '';
+  const match = content.match(new RegExp(`<${tagName}>([\\s\\S]*?)<\\/${tagName}>`, 'i'));
+  return match ? match[1].trim() : '';
+}
+
+function normalizeCommandWhitespace(command) {
+  return String(command || '')
+    .replace(/```(?:[a-z0-9_-]+)?/gi, ' ')
+    .replace(/```/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function tokenizeCommand(command) {
+  return normalizeCommandWhitespace(command).match(/(?:"[^"]+"|'[^']+'|`[^`]+`|\S+)/g) || [];
+}
+
+function normalizeVerificationSignature(command) {
+  const normalized = normalizeCommandWhitespace(command);
+  if (!normalized) return '';
+
+  const tokens = tokenizeCommand(normalized);
+  const lowered = tokens.map((token) => token.toLowerCase());
+
+  if (lowered[0] === 'npm' && lowered[1] === 'run' && lowered[2] === 'test:file' && lowered[3] === '--') {
+    return ['npm', 'run', 'test:file', '--', ...tokens.slice(4).sort()].join(' ');
+  }
+
+  if (lowered[0] === 'node' && lowered[1] === '--test') {
+    const optionTokens = [];
+    const fileTokens = [];
+    for (let i = 2; i < tokens.length; i += 1) {
+      if (tokens[i].startsWith('-')) optionTokens.push(tokens[i]);
+      else fileTokens.push(tokens[i]);
+    }
+    return ['node', '--test', ...optionTokens, ...fileTokens.sort()].join(' ').trim();
+  }
+
+  return normalized.toLowerCase();
+}
+
+function extractTaskVerificationCommands(verifyBlock) {
+  if (!verifyBlock) return [];
+
+  const commands = [];
+  const seen = new Set();
+  const addCommand = (value) => {
+    const normalized = normalizeCommandWhitespace(value);
+    if (!normalized || seen.has(normalized)) return;
+    seen.add(normalized);
+    commands.push(normalized);
+  };
+
+  const codeMatches = [...String(verifyBlock).matchAll(/```(?:[a-z0-9_-]+)?\n([\s\S]*?)```/gi)];
+  if (codeMatches.length > 0) {
+    for (const match of codeMatches) {
+      for (const line of match[1].split('\n').map((entry) => entry.trim()).filter(Boolean)) {
+        addCommand(line);
+      }
+    }
+    return commands;
+  }
+
+  addCommand(verifyBlock);
+  return commands;
+}
+
+function extractPlanVerificationCommands(content) {
+  const block = extractTaggedBlock(content, 'verification');
+  if (!block) return [];
+
+  const commands = [];
+  const seen = new Set();
+  const addCommand = (value) => {
+    const normalized = normalizeCommandWhitespace(value);
+    if (!normalized || seen.has(normalized)) return;
+    seen.add(normalized);
+    commands.push(normalized);
+  };
+
+  const codeMatches = [...block.matchAll(/```(?:[a-z0-9_-]+)?\n([\s\S]*?)```/gi)];
+  for (const match of codeMatches) {
+    for (const line of match[1].split('\n').map((entry) => entry.trim()).filter(Boolean)) {
+      addCommand(line);
+    }
+  }
+
+  for (const line of block.split('\n')) {
+    const runMatch = line.trim().match(/^(?:[-*]|\d+\.)\s*Run:\s*(.+)$/i);
+    if (runMatch) addCommand(runMatch[1]);
+  }
+
+  return commands;
+}
+
+function isBuildVerificationCommand(command) {
+  const normalized = normalizeCommandWhitespace(command).toLowerCase();
+  return /^(npm run build|pnpm build|yarn build|bun run build)(?:\s|$)/.test(normalized);
+}
+
+function isTestVerificationCommand(command) {
+  const normalized = normalizeCommandWhitespace(command).toLowerCase();
+  return /^(npm run test:file|npm test|pnpm test|yarn test|bun test|node --test|pytest|cargo test|go test)(?:\s|$)/.test(normalized);
+}
+
+function describeVerificationLocation(entry) {
+  return entry.scope === 'plan' ? '<verification>' : `task '${entry.task}'`;
+}
+
 function walkWorkspaceFiles(rootPath, currentPath = rootPath, collected = []) {
   if (!fs.existsSync(currentPath)) return collected;
   const stat = fs.statSync(currentPath);
@@ -340,6 +456,7 @@ function analyzePlanRealism(cwd, fullPath, content, tasks, filesModified) {
   const touchedPaths = [];
   const taskFileOrder = new Map();
   const relativePlanPath = path.relative(cwd, fullPath).replace(/\\/g, '/');
+  const verificationCommands = [];
 
   const pushPathIssue = (severity, issue) => {
     (severity === 'warning' ? warnings : issues).push(issue);
@@ -406,6 +523,15 @@ function analyzePlanRealism(cwd, fullPath, content, tasks, filesModified) {
   }
 
   tasks.forEach((task, index) => {
+    extractTaskVerificationCommands(task.verify).forEach((command) => {
+      verificationCommands.push({
+        scope: 'task',
+        task: task.name,
+        command,
+        signature: normalizeVerificationSignature(command),
+      });
+    });
+
     const verifyPaths = extractCommandPathCandidates(task.verify);
     for (const verifyPath of verifyPaths) {
       if (hasGlobSyntax(verifyPath)) {
@@ -447,6 +573,53 @@ function analyzePlanRealism(cwd, fullPath, content, tasks, filesModified) {
       }
     }
   });
+
+  extractPlanVerificationCommands(content).forEach((command) => {
+    verificationCommands.push({
+      scope: 'plan',
+      task: null,
+      command,
+      signature: normalizeVerificationSignature(command),
+    });
+  });
+
+  const groupedVerification = new Map();
+  for (const entry of verificationCommands) {
+    if (!entry.signature) continue;
+    if (!isBuildVerificationCommand(entry.command) && !isTestVerificationCommand(entry.command)) continue;
+    const existing = groupedVerification.get(entry.signature) || [];
+    existing.push(entry);
+    groupedVerification.set(entry.signature, existing);
+  }
+
+  for (const entries of groupedVerification.values()) {
+    if (entries.length < 2) continue;
+    const locations = Array.from(new Set(entries.map(describeVerificationLocation)));
+    warnings.push({
+      kind: 'duplicate-verification-command',
+      source: 'verification',
+      command: entries[0].command,
+      locations,
+      message: `Verification command \`${entries[0].command}\` repeats in ${locations.join(', ')}. Task <verify> should prove only the delta for that task, while plan <verification> should add only aggregate or final proof not already covered.`,
+    });
+  }
+
+  const changedPaths = Array.from(new Set([
+    ...filesModified,
+    ...tasks.flatMap((task) => task.files),
+  ].map((entry) => String(entry || '').trim()).filter(Boolean)));
+  const runtimeFreshness = getRuntimeFreshness(cwd, changedPaths);
+  const buildEntries = verificationCommands.filter((entry) => isBuildVerificationCommand(entry.command));
+  if (buildEntries.length > 0 && !runtimeFreshness.checked) {
+    const locations = Array.from(new Set(buildEntries.map(describeVerificationLocation)));
+    warnings.push({
+      kind: 'unnecessary-build-verification',
+      source: 'verification',
+      command: buildEntries[0].command,
+      locations,
+      message: `Build verification appears in ${locations.join(', ')}, but the plan does not touch source files that require rebuilt runtime artifact proof. Skip the build or explain the extra signal.`,
+    });
+  }
 
   return { issues, warnings, touchedPaths };
 }
@@ -495,6 +668,7 @@ function cmdVerifyPlanStructure(cwd, filePath, raw) {
   // Template compliance checks
   const templateCompliance = { valid: true, missing_fields: [], type_issues: [] };
   const planType = fm.type || 'execute';
+  const canonicalTddDecision = extractCanonicalTddDecision(content);
 
   // Required fields by plan type
   const typeRequiredFields = {
@@ -547,6 +721,18 @@ function cmdVerifyPlanStructure(cwd, filePath, raw) {
     if (!/<feature>/.test(content)) {
       templateCompliance.type_issues.push('TDD plan missing <feature> block');
     }
+  }
+
+  if (canonicalTddDecision === 'selected' && planType !== 'tdd') {
+    const message = 'TDD decision/type mismatch: `> **TDD Decision:** Selected` plans must use `type: tdd`';
+    errors.push(message);
+    templateCompliance.type_issues.push(message);
+  }
+
+  if (canonicalTddDecision === 'skipped' && planType === 'tdd') {
+    const message = 'TDD decision/type mismatch: `> **TDD Decision:** Skipped` plans must use `type: execute`';
+    errors.push(message);
+    templateCompliance.type_issues.push(message);
   }
 
   // Check task elements have required sub-elements

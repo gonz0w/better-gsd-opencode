@@ -201,6 +201,8 @@ Output: [Artifacts created]
 
 > **TDD Decision:** {Selected|Skipped} — [Short rationale explaining how the deterministic floor applied for this plan]
 
+`Selected` plans use `type: tdd`. `Skipped` plans use `type: execute`.
+
 <execution_context>
 @__OPENCODE_CONFIG__/bgsd-oc/workflows/execute-plan.md
 @__OPENCODE_CONFIG__/bgsd-oc/templates/summary.md
@@ -229,9 +231,14 @@ Output: [Artifacts created]
 
 ### Verification Command Rules
 - Task `<verify>` commands should be the narrowest proof that the task works.
+- Treat task `<verify>` and plan `<verification>` as different proof layers.
+- Task `<verify>` should prove only the delta introduced by that task, not rerun the entire plan's proof.
+- Plan `<verification>` should contain only aggregate, cross-task, or final runtime proof that task-level `<verify>` checks did not already cover.
 - Prefer targeted checks (`npm test -- tests/foo.test.cjs`, `npm run test:file -- tests/foo.test.cjs`, direct CLI smoke runs, file/read checks) over repo-wide suites.
 - Do not repeat the same broad test command in multiple task `<verify>` blocks and again in `<verification>` unless the phase is explicitly cross-cutting.
+- Do not repeat the same focused test or build command in multiple task `<verify>` blocks and then copy it into `<verification>`; if a command appears twice, the plan should explain why the second run adds new signal.
 - Reserve full-suite commands like `npm test` for one final regression gate when the change is broad, risky, or infrastructure-level.
+- Reserve `npm run build` (or equivalent) for plans that touch source files whose generated runtime artifacts must be rebuilt for trustworthy verification; docs-, workflow-, and guidance-only plans should usually skip it.
 - For docs, wrappers, and workflow-only tasks, prefer structural verification instead of running tests that cannot add signal.
 
 <verification>
@@ -507,10 +514,17 @@ Apply TDD detection heuristic. Apply user setup detection.
 - Apply the deterministic floor exactly:
   - **Selected:** work introduces or changes testable behavior with clear expected outcomes (business logic, validation, algorithms, parsers, API I/O contracts).
   - **Skipped:** work is clearly docs-only, config-only, layout-only, or other non-behavioral/tooling work.
+- Map the visible decision to plan type directly: `Selected` => `type: tdd`; `Skipped` => `type: execute`.
+- Do not emit `> **TDD Decision:** Selected` on a `type: execute` plan, or `Skipped` on a `type: tdd` plan.
 - If ROADMAP says `recommended`: still evaluate every plan, but TDD-eligible `type: execute` plans become checker warnings.
 - If ROADMAP says `required`: every plan covering testable behavior MUST use `type: tdd`; checker violations are blockers.
 - Record the result in the plan body as a visible callout immediately after `<objective>` using: `> **TDD Decision:** Selected|Skipped — ...`
 - Keep the rationale short, human-readable, and **out of frontmatter**. It explains how the deterministic floor applied for that plan; it does not replace the rule.
+
+When designing verification:
+- give each task its own narrow proof tied to the files or behavior it changes
+- keep plan `<verification>` for one higher-level integration/build/regression proof only when that higher-level proof adds signal beyond the task checks
+- avoid planner-generated repetition where Task 1, Task 2, and `<verification>` all rerun the same expensive test or build command
 </step>
 
 <step name="build_dependency_graph">
@@ -592,7 +606,7 @@ Returns JSON: `{ valid, errors, warnings, task_count, tasks }`
 
 `verify:verify plan-structure` is the approval-time semantic gate for verifier-facing metadata. Do not treat a visible `must_haves` field as sufficient — fix malformed or inconclusive `artifacts`/`key_links` metadata until the command passes cleanly.
 
-`verify:verify analyze-plan` is the approval-time realism gate. Run `verify:verify analyze-plan` and fix command, path, verification-order, or overscope blockers before approval.
+`verify:verify analyze-plan` is the approval-time realism gate. Run `verify:verify analyze-plan` and fix command, path, verification-order, redundant-verification, unnecessary-build, or overscope findings before approval.
 
 **If errors exist:** Fix before committing or handing plans to the checker.
 </step>

@@ -975,6 +975,62 @@ must_haves:
     assert.ok(output.issues.some(issue => issue.kind === 'overscoped-plan'), 'overscoped plans should be surfaced before approval');
     assert.strictEqual(output.approval_ready, false, 'overscoped risky plan should not be approval-ready');
   });
+
+  test('warns on repeated expensive verification and unjustified builds', () => {
+    const phaseDir = path.join(tmpDir, '.planning', 'phases', '01-test');
+    fs.mkdirSync(path.join(tmpDir, 'docs'), { recursive: true });
+    fs.writeFileSync(path.join(tmpDir, 'docs', 'guide.md'), 'guide\n');
+    fs.writeFileSync(path.join(tmpDir, 'tests', 'a.test.cjs'), 'test\n');
+    fs.writeFileSync(path.join(tmpDir, 'tests', 'b.test.cjs'), 'test\n');
+    fs.mkdirSync(phaseDir, { recursive: true });
+    const planPath = path.join(phaseDir, '01-03-PLAN.md');
+    fs.writeFileSync(planPath, `---
+phase: 01-test
+plan: 03
+type: execute
+wave: 1
+depends_on: []
+files_modified:
+  - docs/guide.md
+  - tests/a.test.cjs
+  - tests/b.test.cjs
+autonomous: true
+requirements: [PLAN-04]
+must_haves:
+  artifacts:
+    - path: docs/guide.md
+---
+
+<task type="auto">
+  <name>Task 1: docs update</name>
+  <files>docs/guide.md</files>
+  <action>Update the guide</action>
+  <verify>npm run test:file -- tests/a.test.cjs tests/b.test.cjs</verify>
+  <done>Guide updated</done>
+</task>
+
+<task type="auto">
+  <name>Task 2: examples refresh</name>
+  <files>tests/a.test.cjs
+  <action>Refresh the examples</action>
+  <verify>npm run test:file -- tests/b.test.cjs tests/a.test.cjs</verify>
+  <done>Examples refreshed</done>
+</task>
+
+<verification>
+- Run: npm run test:file -- tests/a.test.cjs tests/b.test.cjs
+- Run: npm run build
+</verification>
+`);
+
+    const result = runGsdTools(`verify:verify analyze-plan ${planPath} --raw`, tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.ok(output.warnings.some(issue => issue.kind === 'duplicate-verification-command' && issue.command === 'npm run test:file -- tests/a.test.cjs tests/b.test.cjs'), 'repeated expensive verification should warn');
+    assert.ok(output.warnings.some(issue => issue.kind === 'unnecessary-build-verification' && issue.command === 'npm run build'), 'docs-only plans should warn on unjustified builds');
+    assert.strictEqual(output.approval_ready, true, 'warnings alone should not mark the plan unapproval-ready');
+  });
 });
 
 describe('phase add command', () => {

@@ -89,7 +89,7 @@ CONTEXT: [✓ if has_context | - if not]
 - [e.g. jq -r '.blockers[].text' from state-snapshot]
 
 ## Pending Todos
-- [count] pending — /bgsd-check-todos to review
+- [count] pending — /bgsd-plan todo check to review
 
 ## Active Debug Sessions
 - [count] active — /bgsd-debug to continue

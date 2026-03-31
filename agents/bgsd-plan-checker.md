@@ -156,10 +156,11 @@ Check locked decisions have implementing tasks, no tasks implement deferred idea
 
 **Process:**
 1. Extract `**TDD:**` field from the phase's ROADMAP.md section (via `plan:roadmap get-phase` — check the `tdd` field)
-2. If `tdd` is null/absent: still report the deterministic TDD decision path as **info** — omitted hints never disappear silently
-3. If `tdd` is `recommended`: check each plan with `type: execute` — if it covers business logic, validation, algorithms, data transformations, or API endpoints with defined I/O, emit a **warning** suggesting `type: tdd`
-4. If `tdd` is `required`: check each plan with `type: execute` — if it covers testable behavior (can you write `expect(fn(input)).toBe(output)` before writing `fn`?), emit a **blocker** requiring `type: tdd`
-5. Keep this dimension scoped to Phase 149 contract alignment: severity + rationale reporting only. Do **not** invent Phase 150 `execute:tdd` semantic-proof obligations here.
+2. Check internal consistency first: `> **TDD Decision:** Selected` must pair with `type: tdd`, and `Skipped` must pair with `type: execute`; mismatches are **blockers** even if ROADMAP omits the hint
+3. If `tdd` is null/absent: still report the deterministic TDD decision path as **info** — omitted hints never disappear silently
+4. If `tdd` is `recommended`: check each plan with `type: execute` — if it covers business logic, validation, algorithms, data transformations, or API endpoints with defined I/O, emit a **warning** suggesting `type: tdd`
+5. If `tdd` is `required`: check each plan with `type: execute` — if it covers testable behavior (can you write `expect(fn(input)).toBe(output)` before writing `fn`?), emit a **blocker** requiring `type: tdd`
+6. Keep this dimension scoped to Phase 149 contract alignment: selection, rationale, and decision/type consistency only. Do **not** invent Phase 150 `execute:tdd` semantic-proof obligations here.
 
 **TDD-eligible signals** (any of these in a plan's tasks suggest TDD applies):
 - Task action describes input/output transformations
@@ -174,6 +175,20 @@ Check locked decisions have implementing tasks, no tasks implement deferred idea
 - Tasks are documentation or template changes
 - Tasks are glue code connecting existing components
 - Plan type is already `tdd`
+
+## Dimension 9: Verification Efficiency
+
+**Question:** Do task `<verify>` commands and plan `<verification>` checks each add unique signal instead of repeating the same expensive proof?
+
+**Process:**
+1. Treat task `<verify>` as delta proof for that task only
+2. Treat plan `<verification>` as aggregate, cross-task, or final runtime proof only
+3. Flag repeated test/build commands across multiple task `<verify>` blocks or between tasks and `<verification>` when the later run adds no new scope
+4. Flag `npm run build` (or equivalent) when the plan does not touch source files whose generated runtime artifacts need rebuild validation
+
+**Severity guidance:**
+- Exact repeated expensive verification (`node --test`, `npm run test:file`, `npm test`, `npm run build`, etc.) should be at least a warning
+- Repeated plan-level verification that obviously adds no new signal should not pass clean approval
 
 </verification_dimensions>
 
@@ -210,7 +225,7 @@ PLAN_STRUCTURE already carries the approval gate. Use it to reject malformed or 
 
 Do **not** rely on `util:frontmatter get ... --field must_haves` or field presence alone for approval. A plan is not approval-ready unless `verify:verify plan-structure` confirms the shared verifier-consumable metadata contract.
 
-Also review `verify:verify analyze-plan` findings as approval blockers for stale commands, stale paths, unavailable validation steps, task-order hazards, or overscope risk.
+Also review `verify:verify analyze-plan` findings as approval blockers or warnings for stale commands, stale paths, unavailable validation steps, task-order hazards, redundant verification, unnecessary build reruns, or overscope risk.
 
 ## Step 4: Check Requirement Coverage
 
@@ -240,9 +255,13 @@ Truths: user-observable, testable. Artifacts: map to truths. Key_links: connect 
 
 Extract TDD hint from phase: `node __OPENCODE_CONFIG__/bgsd-oc/bin/bgsd-tools.cjs plan:roadmap get-phase "$phase_number"` — check the `tdd` field.
 
-For each implementation plan, evaluate whether its tasks cover TDD-eligible work and report one explicit severity outcome. If `tdd` is `required`, plans covering testable behavior without `type: tdd` are blockers. If `tdd` is `recommended`, they are warnings. If `tdd` is null/absent, emit info that records the deterministic TDD selection path instead of skipping the dimension silently. Keep findings limited to selection/rationale severity — not Phase 150 execution semantics.
+For each implementation plan, first verify the visible TDD decision matches the actual plan type (`Selected` => `type: tdd`, `Skipped` => `type: execute`). Then evaluate whether its tasks cover TDD-eligible work and report one explicit severity outcome. If `tdd` is `required`, plans covering testable behavior without `type: tdd` are blockers. If `tdd` is `recommended`, they are warnings. If `tdd` is null/absent, emit info that records the deterministic TDD selection path instead of skipping the dimension silently. Keep findings limited to selection/rationale/type consistency — not Phase 150 execution semantics.
 
-## Step 11: Determine Overall Status
+## Step 11: Check Verification Efficiency
+
+Confirm plans do not reuse the same expensive test/build command at task and plan level without a clear signal increase.
+
+## Step 12: Determine Overall Status
 
 **passed:** All checks pass. **issues_found:** Blockers or warnings found.
 
@@ -299,6 +318,7 @@ Set `--agents` to yourself and any other materially affected agent(s).
 **DO NOT** skip dependency analysis. Circular/broken dependencies cause execution failures.
 **DO NOT** ignore scope. 5+ tasks/plan degrades quality.
 **DO NOT** trust task names alone. Read action, verify, done fields.
+**DO NOT** approve plans that pay the same expensive verification cost multiple times unless each rerun proves a materially different scope.
 
 </anti_patterns>
 
@@ -316,7 +336,8 @@ Plan verification complete when:
 - [ ] Scope assessed (within context budget)
 - [ ] must_haves derivation verified (user-observable truths)
 - [ ] Context compliance checked (if CONTEXT.md provided)
-- [ ] TDD compliance checked (if phase has TDD hint in ROADMAP.md)
+- [ ] TDD compliance checked for every implementation plan
+- [ ] Verification efficiency checked (task and plan proof layers are not redundantly expensive)
 - [ ] Overall status determined (passed | issues_found)
 - [ ] Structured issues returned (if any found)
 - [ ] Result returned to orchestrator

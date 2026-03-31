@@ -5,16 +5,7 @@ Use the canonical planning-family entrypoint for phase planning and planning-pre
 </objective>
 
 <execution_context>
-@__OPENCODE_CONFIG__/bgsd-oc/workflows/plan-phase.md
-@__OPENCODE_CONFIG__/bgsd-oc/workflows/discuss-phase.md
-@__OPENCODE_CONFIG__/bgsd-oc/workflows/research-phase.md
-@__OPENCODE_CONFIG__/bgsd-oc/workflows/list-phase-assumptions.md
-@__OPENCODE_CONFIG__/bgsd-oc/workflows/add-phase.md
-@__OPENCODE_CONFIG__/bgsd-oc/workflows/insert-phase.md
-@__OPENCODE_CONFIG__/bgsd-oc/workflows/remove-phase.md
-@__OPENCODE_CONFIG__/bgsd-oc/workflows/plan-milestone-gaps.md
-@__OPENCODE_CONFIG__/bgsd-oc/workflows/add-todo.md
-@__OPENCODE_CONFIG__/bgsd-oc/workflows/check-todos.md
+Route first. Do not preload sibling planning-family workflows into context.
 </execution_context>
 
 <context>
@@ -63,4 +54,19 @@ Keep `/bgsd-plan` scoped to planning-family behavior only:
 - Settings and read-only inspection remain separate canonical families.
 
 This normalized contract should be explicit enough for follow-on parity checks to compare canonical and legacy entrypoints without redefining behavior again.
+
+After you determine the target route, use the Read tool to load only the selected workflow file:
+
+- `phase` -> `@__OPENCODE_CONFIG__/bgsd-oc/workflows/plan-phase.md`
+- `discuss` -> `@__OPENCODE_CONFIG__/bgsd-oc/workflows/discuss-phase.md`
+- `research` -> `@__OPENCODE_CONFIG__/bgsd-oc/workflows/research-phase.md`
+- `assumptions` -> `@__OPENCODE_CONFIG__/bgsd-oc/workflows/list-phase-assumptions.md`
+- `roadmap add` -> `@__OPENCODE_CONFIG__/bgsd-oc/workflows/add-phase.md`
+- `roadmap insert` -> `@__OPENCODE_CONFIG__/bgsd-oc/workflows/insert-phase.md`
+- `roadmap remove` -> `@__OPENCODE_CONFIG__/bgsd-oc/workflows/remove-phase.md`
+- `gaps` -> `@__OPENCODE_CONFIG__/bgsd-oc/workflows/plan-milestone-gaps.md`
+- `todo add` -> `@__OPENCODE_CONFIG__/bgsd-oc/workflows/add-todo.md`
+- `todo check` -> `@__OPENCODE_CONFIG__/bgsd-oc/workflows/check-todos.md`
+
+Do not read non-selected sibling workflows unless the selected workflow explicitly requires them.
 </process>

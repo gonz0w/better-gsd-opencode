@@ -612,6 +612,7 @@ describe('Phase 149 TDD roadmap contract guidance', () => {
     assert.match(roadmap, /`recommended`[\s\S]*warnings/i);
     assert.match(roadmap, /`required`[\s\S]*blockers/i);
     assert.match(roadmap, /Omit the field[\s\S]*info instead of staying silent/i);
+    assert.match(roadmap, /`Selected` maps to `type: tdd`, `Skipped` maps to `type: execute`/i);
     assert.match(roadmap, /does \*\*not\*\* add Phase 150 `execute:tdd` semantic enforcement/i);
   });
 });

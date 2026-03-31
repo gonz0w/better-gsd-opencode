@@ -840,10 +840,12 @@ describe('Phase 150 TDD execution semantics contract', () => {
   test('plan-phase workflow preserves the checker severity ladder including omitted-hint info output', () => {
     const workflow = fs.readFileSync(path.join(process.cwd(), 'workflows', 'plan-phase.md'), 'utf-8');
 
+    assert.match(workflow, /`Selected` plans use `type: tdd`, `Skipped` plans use `type: execute`/i);
+    assert.match(workflow, /Do not emit a `Selected` callout on an `execute` plan/i);
     assert.match(workflow, /`recommended` upgrades TDD-eligible `type: execute` plans to checker warnings/i);
     assert.match(workflow, /`required` upgrades them to blockers/i);
     assert.match(workflow, /omitted hints still produce checker info/i);
-    assert.match(workflow, /selection\/rationale severity only, not Phase 150 `execute:tdd` semantic enforcement/i);
+    assert.match(workflow, /selection\/rationale\/type consistency only, not Phase 150 `execute:tdd` semantic enforcement/i);
   });
 });
 

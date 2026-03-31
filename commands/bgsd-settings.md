@@ -6,9 +6,7 @@ Use the canonical settings-family entrypoint for workflow configuration, model-p
 </objective>
 
 <execution_context>
-@__OPENCODE_CONFIG__/bgsd-oc/workflows/settings.md
-@__OPENCODE_CONFIG__/bgsd-oc/workflows/set-profile.md
-@__OPENCODE_CONFIG__/bgsd-oc/workflows/cmd-validate-config.md
+Route first. Do not preload sibling settings-family workflows into context.
 </execution_context>
 
 <context>
@@ -32,4 +30,12 @@ Representative compatibility shims that must stay equivalent to this contract:
 Preserve the remaining arguments after the normalized settings-family prefix so canonical and legacy entrypoints stay behaviorally equivalent.
 
 Keep `/bgsd-settings` separate from the canonical planning and read-only inspection families.
+
+After you determine the target route, use the Read tool to load only the selected workflow file:
+
+- default settings flow -> `@__OPENCODE_CONFIG__/bgsd-oc/workflows/settings.md`
+- `profile` -> `@__OPENCODE_CONFIG__/bgsd-oc/workflows/set-profile.md`
+- `validate` -> `@__OPENCODE_CONFIG__/bgsd-oc/workflows/cmd-validate-config.md`
+
+Do not read non-selected sibling workflows unless the selected workflow explicitly requires them.
 </process>

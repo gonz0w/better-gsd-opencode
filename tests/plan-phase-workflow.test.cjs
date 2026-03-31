@@ -59,8 +59,35 @@ describe('plan approval realism gates', () => {
 
     assert.match(workflow, /run `verify:verify analyze-plan` and fix any realism blockers/i, 'workflow should require the analyze-plan realism gate before approval');
     assert.match(workflow, /command drift, stale paths, unavailable validation steps, task-order verify hazards, and overscope risk/i, 'workflow should name the realism failure modes explicitly');
-    assert.match(planner, /run `verify:verify analyze-plan` and fix command, path, verification-order, or overscope blockers before approval/i, 'planner prompt should require the analyze-plan approval gate');
-    assert.match(checker, /review `verify:verify analyze-plan` findings as approval blockers for stale commands, stale paths, unavailable validation steps, task-order hazards, or overscope risk/i, 'checker prompt should treat analyze-plan realism findings as approval blockers');
+    assert.match(planner, /run `verify:verify analyze-plan` and fix command, path, verification-order, redundant-verification, unnecessary-build, or overscope findings before approval/i, 'planner prompt should require the analyze-plan approval gate');
+    assert.match(checker, /review `verify:verify analyze-plan` findings as approval blockers or warnings for stale commands, stale paths, unavailable validation steps, task-order hazards, redundant verification, unnecessary build reruns, or overscope risk/i, 'checker prompt should treat analyze-plan realism findings as approval blockers');
+  });
+});
+
+describe('verification layering guidance', () => {
+  test('planner and checker separate task proof from plan proof and reject redundant expensive reruns', () => {
+    const planner = read(PLANNER_AGENT_PATH);
+    const checker = read(CHECKER_AGENT_PATH);
+
+    assert.match(planner, /Task `<verify>` should prove only the delta introduced by that task/i, 'planner should keep task verification delta-scoped');
+    assert.match(planner, /Plan `<verification>` should contain only aggregate, cross-task, or final runtime proof/i, 'planner should reserve plan verification for higher-level proof');
+    assert.match(planner, /Reserve `npm run build` \(or equivalent\) for plans that touch source files whose generated runtime artifacts must be rebuilt/i, 'planner should gate build verification on runtime-artifact relevance');
+    assert.match(checker, /## Dimension 9: Verification Efficiency/, 'checker should add a verification-efficiency dimension');
+    assert.match(checker, /Flag repeated test\/build commands across multiple task `<verify>` blocks or between tasks and `<verification>`/i, 'checker should flag repeated expensive verification');
+    assert.match(checker, /Flag `npm run build` \(or equivalent\) when the plan does not touch source files whose generated runtime artifacts need rebuild validation/i, 'checker should flag unjustified build verification');
+  });
+});
+
+describe('TDD decision-to-type mapping guidance', () => {
+  test('planner and checker require Selected plans to actually become type:tdd', () => {
+    const workflow = read(WORKFLOW_PATH);
+    const planner = read(PLANNER_AGENT_PATH);
+    const checker = read(CHECKER_AGENT_PATH);
+
+    assert.match(workflow, /`Selected` plans use `type: tdd`, `Skipped` plans use `type: execute`/i, 'workflow should map visible TDD decisions directly to plan type');
+    assert.match(planner, /Map the visible decision to plan type directly: `Selected` => `type: tdd`; `Skipped` => `type: execute`/i, 'planner should map TDD decisions to plan type directly');
+    assert.match(planner, /Do not emit `> \*\*TDD Decision:\*\* Selected` on a `type: execute` plan/i, 'planner should forbid selected execute mismatches');
+    assert.match(checker, /`> \*\*TDD Decision:\*\* Selected` must pair with `type: tdd`, and `Skipped` must pair with `type: execute`/i, 'checker should block decision/type mismatches');
   });
 });
 

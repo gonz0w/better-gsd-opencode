@@ -666,6 +666,21 @@ Add compact milestone and phase intent so planning flows can refine current focu
     assert.ok(!rewrittenPlan.includes('tdd_rationale:'), 'legacy rationale frontmatter should be removed');
   });
 
+  test('init plan-phase rewrites selected execute plans to canonical type tdd', () => {
+    const phaseDir = path.join(tmpDir, '.planning', 'phases', '03-api');
+    fs.mkdirSync(phaseDir, { recursive: true });
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'ROADMAP.md'), `# Roadmap\n\n### Phase 3: API\n**Goal:** Build API\n`);
+    const planPath = path.join(phaseDir, '03-02-PLAN.md');
+    fs.writeFileSync(planPath, `---\nphase: 03-api\nplan: 02\ntype: execute\nwave: 1\ndepends_on: []\nfiles_modified:\n  - src/api.js\nautonomous: true\nrequirements:\n  - API-01\nmust_haves:\n  artifacts:\n    - path: src/api.js\n---\n\n<objective>\nBuild API behavior\n</objective>\n\n> **TDD Decision:** Selected — API request/response behavior should execute through TDD.\n\n<tasks>\n<task type="auto">\n  <name>Fixture task</name>\n  <files>src/api.js</files>\n  <action>Implement fixture behavior</action>\n  <verify>node --test tests/api.test.cjs</verify>\n  <done>Fixture done</done>\n</task>\n</tasks>\n`);
+
+    const result = runGsdTools('init:plan-phase 03 --verbose', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const rewrittenPlan = fs.readFileSync(planPath, 'utf-8');
+    assert.ok(rewrittenPlan.includes('type: tdd'), 'selected plans should normalize to type: tdd');
+    assert.ok(rewrittenPlan.includes('> **TDD Decision:** Selected — API request/response behavior should execute through TDD.'), 'canonical selected callout should stay intact');
+  });
+
   // --compact flag tests
 
   test('init commands return full output with --verbose', () => {

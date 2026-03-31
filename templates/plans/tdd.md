@@ -33,6 +33,8 @@ Purpose: [Design benefit of TDD for this feature — e.g., forces clean interfac
 Output: [Working, tested feature with 2-3 commits.]
 </objective>
 
+> **TDD Decision:** Selected — [Why this feature should run as a dedicated TDD plan.]
+
 <execution_context>
 @__OPENCODE_CONFIG__/bgsd-oc/workflows/execute-plan.md
 @__OPENCODE_CONFIG__/bgsd-oc/templates/summary.md
