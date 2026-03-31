@@ -1,6 +1,6 @@
 ---
 name: model-profiles
-description: AI model selection profiles for bGSD agents — quality/balanced/budget profile definitions, per-agent model assignments, resolution logic, per-agent overrides, and design rationale for why each agent uses its assigned model tier.
+description: AI model selection profiles for bGSD agents — quality/balanced/budget profile definitions, one selected global default, sparse direct overrides, and provider-agnostic guidance for resolving concrete models.
 type: shared
 agents: [planner, executor, verifier, debugger, roadmapper, project-researcher, phase-researcher, codebase-mapper, plan-checker, github-ci]
 sections: [profiles, resolution, overrides, rationale]
@@ -8,7 +8,7 @@ sections: [profiles, resolution, overrides, rationale]
 
 ## Purpose
 
-Controls which AI model each bGSD agent uses, balancing quality vs token spend. Orchestrators resolve the profile once at start, then pass the model parameter to each agent spawn. The profile system prevents wasting expensive models on simple tasks while ensuring critical decision-making agents get maximum reasoning power.
+Controls model selection through one shared project contract. Orchestrators resolve the selected profile plus any sparse direct overrides from `.planning/config.json`, then pass the resulting concrete model parameter to each agent spawn.
 
 ## Placeholders
 
@@ -21,40 +21,39 @@ Controls which AI model each bGSD agent uses, balancing quality vs token spend. 
 <!-- section: profiles -->
 ### Profile Definitions
 
-| Agent | `quality` | `balanced` | `budget` |
-|-------|-----------|------------|----------|
-| planner | opus | opus | sonnet |
-| roadmapper | opus | sonnet | sonnet |
-| executor | opus | sonnet | sonnet |
-| phase-researcher | opus | sonnet | haiku |
-| project-researcher | opus | sonnet | haiku |
-| debugger | opus | sonnet | sonnet |
-| codebase-mapper | sonnet | haiku | haiku |
-| verifier | sonnet | sonnet | haiku |
-| plan-checker | sonnet | sonnet | haiku |
+```json
+{
+  "model_settings": {
+    "default_profile": "balanced",
+    "profiles": {
+      "quality": { "model": "gpt-5.4" },
+      "balanced": { "model": "gpt-5.4-mini" },
+      "budget": { "model": "gpt-5.4-nano" }
+    },
+    "agent_overrides": {}
+  }
+}
+```
 
-**quality** — Maximum reasoning power. Opus for all decision-making agents. Use when: quota available, critical architecture.
+**quality** — Highest capability profile. Default concrete model: `gpt-5.4`. Use when best reasoning and review quality matter more than speed.
 
-**balanced** (default) — Smart allocation. Opus only for planning. Sonnet for execution/research. Use when: normal development.
+**balanced** (default) — Recommended day-to-day profile. Default concrete model: `gpt-5.4-mini`.
 
-**budget** — Minimal Opus usage. Sonnet for code-writing. Haiku for research/verification. Use when: conserving quota.
+**budget** — Fastest / lowest-cost profile. Default concrete model: `gpt-5.4-nano`.
 <!-- /section -->
 
 <!-- section: resolution -->
 ### Resolution Logic
 
-Resolve once at orchestration start:
-
-```bash
-MODEL_PROFILE=$(cat .planning/config.json 2>/dev/null | grep -o '"model_profile"[[:space:]]*:[[:space:]]*"[^"]*"' | grep -o '"[^"]*"$' | tr -d '"' || echo "balanced")
-```
+Resolve once at orchestration start from the canonical contract:
 
 1. Read `.planning/config.json`
-2. Check `model_overrides` for agent-specific override
-3. If no override, look up agent in profile table
-4. Pass model parameter to Task call
+2. Check `model_settings.agent_overrides` for a direct concrete-model override for the current agent
+3. Otherwise read `model_settings.default_profile`
+4. Resolve the concrete model from `model_settings.profiles[default_profile].model`
+5. If config is partial or missing, fall back to shipped defaults for `quality`, `balanced`, and `budget`
 
-**Note:** Opus-tier agents resolve to `"inherit"` (not `"opus"`). This uses the parent session's model, avoiding conflicts with organization policies that may block specific opus versions.
+The public contract is the selected profile plus concrete model ids. Keep provider-specific alias behavior out of user-facing guidance.
 <!-- /section -->
 
 <!-- section: overrides -->
@@ -64,31 +63,36 @@ Override specific agents without changing the entire profile:
 
 ```json
 {
-  "model_profile": "balanced",
-  "model_overrides": {
-    "bgsd-executor": "opus",
-    "bgsd-planner": "haiku"
+  "model_settings": {
+    "default_profile": "balanced",
+    "profiles": {
+      "quality": { "model": "gpt-5.4" },
+      "balanced": { "model": "gpt-5.4-mini" },
+      "budget": { "model": "gpt-5.4-nano" }
+    },
+    "agent_overrides": {
+      "bgsd-executor": "ollama/qwen3-coder:latest",
+      "bgsd-planner": "gpt-5.4"
+    }
   }
 }
 ```
 
-Overrides take precedence over the profile. Valid values: `opus`, `sonnet`, `haiku`.
+Overrides take precedence over the selected project profile and should stay sparse.
 
-**Switching profiles:** `/bgsd-settings profile quality` at runtime, or set `"model_profile"` in `.planning/config.json`.
+**Switching profiles:** `/bgsd-settings profile quality` at runtime, or set `model_settings.default_profile` in `.planning/config.json`.
 <!-- /section -->
 
 <!-- section: rationale -->
 ### Design Rationale
 
-**Opus for planner:** Planning involves architecture decisions, goal decomposition, task design — highest quality impact.
+**One selected project default:** Most projects should feel configurable after setting one default profile and three concrete model ids.
 
-**Sonnet for executor:** Follows explicit PLAN.md instructions. Plan contains the reasoning; execution is implementation.
+**Concrete profiles stay reusable:** `quality`, `balanced`, and `budget` remain the stable knobs across projects even when the actual provider or model id changes.
 
-**Sonnet (not Haiku) for verifiers in balanced:** Verification needs goal-backward reasoning — checking if code delivers what the phase promised. Haiku may miss subtle gaps.
+**Sparse overrides only:** Agent-specific exceptions exist for edge cases such as local models, not as the primary configuration surface.
 
-**Haiku for codebase-mapper:** Read-only exploration and pattern extraction. No reasoning required.
-
-**`inherit` instead of `opus` directly:** The host editor's `"opus"` alias maps to a specific model version. Organizations may block older versions. `"inherit"` uses whatever opus version is configured, avoiding conflicts.
+**Provider-agnostic copy with seeded defaults:** Guidance should talk about capability, speed, and use case while shipping useful GPT-family defaults.
 <!-- /section -->
 
 ## Cross-references

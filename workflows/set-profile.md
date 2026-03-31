@@ -1,5 +1,5 @@
 <purpose>
-Switch the model profile used by bGSD agents. Controls which AI model each agent uses, balancing quality vs token spend.
+Quickly switch the selected project default profile used by bGSD agents. This changes which shared profile the project uses by default without rewriting the concrete models behind `quality`, `balanced`, or `budget`.
 </purpose>
 
 <required_reading>
@@ -33,41 +33,48 @@ This creates `.planning/config.json` with defaults if missing and loads current 
 <step name="update_config">
 Read current config from state load or directly:
 
-Update `model_profile` field:
+Update `model_settings.default_profile`:
 ```json
 {
-  "model_profile": "$ARGUMENTS.profile"
+  "model_settings": {
+    "default_profile": "$ARGUMENTS.profile"
+  }
 }
 ```
+
+Preserve the existing concrete profile definitions and any sparse `agent_overrides` entries.
 
 Write updated config back to `.planning/config.json`.
 </step>
 
 <step name="confirm">
-Display confirmation with model table for selected profile:
+Display confirmation with the selected profile and the concrete model currently behind it:
 
 ```
-✓ Model profile set to: $ARGUMENTS.profile
+✓ Project default profile set to: $ARGUMENTS.profile
 
-Agents will now use:
+Most agents will now use the `$ARGUMENTS.profile` shared profile.
 
-[Show table from MODEL_PROFILES in bgsd-tools.cjs for selected profile]
+Concrete model for that profile:
+
+| Profile | Model |
+|---------|-------|
+| $ARGUMENTS.profile | {model_settings.profiles[$ARGUMENTS.profile].model} |
+
+Sparse overrides stay unchanged:
+
+| Agent Override | Result |
+|----------------|--------|
+| Any configured override | Continues using its direct concrete model |
+| No override | Uses the project default profile above |
 
 Example:
-| Agent | Model |
-|-------|-------|
-| bgsd-planner | opus |
-| bgsd-executor | sonnet |
-| bgsd-verifier | haiku |
-| ... | ... |
+| Profile | Model |
+|---------|-------|
+| quality | gpt-5.4 |
 
 Next spawned agents will use the new profile.
 ```
-
-Map profile names:
-- quality: use "quality" column from MODEL_PROFILES
-- balanced: use "balanced" column from MODEL_PROFILES
-- budget: use "budget" column from MODEL_PROFILES
 </step>
 
 </process>
@@ -75,6 +82,6 @@ Map profile names:
 <success_criteria>
 - [ ] Argument validated
 - [ ] Config file ensured
-- [ ] Config updated with new model_profile
-- [ ] Confirmation displayed with model table
+- [ ] Config updated with new `model_settings.default_profile`
+- [ ] Confirmation displayed with selected profile, concrete model, and override behavior
 </success_criteria>

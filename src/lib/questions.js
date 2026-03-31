@@ -261,11 +261,11 @@ const OPTION_TEMPLATES = {
 
   // settings workflow templates
   'settings-model-profile': {
-    question: 'Which model profile for agents?',
+    question: 'Which shared profile should this project use by default?',
     options: [
-      { id: 'quality', label: 'Quality', description: 'Opus everywhere except verification (highest cost)', diversity: { certainty: 1.0 } },
-      { id: 'balanced', label: 'Balanced (Recommended)', description: 'Opus for planning, Sonnet for execution/verification', diversity: { certainty: 0.6 } },
-      { id: 'budget', label: 'Budget', description: 'Sonnet for writing, Haiku for research/verification (lowest cost)', diversity: { certainty: 0.3 } }
+      { id: 'quality', label: 'Quality', description: 'Best reasoning and review quality (default model: gpt-5.4)', diversity: { certainty: 1.0 } },
+      { id: 'balanced', label: 'Balanced (Recommended)', description: 'Recommended day-to-day default (default model: gpt-5.4-mini)', diversity: { certainty: 0.6 } },
+      { id: 'budget', label: 'Budget', description: 'Fastest / lowest-cost routine work (default model: gpt-5.4-nano)', diversity: { certainty: 0.3 } }
     ],
     typeHint: 'SINGLE_CHOICE'
   },

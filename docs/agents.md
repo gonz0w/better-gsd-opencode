@@ -244,20 +244,29 @@ bGSD uses 10 specialized AI agents, each purpose-built for a specific task. Agen
 
 ## Model Profiles
 
-Three profiles control which AI model each agent uses:
+Projects use one shared model-settings contract instead of a hard-coded provider-specific agent table.
 
-| Agent | Quality | Balanced (default) | Budget |
-|-------|---------|-------------------|--------|
-| gsd-planner | opus | opus | sonnet |
-| gsd-executor | opus | sonnet | sonnet |
-| gsd-verifier | sonnet | sonnet | haiku |
-| gsd-debugger | opus | sonnet | sonnet |
-| gsd-phase-researcher | opus | sonnet | haiku |
-| gsd-project-researcher | opus | sonnet | haiku |
-| gsd-roadmapper | opus | opus | sonnet |
-| gsd-plan-checker | sonnet | sonnet | haiku |
-| gsd-codebase-mapper | sonnet | sonnet | haiku |
-| gsd-github-ci | sonnet | sonnet | sonnet |
+```json
+{
+  "model_settings": {
+    "default_profile": "balanced",
+    "profiles": {
+      "quality": { "model": "gpt-5.4" },
+      "balanced": { "model": "gpt-5.4-mini" },
+      "budget": { "model": "gpt-5.4-nano" }
+    },
+    "agent_overrides": {}
+  }
+}
+```
+
+### Shared Profiles
+
+| Profile | Default model | Intended use |
+|---------|---------------|--------------|
+| `quality` | `gpt-5.4` | Best reasoning and review quality |
+| `balanced` | `gpt-5.4-mini` | Recommended day-to-day project default |
+| `budget` | `gpt-5.4-nano` | Fastest / lowest-cost routine work |
 
 ### Per-Agent Overrides
 
@@ -265,18 +274,30 @@ Override individual agents in `.planning/config.json`:
 
 ```json
 {
-  "model_profile": "balanced",
-  "model_profiles": {
-    "gsd-executor": "opus"
+  "model_settings": {
+    "default_profile": "balanced",
+    "profiles": {
+      "quality": { "model": "gpt-5.4" },
+      "balanced": { "model": "gpt-5.4-mini" },
+      "budget": { "model": "gpt-5.4-nano" }
+    },
+    "agent_overrides": {
+      "bgsd-executor": "ollama/qwen3-coder:latest"
+    }
   }
 }
 ```
 
+Overrides are intentionally sparse. The normal path is one project-wide selected profile for most agents, with only a few direct exceptions when needed.
+
 ### Model Resolution
 
-1. Check `config.json` → `model_profiles` for agent-specific override
-2. Look up agent in profile table for the current `model_profile`
-3. Opus-tier agents resolve to `"inherit"` to avoid version conflicts
+1. Check `config.json` → `model_settings.agent_overrides` for a direct agent override
+2. Read `model_settings.default_profile`
+3. Resolve the concrete model from `model_settings.profiles[default_profile]`
+4. If config is partial or empty, fall back to the shipped `quality` / `balanced` / `budget` defaults
+
+This keeps the public contract provider-agnostic and project-default-first while still allowing a specific agent to use a different concrete model when needed.
 
 ---
 
@@ -317,11 +338,11 @@ Each agent gets a **fresh context window**. There is no shared conversation hist
 
 The CLI classifies each plan task by complexity (1-5):
 
-| Score | Complexity | Criteria | Model |
-|-------|-----------|----------|-------|
-| 1-2 | Simple | <3 files, single module, no tests needed | sonnet |
-| 3 | Moderate | 3-7 files, limited cross-module | sonnet |
-| 4-5 | Complex | 8+ files, cross-module, tests required | opus |
+| Score | Complexity | Criteria | Typical recommendation |
+|-------|-----------|----------|------------------------|
+| 1-2 | Simple | <3 files, single module, no tests needed | `balanced` or `budget` |
+| 3 | Moderate | 3-7 files, limited cross-module | `balanced` |
+| 4-5 | Complex | 8+ files, cross-module, tests required | `quality` |
 
 ### Context Manifests
 

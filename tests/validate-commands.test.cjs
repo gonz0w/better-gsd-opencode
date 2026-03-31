@@ -52,7 +52,7 @@ describe('validateCommandIntegrity', () => {
         {
           surface: 'workflow',
           path: 'workflows/settings.md',
-          content: 'Switch model profiles with `/bgsd-settings profile`.',
+          content: 'Switch the selected project profile with `/bgsd-settings profile`.',
         },
       ],
     });

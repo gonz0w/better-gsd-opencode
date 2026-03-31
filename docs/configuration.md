@@ -8,16 +8,10 @@ Complete reference for all bGSD configuration options. Configuration lives in `.
 
 ```
 /bgsd-settings                              # Interactive configuration
-/bgsd-settings profile quality              # Quick model switch
+/bgsd-settings profile quality              # Quick selected-profile switch
 ```
 
-CLI commands:
-```bash
-node bin/gsd-tools.cjs config-set model_profile quality
-node bin/gsd-tools.cjs config-get model_profile
-node bin/gsd-tools.cjs config-migrate                    # Add missing keys with defaults
-node bin/gsd-tools.cjs validate-config                   # Schema validation
-```
+Edit `.planning/config.json` directly for scripted changes, then run `/bgsd-settings validate` (or the equivalent config validation command) if you want a contract check.
 
 ---
 
@@ -27,8 +21,15 @@ node bin/gsd-tools.cjs validate-config                   # Schema validation
 {
   "mode": "interactive",
   "depth": "standard",
-  "model_profile": "balanced",
-  "model_profiles": {},
+  "model_settings": {
+    "default_profile": "balanced",
+    "profiles": {
+      "quality": { "model": "gpt-5.4" },
+      "balanced": { "model": "gpt-5.4-mini" },
+      "budget": { "model": "gpt-5.4-nano" }
+    },
+    "agent_overrides": {}
+  },
   "commit_docs": true,
   "search_gitignored": false,
   "branching_strategy": "none",
@@ -97,10 +98,69 @@ node bin/gsd-tools.cjs validate-config                   # Schema validation
 |---------|------|---------|-------------|
 | `mode` | string | `"interactive"` | `"interactive"` confirms each step; `"yolo"` auto-approves human-verify checkpoints |
 | `depth` | string | `"standard"` | Planning depth: `"quick"`, `"standard"`, `"deep"` |
-| `model_profile` | string | `"balanced"` | AI model tier: `"quality"`, `"balanced"`, `"budget"` |
-| `model_profiles` | object | `{}` | Per-agent model overrides (e.g., `{"gsd-executor": "opus"}`) |
+| `model_settings` | object | built-in contract | Shared model contract: selected default profile, concrete profile definitions, sparse agent overrides |
 | `commit_docs` | boolean | `true` | Auto-commit planning documents to git |
 | `search_gitignored` | boolean | `false` | Include gitignored files in searches |
+
+### Model Settings Contract
+
+The normal path is:
+
+1. Pick one selected project profile in `model_settings.default_profile`
+2. Define the concrete model behind each built-in profile in `model_settings.profiles`
+3. Add `model_settings.agent_overrides` only when one agent should be an exception
+
+```json
+{
+  "model_settings": {
+    "default_profile": "balanced",
+    "profiles": {
+      "quality": { "model": "gpt-5.4" },
+      "balanced": { "model": "gpt-5.4-mini" },
+      "budget": { "model": "gpt-5.4-nano" }
+    },
+    "agent_overrides": {
+      "bgsd-executor": "ollama/qwen3-coder:latest"
+    }
+  }
+}
+```
+
+### `model_settings.default_profile`
+
+Selects which shared profile the project uses by default. Valid values are `quality`, `balanced`, and `budget`.
+
+### `model_settings.profiles`
+
+Defines the concrete model id behind each built-in profile.
+
+| Profile | Shipped default | Use when |
+|---------|-----------------|----------|
+| `quality` | `gpt-5.4` | Best reasoning and review quality matter more than speed |
+| `balanced` | `gpt-5.4-mini` | Recommended day-to-day default |
+| `budget` | `gpt-5.4-nano` | Fastest / lowest-cost routine work |
+
+### `model_settings.agent_overrides`
+
+Optional sparse exceptions keyed by canonical agent id. Each override points directly to a concrete model id.
+
+Example:
+
+```json
+{
+  "model_settings": {
+    "agent_overrides": {
+      "bgsd-executor": "ollama/qwen3-coder:latest"
+    }
+  }
+}
+```
+
+Resolution order is:
+
+1. `model_settings.agent_overrides[agent]`
+2. `model_settings.profiles[model_settings.default_profile].model`
+3. Shipped defaults for `quality`, `balanced`, and `budget`
 
 ### Branching
 
@@ -190,64 +250,21 @@ In `yolo` mode, most gates auto-approve. `decision` and `human-action` checkpoin
 | `worktree.setup_hooks` | `[]` | Commands run after worktree creation (e.g., `["npm install"]`) |
 | `worktree.max_concurrent` | `3` | Maximum simultaneous worktrees |
 
----
-
-## Model Profiles Detail
-
-### Quality Profile
-
-Best results, highest cost. Use for critical projects or complex domains.
-
-| Agent | Model |
-|-------|-------|
-| gsd-planner | opus |
-| gsd-executor | opus |
-| gsd-verifier | sonnet |
-| gsd-debugger | opus |
-| gsd-roadmapper | opus |
-| gsd-phase-researcher | opus |
-| gsd-project-researcher | opus |
-| gsd-plan-checker | sonnet |
-
-### Balanced Profile (Default)
-
-Good balance of quality and cost. Planning uses stronger models; execution uses efficient ones.
-
-| Agent | Model |
-|-------|-------|
-| gsd-planner | opus |
-| gsd-executor | sonnet |
-| gsd-verifier | sonnet |
-| gsd-debugger | sonnet |
-| gsd-roadmapper | opus |
-| gsd-phase-researcher | sonnet |
-| gsd-project-researcher | sonnet |
-| gsd-plan-checker | sonnet |
-
-### Budget Profile
-
-Lowest cost. Suitable for well-defined tasks with clear requirements.
-
-| Agent | Model |
-|-------|-------|
-| gsd-planner | sonnet |
-| gsd-executor | sonnet |
-| gsd-verifier | haiku |
-| gsd-debugger | sonnet |
-| gsd-roadmapper | sonnet |
-| gsd-phase-researcher | haiku |
-| gsd-project-researcher | haiku |
-| gsd-plan-checker | haiku |
-
----
-
 ## User Defaults
 
 Save preferred settings globally at `~/.gsd/defaults.json`. These are applied when creating new projects via `/bgsd-new-project`.
 
 ```json
 {
-  "model_profile": "quality",
+  "model_settings": {
+    "default_profile": "quality",
+    "profiles": {
+      "quality": { "model": "gpt-5.4" },
+      "balanced": { "model": "gpt-5.4-mini" },
+      "budget": { "model": "gpt-5.4-nano" }
+    },
+    "agent_overrides": {}
+  },
   "mode": "yolo",
   "research": true,
   "plan_checker": true

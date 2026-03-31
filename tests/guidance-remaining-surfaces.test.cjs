@@ -34,7 +34,7 @@ describe('Phase 158 remaining canonical guidance surfaces', () => {
     assert.match(milestoneWorkflow, /Also: `\/bgsd-plan phase \[N\]` — skip discussion, plan directly \(`\/bgsd-plan-phase \[N\]` remains a compatibility alias\)/, 'new-milestone should recommend the canonical phase subcommand and demote the legacy alias');
     assert.match(executeWorkflow, /offer `\/bgsd-plan gaps \{X\}`/, 'execute-phase should offer the canonical gaps subcommand after gaps are found');
     assert.match(settingsWorkflow, /These settings apply to future \/bgsd-plan phase and \/bgsd-execute-phase runs\./, 'settings should reference the canonical planning family');
-    assert.match(settingsWorkflow, /\/bgsd-settings profile <profile> — switch model profile \(`\/bgsd-set-profile` remains a compatibility alias\)/, 'settings should prefer /bgsd-settings profile and keep the legacy alias compatibility-only');
+    assert.match(settingsWorkflow, /\/bgsd-settings profile <profile> — switch the selected project profile \(`\/bgsd-set-profile` remains a compatibility alias\)/, 'settings should prefer /bgsd-settings profile and keep the legacy alias compatibility-only');
     assert.doesNotMatch(settingsWorkflow, /Quick commands:\n- \/bgsd-set-profile <profile>/, 'settings should not keep the legacy profile command as the primary quick command');
   });
 

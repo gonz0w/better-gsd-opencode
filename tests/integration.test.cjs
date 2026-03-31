@@ -210,6 +210,34 @@ Canonical model resolution fixture.
   });
 });
 
+describe('integration: phase 168 settings UX guidance', () => {
+  test('settings workflows and docs teach the project-default-first model settings contract', () => {
+    const projectRoot = path.join(__dirname, '..');
+    const settingsWorkflow = fs.readFileSync(path.join(projectRoot, 'workflows', 'settings.md'), 'utf-8');
+    const setProfileWorkflow = fs.readFileSync(path.join(projectRoot, 'workflows', 'set-profile.md'), 'utf-8');
+    const configurationDoc = fs.readFileSync(path.join(projectRoot, 'docs', 'configuration.md'), 'utf-8');
+    const agentsDoc = fs.readFileSync(path.join(projectRoot, 'docs', 'agents.md'), 'utf-8');
+    const profileSkill = fs.readFileSync(path.join(projectRoot, 'skills', 'model-profiles', 'SKILL.md'), 'utf-8');
+    const questionsSource = fs.readFileSync(path.join(projectRoot, 'src', 'lib', 'questions.js'), 'utf-8');
+
+    assert.match(settingsWorkflow, /Lead with the selected project default profile, then collect the concrete models behind each built-in profile, then offer optional sparse overrides/i, 'settings workflow should lead with selected profile, then profile definitions, then overrides');
+    assert.match(settingsWorkflow, /model_settings\.default_profile/i, 'settings workflow should teach the canonical default profile key');
+    assert.match(setProfileWorkflow, /model_settings\.default_profile/i, 'set-profile should update the canonical selected profile field');
+    assert.match(setProfileWorkflow, /Preserve the existing concrete profile definitions and any sparse `agent_overrides` entries\./, 'set-profile should keep profile definitions and overrides intact');
+
+    for (const docText of [configurationDoc, agentsDoc, profileSkill]) {
+      assert.match(docText, /model_settings/i, 'guidance should teach model_settings');
+      assert.match(docText, /default_profile/i, 'guidance should teach the selected default profile');
+      assert.match(docText, /agent_overrides/i, 'guidance should teach sparse direct overrides');
+      assert.match(docText, /gpt-5\.4/i, 'guidance should seed GPT-family defaults');
+      assert.doesNotMatch(docText, /model_profiles"?: \{|`model_profiles`|`model_overrides`|\bopus\b|\bsonnet\b|\bhaiku\b/i, 'guidance should avoid legacy Anthropic-shaped settings language');
+    }
+
+    assert.match(questionsSource, /Which shared profile should this project use by default\?/i, 'settings question should be project-default-first');
+    assert.match(questionsSource, /default model: gpt-5\.4-mini/i, 'settings question descriptions should use GPT-family defaults');
+  });
+});
+
 describe('integration: scoped effective intent delivery', () => {
   test('plan-phase agent scoping keeps effective_intent for planner and verifier-style handoffs stay compact', () => {
     const planner = JSON.parse(runGsdTools('init:plan-phase 157 --agent=bgsd-planner --raw').output);
