@@ -59,3 +59,10 @@ This is the canonical six-pass milestone audit for Phase 173. It is the only fin
 - Define actual gate names, prerequisites, and per-finding stage placement in `173-02-PLAN.md`; this file only preserves the placeholders and dependencies needed for that follow-up.
 - Convert high-confidence findings into execution plans that group low-blast-radius deletes separately from router/global-state refactors instead of batching the whole audit into one cleanup pass.
 - Re-run targeted regression proof only for the touched command families when Phase 174-176 cleanup starts; avoid broad milestone-wide revalidation unless a later plan explicitly asks for it.
+
+## Recommended Order of Operations
+
+- Start with the low-blast-radius `safe_delete` work in Stage 1 so clearly dead or legacy-only surfaces can be removed without dragging router or command-structure risk into the first cleanup pass.
+- Promote `validate_before_delete` findings only after targeted proof exists; Stage 2 is where packaging, routing, help, docs, and regression checks decide whether a suspect really graduates from evidence-backed candidate to removal-ready work.
+- Use Stage 3 for live-surface simplification once the supported surface is clearer, especially duplicate context assembly, command-reference drift, and fallback cleanup that should not be mixed with speculative deletes.
+- Leave router, ambient-global, direct-argv, circular-dependency, and oversized command-module work for Stage 4, where focused proof can justify touching the highest-coupling hotspots after earlier cleanup has already reduced blast radius.
