@@ -87,6 +87,25 @@ function isProbablyTextFile(filePath, stat, content) {
   return !content.includes('\u0000');
 }
 
+function readMaybeTextFile(filePath) {
+  let buffer;
+  try {
+    buffer = fs.readFileSync(filePath);
+  } catch {
+    return null;
+  }
+
+  if (buffer.length > MAX_FILE_SIZE_BYTES) return null;
+  const content = buffer.toString('utf-8');
+  const statLike = {
+    isFile: () => true,
+    size: buffer.length,
+  };
+
+  if (!isProbablyTextFile(filePath, statLike, content)) return null;
+  return { absolutePath: filePath, content };
+}
+
 function walkSecretFiles(rootPath, currentPath = rootPath, files = []) {
   let entries = [];
   try {
@@ -103,17 +122,8 @@ function walkSecretFiles(rootPath, currentPath = rootPath, files = []) {
       continue;
     }
     if (!entry.isFile()) continue;
-    let stat;
-    let content;
-    try {
-      stat = fs.statSync(absolutePath);
-      content = fs.readFileSync(absolutePath, 'utf-8');
-    } catch {
-      continue;
-    }
-    if (isProbablyTextFile(absolutePath, stat, content)) {
-      files.push({ absolutePath, content });
-    }
+    const file = readMaybeTextFile(absolutePath);
+    if (file) files.push(file);
   }
   return files;
 }
@@ -196,9 +206,16 @@ function collectSecretFindings(relPath, content, config) {
 
 function runSecretsEngine(cwd, target, config = {}) {
   const absoluteTarget = target && target.path ? target.path : cwd;
-  const files = fs.existsSync(absoluteTarget) && fs.statSync(absoluteTarget).isFile()
-    ? [{ absolutePath: absoluteTarget, content: fs.readFileSync(absoluteTarget, 'utf-8') }]
-    : walkSecretFiles(absoluteTarget);
+  let files;
+  try {
+    files = walkSecretFiles(absoluteTarget);
+  } catch {
+    files = [];
+  }
+  if (files.length === 0) {
+    const singleFile = readMaybeTextFile(absoluteTarget);
+    files = singleFile ? [singleFile] : [];
+  }
   const findings = [];
 
   for (const file of files) {

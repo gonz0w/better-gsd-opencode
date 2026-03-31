@@ -2,8 +2,12 @@
 
 const { SEVERITY } = require('../severity');
 
+function escapeRegex(text) {
+  return String(text || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 function countIdentifierUsage(source, name) {
-  const matches = source.match(new RegExp(`\\b${name.replace(/[$]/g, '\\$&')}\\b`, 'g'));
+  const matches = source.match(new RegExp(`\\b${escapeRegex(name)}\\b`, 'g'));
   return matches ? matches.length : 0;
 }
 

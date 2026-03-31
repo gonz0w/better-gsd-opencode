@@ -419,7 +419,7 @@ function normalizePhaseName(phase) {
 function buildPhaseHandoffRunId(phase, timestamp = new Date()) {
   const normalizedPhase = normalizePhaseName(String(phase || '')).trim() || 'unknown';
   const iso = timestamp instanceof Date ? timestamp.toISOString() : new Date(timestamp || Date.now()).toISOString();
-  return `${normalizedPhase}-${iso.replace(/[:.]/g, '-').replace(/Z$/, 'Z')}`;
+  return `${normalizedPhase}-${iso.replace(/[:.]/g, '-')}`;
 }
 
 function buildPhaseHandoffSourceFingerprint(phase, runId) {

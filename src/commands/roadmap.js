@@ -262,7 +262,7 @@ function cmdRoadmapUpdatePlanProgress(cwd, phaseNum, raw) {
     }
     throw e;
   }
-  const phaseEscaped = phaseNum.replace('.', '\\.');
+  const phaseEscaped = String(phaseNum || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
   // Progress table row: update Plans column (summaries/plans) and Status column
   const tablePattern = new RegExp(

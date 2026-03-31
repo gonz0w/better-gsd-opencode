@@ -5,6 +5,7 @@ const { output, error, debugLog } = require('../lib/output');
 const { getDb } = require('../lib/db');
 const { PlanningCache } = require('../lib/planning-cache');
 const { mutateJsonStore } = require('../lib/json-store-mutator');
+const { writeFileAtomic } = require('../lib/atomic-write');
 
 // ─── Memory Commands ─────────────────────────────────────────────────────────
 
@@ -213,8 +214,7 @@ function parseStructuredMemory(content) {
 function ensureStructuredMemoryFile(cwd) {
   const filePath = getMemoryFilePath(cwd);
   if (!fs.existsSync(filePath)) {
-    fs.mkdirSync(path.dirname(filePath), { recursive: true });
-    fs.writeFileSync(filePath, serializeStructuredMemory(createEmptyStructuredMemory()), 'utf-8');
+    writeFileAtomic(filePath, serializeStructuredMemory(createEmptyStructuredMemory()));
   }
   return filePath;
 }
@@ -228,7 +228,7 @@ function loadStructuredMemory(cwd) {
 
 function writeStructuredMemory(cwd, doc) {
   const filePath = ensureStructuredMemoryFile(cwd);
-  fs.writeFileSync(filePath, serializeStructuredMemory(doc), 'utf-8');
+  writeFileAtomic(filePath, serializeStructuredMemory(doc));
   return filePath;
 }
 

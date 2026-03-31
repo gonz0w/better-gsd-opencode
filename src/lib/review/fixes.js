@@ -2,6 +2,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { writeFileAtomic } = require('../atomic-write');
 
 function cloneFinding(finding, extra) {
   return { ...finding, ...extra };
@@ -82,7 +83,7 @@ function applyMechanicalFixes(cwd, findings) {
 
     if (fileChanged) {
       const nextContent = lines.join('\n') + (hadTrailingNewline ? '\n' : '');
-      fs.writeFileSync(absolutePath, nextContent, 'utf-8');
+      writeFileAtomic(absolutePath, nextContent);
     }
   }
 
