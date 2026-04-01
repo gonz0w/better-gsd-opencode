@@ -13,7 +13,7 @@ v18.1 reduces cleanup drag before adding anything new. The milestone starts with
 
 - [x] **Phase 173: Simplification Audit & Safe Sequencing** (completed 2026-03-31) - Classify cleanup targets and safe order of operations before deleting or flattening anything.
 - [x] **Phase 174: Greenfield Compatibility Surface Cleanup** (completed 2026-04-01) - Remove migration-only and superseded normalization paths while keeping canonical artifacts valid; verification gaps remain.
-- [ ] **Phase 175: Canonical Command Surface Alignment** - Move routing, aliases, help, and discovery toward one clearer command definition and supported guidance surface.
+- [ ] **Phase 175: Canonical Command Surface Alignment** - Move routing, aliases, help, and discovery toward one clearer command definition and supported guidance surface, including the remaining Phase 174 command-integrity blocker.
 - [ ] **Phase 176: Command Hotspot Simplification & Hardening** - Break up the highest-friction CLI hotspots and prove supported workflows still hold after cleanup.
 
 ## Phase Details
@@ -41,7 +41,8 @@ v18.1 reduces cleanup drag before adding anything new. The milestone starts with
 ### Phase 175: Canonical Command Surface Alignment
 **Goal**: Maintainers can change the supported command surface from one clearer canonical definition instead of keeping routing, aliases, help, and discovery in parallel drift-prone paths
 **Depends on**: Phase 174
-**Requirements**: CLI-01, CLI-02, SAFE-03
+**Requirements**: CLI-01, CLI-02, SAFE-03, CLEAN-03
+**Gap Closure:** Closes `GAP-174-RV-03` by making shipped command-integrity validation accept the canonical planning workflow guidance in `workflows/plan-phase.md` and `workflows/discuss-phase.md`.
 **Success Criteria** (what must be TRUE):
   1. Maintainers can update a supported command route, alias, or help/discovery entry from one canonical definition instead of editing parallel registries by hand.
   2. Maintainers can change touched router parsing behavior without wading through repeated hand-written flag scans and unrelated startup logic in the same edit path.

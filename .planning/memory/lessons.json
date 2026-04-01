@@ -407,5 +407,42 @@
     "affected_agents": [
       "bgsd-verifier"
     ]
+  },
+  {
+    "id": "4b7a58bd-f146-4fa1-bd67-7d7b606fe9ae",
+    "date": "2026-04-01T02:38:49.967Z",
+    "title": "verify:state complete-plan should dedupe rerun entries",
+    "severity": "MEDIUM",
+    "type": "tooling",
+    "root_cause": "The execute flow can legitimately rerun verify:state complete-plan after SUMMARY creation to refresh status, but the helper appends duplicate trend and decision entries instead of updating the existing plan record.",
+    "prevention_rule": "Make verify:state complete-plan idempotent per phase-plan by replacing existing recent trend and decision entries for the same plan when rerun in one execution session.",
+    "affected_agents": [
+      "bgsd-executor"
+    ]
+  },
+  {
+    "id": "0ff02f8d-9182-4a0f-a1f3-d24080a53403",
+    "date": "2026-04-01T02:41:57.137Z",
+    "title": "Verification should compare source behavior against shipped bundle",
+    "severity": "MEDIUM",
+    "type": "workflow",
+    "root_cause": "Focused verifier checks and source-imported tests can pass while the bundled bgsd-tools runtime remains stale or broken, leaving shipped validation behavior inconsistent with source evidence.",
+    "prevention_rule": "For bundle-adjacent phases, always pair source-level proofs with a shipped-runtime command check (for example util:validate-commands or verifier helpers via bin/bgsd-tools.cjs) before declaring guidance or validation gaps closed.",
+    "affected_agents": [
+      "bgsd-verifier"
+    ]
+  },
+  {
+    "id": "ee3c35d5-c6e3-45bb-a354-3ce39f88d87c",
+    "date": "2026-04-01T02:46:48.745Z",
+    "title": "Rebuild bundled runtime before shipped-surface re-verification",
+    "severity": "MEDIUM",
+    "type": "workflow",
+    "root_cause": "Verification of shipped CLI behavior can stay red from stale bundled artifacts even after source-level fixes land, producing false remaining gaps until bin/plugin outputs are rebuilt.",
+    "prevention_rule": "When a phase gap depends on bundled runtime behavior, require a fresh build of shipped artifacts before re-running verifier helpers or broad shipped-surface validation.",
+    "affected_agents": [
+      "bgsd-verifier",
+      "bgsd-executor"
+    ]
   }
 ]

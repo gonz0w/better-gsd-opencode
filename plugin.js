@@ -7582,7 +7582,7 @@ import { join as join2 } from "path";
 import { randomBytes as randomBytes2 } from "crypto";
 
 // src/plugin/logger.js
-import { existsSync, mkdirSync, statSync, fstatSync, appendFileSync, copyFileSync, writeFileSync as writeFileSync2, openSync, ftruncateSync, closeSync } from "fs";
+import { existsSync, mkdirSync, statSync, fstatSync, appendFileSync, copyFileSync, writeFileSync, openSync, ftruncateSync, closeSync } from "fs";
 import { join } from "path";
 import { randomBytes } from "crypto";
 var MAX_LOG_SIZE = 512 * 1024;
@@ -10103,7 +10103,7 @@ function createFileWatcher(cwd, options = {}) {
 }
 
 // src/plugin/idle-validator.js
-import { existsSync as existsSync8, readFileSync as readFileSync10, writeFileSync as writeFileSync3 } from "fs";
+import { existsSync as existsSync8, readFileSync as readFileSync10, writeFileSync as writeFileSync2 } from "fs";
 import { join as join17 } from "path";
 import { execSync } from "child_process";
 import { homedir as homedir4 } from "os";
@@ -10142,7 +10142,7 @@ function createIdleValidator(cwd, notifier, fileWatcher, config) {
   }
   function writeTracked(filePath, content) {
     fileWatcher.trackSelfWrite(filePath);
-    writeFileSync3(filePath, content);
+    writeFileSync2(filePath, content);
   }
   function getLastGitTimestamp() {
     try {
