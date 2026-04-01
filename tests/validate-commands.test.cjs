@@ -377,6 +377,60 @@ describe('validateCommandIntegrity', () => {
     );
   });
 
+  test('accepts supported routed node-invoked commands and redirect-bearing shell examples', () => {
+    const result = validateCommandIntegrity({
+      cwd: ROOT,
+      surfaces: [
+        {
+          surface: 'agent',
+          path: 'agents/example.md',
+          content: [
+            'Run `node __OPENCODE_CONFIG__/bgsd-oc/bin/bgsd-tools.cjs init:execute-phase 180 --raw` to load execution context.',
+            'Then `node __OPENCODE_CONFIG__/bgsd-oc/bin/bgsd-tools.cjs init:phase-op 180 --raw` for phase metadata.',
+            'Repair roadmap parity with `node __OPENCODE_CONFIG__/bgsd-oc/bin/bgsd-tools.cjs verify:validate roadmap --repair 2>/dev/null`.',
+            'Check GitHub auth with `node __OPENCODE_CONFIG__/bgsd-oc/bin/bgsd-tools.cjs detect:gh-preflight 2>/dev/null`.',
+            'A stale command should still fail: `node __OPENCODE_CONFIG__/bgsd-oc/bin/bgsd-tools.cjs fake:missing --raw`.',
+          ].join('\n'),
+        },
+      ],
+    });
+
+    assert.equal(
+      result.issues.some(issue => /init:execute-phase|init:phase-op|verify:validate roadmap|detect:gh-preflight/.test(issue.command)),
+      false,
+      'supported routed commands and redirect-bearing examples should validate cleanly'
+    );
+    assert.ok(
+      result.issues.some(issue => issue.kind === 'nonexistent-command' && issue.command.includes('fake:missing')),
+      'nearby fake commands must still fail so the validator contract does not erode'
+    );
+  });
+
+  test('classifies transition headings intentionally and exposes proof inventory in raw output', () => {
+    const result = validateCommandIntegrity({
+      cwd: ROOT,
+      surfaces: [
+        {
+          surface: 'workflow',
+          path: 'workflows/transition.md',
+          content: '## ▶ Next Up: /bgsd-complete-milestone {version}',
+        },
+      ],
+    });
+
+    assert.equal(result.valid, true, 'transition-style Next Up output headings should be classified intentionally');
+    assert.ok(result.proofInventory, 'validator should expose proof inventory metadata');
+    assert.ok(Array.isArray(result.proofInventory.namedExclusions), 'proof inventory should list named exclusions');
+    assert.ok(
+      result.proofInventory.namedExclusions.includes('transition-output-heading'),
+      'proof inventory should disclose the transition-heading exclusion/classification'
+    );
+    assert.ok(
+      result.proofInventory.namedExclusions.includes('workflow-bootstrap-reconstruction'),
+      'proof inventory should include the existing bootstrap exclusion family'
+    );
+  });
+
   test('config-migrate is absent from discovery inventory and canonical config docs', () => {
     const result = validateCommandIntegrity({
       cwd: ROOT,
