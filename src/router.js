@@ -2,6 +2,15 @@
 
 const { COMMAND_HELP } = require('./lib/constants');
 const { error, output } = require('./lib/output');
+const {
+  getCompactMode,
+  getOutputMode,
+  setCompactMode,
+  setDbNotices,
+  setManifestMode,
+  setOutputMode,
+  setRequestedFields,
+} = require('./lib/output-context');
 const { diagnoseCompileCache } = require('./lib/runtime-capabilities');
 const { detectBun, getCachedBunVersion, configGet, configSet } = require('./lib/cli-tools/bun-runtime');
 const { loadConfig } = require('./lib/config');
@@ -132,12 +141,12 @@ async function main() {
   // --pretty: force formatted output even when piped (e.g., | less -R)
   const prettyIdx = args.indexOf('--pretty');
   if (prettyIdx !== -1) {
-    global._gsdOutputMode = 'pretty';
+    setOutputMode('pretty');
     args.splice(prettyIdx, 1);
   }
   // Auto-detect: TTY → formatted, piped → json
-  if (global._gsdOutputMode === undefined) {
-    global._gsdOutputMode = process.stdout.isTTY ? 'formatted' : 'json';
+  if (getOutputMode() === undefined) {
+    setOutputMode(process.stdout.isTTY ? 'formatted' : 'json');
   }
 
   // Backward compat: accept --raw silently (no-op, auto-detection handles it)
@@ -146,7 +155,8 @@ async function main() {
   // Legacy: all command handlers still receive `raw` parameter.
   // In piped mode (json/no-TTY), this is true. Commands that haven't been
   // migrated to output(result, { formatter }) will use this to produce JSON.
-  const raw = global._gsdOutputMode === 'json' || global._gsdOutputMode !== 'pretty' && !process.stdout.isTTY;
+  const outputMode = getOutputMode();
+  const raw = outputMode === 'json' || outputMode !== 'pretty' && !process.stdout.isTTY;
 
   // Parse --fields global flag for JSON output filtering
   const fieldsIdx = args.indexOf('--fields');
@@ -155,23 +165,23 @@ async function main() {
     const requestedFields = fieldsValue ? fieldsValue.split(',') : null;
     args.splice(fieldsIdx, 2); // Remove --fields and its value from args
     if (requestedFields) {
-      global._gsdRequestedFields = requestedFields;
+      setRequestedFields(requestedFields);
     }
   }
 
   // Parse --verbose global flag (default is compact mode)
   const verboseIdx = args.indexOf('--verbose');
   if (verboseIdx !== -1) {
-    global._gsdCompactMode = false;
+    setCompactMode(false);
     args.splice(verboseIdx, 1);
-  } else if (global._gsdCompactMode === undefined) {
-    global._gsdCompactMode = true;
+  } else if (getCompactMode() === undefined) {
+    setCompactMode(true);
   }
 
   // Parse --compact global flag (backward-compat no-op, compact is already default)
   const compactIdx = args.indexOf('--compact');
   if (compactIdx !== -1) {
-    global._gsdCompactMode = true;
+    setCompactMode(true);
     args.splice(compactIdx, 1);
   }
 
@@ -185,7 +195,7 @@ async function main() {
 
   // ─── Runtime Banner ─────────────────────────────────────────────────────────
   // Show runtime info at startup (only in verbose mode or when running with Bun)
-  const isVerbose = global._gsdCompactMode === false;
+  const isVerbose = getCompactMode() === false;
   const showBanner = isVerbose || (_runtimeDetected && _runtimeDetected.available);
   if (showBanner) {
     showRuntimeBanner(_runtimeDetected, isVerbose);
@@ -194,7 +204,7 @@ async function main() {
   // Parse --manifest global flag for context manifest in compact output
   const manifestIdx = args.indexOf('--manifest');
   if (manifestIdx !== -1) {
-    global._gsdManifestMode = true;
+    setManifestMode(true);
     args.splice(manifestIdx, 1);
   }
 
@@ -218,7 +228,7 @@ async function main() {
     const notices = db.notices;
     if (notices && notices.length > 0) {
       // Store notices for plugin system to drain via drainPendingContext()
-      global._gsdDbNotices = notices;
+      setDbNotices(notices);
     }
   } catch (e) {
     // Silent failure — database is a cache, not critical
@@ -1239,8 +1249,8 @@ Use without --exact for fuzzy matching.`);
             error('Benchmarks are disabled in this build. Set INCLUDE_BENCHMARKS=true to enable.');
           }
           const binPathIdx = restArgs.indexOf('--bin');
-          // --verbose is a global flag - check global._gsdCompactMode
-          const isVerbose = global._gsdCompactMode === false;
+          // --verbose is a global flag - check shared output context compact mode
+          const isVerbose = getCompactMode() === false;
           lazyMeasure().cmdMeasure(cwd, {
             verbose: isVerbose,
             binPath: binPathIdx !== -1 ? restArgs[binPathIdx + 1] : 'bin/bgsd-tools.cjs'

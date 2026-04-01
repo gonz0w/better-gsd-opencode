@@ -1,3 +1,7 @@
+import outputContext from '../lib/output-context.js';
+
+const { getCompactMode } = outputContext;
+
 function isTruthyDebugValue(value) {
   if (value === undefined || value === null) return false;
   if (typeof value === 'boolean') return value;
@@ -15,7 +19,7 @@ export function isDebugEnabled(options = {}) {
     return false;
   }
 
-  return global._gsdCompactMode === false;
+  return getCompactMode() === false;
 }
 
 export function writeDebugDiagnostic(prefix, message, options = {}) {

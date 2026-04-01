@@ -37,6 +37,73 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
   mod
 ));
 
+// src/lib/output-context.js
+var require_output_context = __commonJS({
+  "src/lib/output-context.js"(exports, module) {
+    "use strict";
+    var state = {
+      outputMode: void 0,
+      requestedFields: void 0,
+      compactMode: void 0,
+      manifestMode: void 0,
+      dbNotices: void 0
+    };
+    function readState(localKey, globalKey) {
+      if (global[globalKey] !== void 0) {
+        state[localKey] = global[globalKey];
+      }
+      return state[localKey];
+    }
+    function writeState(localKey, globalKey, value) {
+      state[localKey] = value;
+      global[globalKey] = value;
+      return value;
+    }
+    function getOutputMode() {
+      return readState("outputMode", "_gsdOutputMode");
+    }
+    function setOutputMode(value) {
+      return writeState("outputMode", "_gsdOutputMode", value);
+    }
+    function getRequestedFields() {
+      return readState("requestedFields", "_gsdRequestedFields");
+    }
+    function setRequestedFields(value) {
+      return writeState("requestedFields", "_gsdRequestedFields", value);
+    }
+    function getCompactMode2() {
+      return readState("compactMode", "_gsdCompactMode");
+    }
+    function setCompactMode(value) {
+      return writeState("compactMode", "_gsdCompactMode", value);
+    }
+    function getManifestMode() {
+      return readState("manifestMode", "_gsdManifestMode");
+    }
+    function setManifestMode(value) {
+      return writeState("manifestMode", "_gsdManifestMode", value);
+    }
+    function getDbNotices() {
+      return readState("dbNotices", "_gsdDbNotices");
+    }
+    function setDbNotices(value) {
+      return writeState("dbNotices", "_gsdDbNotices", value);
+    }
+    module.exports = {
+      getOutputMode,
+      setOutputMode,
+      getRequestedFields,
+      setRequestedFields,
+      getCompactMode: getCompactMode2,
+      setCompactMode,
+      getManifestMode,
+      setManifestMode,
+      getDbNotices,
+      setDbNotices
+    };
+  }
+});
+
 // src/plugin/lib/db-cache.js
 import * as nodeFs from "node:fs";
 import * as nodePath from "node:path";
@@ -4077,6 +4144,7 @@ var init_parsers = __esm({
 // src/lib/output.js
 var require_output = __commonJS({
   "src/lib/output.js"(exports, module) {
+    var { getCompactMode: getCompactMode2, getOutputMode, getRequestedFields } = require_output_context();
     var _tmpFiles = [];
     process.on("exit", () => {
       for (const f of _tmpFiles) {
@@ -4124,19 +4192,20 @@ var require_output = __commonJS({
       return result;
     }
     function outputMode() {
-      return global._gsdOutputMode || "json";
+      return getOutputMode() || "json";
     }
     function outputJSON(result, rawValue) {
       const fs3 = __require("fs");
       const path2 = __require("path");
-      const mode = global._gsdOutputMode || "json";
+      const mode = getOutputMode() || "json";
       if (rawValue !== void 0 && mode !== "json") {
         process.stdout.write(String(rawValue));
         return;
       }
       let filtered = result;
-      if (global._gsdRequestedFields && typeof result === "object" && result !== null) {
-        filtered = filterFields(result, global._gsdRequestedFields);
+      const requestedFields = getRequestedFields();
+      if (requestedFields && typeof result === "object" && result !== null) {
+        filtered = filterFields(result, requestedFields);
       }
       const json = JSON.stringify(filtered, null, 2);
       if (json.length > 5e4 && !process.env.BGSD_NO_TMPFILE) {
@@ -4183,7 +4252,7 @@ var require_output = __commonJS({
       return normalized !== "" && normalized !== "0" && normalized !== "false" && normalized !== "off";
     }
     function isVerboseModeEnabled() {
-      return global._gsdCompactMode === false;
+      return getCompactMode2() === false;
     }
     function isDebugEnabled2(options = {}) {
       const env = options.env || process.env;
@@ -7737,6 +7806,8 @@ function safeHook(name, fn, options = {}) {
 }
 
 // src/plugin/debug-contract.js
+var import_output_context = __toESM(require_output_context());
+var { getCompactMode } = import_output_context.default;
 function isTruthyDebugValue(value) {
   if (value === void 0 || value === null) return false;
   if (typeof value === "boolean") return value;
@@ -7751,7 +7822,7 @@ function isDebugEnabled(options = {}) {
   if (options.allowVerbose === false) {
     return false;
   }
-  return global._gsdCompactMode === false;
+  return getCompactMode() === false;
 }
 function writeDebugDiagnostic2(prefix, message, options = {}) {
   if (!isDebugEnabled(options)) {

@@ -1,5 +1,7 @@
 // ─── Temp File Cleanup ───────────────────────────────────────────────────────
 
+const { getCompactMode, getOutputMode, getRequestedFields } = require('./output-context');
+
 const _tmpFiles = [];
 
 process.on('exit', () => {
@@ -73,11 +75,11 @@ function filterFields(obj, fields) {
 
 /**
  * Returns the current output mode: 'formatted', 'json', or 'pretty'.
- * Set by router.js at startup via global._gsdOutputMode.
+ * Set by router.js at startup via the shared output context.
  * Defaults to 'json' (safe for piped/scripted contexts).
  */
 function outputMode() {
-  return global._gsdOutputMode || 'json';
+  return getOutputMode() || 'json';
 }
 
 // ─── JSON Output ─────────────────────────────────────────────────────────────
@@ -94,14 +96,15 @@ function outputJSON(result, rawValue) {
   // With TTY auto-detection, piped contexts get JSON, TTY gets formatted.
   // rawValue is only honored in formatted/pretty mode (for commands that
   // produce simple text output like current-timestamp, generate-slug).
-  const mode = global._gsdOutputMode || 'json';
+  const mode = getOutputMode() || 'json';
   if (rawValue !== undefined && mode !== 'json') {
     process.stdout.write(String(rawValue));
     return;
   }
   let filtered = result;
-  if (global._gsdRequestedFields && typeof result === 'object' && result !== null) {
-    filtered = filterFields(result, global._gsdRequestedFields);
+  const requestedFields = getRequestedFields();
+  if (requestedFields && typeof result === 'object' && result !== null) {
+    filtered = filterFields(result, requestedFields);
   }
   const json = JSON.stringify(filtered, null, 2);
   // Large payloads exceed OpenCode's Bash tool buffer (~50KB).
@@ -123,7 +126,7 @@ function outputJSON(result, rawValue) {
 /**
  * Primary output function with dual-mode routing.
  *
- * Modes (set by global._gsdOutputMode):
+ * Modes (set by the shared output context):
  *   'json'      — JSON to stdout (piped, default, backward-compat)
  *   'formatted' — Human-readable via formatter function (TTY)
  *   'pretty'    — Same as formatted, forced via --pretty flag
@@ -194,7 +197,7 @@ function isTruthyDebugValue(value) {
 }
 
 function isVerboseModeEnabled() {
-  return global._gsdCompactMode === false;
+  return getCompactMode() === false;
 }
 
 function isDebugEnabled(options = {}) {
