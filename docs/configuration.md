@@ -78,11 +78,8 @@ Edit `.planning/config.json` directly for scripted changes, then run `/bgsd-sett
     "min_plans_for_parallel": 2
   },
 
-  "worktree": {
-    "enabled": false,
-    "base_path": "/tmp/bgsd-worktrees",
-    "sync_files": [".env", ".env.local", ".planning/config.json"],
-    "setup_hooks": [],
+  "workspace": {
+    "base_path": "/tmp/gsd-workspaces",
     "max_concurrent": 3
   }
 }
@@ -240,15 +237,12 @@ In `yolo` mode, most gates auto-approve. `decision` and `human-action` checkpoin
 | `parallelization.max_concurrent_agents` | `3` | Maximum simultaneous agent spawns |
 | `parallelization.min_plans_for_parallel` | `2` | Minimum plans needed to trigger parallel execution |
 
-### Worktree Isolation
+### Workspace Execution
 
 | Setting | Default | Description |
 |---------|---------|-------------|
-| `worktree.enabled` | `false` | Enable git worktree isolation for parallel execution |
-| `worktree.base_path` | `"/tmp/bgsd-worktrees"` | Directory for worktree creation |
-| `worktree.sync_files` | `[".env", ".env.local", ".planning/config.json"]` | Files copied to each worktree |
-| `worktree.setup_hooks` | `[]` | Commands run after worktree creation (e.g., `["npm install"]`) |
-| `worktree.max_concurrent` | `3` | Maximum simultaneous worktrees |
+| `workspace.base_path` | `"/tmp/gsd-workspaces"` | Directory where JJ-backed execution workspaces are created |
+| `workspace.max_concurrent` | `3` | Maximum simultaneous execution workspaces |
 
 ## User Defaults
 

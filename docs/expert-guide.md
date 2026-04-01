@@ -224,7 +224,7 @@ Discovery uses Context7 MCP for library docs and optionally Brave Search for web
 | Mode | When | How |
 |------|------|-----|
 | **Standard** | Default | Plans execute sequentially within waves, waves execute in order |
-| **Worktree parallel** | `worktree.enabled = true` | Each plan gets an isolated git worktree, merged back after |
+| **Workspace parallel** | `workspace.base_path` configured | Each plan gets an isolated JJ workspace, then execution reconciles the plan results |
 
 **Gaps-only mode:**
 ```
@@ -574,23 +574,20 @@ Configure in `.planning/config.json`:
 | `phase` | New branch per phase, merged at completion |
 | `milestone` | New branch per milestone |
 
-### Worktree Isolation
+### Workspace Execution
 
-For true parallel execution without merge conflicts:
+For workspace-first parallel execution:
 
 ```json
 {
-  "worktree": {
-    "enabled": true,
-    "base_path": "/tmp/bgsd-worktrees",
-    "sync_files": [".env", ".env.local", ".planning/config.json"],
-    "setup_hooks": ["npm install"],
+  "workspace": {
+    "base_path": "/tmp/gsd-workspaces",
     "max_concurrent": 3
   }
 }
 ```
 
-Each plan executes in its own git worktree, merged back to main after completion.
+This is the supported workspace-first model: each plan executes in its own JJ workspace rooted under `workspace.base_path`.
 
 ---
 
@@ -738,11 +735,8 @@ node bin/bgsd-tools.cjs util:mcp profile --restore  # Restore from backup
     "min_plans_for_parallel": 2
   },
 
-  "worktree": {
-    "enabled": false,
-    "base_path": "/tmp/bgsd-worktrees",
-    "sync_files": [".env", ".env.local", ".planning/config.json"],
-    "setup_hooks": [],
+  "workspace": {
+    "base_path": "/tmp/gsd-workspaces",
     "max_concurrent": 3
   }
 }

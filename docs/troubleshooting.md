@@ -91,14 +91,14 @@ bGSD is designed for context resets. All state lives in `.planning/` files, not 
 - If stuck, check `/bgsd-debug` for systematic debugging
 - Disable test gating temporarily: set `test_gate: false` in config
 
-### Worktree conflicts
+### Workspace conflicts
 
 **Cause:** Parallel plans modify the same files.
 
 **Fix:**
 1. The overlap checker warns before execution
 2. Move conflicting plans to sequential waves
-3. Disable worktrees: set `worktree.enabled: false` in config
+3. Reduce or disable workspace concurrency by editing `.planning/config.json` and lowering `workspace.max_concurrent`
 
 ---
 
