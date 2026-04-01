@@ -30,6 +30,17 @@ describe('Phase 159 workflow prep guidance slice C', () => {
     assert.doesNotMatch(newProject, /\/bgsd-progress/, 'new-project should not surface the stale progress alias');
   });
 
+  test('templates/state.md ships canonical todo follow-up guidance', () => {
+    const stateTemplate = read('templates/state.md');
+
+    // Canonical todo add pattern with example argument
+    assert.match(stateTemplate, /\/bgsd-plan todo add/, 'state template should teach /bgsd-plan todo add');
+    // Canonical todo check pattern
+    assert.match(stateTemplate, /\/bgsd-plan todo check/, 'state template should teach /bgsd-plan todo check');
+    // Should not teach stale aliases
+    assert.doesNotMatch(stateTemplate, /\/bgsd-add-todo|\/bgsd-check-todos/, 'state template should not teach stale todo aliases');
+  });
+
   test('validator accepts the touched workflow prep slice', () => {
     const surfaces = [
       {
@@ -41,6 +52,11 @@ describe('Phase 159 workflow prep guidance slice C', () => {
         surface: 'workflow',
         path: 'workflows/new-project.md',
         content: read('workflows/new-project.md'),
+      },
+      {
+        surface: 'template',
+        path: 'templates/state.md',
+        content: read('templates/state.md'),
       },
     ];
 

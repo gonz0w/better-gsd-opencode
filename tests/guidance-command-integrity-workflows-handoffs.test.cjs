@@ -35,18 +35,45 @@ describe('Phase 159 workflow planning-prep guidance', () => {
     assert.match(progress, /`\/bgsd-plan discuss \{Z\+1\}` — gather context and clarify approach/, 'progress should use /bgsd-plan discuss for next-phase follow-up');
     assert.doesNotMatch(progress, /\/bgsd-discuss-phase \{phase\}|\/bgsd-discuss-phase \{Z\+1\}|\/bgsd-list-assumptions \{phase\}/, 'progress should not surface legacy planning-prep aliases');
 
-    assert.match(assumptions, /Usage: \/bgsd-plan assumptions \[phase-number\]/, 'list-phase-assumptions should advertise the canonical assumptions command');
+    assert.match(assumptions, /Usage: \/bgsd-plan assumptions <phase-number>/, 'list-phase-assumptions should advertise the canonical assumptions command');
     assert.match(assumptions, /Example: \/bgsd-plan assumptions 3/, 'list-phase-assumptions should keep the phase number in its canonical example');
     assert.match(assumptions, /Discuss context \(\/bgsd-plan discuss \$\{PHASE\}\)/, 'list-phase-assumptions should offer /bgsd-plan discuss as the next step');
     assert.doesNotMatch(assumptions, /\/bgsd-list-assumptions|\/bgsd-discuss-phase/, 'list-phase-assumptions should not keep legacy planning-prep aliases');
 
-    assert.match(discuss, /reference-style standalone `\/bgsd-plan discuss \[phase\]` behavior/, 'discuss should describe the canonical standalone entrypoint');
+    assert.match(discuss, /reference-style standalone `\/bgsd-plan discuss <phase-number>` behavior/, 'discuss should describe the canonical standalone entrypoint');
     assert.match(discuss, /--next-command "\/bgsd-plan research \$\{PHASE\}"/, 'discuss handoff guidance should point to canonical research routing');
     assert.doesNotMatch(discuss, /\/bgsd-discuss-phase|\/bgsd-research-phase/, 'discuss should not keep legacy discuss or research aliases');
 
     assert.match(research, /Usage: \/bgsd-plan research <phase-number>/, 'research should advertise the canonical research command');
     assert.match(research, /Example: \/bgsd-plan research 92/, 'research should keep the required phase number in its canonical example');
     assert.doesNotMatch(research, /\/bgsd-research-phase/, 'research should not keep the legacy research alias');
+  });
+
+  test('adjacent next-step surfaces keep canonical planning-family and preserve non-planning boundaries', () => {
+    const newMilestone = read('workflows/new-milestone.md');
+    const progress = read('workflows/progress.md');
+
+    // new-milestone should teach canonical planning-family next steps
+    assert.match(newMilestone, /\/bgsd-plan/, 'new-milestone should teach canonical planning-family commands');
+    // new-milestone should NOT mix settings/inspect into planning-family
+    assert.doesNotMatch(newMilestone, /\/bgsd-plan gaps.*\/bgsd-settings/, 'new-milestone should not collapse planning and settings families');
+
+    // progress should teach canonical planning-family next steps
+    assert.match(progress, /\/bgsd-plan/, 'progress should teach canonical planning-family commands');
+    // progress should keep settings and inspect in their own families
+    assert.doesNotMatch(progress, /planning.*settings.*same command/, 'progress should not collapse planning and settings families');
+  });
+
+  test('expert-guide keeps planning-family next steps canonical', () => {
+    const expertGuide = read('docs/expert-guide.md');
+
+    // Expert guide should teach canonical /bgsd-plan routes with proper arguments
+    assert.match(expertGuide, /\/bgsd-plan todo add ".+"/m, 'expert-guide should show todo add with example argument');
+    assert.match(expertGuide, /\/bgsd-plan roadmap add ".+"/m, 'expert-guide should show roadmap add with example argument');
+    assert.match(expertGuide, /\/bgsd-plan roadmap insert \d+ ".+"/m, 'expert-guide should show roadmap insert with position and argument');
+    assert.match(expertGuide, /\/bgsd-plan roadmap remove \d+/m, 'expert-guide should show roadmap remove with phase number');
+    // Expert guide should NOT collapse settings/inspect under /bgsd-plan
+    assert.doesNotMatch(expertGuide, /\/bgsd-plan.*settings.*inspect/m, 'expert-guide should not mix settings/inspect into planning family');
   });
 
   test('workflow and persisted handoff surfaces pass the shared command-integrity validator', () => {
