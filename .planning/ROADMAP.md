@@ -3,7 +3,7 @@
 ## Milestones
 
 - ✅ **v18.0 Adaptive Models & Ambient cmux UX** - Phases 168-172 (shipped 2026-03-31)
-- 🚧 **v18.1 Greenfield Cleanup & CLI Simplification** - Phases 173-176 (active)
+- 🚧 **v18.1 Greenfield Cleanup & CLI Simplification** - Phases 173-178 (active)
 
 ## Overview
 
@@ -15,6 +15,8 @@ v18.1 reduces cleanup drag before adding anything new. The milestone starts with
 - [x] **Phase 174: Greenfield Compatibility Surface Cleanup** (completed 2026-04-01) - Remove migration-only and superseded normalization paths while keeping canonical artifacts valid; verification gaps remain.
 - [x] **Phase 175: Canonical Command Surface Alignment** - Move routing, aliases, help, and discovery toward one clearer command definition and supported guidance surface, including the remaining Phase 174 command-integrity blocker. (completed 2026-04-01)
 - [x] **Phase 176: Command Hotspot Simplification & Hardening** (completed 2026-04-01) - Break up the highest-friction CLI hotspots and prove supported workflows still hold after cleanup.
+- [ ] **Phase 177: Runtime Guidance Integrity Cleanup** - Repair runtime/plugin roadmap follow-up guidance so surfaced canonical commands are runnable and validator-clean.
+- [ ] **Phase 178: Phase 176 Hardening Truth Reconciliation** - Bring the shipped hardening state, regression proof, and verification artifacts back into alignment with current source.
 
 ## Phase Details
 
@@ -59,6 +61,28 @@ v18.1 reduces cleanup drag before adding anything new. The milestone starts with
   3. Users can run supported planning and settings workflows after cleanup with regression proof showing canonical command routes still work.
 **Plans**: 4/4 plans complete
 
+### Phase 177: Runtime Guidance Integrity Cleanup
+**Goal**: Users receive runnable canonical roadmap follow-up commands from runtime and plugin guidance surfaces instead of incomplete suggestions that fail validation
+**Depends on**: Phase 176
+**Requirements**: SAFE-03
+**Gap Closure:** Closes the milestone audit runtime guidance gap where `plugin.js` surfaces incomplete `/bgsd-plan roadmap ...` suggestions.
+**Success Criteria** (what must be TRUE):
+  1. Runtime and plugin follow-up guidance only surfaces canonical roadmap commands with the required operands or clearly marks them as reference syntax.
+  2. Command-integrity validation no longer reports the runtime/plugin roadmap guidance gap.
+  3. Users can follow roadmap next-step guidance from shipped runtime surfaces without hitting invalid-command or missing-argument failures.
+**Plans**: 0/1 plans complete
+
+### Phase 178: Phase 176 Hardening Truth Reconciliation
+**Goal**: Maintainers can trust that the shipped cleanup state, regression proof, and verification artifacts for the Phase 176 hotspot work match the live repo state
+**Depends on**: Phase 177
+**Requirements**: CLI-03, SAFE-01, SAFE-02
+**Gap Closure:** Closes the milestone audit gaps caused by missing `176-VERIFICATION.md`, unresolved ambient-global state, and mismatched Phase 176 summary claims.
+**Success Criteria** (what must be TRUE):
+  1. Touched command-hotspot cleanup claims are made true in current source or corrected so planning artifacts no longer overstate shipped behavior.
+  2. Supported planning and settings workflows have current regression proof aligned to the real cleanup state.
+  3. Phase 176 has a verification artifact that matches current source, tests, and milestone-close evidence.
+**Plans**: 0/0 plans complete
+
 ## Progress
 
 | Phase | Plans Complete | Status | Completed |
@@ -66,7 +90,9 @@ v18.1 reduces cleanup drag before adding anything new. The milestone starts with
 | 173. Simplification Audit & Safe Sequencing | 2/2 | Complete    | 2026-03-31 |
 | 174. Greenfield Compatibility Surface Cleanup | 8/8 | Complete   | 2026-04-01 |
 | 175. Canonical Command Surface Alignment | 4/4 | Complete    | 2026-04-01 |
-| 176. Command Hotspot Simplification & Hardening | 4/4 | Complete   | 2026-04-01 |
+| 176. Command Hotspot Simplification & Hardening | 4/4 | Complete    | 2026-04-01 |
+| 177. Runtime Guidance Integrity Cleanup | 0/0 | Planned | - |
+| 178. Phase 176 Hardening Truth Reconciliation | 0/0 | Planned | - |
 
 ## Backlog
 
