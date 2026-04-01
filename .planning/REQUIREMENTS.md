@@ -56,27 +56,27 @@
 
 | Requirement | Phase | Status | Test Command |
 |-------------|-------|--------|--------------|
-| JJ-01 | Unmapped | Pending | TBD |
-| JJ-02 | Unmapped | Pending | TBD |
-| JJ-03 | Unmapped | Pending | TBD |
-| FIN-01 | Unmapped | Pending | TBD |
-| FIN-02 | Unmapped | Pending | TBD |
-| FIN-03 | Unmapped | Pending | TBD |
-| FIN-04 | Unmapped | Pending | TBD |
-| CMUX-01 | Unmapped | Pending | TBD |
-| CMUX-02 | Unmapped | Pending | TBD |
-| CMUX-03 | Unmapped | Pending | TBD |
-| CMUX-04 | Unmapped | Pending | TBD |
-| TEST-01 | Unmapped | Pending | TBD |
-| TEST-02 | Unmapped | Pending | TBD |
-| TEST-03 | Unmapped | Pending | TBD |
-| TEST-04 | Unmapped | Pending | TBD |
+| JJ-01 | Phase 181 | Pending | TBD |
+| JJ-02 | Phase 183 | Pending | TBD |
+| JJ-03 | Phase 181 | Pending | TBD |
+| FIN-01 | Phase 183 | Pending | TBD |
+| FIN-02 | Phase 184 | Pending | TBD |
+| FIN-03 | Phase 184 | Pending | TBD |
+| FIN-04 | Phase 184 | Pending | TBD |
+| CMUX-01 | Phase 185 | Pending | TBD |
+| CMUX-02 | Phase 186 | Pending | TBD |
+| CMUX-03 | Phase 186 | Pending | TBD |
+| CMUX-04 | Phase 185 | Pending | TBD |
+| TEST-01 | Phase 182 | Pending | TBD |
+| TEST-02 | Phase 182 | Pending | TBD |
+| TEST-03 | Phase 182 | Pending | TBD |
+| TEST-04 | Phase 182 | Pending | TBD |
 
 **Coverage:**
 - v19.0 requirements: 15 total
-- Mapped to phases: 0
-- Unmapped: 15
+- Mapped to phases: 15
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-04-01*
-*Last updated: 2026-04-01 after initial milestone requirement drafting*
+*Last updated: 2026-04-01 after creating the v19.0 active milestone roadmap*

@@ -5,14 +5,14 @@
 See: .planning/PROJECT.md (updated 2026-04-01)
 
 **Core value:** Manage and deliver high-quality software with high-quality documentation, while continuously reducing token usage and improving performance.
-**Current focus:** Defining requirements for v19.0 Workspace Execution, cmux Coordination & Risk-Based Testing
+**Current focus:** Phase 181 - Workspace Root Truth & Safe Fallback
 
 ## Current Position
 
-Phase: Not started
-Plan: Not started
-Status: Defining requirements
-Last activity: 2026-04-01 - Initialized milestone v19.0 planning context, research set, and milestone intent
+Phase: 181 of 186 (Workspace Root Truth & Safe Fallback)
+Plan: 01 of 02 in current phase
+Status: Ready to execute
+Last activity: 2026-04-01 - Created v19.0 active roadmap, initialized execution order, and mapped all milestone requirements to phases
 
 Progress: [░░░░░░░░░░] 0%
 
@@ -37,9 +37,9 @@ Progress: [░░░░░░░░░░] 0%
 
 ### Decisions
 
-- [Carry-forward] JJ-first execution is the supported model; new milestone work should harden real JJ workspace behavior instead of reintroducing Git worktree assumptions.
-- [Carry-forward] Safe `cmux` attachment already requires exact workspace proof and fail-open behavior; v19.0 should improve truthful coordination without weakening that trust boundary.
-- [Carry-forward] Verification should stay risk-based, with broad regression reserved for cross-cutting runtime and shared-state changes.
+- [Carry-forward] JJ-first execution remains the supported model; v19.0 starts by making workspace-root truth runtime-enforced rather than prompt-advisory.
+- [Carry-forward] Shared `.planning/` artifacts stay single-writer and finalize-owned; workspace runs are plan-local until reconcile and finalize complete.
+- [Carry-forward] Risk-based verification routing must shape runtime-hardening proof early, while `cmux` polish follows real execution and recovery state.
 
 ### Pending Todos
 
@@ -47,10 +47,10 @@ None yet.
 
 ### Blockers/Concerns
 
-- User-selected skill install partially blocked: `danverbraganza/jujutsu-skill` does not expose `SKILL.md` in the repository root expected by `skills:install`.
+None yet.
 
 ## Session Continuity
 
 Last session: 2026-04-01 00:00
-Stopped at: Milestone v19.0 initialization in progress; requirements drafted, roadmap not yet created
+Stopped at: v19.0 roadmap created; Phase 181 is ready for plan creation and execution setup
 Resume file: None
