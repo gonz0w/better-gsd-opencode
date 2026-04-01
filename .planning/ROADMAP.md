@@ -13,7 +13,7 @@ v18.1 reduces cleanup drag before adding anything new. The milestone starts with
 
 - [x] **Phase 173: Simplification Audit & Safe Sequencing** (completed 2026-03-31) - Classify cleanup targets and safe order of operations before deleting or flattening anything.
 - [x] **Phase 174: Greenfield Compatibility Surface Cleanup** (completed 2026-04-01) - Remove migration-only and superseded normalization paths while keeping canonical artifacts valid; verification gaps remain.
-- [ ] **Phase 175: Canonical Command Surface Alignment** - Move routing, aliases, help, and discovery toward one clearer command definition and supported guidance surface, including the remaining Phase 174 command-integrity blocker.
+- [x] **Phase 175: Canonical Command Surface Alignment** - Move routing, aliases, help, and discovery toward one clearer command definition and supported guidance surface, including the remaining Phase 174 command-integrity blocker. (completed 2026-04-01)
 - [ ] **Phase 176: Command Hotspot Simplification & Hardening** - Break up the highest-friction CLI hotspots and prove supported workflows still hold after cleanup.
 
 ## Phase Details
@@ -47,7 +47,7 @@ v18.1 reduces cleanup drag before adding anything new. The milestone starts with
   1. Maintainers can update a supported command route, alias, or help/discovery entry from one canonical definition instead of editing parallel registries by hand.
   2. Maintainers can change touched router parsing behavior without wading through repeated hand-written flag scans and unrelated startup logic in the same edit path.
   3. Users see help and workflow guidance that teach the real supported command surface first, with stale aliases or contradictory guidance removed.
-**Plans**: 2/4 plans executed
+**Plans**: 4/4 plans complete
 
 ### Phase 176: Command Hotspot Simplification & Hardening
 **Goal**: Maintainers can work in smaller CLI subdomains with less hidden state while supported planning and settings workflows keep behaving the same after cleanup
@@ -65,7 +65,7 @@ v18.1 reduces cleanup drag before adding anything new. The milestone starts with
 |-------|----------------|--------|-----------|
 | 173. Simplification Audit & Safe Sequencing | 2/2 | Complete    | 2026-03-31 |
 | 174. Greenfield Compatibility Surface Cleanup | 8/8 | Complete   | 2026-04-01 |
-| 175. Canonical Command Surface Alignment | 3/4 | In Progress|  |
+| 175. Canonical Command Surface Alignment | 3/4 | Complete    | 2026-04-01 |
 | 176. Command Hotspot Simplification & Hardening | 0/TBD | Not started | - |
 
 ## Backlog
