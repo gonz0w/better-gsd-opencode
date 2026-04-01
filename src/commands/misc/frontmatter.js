@@ -116,6 +116,7 @@ function cmdValidateCommands(cwd, options = {}, raw) {
     groupedIssueCount: result.groupedIssueCount,
     issueCount: result.issueCount,
     message: result.message,
+    proofInventory: result.proofInventory,
     groupedIssues: result.groupedIssues,
     issues: result.issues,
   };

@@ -738,6 +738,131 @@ const VALIDATION_SURFACE_SPECS = [
   { root: 'plugin.js', extensions: ['.js'], surface: 'runtime' },
 ];
 
+const ROUTER_IMPLEMENTATIONS = {
+  init: ['execute-phase', 'plan-phase', 'new-project', 'new-milestone', 'quick', 'resume', 'verify-work', 'phase-op', 'todos', 'milestone-op', 'map-codebase', 'progress', 'memory'],
+  plan: {
+    intent: {
+      create: null,
+      show: null,
+      read: null,
+      update: null,
+      validate: null,
+      trace: null,
+      drift: null,
+    },
+    requirements: ['mark-complete'],
+    roadmap: ['get-phase', 'analyze', 'update-plan-progress'],
+    phases: ['list'],
+    'find-phase': null,
+    milestone: ['complete', 'summary', 'info'],
+    phase: ['next-decimal', 'add', 'insert', 'remove', 'complete'],
+    generate: null,
+  },
+  phase: ['snapshot'],
+  workspace: ['add', 'list', 'forget', 'cleanup', 'reconcile'],
+  execute: {
+    commit: null,
+    'rollback-info': null,
+    'session-diff': null,
+    'session-summary': null,
+    velocity: null,
+    tdd: null,
+    'test-run': null,
+    trajectory: ['checkpoint', 'list', 'pivot', 'compare', 'choose', 'dead-ends'],
+  },
+  verify: {
+    regression: null,
+    quality: null,
+    review: null,
+    state: ['update', 'get', 'patch', 'advance-plan', 'record-metric', 'update-progress', 'add-decision', 'add-blocker', 'resolve-blocker', 'record-session', 'complete-plan', 'handoff', 'validate'],
+    verify: ['plan-structure', 'phase-completeness', 'references', 'commits', 'artifacts', 'key-links', 'analyze-plan', 'deliverables', 'requirements', 'regression', 'plan-wave', 'plan-deps', 'quality'],
+    assertions: ['list', 'validate'],
+    'search-decisions': null,
+    'search-lessons': null,
+    'context-budget': ['baseline', 'compare', 'measure'],
+    'token-budget': null,
+    summary: null,
+    validate: ['consistency', 'health', 'roadmap'],
+    'validate-dependencies': null,
+    'validate-config': null,
+    'test-coverage': null,
+    handoff: null,
+    agents: null,
+    generate: null,
+  },
+  review: ['scan', 'readiness'],
+  security: ['scan'],
+  release: null,
+  util: {
+    'config-get': null,
+    'config-set': null,
+    settings: null,
+    env: ['scan', 'status'],
+    'current-timestamp': null,
+    'list-todos': null,
+    todo: ['complete'],
+    memory: ['write', 'read', 'list', 'ensure-dir', 'compact'],
+    mcp: ['profile'],
+    classify: ['plan', 'phase'],
+    frontmatter: ['get', 'set', 'merge', 'validate'],
+    progress: null,
+    websearch: null,
+    'history-digest': null,
+    'trace-requirement': null,
+    codebase: ['analyze', 'status', 'conventions', 'rules', 'deps', 'impact', 'context', 'lifecycle', 'ast', 'exports', 'complexity', 'repo-map'],
+    cache: ['research-stats', 'research-clear', 'status', 'clear', 'warm'],
+    agent: ['audit', 'list', 'validate-contracts'],
+    'resolve-model': null,
+    template: ['select', 'fill'],
+    'generate-slug': null,
+    'verify-path-exists': null,
+    'config-ensure-section': null,
+    scaffold: null,
+    'phase-plan-index': null,
+    'state-snapshot': null,
+    'summary-extract': null,
+    'summary-generate': null,
+    'quick-summary': null,
+    'extract-sections': null,
+    git: ['log', 'diff-summary', 'blame', 'branch-info', 'rewind', 'trajectory-branch'],
+    tools: null,
+    runtime: null,
+    measure: null,
+    recovery: null,
+    history: null,
+    examples: null,
+    'validate-commands': null,
+    'validate-artifacts': null,
+  },
+  memory: ['list', 'add', 'remove', 'prune'],
+  research: ['capabilities', 'yt-search', 'yt-transcript', 'collect', 'nlm-create', 'nlm-add-source', 'nlm-ask', 'nlm-report', 'score', 'gaps'],
+  cache: ['research-stats', 'research-clear', 'status', 'clear', 'warm'],
+  audit: ['scan'],
+  decisions: ['list', 'inspect', 'evaluate', 'savings'],
+  detect: ['tools', 'gh-preflight'],
+  lessons: ['capture', 'list', 'migrate', 'analyze', 'suggest', 'compact', 'deviation-capture'],
+  skills: ['list', 'install', 'validate', 'remove'],
+  workflow: ['baseline', 'compare', 'verify-structure', 'savings'],
+  questions: null,
+};
+
+const KNOWN_FORMAT_DIFFERENCES = [
+  'execute:trajectory choose', 'execute:trajectory compare',
+  'execute:trajectory dead-ends', 'execute:trajectory pivot',
+  'plan:intent show', 'util:classify phase', 'util:classify plan',
+  'util:codebase ast', 'util:codebase complexity', 'util:codebase context',
+  'util:codebase exports', 'util:codebase repo-map', 'research:collect --resume',
+  'verify:validate consistency', 'verify:validate health',
+];
+
+const NAMED_EXCLUSION_CLASSES = [
+  'reference-style-mention',
+  'reference-output-fence',
+  'workflow-bootstrap-reconstruction',
+  'transition-output-heading',
+  'workflow-self-reference',
+];
+
 function normalizeSlashCommandExample(example) {
   if (!example) return '';
   const cleaned = example
@@ -859,12 +984,50 @@ function getSlashCommandInventory(cwd = process.cwd()) {
 }
 
 function getCliCommandInventory() {
+  const routedCommands = getRouterCommandInventory();
   try {
     const { COMMAND_HELP } = require('./constants');
-    return Object.keys(COMMAND_HELP).sort();
+    return Array.from(new Set([...Object.keys(COMMAND_HELP), ...routedCommands])).sort();
   } catch {
-    return getAllCommands();
+    return Array.from(new Set([...getAllCommands(), ...routedCommands])).sort();
   }
+}
+
+function collectRouterCommands(namespace, value, prefix = '') {
+  const base = prefix ? `${prefix} ${namespace}` : namespace;
+  if (value === null) return [base];
+  if (Array.isArray(value)) {
+    return value.flatMap((entry) => {
+      if (entry === '') return [base];
+      return [base, `${base} ${entry}`];
+    });
+  }
+
+  if (typeof value === 'object') {
+    const direct = [base];
+    for (const [subKey, subValue] of Object.entries(value)) {
+      direct.push(...collectRouterCommands(subKey, subValue, base));
+    }
+    return direct;
+  }
+
+  return [base];
+}
+
+function getRouterCommandInventory() {
+  const routed = [];
+  for (const [namespace, value] of Object.entries(ROUTER_IMPLEMENTATIONS)) {
+    routed.push(...collectRouterCommands(namespace, value));
+  }
+  const colonized = routed
+    .filter((command) => command.includes(' '))
+    .map((command) => {
+      const tokens = command.split(/\s+/).filter(Boolean);
+      if (tokens.length < 2) return command;
+      return `${tokens[0]}:${tokens[1]}${tokens.length > 2 ? ` ${tokens.slice(2).join(' ')}` : ''}`;
+    });
+
+  return Array.from(new Set([...routed, ...colonized, ...KNOWN_FORMAT_DIFFERENCES])).sort();
 }
 
 function collectValidationSurfaces(cwd = process.cwd()) {
@@ -909,6 +1072,20 @@ function getCommandTextForValidation(mention) {
   if (!backtickMatch) return command;
 
   return cleanCommandCapture(`${command}${backtickMatch[1] || ''}`);
+}
+
+function getSlashCommandTextForValidation(mention) {
+  const command = mention.text || '';
+  const lineText = mention.lineText || '';
+  if (/^\/bgsd-[a-z0-9-]+/i.test(command)) return command;
+  if (!lineText) return command;
+
+  const inlineSegments = Array.from(lineText.matchAll(/`([^`]*)`/g), (match) => match[1]);
+  const inlineSlash = inlineSegments.find((candidate) => /\/bgsd-[a-z0-9-]+/i.test(candidate));
+  if (inlineSlash) return cleanCommandCapture(inlineSlash);
+
+  const directMatch = lineText.match(/\/bgsd-[a-z0-9-]+(?:\s+(?:"[^"]+"|'[^']+'|\[[^\]]+\]|\{[^}]+\}|<[^>]+>|[^\s`"'<>()[\]{}]+))*/i);
+  return directMatch ? cleanCommandCapture(directMatch[0]) : command;
 }
 
 function countSlashCommandsInLine(lineText = '') {
@@ -1069,6 +1246,11 @@ function isReferenceOutputFence(mention) {
   return /(usage|example|examples|display format|format and display results|present|completion summary|footer|errors|warnings|info|would you like|if no .*provided|if repairs were performed|if errors exist|if warnings exist|if info exists)/i.test(context);
 }
 
+function isTransitionOutputHeading(mention) {
+  const lineText = mention.lineText || '';
+  return /^\s*##\s*(?:▶\s*)?Next Up:/i.test(lineText);
+}
+
 function isReferenceStyleMention(mention) {
   const lineText = mention.lineText || '';
   const commandText = getCommandTextForValidation(mention);
@@ -1179,14 +1361,14 @@ function buildSlashSuggestion(baseCommand, args, aliasToCanonical) {
 
 function validateSlashMention(mention, surfacePath, surfaceType, slashInventory, planningSurface = getPlanningCommandSurface()) {
   const issues = [];
-  const commandText = getCommandTextForValidation(mention);
+  const commandText = getSlashCommandTextForValidation(mention);
   const tokens = commandText.split(/\s+/).filter(Boolean);
   const baseCommand = tokens[0];
   const args = tokens.slice(1);
   const slashSet = new Set(slashInventory.slashCommands);
   const planningAliasSuggestions = getLegacyPlanningAliasSuggestions(planningSurface);
   const legacyCanonical = slashInventory.aliasToCanonical[baseCommand] || planningAliasSuggestions[baseCommand] || null;
-  const referenceStyle = isReferenceStyleMention(mention) || isWorkflowSelfReference(surfacePath, mention) || isWorkflowFallbackReconstructionContext(surfacePath, mention);
+  const referenceStyle = isReferenceStyleMention(mention) || isWorkflowSelfReference(surfacePath, mention) || isWorkflowFallbackReconstructionContext(surfacePath, mention) || isTransitionOutputHeading(mention);
 
   if (referenceStyle) {
     return issues;
@@ -1258,11 +1440,22 @@ function validateSlashMention(mention, surfacePath, surfaceType, slashInventory,
   return issues;
 }
 
+function stripShellRedirectArtifacts(args, lineText = '') {
+  const cleaned = [];
+  for (let index = 0; index < args.length; index += 1) {
+    const token = args[index];
+    if (/^(?:\d*>>?|<<?|\|\|?|&&)$/.test(token)) break;
+    if (/^\d+$/.test(token) && lineText.includes(`${token}>`)) break;
+    cleaned.push(token);
+  }
+  return cleaned;
+}
+
 function validateCliMention(mention, surfacePath, surfaceType, cliInventory) {
   const issues = [];
   const tokens = mention.text.split(/\s+/).filter(Boolean);
   const binary = tokens.shift();
-  const args = tokens;
+  const args = stripShellRedirectArtifacts(tokens, mention.lineText || '');
   const referenceStyle = isReferenceStyleMention(mention) || isWorkflowFallbackReconstructionContext(surfacePath, mention);
 
   if (referenceStyle) {
@@ -1372,6 +1565,13 @@ function validateCommandIntegrity(options = {}) {
       slashCommands: slashInventory.slashCommands,
       canonicalSlashCommands: slashInventory.canonicalCommands,
       cliCommands: cliInventory,
+    },
+    proofInventory: {
+      surfacesChecked: surfaces.map((surface) => surface.path),
+      surfaceTypes: Array.from(new Set(surfaces.map((surface) => surface.surface || 'surface'))).sort(),
+      slashContractSource: 'commands/bgsd-plan.md',
+      cliContractSources: ['src/router.js', 'src/lib/constants.js'],
+      namedExclusions: NAMED_EXCLUSION_CLASSES,
     },
     issues,
     groupedIssues,
