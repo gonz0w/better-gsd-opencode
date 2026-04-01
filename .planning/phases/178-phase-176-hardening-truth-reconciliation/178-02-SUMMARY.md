@@ -67,7 +67,7 @@ Each task was committed atomically:
 1. **Task 1: Write the authoritative 176 verification report from live source and focused proof** - `mwwtlqql` (`3df2289a`) (docs)
 2. **Task 2: Correct the overstated Phase 176 summaries and milestone-close evidence** - `sxrmqtlx` (`61a00885`) (docs)
 
-**Plan metadata:** `PENDING`
+**Plan metadata:** `cb58a142` (docs)
 
 ## Files Created/Modified
 - `.planning/phases/176-command-hotspot-simplification-hardening/176-VERIFICATION.md` - Claim-by-claim Phase 176 verification boundary with focused proof rerun and requirement dispositions.
@@ -104,7 +104,11 @@ None - no external service configuration required.
 
 ## Self-Check
 
-PENDING
+PASSED
+
+- Found `.planning/phases/176-command-hotspot-simplification-hardening/176-VERIFICATION.md`
+- Found `.planning/phases/178-phase-176-hardening-truth-reconciliation/178-02-SUMMARY.md`
+- Found task commits `mwwtlqql` and `sxrmqtlx` in `jj log`
 
 ---
 *Phase: 178-phase-176-hardening-truth-reconciliation*
