@@ -376,7 +376,7 @@ function getAllCommands() {
       'plan:intent', 'plan:requirements', 'plan:roadmap', 'plan:phases', 'plan:find-phase',
       'plan:milestone', 'plan:phase',
       'execute:commit', 'execute:rollback-info', 'execute:session-diff', 'execute:session-summary',
-      'execute:velocity', 'execute:tdd', 'execute:test-run', 'execute:trajectory', 'workspace', 'workspace add', 'workspace list', 'workspace forget', 'workspace cleanup', 'workspace reconcile',
+      'execute:velocity', 'execute:tdd', 'execute:test-run', 'execute:trajectory', 'workspace', 'workspace add', 'workspace list', 'workspace forget', 'workspace cleanup', 'workspace prove', 'workspace reconcile',
       'verify:state', 'verify:verify', 'verify:assertions', 'verify:search-decisions', 'verify:search-lessons',
       'verify:review', 'verify:context-budget', 'verify:token-budget',
       'util:config-get', 'util:config-set', 'util:env', 'util:current-timestamp', 'util:list-todos',

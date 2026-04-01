@@ -292,7 +292,7 @@ async function main() {
   }
 
   if (!command) {
-    error('Usage: bgsd-tools <namespace:command> [args] [--pretty] [--verbose]\nCommands: init:<workflow>, plan:<intent|requirements|roadmap|phases|find-phase|milestone|phase>, execute:<commit|rollback-info|session-diff|session-summary|velocity|tdd|test-run>, workspace <add|list|forget|cleanup|reconcile>, verify:<state|verify|assertions|search-decisions|search-lessons|review|context-budget|token-budget>, review:<scan|readiness>, security:<scan>, release:<bump|changelog|tag|pr>, util:<config-get|config-set|env|current-timestamp|list-todos|todo|memory|mcp|classify|frontmatter|progress|websearch|history-digest|trace-requirement|codebase|cache|agent>, memory:<list|add|remove|prune>, research:<capabilities|yt-search|yt-transcript|collect|nlm-create|nlm-add-source|nlm-ask|nlm-report|score|gaps>, workflow:<baseline|compare|verify-structure|savings>');
+    error('Usage: bgsd-tools <namespace:command> [args] [--pretty] [--verbose]\nCommands: init:<workflow>, plan:<intent|requirements|roadmap|phases|find-phase|milestone|phase>, execute:<commit|rollback-info|session-diff|session-summary|velocity|tdd|test-run>, workspace <add|list|forget|cleanup|prove|reconcile>, verify:<state|verify|assertions|search-decisions|search-lessons|review|context-budget|token-budget>, review:<scan|readiness>, security:<scan>, release:<bump|changelog|tag|pr>, util:<config-get|config-set|env|current-timestamp|list-todos|todo|memory|mcp|classify|frontmatter|progress|websearch|history-digest|trace-requirement|codebase|cache|agent>, memory:<list|add|remove|prune>, research:<capabilities|yt-search|yt-transcript|collect|nlm-create|nlm-add-source|nlm-ask|nlm-report|score|gaps>, workflow:<baseline|compare|verify-structure|savings>');
   }
 
   // --help / -h: print command help to stderr (never contaminates JSON stdout)
@@ -553,10 +553,12 @@ Use without --exact for fuzzy matching.`);
           lazyWorkspace().cmdWorkspaceForget(cwd, restArgs[0], raw);
         } else if (subcommand === 'cleanup') {
           lazyWorkspace().cmdWorkspaceCleanup(cwd, raw);
+        } else if (subcommand === 'prove') {
+          lazyWorkspace().cmdWorkspaceProve(cwd, restArgs[0], raw);
         } else if (subcommand === 'reconcile') {
           lazyWorkspace().cmdWorkspaceReconcile(cwd, restArgs[0], raw);
         } else {
-          error('Unknown workspace subcommand. Available: add, list, forget, cleanup, reconcile');
+          error('Unknown workspace subcommand. Available: add, list, forget, cleanup, prove, reconcile');
         }
         break;
       }

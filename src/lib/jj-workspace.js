@@ -1,9 +1,61 @@
 'use strict';
 
 const fs = require('fs');
+const path = require('path');
 const { execJj } = require('./jj');
 
 const OP_LOG_LIMIT = 5;
+const WORKSPACE_FALLBACK_REASON = 'workspace proof missing or mismatched before work start';
+
+function comparablePath(targetPath) {
+  if (!targetPath) return null;
+  try {
+    return fs.realpathSync.native(targetPath);
+  } catch {
+    return path.resolve(targetPath);
+  }
+}
+
+function collectWorkspaceProof(repoCwd, workspaceName, observedCwd = repoCwd) {
+  const normalizedObservedCwd = comparablePath(observedCwd);
+  const intendedRootResult = workspaceName
+    ? execJj(repoCwd, ['workspace', 'root', '--name', workspaceName])
+    : { exitCode: 1, stdout: '', stderr: 'Workspace name is required.', error: null };
+  const observedJjRootResult = execJj(observedCwd, ['workspace', 'root']);
+
+  const intendedRoot = intendedRootResult.exitCode === 0
+    ? comparablePath(intendedRootResult.stdout.trim())
+    : null;
+  const observedJjRoot = observedJjRootResult.exitCode === 0
+    ? comparablePath(observedJjRootResult.stdout.trim())
+    : null;
+  const parallelAllowed = Boolean(
+    intendedRoot
+    && normalizedObservedCwd
+    && observedJjRoot
+    && intendedRoot === normalizedObservedCwd
+    && normalizedObservedCwd === observedJjRoot
+  );
+
+  return {
+    workspace_name: workspaceName || null,
+    intended_root: intendedRoot,
+    observed_cwd: normalizedObservedCwd,
+    observed_jj_root: observedJjRoot,
+    parallel_allowed: parallelAllowed,
+    fallback_reason: parallelAllowed ? null : WORKSPACE_FALLBACK_REASON,
+    evidence: {
+      intended_root_lookup: {
+        command: workspaceName ? `jj workspace root --name ${workspaceName}` : null,
+        exit_code: intendedRootResult.exitCode,
+      },
+      observed_jj_root_lookup: {
+        command: 'jj workspace root',
+        exit_code: observedJjRootResult.exitCode,
+      },
+    },
+  };
+}
 
 function summarizeLines(text, limit = 4) {
   return String(text || '')
@@ -176,5 +228,8 @@ function inspectWorkspace(workspace) {
 }
 
 module.exports = {
+  collectWorkspaceProof,
+  comparablePath,
   inspectWorkspace,
+  WORKSPACE_FALLBACK_REASON,
 };

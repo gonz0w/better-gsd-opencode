@@ -21,7 +21,7 @@ const ROUTER_CONTRACT = {
     generate: null,
   },
   phase: ['snapshot'],
-  workspace: ['add', 'list', 'forget', 'cleanup', 'reconcile'],
+  workspace: ['add', 'list', 'forget', 'cleanup', 'prove', 'reconcile'],
   execute: {
     commit: null,
     'rollback-info': null,

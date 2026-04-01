@@ -2206,6 +2206,7 @@ Subcommands:
   list                         List managed JJ workspaces for this project
   forget <plan-id|name>        Stop tracking a managed workspace
   cleanup                      Forget managed workspaces and delete their directories
+  prove <plan-id|name>         Prove the executor is pinned to the intended workspace root
   reconcile <plan-id|name>     Inspect recovery state and preview reconcile actions`,
       "workspace list": `Usage: bgsd-tools workspace list
 
@@ -2219,6 +2220,9 @@ Forget a managed JJ workspace without deleting its directory.`,
       "workspace cleanup": `Usage: bgsd-tools workspace cleanup
 
 Forget every managed JJ workspace for this project and remove only directories that are no longer needed after recovery work.`,
+      "workspace prove": `Usage: bgsd-tools workspace prove <plan-id|workspace-name>
+
+Collect the intended workspace root, observed cwd, and observed \`jj workspace root\` evidence and only unlock parallel mode when all three canonical paths match.`,
       "workspace reconcile": `Usage: bgsd-tools workspace reconcile <plan-id|workspace-name>
 
 Inspect a managed JJ workspace, report JJ-backed recovery context, and preview reconcile actions before follow-up mutation.`,

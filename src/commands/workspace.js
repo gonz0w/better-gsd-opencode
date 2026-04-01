@@ -6,7 +6,7 @@ const { execFileSync } = require('child_process');
 const { output, error, debugLog } = require('../lib/output');
 const { extractFrontmatter } = require('../lib/frontmatter');
 const { requireJjForExecution } = require('../lib/jj');
-const { inspectWorkspace } = require('../lib/jj-workspace');
+const { collectWorkspaceProof, comparablePath, inspectWorkspace } = require('../lib/jj-workspace');
 
 const WORKSPACE_DEFAULTS = {
   base_path: '/tmp/gsd-workspaces',
@@ -44,15 +44,6 @@ function toWorkspaceName(planId) {
 function getWorkspacePath(cwd, workspaceName) {
   const config = readWorkspaceConfig(cwd);
   return path.join(config.base_path, getProjectName(cwd), workspaceName);
-}
-
-function comparablePath(targetPath) {
-  if (!targetPath) return null;
-  try {
-    return fs.realpathSync.native(targetPath);
-  } catch {
-    return path.resolve(targetPath);
-  }
 }
 
 function execJj(cwd, args) {
@@ -327,6 +318,17 @@ function cmdWorkspaceReconcile(cwd, target, raw) {
   }, raw);
 }
 
+function cmdWorkspaceProve(cwd, target, raw) {
+  requireJjForExecution(cwd, 'workspace prove');
+  if (!target) {
+    error('Usage: bgsd-tools workspace prove <plan-id|workspace-name>');
+  }
+
+  const workspaceName = toWorkspaceName(target) || target;
+  const proof = collectWorkspaceProof(cwd, workspaceName, cwd);
+  output(proof, raw);
+}
+
 function getPhaseFilesModified(cwd, phaseNumber) {
   const phasesDir = path.join(cwd, '.planning', 'phases');
   const normalizedPhase = String(phaseNumber).replace(/^0+/, '') || '0';
@@ -373,6 +375,7 @@ module.exports = {
   cmdWorkspaceList,
   cmdWorkspaceForget,
   cmdWorkspaceCleanup,
+  cmdWorkspaceProve,
   cmdWorkspaceReconcile,
   getPhaseFilesModified,
   listManagedWorkspaces,
