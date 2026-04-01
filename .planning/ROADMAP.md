@@ -81,7 +81,7 @@ v18.1 reduces cleanup drag before adding anything new. The milestone starts with
   1. Touched command-hotspot cleanup claims are made true in current source or corrected so planning artifacts no longer overstate shipped behavior.
   2. Supported planning and settings workflows have current regression proof aligned to the real cleanup state.
   3. Phase 176 has a verification artifact that matches current source, tests, and milestone-close evidence.
-**Plans**: 0/2 plans complete
+**Plans**: 1/2 plans executed
 
 ## Progress
 
@@ -92,7 +92,7 @@ v18.1 reduces cleanup drag before adding anything new. The milestone starts with
 | 175. Canonical Command Surface Alignment | 4/4 | Complete    | 2026-04-01 |
 | 176. Command Hotspot Simplification & Hardening | 4/4 | Complete    | 2026-04-01 |
 | 177. Runtime Guidance Integrity Cleanup | 1/1 | Complete    | 2026-04-01 |
-| 178. Phase 176 Hardening Truth Reconciliation | 0/0 | Planned | - |
+| 178. Phase 176 Hardening Truth Reconciliation | 1/2 | In Progress|  |
 
 ## Backlog
 

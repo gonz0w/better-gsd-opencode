@@ -25,12 +25,12 @@ Make bGSD easier to maintain and safer for agents to modify by removing compatib
 
 - [x] **CLI-01** Maintainer can change command dispatch, help, aliases, and discovery from a clearer canonical definition instead of parallel registries that drift.
 - [x] **CLI-02** Maintainer can change router parsing behavior without editing a god-object full of repeated hand-written flag scans and unrelated startup logic.
-- [ ] **CLI-03** Maintainer can work within smaller command subdomains instead of multi-thousand-line bucket modules and ambient output globals.
+- [x] **CLI-03** Maintainer can work within smaller command subdomains instead of multi-thousand-line bucket modules and ambient output globals.
 
 ### SAFE - Behavior Preservation & Hardening
 
-- [ ] **SAFE-01** Users can run supported planning and settings workflows after cleanup with regression coverage proving canonical command routes still work.
-- [ ] **SAFE-02** Maintainers can eliminate silent error swallowing, unnecessary async or control-flow indirection, and unguarded shared mutable state on touched cleanup paths before milestone close.
+- [x] **SAFE-01** Users can run supported planning and settings workflows after cleanup with regression coverage proving canonical command routes still work.
+- [x] **SAFE-02** Maintainers can eliminate silent error swallowing, unnecessary async or control-flow indirection, and unguarded shared mutable state on touched cleanup paths before milestone close.
 - [x] **SAFE-03** Users see help and workflow guidance that match the real supported command surface after cleanup, with stale aliases or contradictory guidance removed.
 
 ## Future Requirements

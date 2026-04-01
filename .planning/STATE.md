@@ -5,24 +5,24 @@
 See: .planning/PROJECT.md (updated 2026-03-31)
 
 **Core value:** Manage and deliver high-quality software with high-quality documentation, while continuously reducing token usage and improving performance.
-**Current focus:** Phase 178 — phase-176-hardening-truth-reconciliation not started
+**Current focus:** Phase 178 — plan 02 verification and artifact reconciliation pending
 
 ## Current Position
 
 **Phase:** 178
-**Current Plan:** Not started
-**Total Plans in Phase:** 0
-**Status:** Ready to plan
+**Current Plan:** 02
+**Total Plans in Phase:** 2
+**Status:** In progress
 **Last Activity:** 2026-04-01
 
-**Progress:** [████████░░] 83%
+**Progress:** [██████████] 99%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 358 (through Phase 177 P01)
+- Total plans completed: 359 (through Phase 178 P01)
 - Average duration: ~12 min/plan
-- Total execution time: ~55.0 hours
+- Total execution time: ~55.1 hours
 
 **By Phase:**
 
@@ -51,12 +51,12 @@ See: .planning/PROJECT.md (updated 2026-03-31)
 | Phase 176-command-hotspot-simplification-hardening P03 | 12 min | 2 tasks | 5 files |
 | Phase 176 P04 | 14 min | 2 tasks | 0 files |
 | Phase 177 P01 | 8 min | 2 tasks | 6 files |
+| Phase 178-phase-176-hardening-truth-reconciliation P01 | 4 min | 2 tasks | 10 files |
 
 ## Accumulated Context
 
 ### Decisions
 
-- [Phase 173]: Defined gate-based cleanup sequencing and staged router/ambient-global hot spots last — Phase 173 now needs explicit safety boundaries so later cleanup plans can start with proven low-blast-radius work and defer router, argv, and oversized command hotspots until earlier reductions land.
 - [Phase 174]: Removed util:config-migrate from the supported CLI surface and docs — Phase 174 requires migration-only config helpers to disappear so maintainers follow canonical validate/edit workflows.
 - [Phase 174]: Removed legacy JSON memory auto-import from active init and util:memory flows — Phase 174 needs canonical greenfield-only memory behavior, so active SQLite-backed paths now ignore retired JSON migration bridges while map fallback stays explicit runtime resilience.
 - [Phase 174]: Canonical roadmap and plan readers now stay strict and stop rewriting legacy TDD metadata on read — Phase 174 intent requires canonical-only active paths with CLI and plugin reader parity rather than hidden normalization
@@ -556,6 +556,7 @@ See: .planning/PROJECT.md (updated 2026-03-31)
 - [Phase 175-canonical-command-surface-alignment]: Adjacent surfaces already aligned to canonical planning-family routes — Tests confirm templates/state.md, workflows/new-milestone.md, workflows/progress.md, and docs/expert-guide.md teach canonical /bgsd-plan routes
 - [Phase 176]: Extracted verify.js (3383 LOC) into verify/ subdomain with barrel re-export — Phase 176 CLI-03 requires maintainers to work within smaller command subdomains; backward compatibility preserved via barrel at original path
 - [Phase 176]: Full test suite (>5min) too large for executor timeout - smoke tests + validate-commands provide sufficient canonical route verification after cleanup
+- [Phase 178-phase-176-hardening-truth-reconciliation]: Added focused Phase 176 truth-reconciliation proof and a shared output-context shim for the touched router/output/debug surfaces.
 
 ### Pending Todos
 
@@ -567,6 +568,6 @@ None
 
 ## Session Continuity
 
-Last session: 2026-04-01T13:47:28.223Z
-Stopped at: Phase 178 context gathered
-Resume file: .planning/phases/178-phase-176-hardening-truth-reconciliation/178-CONTEXT.md
+Last session: 2026-04-01T14:37:23.987Z
+Stopped at: Completed 178-01-PLAN.md
+Resume file: None
