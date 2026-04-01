@@ -28,6 +28,21 @@ function readRepoFile(relativePath) {
   return fs.readFileSync(path.join(ROOT, relativePath), 'utf8');
 }
 
+function extractPlanningRouteMatrix() {
+  const content = readRepoFile('commands/bgsd-plan.md');
+  const matches = Array.from(
+    content.matchAll(/- `([^`]+)` → route to `([^`]+)`/g),
+    match => ({ route: match[1], workflow: match[2] })
+  );
+
+  const routes = {};
+  for (const match of matches) {
+    routes[match.route] = match.workflow;
+  }
+
+  return routes;
+}
+
 afterEach(() => {
   while (tempDirs.length > 0) {
     fs.rmSync(tempDirs.pop(), { recursive: true, force: true });
@@ -35,6 +50,33 @@ afterEach(() => {
 });
 
 describe('validateCommandIntegrity', () => {
+  test('reads the canonical planning-family route matrix from commands/bgsd-plan.md', () => {
+    const routeMatrix = extractPlanningRouteMatrix();
+
+    assert.deepEqual(Object.keys(routeMatrix), [
+      'phase <phase-number> [flags]',
+      'discuss <phase-number> [flags]',
+      'research <phase-number> [flags]',
+      'assumptions <phase-number> [flags]',
+      'roadmap add <description>',
+      'roadmap insert <after> <description>',
+      'roadmap remove <phase-number>',
+      'gaps [milestone-or-context] [flags]',
+      'todo add <description>',
+      'todo check [area]',
+    ]);
+    assert.equal(routeMatrix['phase <phase-number> [flags]'], '__OPENCODE_CONFIG__/bgsd-oc/workflows/plan-phase.md');
+    assert.equal(routeMatrix['discuss <phase-number> [flags]'], '__OPENCODE_CONFIG__/bgsd-oc/workflows/discuss-phase.md');
+    assert.equal(routeMatrix['research <phase-number> [flags]'], '__OPENCODE_CONFIG__/bgsd-oc/workflows/research-phase.md');
+    assert.equal(routeMatrix['assumptions <phase-number> [flags]'], '__OPENCODE_CONFIG__/bgsd-oc/workflows/list-phase-assumptions.md');
+    assert.equal(routeMatrix['roadmap add <description>'], '__OPENCODE_CONFIG__/bgsd-oc/workflows/add-phase.md');
+    assert.equal(routeMatrix['roadmap insert <after> <description>'], '__OPENCODE_CONFIG__/bgsd-oc/workflows/insert-phase.md');
+    assert.equal(routeMatrix['roadmap remove <phase-number>'], '__OPENCODE_CONFIG__/bgsd-oc/workflows/remove-phase.md');
+    assert.equal(routeMatrix['gaps [milestone-or-context] [flags]'], '__OPENCODE_CONFIG__/bgsd-oc/workflows/plan-milestone-gaps.md');
+    assert.equal(routeMatrix['todo add <description>'], '__OPENCODE_CONFIG__/bgsd-oc/workflows/add-todo.md');
+    assert.equal(routeMatrix['todo check [area]'], '__OPENCODE_CONFIG__/bgsd-oc/workflows/check-todos.md');
+  });
+
   test('groups actionable issues by surfaced file and semantic rule', () => {
     const result = validateCommandIntegrity({
       cwd: ROOT,
@@ -486,5 +528,35 @@ describe('validateCommandIntegrity', () => {
     assert.match(fallbackContent, /verify:state/, 'fallback guidance should keep canonical state verification');
     assert.match(fallbackContent, /plan:milestone/, 'fallback guidance should keep canonical milestone routing');
     assert.match(fallbackContent, /\/bgsd-inspect progress/, 'fallback guidance should point progress follow-ups at the inspect family');
+  });
+
+  test('rejects ambiguous runnable /bgsd-plan shorthand and keeps legacy planning wrappers on canonical suggestions', () => {
+    const result = validateCommandIntegrity({
+      cwd: ROOT,
+      surfaces: [
+        {
+          surface: 'workflow',
+          path: 'workflows/ambiguous-plan.md',
+          content: [
+            'Next run `/bgsd-plan 175`.',
+            'Then try `/bgsd-plan roadmap`.',
+            'Legacy notes still mention `/bgsd-plan-phase 175`.',
+          ].join('\n'),
+        },
+      ],
+    });
+
+    assert.equal(result.valid, false);
+    assert.ok(
+      result.issues.some(issue => issue.file === 'workflows/ambiguous-plan.md' && issue.kind === 'unsupported-command' && issue.command === '/bgsd-plan 175'),
+      'bare phase shorthand should fail instead of being treated as runnable guidance'
+    );
+    assert.ok(
+      result.issues.some(issue => issue.file === 'workflows/ambiguous-plan.md' && issue.kind === 'missing-argument' && issue.command === '/bgsd-plan roadmap'),
+      'supported planning sub-actions should still enforce their required operand shape'
+    );
+    const legacyAliasIssue = result.issues.find(issue => issue.file === 'workflows/ambiguous-plan.md' && issue.kind === 'legacy-command' && issue.command === '/bgsd-plan-phase 175');
+    assert.ok(legacyAliasIssue, 'legacy planning wrappers should stay classified as legacy guidance');
+    assert.equal(legacyAliasIssue.suggestion, '/bgsd-plan phase 175');
   });
 });
