@@ -69,9 +69,10 @@ describe('validateCommandIntegrity', () => {
 
     const legacyGroup = result.groupedIssues.find(group => group.file === 'workflows/legacy.md');
     assert.ok(legacyGroup, 'expected grouped report for workflows/legacy.md');
-    assert.ok(
+    assert.equal(
       legacyGroup.issues.some(issue => issue.kind === 'nonexistent-command' && issue.command === '/bgsd-plan-phase 159'),
-      'RED: removed planning aliases are currently falling through as generic nonexistent commands'
+      false,
+      'removed planning aliases should not fall through as generic nonexistent commands'
     );
     assert.ok(
       legacyGroup.issues.some(issue => issue.kind === 'legacy-command' && issue.command === '/bgsd-plan-phase 159'),
@@ -451,30 +452,9 @@ describe('validateCommandIntegrity', () => {
     const phase174WorkflowIssues = result.issues.filter(issue => /workflows\/(?:plan-phase|discuss-phase)\.md$/.test(issue.file));
 
     assert.deepEqual(
-      phase174WorkflowIssues.map(issue => ({ file: issue.file, kind: issue.kind, command: issue.command })),
-      [
-        {
-          file: 'workflows/plan-phase.md',
-          kind: 'missing-argument',
-          command: '/bgsd-plan phase',
-        },
-        {
-          file: 'workflows/plan-phase.md',
-          kind: 'nonexistent-command',
-          command: 'node __OPENCODE_CONFIG__/bgsd-oc/bin/bgsd-tools.cjs init:plan-phase',
-        },
-        {
-          file: 'workflows/discuss-phase.md',
-          kind: 'missing-argument',
-          command: '/bgsd-plan discuss',
-        },
-        {
-          file: 'workflows/discuss-phase.md',
-          kind: 'nonexistent-command',
-          command: 'node __OPENCODE_CONFIG__/bgsd-oc/bin/bgsd-tools.cjs init:phase-op',
-        },
-      ],
-      'RED: the Phase 174 workflow slice currently misclassifies internal fallback reconstruction as surfaced runnable guidance'
+      phase174WorkflowIssues,
+      [],
+      'internal fallback reconstruction blocks in the Phase 174 workflows should not be treated as surfaced runnable guidance'
     );
 
     assert.equal(result.valid, true, 'Phase 174 surfaced command guidance should stay on canonical supported routes only');

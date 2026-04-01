@@ -916,11 +916,41 @@ function getWorkflowSelfCommand(surfacePath) {
   return `/bgsd-${commandName}`;
 }
 
+const LEGACY_SLASH_COMMAND_ALIASES = {
+  '/bgsd-plan-phase': '/bgsd-plan phase',
+  '/bgsd-discuss-phase': '/bgsd-plan discuss',
+  '/bgsd-research-phase': '/bgsd-plan research',
+  '/bgsd-assumptions-phase': '/bgsd-plan assumptions',
+};
+
 function isWorkflowSelfReference(surfacePath, mention) {
   const selfCommand = getWorkflowSelfCommand(surfacePath);
   if (!selfCommand) return false;
   const baseCommand = (mention.text || '').split(/\s+/)[0];
   return baseCommand === selfCommand;
+}
+
+function isWorkflowFallbackReconstructionContext(surfacePath, mention) {
+  if (!/workflows\/(?:plan-phase|discuss-phase)\.md$/i.test(surfacePath || '')) return false;
+
+  const lineText = mention.lineText || '';
+  const baseCommand = (mention.text || '').split(/\s+/)[0];
+  const context = [lineText, mention.fenceLabel || '', mention.fenceLeadIn || ''].join('\n');
+
+  if (
+    baseCommand === '/bgsd-plan' &&
+    /\b(routed|copied)\b/i.test(lineText) &&
+    /hook was bypassed/i.test(lineText)
+  ) {
+    return true;
+  }
+
+  if (/^node(?:js)?\b/i.test(mention.text || '')) {
+    return (/if no `<bgsd-context>` found|reconstruct the same/i.test(context) && /hook was bypassed/i.test(context)) ||
+      (/BGSD_CONTEXT=\$\(/.test(lineText) && /\binit:(?:plan-phase|phase-op)\b/.test(mention.text || ''));
+  }
+
+  return false;
 }
 
 function isReferenceOutputFence(mention) {
@@ -1042,13 +1072,14 @@ function validateSlashMention(mention, surfacePath, surfaceType, slashInventory)
   const baseCommand = tokens[0];
   const args = tokens.slice(1);
   const slashSet = new Set(slashInventory.slashCommands);
-  const referenceStyle = isReferenceStyleMention(mention) || isWorkflowSelfReference(surfacePath, mention);
+  const legacyCanonical = slashInventory.aliasToCanonical[baseCommand] || LEGACY_SLASH_COMMAND_ALIASES[baseCommand] || null;
+  const referenceStyle = isReferenceStyleMention(mention) || isWorkflowSelfReference(surfacePath, mention) || isWorkflowFallbackReconstructionContext(surfacePath, mention);
 
   if (referenceStyle) {
     return issues;
   }
 
-  if (!slashSet.has(baseCommand)) {
+  if (!slashSet.has(baseCommand) && !legacyCanonical) {
     issues.push({
       kind: 'nonexistent-command',
       surface: surfaceType,
@@ -1060,14 +1091,14 @@ function validateSlashMention(mention, surfacePath, surfaceType, slashInventory)
     return issues;
   }
 
-  if (slashInventory.aliasToCanonical[baseCommand]) {
+  if (legacyCanonical) {
     issues.push({
       kind: 'legacy-command',
       surface: surfaceType,
       file: surfacePath,
       line: mention.line,
       command: mention.text,
-      suggestion: buildSlashSuggestion(baseCommand, args, slashInventory.aliasToCanonical),
+      suggestion: buildSlashSuggestion(baseCommand, args, { ...LEGACY_SLASH_COMMAND_ALIASES, ...slashInventory.aliasToCanonical }),
       message: `${baseCommand} is a compatibility alias and should not appear in surfaced guidance`,
     });
   }
@@ -1128,7 +1159,7 @@ function validateCliMention(mention, surfacePath, surfaceType, cliInventory) {
   const tokens = mention.text.split(/\s+/).filter(Boolean);
   const binary = tokens.shift();
   const args = tokens;
-  const referenceStyle = isReferenceStyleMention(mention);
+  const referenceStyle = isReferenceStyleMention(mention) || isWorkflowFallbackReconstructionContext(surfacePath, mention);
 
   if (referenceStyle) {
     return issues;
