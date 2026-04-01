@@ -11,6 +11,17 @@ const { runGsdToolsFull } = require('./helpers.cjs');
 
 const ROOT = path.join(__dirname, '..');
 const tempDirs = [];
+const PHASE_180_CLOSURE_BACKLOG = [
+  ['agent', 'agents/bgsd-executor.md'],
+  ['agent', 'agents/bgsd-phase-researcher.md'],
+  ['agent', 'agents/bgsd-plan-checker.md'],
+  ['agent', 'agents/bgsd-planner.md'],
+  ['docs', 'docs/architecture.md'],
+  ['workflow', 'workflows/execute-phase.md'],
+  ['workflow', 'workflows/github-ci.md'],
+  ['workflow', 'workflows/new-milestone.md'],
+  ['workflow', 'workflows/transition.md'],
+];
 
 function makeTempRepo() {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'bgsd-validate-commands-'));
@@ -428,6 +439,46 @@ describe('validateCommandIntegrity', () => {
     assert.ok(
       result.proofInventory.namedExclusions.includes('workflow-bootstrap-reconstruction'),
       'proof inventory should include the existing bootstrap exclusion family'
+    );
+  });
+
+  test('Phase 180 closure backlog stays validator-clean and raw output explains proof scope', () => {
+    const result = validateCommandIntegrity({
+      cwd: ROOT,
+      surfaces: PHASE_180_CLOSURE_BACKLOG.map(([surface, file]) => ({
+        surface,
+        path: file,
+        content: readRepoFile(file),
+      })),
+    });
+
+    assert.equal(result.valid, true, 'the exact Phase 180 surfaced backlog should validate cleanly');
+    assert.deepEqual(result.groupedIssues, [], 'the closure backlog should not emit grouped surfaced-file failures');
+    assert.ok(result.proofInventory, 'closure validation should still expose proof inventory metadata');
+    assert.ok(
+      PHASE_180_CLOSURE_BACKLOG.every(([, file]) => result.proofInventory.surfacesChecked.includes(file)),
+      'proof inventory should include every surfaced file in the closure backlog'
+    );
+    assert.ok(
+      result.proofInventory.namedExclusions.includes('transition-output-heading'),
+      'proof inventory should keep the intentional transition-heading classification visible'
+    );
+
+    const rawResult = runGsdToolsFull('util:validate-commands --raw', ROOT);
+    assert.equal(rawResult.success, true, `raw validator should stay green for repo-close proof: ${rawResult.stderr}`);
+
+    const payload = JSON.parse(rawResult.stdout);
+    assert.equal(payload.valid, true);
+    assert.ok(payload.proofInventory, 'raw validator output should expose proof inventory metadata');
+    assert.ok(Array.isArray(payload.proofInventory.surfacesChecked), 'raw proof inventory should list checked surfaces');
+    assert.ok(Array.isArray(payload.proofInventory.namedExclusions), 'raw proof inventory should list named exclusions');
+    assert.ok(
+      PHASE_180_CLOSURE_BACKLOG.every(([, file]) => payload.proofInventory.surfacesChecked.includes(file)),
+      'raw proof inventory should still cover the exact Phase 180 surfaced backlog'
+    );
+    assert.ok(
+      payload.proofInventory.namedExclusions.includes('workflow-bootstrap-reconstruction'),
+      'raw proof inventory should keep named exclusions visible for repo-close proof meaning'
     );
   });
 
