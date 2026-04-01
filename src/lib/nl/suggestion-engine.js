@@ -13,7 +13,7 @@ function detectCommandType(lastCommand) {
   const cmd = lastCommand.toLowerCase().trim();
 
   // Planning commands
-  const planningCommands = ['plan', 'plan:phase', 'plan:roadmap', 'plan:milestone', 'milestone:new'];
+  const planningCommands = ['plan', 'plan:phase', 'plan:roadmap', 'plan:milestone'];
   if (planningCommands.some(c => cmd.includes(c))) {
     return { category: 'planning', command: cmd };
   }
@@ -25,13 +25,13 @@ function detectCommandType(lastCommand) {
   }
 
   // Verification commands
-  const verificationCommands = ['verify', 'verify:work', 'verify:phase', 'test'];
+  const verificationCommands = ['verify', 'verify:work', 'verify:state', 'test'];
   if (verificationCommands.some(c => cmd.includes(c))) {
     return { category: 'verification', command: cmd };
   }
 
   // Session commands
-  const sessionCommands = ['session', 'session:pause', 'session:resume', 'session:progress'];
+  const sessionCommands = ['session', 'session:pause', 'session:resume'];
   if (sessionCommands.some(c => cmd.includes(c))) {
     return { category: 'session', command: cmd };
   }
@@ -61,16 +61,16 @@ function getSuggestions(commandType, currentState = {}) {
         const phase = currentPhase || lastPhase;
         add(`exec phase ${phase}`, 'Execute the plan you just created', 1);
       } else {
-        add('roadmap show', 'View available phases to execute', 2);
+        add('inspect progress', 'View available phases to execute', 2);
       }
       break;
 
     case 'execution':
       if (currentPhase || lastPhase) {
         const phase = currentPhase || lastPhase;
-        add(`verify phase ${phase}`, 'Verify the execution results', 1);
+        add('verify state', 'Verify the execution results through the canonical state surface', 1);
       }
-      add('session progress', 'Check overall project progress', 3);
+      add('inspect progress', 'Check overall project progress', 3);
       break;
 
     case 'verification':
@@ -81,7 +81,7 @@ function getSuggestions(commandType, currentState = {}) {
       }
       // Suggest milestone completion if appropriate
       if (milestoneStatus === 'ready') {
-        add('milestone complete', 'Complete current milestone', 1);
+        add('plan milestone complete', 'Complete current milestone through the planning family', 1);
       } else {
         add('session pause', 'Pause and review progress', 2);
       }
@@ -90,15 +90,13 @@ function getSuggestions(commandType, currentState = {}) {
     case 'session':
       if (commandType.command && commandType.command.includes('pause')) {
         add('session resume', 'Resume working on the project', 1);
-      } else if (commandType.command && commandType.command.includes('progress')) {
-        add('roadmap show', 'View full roadmap', 2);
       }
       break;
 
     case 'utility':
     default:
       // No specific suggestions for utility commands
-      add('roadmap show', 'View available commands', 2);
+      add('inspect progress', 'View available commands', 2);
       add('health', 'Check project health', 3);
       break;
   }

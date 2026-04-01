@@ -174,7 +174,7 @@ function getCommandsForIntent(intent) {
     plan: [
       { pattern: 'plan phase', command: 'plan:phase', description: 'Create a plan for a phase' },
       { pattern: 'new phase', command: 'plan:phase', description: 'Add a new phase' },
-      { pattern: 'new milestone', command: 'milestone:new', description: 'Create a milestone' }
+      { pattern: 'plan milestone', command: 'plan:milestone', description: 'Create or complete a milestone through the canonical planning family' }
     ],
     execute: [
       { pattern: 'execute phase', command: 'execute:phase', description: 'Execute a phase plan' },
@@ -183,11 +183,11 @@ function getCommandsForIntent(intent) {
     ],
     verify: [
       { pattern: 'verify work', command: 'verify:work', description: 'Verify completed work' },
-      { pattern: 'check status', command: 'verify:state', description: 'Check project state' }
+      { pattern: 'check status', command: 'verify:state', description: 'Check project state and canonical progress details' }
     ],
     query: [
-      { pattern: 'show progress', command: 'session:progress', description: 'Show progress' },
-      { pattern: 'show roadmap', command: 'roadmap:show', description: 'Display roadmap' },
+      { pattern: 'inspect progress', command: 'verify:state', description: 'Check project state and then use /bgsd-inspect progress for canonical progress guidance' },
+      { pattern: 'show roadmap', command: 'verify:state', description: 'Check current state and then use /bgsd-inspect progress to review available phases' },
       { pattern: 'health check', command: 'health', description: 'Project health check' }
     ]
   };
@@ -203,7 +203,7 @@ function getCommandsForIntent(intent) {
  */
 function generateDidYouMean(input) {
   const knownPhrases = [
-    'plan phase', 'execute phase', 'verify work', 'show progress',
+    'plan phase', 'execute phase', 'verify work', 'inspect progress',
     'run tests', 'check work', 'new phase', 'resume work'
   ];
   
@@ -278,13 +278,13 @@ function generateHelp(input) {
   
   let help = `Unrecognized input: "${input || '(empty)'}"\n\n`;
   help += 'Available intents:\n';
-  help += '  plan    - Create plans, add phases, new milestones\n';
+  help += '  plan    - Create plans, add phases, and manage milestones\n';
   help += '  execute - Run phases, tests, resume work\n';
   help += '  verify  - Check work, validate state\n';
-  help += '  query   - Show progress, roadmap, status\n\n';
+  help += '  query   - Inspect progress, roadmap, status\n\n';
   help += 'Try phrases like:\n';
   help += '  "plan phase 5"\n';
-  help += '  "show progress"\n';
+  help += '  "inspect progress"\n';
   help += '  "run tests"\n';
   help += '  "verify work"';
   

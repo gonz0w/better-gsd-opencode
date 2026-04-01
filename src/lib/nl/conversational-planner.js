@@ -101,9 +101,9 @@ function calculateContextBoost(parsedResult, context) {
   
   // Infer intent from command
   const intentMap = {
-    'plan': ['plan:phase', 'plan:roadmap', 'milestone:new'],
+    'plan': ['plan:phase', 'plan:roadmap', 'plan:milestone'],
     'execute': ['execute:phase', 'execute:quick', 'execute:commit', 'session:resume'],
-    'verify': ['verify:work', 'verify:phase', 'verify:state']
+    'verify': ['verify:work', 'verify:state']
   };
   
   for (const [intent, commands] of Object.entries(intentMap)) {

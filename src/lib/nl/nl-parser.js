@@ -246,18 +246,13 @@ function getIntentFromCommand(command) {
     'plan:phase': 'plan',
     'plan:roadmap': 'plan',
     'plan:milestone': 'plan',
-    'milestone:new': 'plan',
-    'milestone:complete': 'execute',
     'execute:phase': 'execute',
     'execute:quick': 'execute',
     'execute:commit': 'execute',
     'session:resume': 'execute',
     'verify:work': 'verify',
-    'verify:phase': 'verify',
     'verify:state': 'verify',
-    'session:progress': 'query',
     'session:pause': 'query',
-    'roadmap:show': 'query',
     'health': 'query'
   };
   
