@@ -18,10 +18,12 @@ describe('Phase 159 discuss-phase workflow-prep guidance', () => {
     const discuss = read('workflows/discuss-phase.md');
 
     assert.match(discuss, /Use \/bgsd-inspect progress to see available phases\./);
-    assert.match(discuss, /reference-style standalone `\/bgsd-plan discuss \[phase\]` behavior/);
+    assert.match(discuss, /routed or copied `\/bgsd-plan discuss <phase-number>` execution/);
+    assert.match(discuss, /reference-style standalone `\/bgsd-plan discuss <phase-number>` behavior/);
     assert.match(discuss, /--next-command "\/bgsd-plan research \$\{PHASE\}"/);
     assert.doesNotMatch(discuss, /\/bgsd-progress|\/bgsd-discuss-phase/);
     assert.doesNotMatch(discuss, /standalone `\/bgsd-plan discuss` behavior/);
+    assert.doesNotMatch(discuss, /reference-style standalone `\/bgsd-plan discuss \[phase\]` behavior/);
   });
 
   test('shared validator accepts the exact shipped discuss-phase workflow', () => {
