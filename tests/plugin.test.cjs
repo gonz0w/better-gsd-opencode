@@ -709,7 +709,8 @@ describe('Plugin canonical runtime guidance regressions', () => {
     assert.strictEqual(typeof mod.createIdleValidator, 'function', 'plugin bundle should export createIdleValidator');
 
     const validatorSource = mod.createIdleValidator.toString();
-    assert.match(validatorSource, /Next: \/bgsd-plan phase \$\{nextPhase\.number\}/, 'idle-validator notification action should point to the canonical planning family command');
+    assert.match(validatorSource, /\/bgsd-plan phase \$\{nextPhase\.number\}/, 'idle-validator notification action should point to the canonical planning family command');
+    assert.doesNotMatch(validatorSource, /Next: \/bgsd-plan phase/, 'idle-validator notification action should keep the runnable action payload command-only');
     assert.doesNotMatch(validatorSource, /\/bgsd-plan-phase/, 'idle-validator notification action should not regress to legacy planning alias wording');
   });
 });

@@ -583,6 +583,29 @@ describe('validateCommandIntegrity', () => {
     );
   });
 
+  test('accepts shipped runtime phase-next guidance only when plugin guidance keeps the action command-only', () => {
+    const result = validateCommandIntegrity({
+      cwd: ROOT,
+      surfaces: [
+        {
+          surface: 'runtime',
+          path: 'plugin.js',
+          content: readRepoFile('plugin.js'),
+        },
+      ],
+    });
+
+    const phaseIssues = result.issues.filter(
+      issue => issue.file === 'plugin.js' && issue.command.includes('/bgsd-plan phase')
+    );
+
+    assert.deepEqual(
+      phaseIssues,
+      [],
+      'shipped runtime phase-next guidance should surface only the runnable canonical /bgsd-plan phase command'
+    );
+  });
+
   test('Phase 176 canonical routes keep planning and settings command floors runnable', () => {
     const routeMatrix = extractPlanningRouteMatrix();
     const settingsDoc = readRepoFile('commands/bgsd-settings.md');

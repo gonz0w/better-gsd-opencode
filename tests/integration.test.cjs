@@ -1007,9 +1007,9 @@ requirements:
 must_haves:
   artifacts:
     - path: src/plugin/idle-validator.js
-      contains: Next: /bgsd-plan phase
+      contains: action: \`/bgsd-plan phase \${nextPhase.number}\`
     - path: plugin.js
-      contains: Next: /bgsd-plan phase
+      contains: action: \`/bgsd-plan phase \${nextPhase.number}\`
   key_links: []
 ---
 
