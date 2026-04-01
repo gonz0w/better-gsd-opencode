@@ -362,4 +362,69 @@ describe('validateCommandIntegrity', () => {
       'discovery inventory should no longer advertise util:config-migrate'
     );
   });
+
+  test('stale registry commands are rejected from NL fallback surfaces', () => {
+    const result = validateCommandIntegrity({
+      cwd: ROOT,
+      surfaces: [
+        {
+          surface: 'runtime',
+          path: 'src/lib/nl/command-registry.js',
+          content: readRepoFile('src/lib/nl/command-registry.js'),
+        },
+        {
+          surface: 'runtime',
+          path: 'src/lib/nl/suggestion-engine.js',
+          content: readRepoFile('src/lib/nl/suggestion-engine.js'),
+        },
+        {
+          surface: 'runtime',
+          path: 'src/lib/nl/conversational-planner.js',
+          content: readRepoFile('src/lib/nl/conversational-planner.js'),
+        },
+        {
+          surface: 'runtime',
+          path: 'src/lib/nl/nl-parser.js',
+          content: readRepoFile('src/lib/nl/nl-parser.js'),
+        },
+      ],
+    });
+
+    assert.equal(result.valid, true, 'touched NL registry files should stay on canonical routed commands only');
+
+    const staleMentions = [
+      'src/lib/nl/command-registry.js',
+      'src/lib/nl/suggestion-engine.js',
+      'src/lib/nl/conversational-planner.js',
+      'src/lib/nl/nl-parser.js',
+    ].map(file => ({ file, content: readRepoFile(file) }));
+
+    for (const { file, content } of staleMentions) {
+      assert.doesNotMatch(content, /verify:phase|session:progress|roadmap:show|milestone:new/, `${file} should not preserve stale compatibility-era command names`);
+    }
+
+    assert.match(readRepoFile('src/lib/nl/command-registry.js'), /verify:state/, 'NL registry should keep canonical verification routing');
+    assert.match(readRepoFile('src/lib/nl/command-registry.js'), /plan:milestone/, 'NL registry should keep canonical milestone routing');
+  });
+
+  test('NL fallback surfaces teach only canonical routed replacements', () => {
+    const fallbackContent = readRepoFile('src/lib/nl/help-fallback.js');
+
+    const result = validateCommandIntegrity({
+      cwd: ROOT,
+      surfaces: [
+        {
+          surface: 'runtime',
+          path: 'src/lib/nl/help-fallback.js',
+          content: fallbackContent,
+        },
+      ],
+    });
+
+    assert.equal(result.valid, true, 'fallback guidance should only advertise canonical routed commands');
+    assert.doesNotMatch(fallbackContent, /session:progress|roadmap:show|milestone:new/, 'fallback guidance should drop stale progress, roadmap, and milestone compatibility commands');
+    assert.match(fallbackContent, /verify:state/, 'fallback guidance should keep canonical state verification');
+    assert.match(fallbackContent, /plan:milestone/, 'fallback guidance should keep canonical milestone routing');
+    assert.match(fallbackContent, /\/bgsd-inspect progress/, 'fallback guidance should point progress follow-ups at the inspect family');
+  });
 });
