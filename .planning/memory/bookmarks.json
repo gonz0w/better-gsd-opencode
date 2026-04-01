@@ -1,5 +1,37 @@
 [
   {
+    "phase": "175",
+    "plan": "02",
+    "task": 2,
+    "total_tasks": 2,
+    "git_head": "2c0a7025",
+    "timestamp": "2026-04-01T04:00:00.317Z"
+  },
+  {
+    "phase": "175",
+    "plan": "02",
+    "task": 1,
+    "total_tasks": 2,
+    "git_head": "e747eb19",
+    "timestamp": "2026-04-01T03:58:24.948Z"
+  },
+  {
+    "phase": "175-canonical-command-surface-alignment",
+    "plan": "01",
+    "task": 2,
+    "total_tasks": 2,
+    "git_head": "262ee50d",
+    "timestamp": "2026-04-01T03:51:34.985Z"
+  },
+  {
+    "phase": "175-canonical-command-surface-alignment",
+    "plan": "01",
+    "task": 1,
+    "total_tasks": 2,
+    "git_head": "294aefae",
+    "timestamp": "2026-04-01T03:46:14.937Z"
+  },
+  {
     "phase": "174",
     "plan": "08",
     "task": 2,
@@ -126,37 +158,5 @@
     "total_tasks": 3,
     "git_head": "425efcd1",
     "timestamp": "2026-03-31T22:52:26.430Z"
-  },
-  {
-    "phase": "173-simplification-audit-safe-sequencing",
-    "plan": "01",
-    "task": 3,
-    "total_tasks": 3,
-    "git_head": "00d75e3e",
-    "timestamp": "2026-03-31T22:47:39.192Z"
-  },
-  {
-    "phase": "173-simplification-audit-safe-sequencing",
-    "plan": "01",
-    "task": 2,
-    "total_tasks": 3,
-    "git_head": "b1c5c3b9",
-    "timestamp": "2026-03-31T22:47:07.755Z"
-  },
-  {
-    "phase": "173-simplification-audit-safe-sequencing",
-    "plan": "01",
-    "task": 1,
-    "total_tasks": 3,
-    "git_head": "4f517e1f",
-    "timestamp": "2026-03-31T22:45:52.741Z"
-  },
-  {
-    "phase": "172",
-    "plan": "02",
-    "task": 2,
-    "total_tasks": 2,
-    "git_head": "8aaee1f1",
-    "timestamp": "2026-03-31T19:17:51.742Z"
   }
 ]

@@ -444,5 +444,53 @@
       "bgsd-verifier",
       "bgsd-executor"
     ]
+  },
+  {
+    "id": "43e2fdfb-9e5a-48c4-b230-d492bbb24273",
+    "date": "2026-04-01T03:33:34.763Z",
+    "title": "Write plan command examples in explicit reference style",
+    "severity": "LOW",
+    "type": "agent-behavior",
+    "root_cause": "Planner plan text used runnable-looking slash commands inside behavior and key-link prose, which command-integrity realism checks interpreted as surfaced guidance and flagged as blockers.",
+    "prevention_rule": "When a PLAN.md needs to mention commands for comparison or legacy context, phrase them as reference-only placeholders (for example with [phase] operands or plain-text alias names) instead of runnable-looking concrete commands unless execution guidance is intentional.",
+    "affected_agents": [
+      "bgsd-planner"
+    ]
+  },
+  {
+    "id": "a16b3800-497f-419f-93c0-39bf33fa5d66",
+    "date": "2026-04-01T03:39:18.217Z",
+    "title": "Retry plan verification once on internal verifier crashes",
+    "severity": "MEDIUM",
+    "type": "tooling",
+    "root_cause": "The plan-structure verifier can intermittently crash with an internal cache warmup ReferenceError before returning a valid result, which is not a plan defect.",
+    "prevention_rule": "When verify:verify plan-structure or analyze-plan fails with an internal tool exception, retry the same command once before surfacing a blocker so transient verifier faults do not create false plan failures.",
+    "affected_agents": [
+      "bgsd-plan-checker"
+    ]
+  },
+  {
+    "id": "6fbb3ea9-828f-469d-811e-b7211f2ce3d2",
+    "date": "2026-04-01T03:54:14.902Z",
+    "title": "verify:state complete-plan can leave stale phase summary fields",
+    "severity": "MEDIUM",
+    "type": "tooling",
+    "root_cause": "The complete-plan helper advanced plan counters and current focus but left STATE.md summary fields like the active phase number and aggregate plan metrics stale, forcing manual repair during executor completion.",
+    "prevention_rule": "After complete-plan updates, automatically re-read STATE.md and reconcile phase/current-plan/velocity summary fields against the active plan before reporting success.",
+    "affected_agents": [
+      "bgsd-executor"
+    ]
+  },
+  {
+    "id": "7e482922-edb7-45fa-9ee4-24661b5cf77f",
+    "date": "2026-04-01T04:02:05.845Z",
+    "title": "Keep slice regressions scoped to owned surfaces",
+    "severity": "MEDIUM",
+    "type": "workflow",
+    "root_cause": "A plan-local guidance regression file still asserted unrelated execute, architecture, and runtime surfaces, so verification for a docs-only slice inherited pre-existing command-integrity failures outside the plan boundary.",
+    "prevention_rule": "When a plan introduces focused parity tests, scope the validator input and explicit assertions to the files that plan owns before using the test as the plan's verification gate.",
+    "affected_agents": [
+      "bgsd-executor"
+    ]
   }
 ]

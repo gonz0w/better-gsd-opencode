@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "kind": "phase-handoff",
+  "phase": "175",
+  "step": "research",
+  "status": "complete",
+  "run_id": "175-2026-04-01T03-09-41-384Z",
+  "source_fingerprint": "e93a2dfb390c8321",
+  "created_at": "2026-04-01T03:22:30.490Z",
+  "updated_at": "2026-04-01T03:22:30.490Z",
+  "summary": "Research ready for Phase 175",
+  "resume_target": {
+    "phase": "175",
+    "step": "research",
+    "plan": null,
+    "resume_file": ".planning/phases/175-canonical-command-surface-alignment/175-RESEARCH.md",
+    "next_command": "/bgsd-plan phase 175"
+  },
+  "context": {}
+}

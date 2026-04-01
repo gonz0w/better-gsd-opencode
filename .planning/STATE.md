@@ -5,17 +5,17 @@
 See: .planning/PROJECT.md (updated 2026-03-31)
 
 **Core value:** Manage and deliver high-quality software with high-quality documentation, while continuously reducing token usage and improving performance.
-**Current focus:** Phase 175 — canonical-command-surface-alignment plan 03 of 4
+**Current focus:** Phase 175 — canonical-command-surface-alignment plan 04 of 4
 
 ## Current Position
 
 **Phase:** 175
-**Current Plan:** 3
+**Current Plan:** 4
 **Total Plans in Phase:** 4
 **Status:** Ready to execute
 **Last Activity:** 2026-04-01
 
-**Progress:** [██████████] 98%
+**Progress:** [██████████] 99%
 
 ## Performance Metrics
 
@@ -45,6 +45,7 @@ See: .planning/PROJECT.md (updated 2026-03-31)
 | Phase 174 P08 | 6 min | 2 tasks | 2 files |
 | Phase 175-canonical-command-surface-alignment P01 | 9 min | 2 tasks | 6 files |
 | Phase 175-canonical-command-surface-alignment P02 | 6 min | 2 tasks | 8 files |
+| Phase 175-canonical-command-surface-alignment P03 | 10 min | 2 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -279,6 +280,7 @@ See: .planning/PROJECT.md (updated 2026-03-31)
 - [Phase 174]: Command integrity now distinguishes legacy planning aliases from workflow-internal fallback reconstruction context — Phase 174 required canonical surfaced guidance to stay strict while treating removed aliases and internal bootstrap examples with precise classifications.
 - [Phase 175-canonical-command-surface-alignment]: Planning-family validation now loads canonical route metadata from commands/bgsd-plan.md and rejects shorthand /bgsd-plan invocations without guessing intent. — Phase 175 needs one maintainable planning-family definition for alias suggestions, required operands, and future docs parity work.
 - [Phase 175-canonical-command-surface-alignment]: Primary planning-entry docs now teach explicit /bgsd-plan phase, discuss, research, and assumptions routes with visible phase operands. — Phase 175 requires primary planning-family guidance to reinforce the canonical /bgsd-plan grammar and keep shorthand out of runnable entry surfaces.
+- [Phase 175-canonical-command-surface-alignment]: Expanded sibling-route parity tests and aligned roadmap/gaps/todo workflows to canonical /bgsd-plan umbrella — Workflow surfaces must teach canonical planning routes to prevent drift
 
 ### Pending Todos
 
@@ -290,6 +292,6 @@ None
 
 ## Session Continuity
 
-Last session: 2026-04-01T04:01:45.789Z
-Stopped at: Completed 175-02-PLAN.md
+Last session: 2026-04-01T04:25:51.582Z
+Stopped at: Completed 175-03-PLAN.md
 Resume file: None

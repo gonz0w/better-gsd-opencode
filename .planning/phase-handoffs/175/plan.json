@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "kind": "phase-handoff",
+  "phase": "175",
+  "step": "plan",
+  "status": "complete",
+  "run_id": "175-2026-04-01T03-09-41-384Z",
+  "source_fingerprint": "b73914dd27975025",
+  "created_at": "2026-04-01T03:39:37.344Z",
+  "updated_at": "2026-04-01T03:39:37.344Z",
+  "summary": "Plans ready for execution in Phase 175",
+  "resume_target": {
+    "phase": "175",
+    "step": "plan",
+    "plan": null,
+    "resume_file": null,
+    "next_command": "/bgsd-execute-phase 175"
+  },
+  "context": {}
+}
