@@ -58,7 +58,7 @@ Each task was committed atomically:
 1. **Task 1: Make workspace-mode execution prove root pinning before any plan work begins** - `ltryoqnq` (`fix(181-02): require workspace proof before parallel execution`)
 2. **Task 2: Keep workspace-mode repo-relative outputs rooted inside the assigned workspace** - `nynntrzk` (`fix(181-02): keep workspace plan outputs rooted`)
 
-**Plan metadata:** `PENDING`
+**Plan metadata:** `lzzznypw`
 
 ## Files Created/Modified
 - `workflows/execute-phase.md` - adds the proof-first Mode A preflight contract and generic fallback wording.
@@ -90,6 +90,7 @@ None - no external service configuration required.
 
 - Found summary file: `.planning/phases/181-workspace-root-truth-safe-fallback/181-02-SUMMARY.md`
 - Found task commits: `ltryoqnq`, `nynntrzk`
+- Found metadata commit: `lzzznypw`
 
 ---
 *Phase: 181-workspace-root-truth-safe-fallback*
