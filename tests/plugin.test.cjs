@@ -273,23 +273,23 @@ describe('plugin parsers and tool registry', () => {
     }
   });
 
-  test('parseRoadmap normalizes legacy TDD hints and persists rewrite on read', async () => {
+  test('parseRoadmap leaves legacy TDD hints untouched on read', async () => {
     const mod = await import(pluginPath);
     const { parseRoadmap, invalidateRoadmap } = mod;
     const tmpDir = createTempProject();
 
     try {
       const roadmapPath = path.join(tmpDir, '.planning', 'ROADMAP.md');
-      fs.writeFileSync(roadmapPath, `# Roadmap\n\n### Phase 1: Foundation\n**Goal:** Set up project\n**TDD:** true\n`);
+      const legacyRoadmap = `# Roadmap\n\n### Phase 1: Foundation\n**Goal:** Set up project\n**TDD:** true\n`;
+      fs.writeFileSync(roadmapPath, legacyRoadmap);
       invalidateRoadmap(tmpDir);
 
       const roadmap = parseRoadmap(tmpDir);
       assert.ok(roadmap, 'should parse roadmap');
-      assert.strictEqual(roadmap.getPhase(1).tdd, 'recommended', 'legacy TDD hint should normalize for plugin consumers');
+      assert.strictEqual(roadmap.getPhase(1).tdd, null, 'legacy TDD hint should no longer be normalized for plugin consumers');
 
-      const rewritten = fs.readFileSync(roadmapPath, 'utf-8');
-      assert.ok(rewritten.includes('**TDD:** recommended'), 'plugin parser should persist canonical roadmap hint');
-      assert.ok(!rewritten.includes('**TDD:** true'), 'legacy hint should be removed from disk');
+      const unchanged = fs.readFileSync(roadmapPath, 'utf-8');
+      assert.strictEqual(unchanged, legacyRoadmap, 'plugin parser should not rewrite roadmap metadata on read');
     } finally {
       cleanup(tmpDir);
     }
@@ -1017,12 +1017,13 @@ describe('Plugin cmux adapter fail-open contract', () => {
       const pluginA = await mod.BgsdPlugin({ directory: tmpDir, cmux });
       const pluginB = await mod.BgsdPlugin({ directory: tmpDir, cmux });
       const result = await pluginB.cmuxAdapter.setStatus('build', 'running');
+      const buildWrites = calls.filter((entry) => entry === 'setStatus:workspace:1:build:running');
 
       assert.strictEqual(resolveCount, 1, 'attached verdict should be cached per session key');
       assert.strictEqual(pluginA.cmuxAdapter.attached, true);
       assert.strictEqual(pluginA.cmuxAdapter.writeProven, true);
       assert.strictEqual(result.ok, true);
-      assert.deepStrictEqual(calls, ['setStatus:workspace:1:build:running']);
+      assert.deepStrictEqual(buildWrites, ['setStatus:workspace:1:build:running']);
     } finally {
       cleanup(tmpDir);
     }
@@ -1060,6 +1061,77 @@ describe('Plugin cmux adapter fail-open contract', () => {
       assert.strictEqual(result.suppressed, true);
       assert.strictEqual(result.reason, 'write-probe-failed');
       assert.match(system, /<bgsd>[\s\S]*Structured Agent Memory[\s\S]*<\/bgsd>/, 'suppressed write probe should not break normal state injection');
+      assert.match(system, /cmux integration suppressed:[\s\S]*Sidebar status, logs, and notifications stay off/i, 'managed suppression should surface a visible diagnostic');
+    } finally {
+      cleanup(tmpDir);
+    }
+  });
+
+  test('retryable startup suppression re-probes on later lifecycle refresh and can recover attachment', async () => {
+    const mod = await import(pluginPath);
+    const tmpDir = createTempProject();
+    let resolveCount = 0;
+    const calls = [];
+
+    try {
+      writePluginMemoryFixture(tmpDir, null);
+      mod.resetCmuxAdapterCache();
+
+      const plugin = await mod.BgsdPlugin({
+        directory: tmpDir,
+        cmux: {
+          resolveAvailability: async () => {
+            resolveCount += 1;
+            if (resolveCount === 1) {
+              return {
+                available: true,
+                attached: false,
+                mode: 'managed',
+                suppressionReason: 'write-probe-failed',
+                workspaceId: 'workspace:1',
+                surfaceId: 'surface:1',
+                writeProven: false,
+              };
+            }
+
+            return {
+              available: true,
+              attached: true,
+              mode: 'managed',
+              suppressionReason: null,
+              workspaceId: 'workspace:1',
+              surfaceId: 'surface:1',
+              writeProven: true,
+            };
+          },
+          setStatus: async ({ workspace, key, value }) => {
+            calls.push(`setStatus:${workspace}:${key}:${value}`);
+            return { ok: true };
+          },
+          clearStatus: async ({ workspace, key }) => {
+            calls.push(`clearStatus:${workspace}:${key}`);
+            return { ok: true };
+          },
+          setProgress: async ({ workspace, progress, label }) => {
+            calls.push(`setProgress:${workspace}:${progress}:${label || ''}`);
+            return { ok: true };
+          },
+          clearProgress: async ({ workspace }) => {
+            calls.push(`clearProgress:${workspace}`);
+            return { ok: true };
+          },
+          log: async () => ({ ok: true }),
+          notify: async () => ({ ok: true }),
+        },
+      });
+
+      assert.strictEqual(plugin.cmuxAdapter.attached, false, 'startup should preserve the initial suppressed verdict');
+
+      await plugin.event({ event: { type: 'session.idle' } });
+
+      assert.strictEqual(resolveCount, 2, 'later lifecycle refreshes should retry transient cmux suppression');
+      assert.strictEqual(plugin.cmuxAdapter.attached, true, 'a successful retry should replace the suppressed adapter');
+      assert.ok(calls.some((entry) => entry.startsWith('setStatus:workspace:1:')), 'recovered attachment should resume sidebar writes');
     } finally {
       cleanup(tmpDir);
     }
@@ -1456,6 +1528,37 @@ ${blockerLines}
       const phaseCompleteAttention = calls.filter((entry) => entry.startsWith('log:') || entry.startsWith('notify:'));
       assert.ok(phaseCompleteAttention.some((entry) => entry.startsWith('log:') && /phase/i.test(entry)), 'phase-complete should emit a success log');
       assert.ok(phaseCompleteAttention.some((entry) => entry.startsWith('notify:') && /phase/i.test(entry)), 'phase-complete should emit a success notification');
+    } finally {
+      cleanup(tmpDir);
+    }
+  });
+
+  test('Plugin cmux attention sync emits a log-only start event when a command executes into active workflow state', async () => {
+    const mod = await import(pluginPath);
+    const tmpDir = createTempProject();
+    const calls = [];
+
+    try {
+      writeCmuxAttentionFixture(tmpDir, buildAttentionState({
+        status: 'Idle',
+        continuity: 'Standing by',
+        progressLine: '',
+      }));
+      mod.resetCmuxAdapterCache();
+
+      const plugin = await mod.BgsdPlugin({ directory: tmpDir, cmux: createAttentionCmux(calls) });
+      const startupAttention = calls.filter((entry) => entry.startsWith('log:') || entry.startsWith('notify:'));
+      assert.strictEqual(startupAttention.length, 0, 'idle startup should stay quiet');
+
+      writeCmuxAttentionFixture(tmpDir, buildAttentionState({
+        status: 'Ready to plan',
+        continuity: 'Planning next step',
+      }));
+      await plugin.event({ event: { type: 'command.executed', command: 'bgsd-plan 172' } });
+
+      const commandAttention = calls.filter((entry) => entry.startsWith('log:') || entry.startsWith('notify:'));
+      assert.ok(commandAttention.some((entry) => entry.startsWith('log:') && /started/i.test(entry)), 'command-driven workflow start should append a sidebar log');
+      assert.strictEqual(commandAttention.filter((entry) => entry.startsWith('notify:')).length, 0, 'command-driven workflow start should stay log-only');
     } finally {
       cleanup(tmpDir);
     }

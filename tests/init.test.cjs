@@ -720,39 +720,44 @@ Add compact milestone and phase intent so planning flows can refine current focu
     assert.strictEqual(output.research_path, undefined);
   });
 
-  test('init plan-phase normalizes legacy TDD metadata and rewrites plan files on read', () => {
+  test('canonical roadmap and plan metadata still parse and validate', () => {
     const phaseDir = path.join(tmpDir, '.planning', 'phases', '03-api');
     fs.mkdirSync(phaseDir, { recursive: true });
-    fs.writeFileSync(path.join(tmpDir, '.planning', 'ROADMAP.md'), `# Roadmap\n\n### Phase 3: API\n**Goal:** Build API\n**TDD:** yes\n`);
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'ROADMAP.md'), `# Roadmap\n\n### Phase 3: API\n**Goal:** Build API\n**TDD:** recommended\n`);
     const planPath = path.join(phaseDir, '03-01-PLAN.md');
-    fs.writeFileSync(planPath, `---\nphase: 03-api\nplan: 01\ntdd: true\ntdd_rationale: Legacy metadata said this plan should use TDD.\n---\n\n<objective>\nBuild API behavior\n</objective>\n\n<tasks>\n<task type="auto">\n  <name>Fixture task</name>\n  <files>src/api.js</files>\n  <action>Implement fixture behavior</action>\n  <done>Fixture done</done>\n</task>\n</tasks>\n`);
+    const canonicalPlan = `---\nphase: 03-api\nplan: 01\ntype: tdd\nwave: 1\ndepends_on: []\nfiles_modified:\n  - src/api.js\nautonomous: true\nrequirements:\n  - API-01\nmust_haves:\n  artifacts:\n    - path: src/api.js\n---\n\n<objective>\nBuild API behavior\n</objective>\n\n> **TDD Decision:** Selected — API request/response behavior should execute through TDD.\n\n<tasks>\n<task type="auto">\n  <name>Fixture task</name>\n  <files>src/api.js</files>\n  <action>Implement fixture behavior</action>\n  <verify>node --test tests/api.test.cjs</verify>\n  <done>Fixture done</done>\n</task>\n</tasks>\n\n<feature>\n  <name>Fixture feature</name>\n</feature>\n`;
+    fs.writeFileSync(planPath, canonicalPlan);
 
     const result = runGsdTools('init:plan-phase 03 --verbose', tmpDir);
     assert.ok(result.success, `Command failed: ${result.error}`);
 
     const output = JSON.parse(result.output);
-    assert.strictEqual(output.tdd, 'recommended', 'legacy roadmap hint should normalize for init output');
+    assert.strictEqual(output.tdd, 'recommended', 'canonical roadmap hint should remain readable');
+    assert.strictEqual(fs.readFileSync(planPath, 'utf-8'), canonicalPlan, 'canonical plan should remain unchanged on read');
 
-    const rewrittenPlan = fs.readFileSync(planPath, 'utf-8');
-    assert.ok(rewrittenPlan.includes('type: tdd'), 'legacy plan metadata should normalize to canonical plan type');
-    assert.ok(rewrittenPlan.includes('> **TDD Decision:** Selected — Legacy metadata said this plan should use TDD.'), 'plan should gain canonical visible TDD decision callout');
-    assert.ok(!rewrittenPlan.includes('\ntdd: true\n'), 'legacy tdd frontmatter should be removed');
-    assert.ok(!rewrittenPlan.includes('tdd_rationale:'), 'legacy rationale frontmatter should be removed');
+    const verifyResult = runGsdTools(`verify:verify plan-structure ${planPath}`, tmpDir);
+    assert.ok(verifyResult.success, `plan validation failed: ${verifyResult.error}`);
+    const verifyOutput = JSON.parse(verifyResult.output);
+    assert.strictEqual(verifyOutput.valid, true, 'canonical plan should still validate cleanly without rewrite helpers');
   });
 
-  test('init plan-phase rewrites selected execute plans to canonical type tdd', () => {
+  test('legacy TDD metadata no longer rewrites plan files on read', () => {
     const phaseDir = path.join(tmpDir, '.planning', 'phases', '03-api');
     fs.mkdirSync(phaseDir, { recursive: true });
-    fs.writeFileSync(path.join(tmpDir, '.planning', 'ROADMAP.md'), `# Roadmap\n\n### Phase 3: API\n**Goal:** Build API\n`);
+    const roadmapPath = path.join(tmpDir, '.planning', 'ROADMAP.md');
+    const legacyRoadmap = `# Roadmap\n\n### Phase 3: API\n**Goal:** Build API\n**TDD:** yes\n`;
+    fs.writeFileSync(roadmapPath, legacyRoadmap);
     const planPath = path.join(phaseDir, '03-02-PLAN.md');
-    fs.writeFileSync(planPath, `---\nphase: 03-api\nplan: 02\ntype: execute\nwave: 1\ndepends_on: []\nfiles_modified:\n  - src/api.js\nautonomous: true\nrequirements:\n  - API-01\nmust_haves:\n  artifacts:\n    - path: src/api.js\n---\n\n<objective>\nBuild API behavior\n</objective>\n\n> **TDD Decision:** Selected — API request/response behavior should execute through TDD.\n\n<tasks>\n<task type="auto">\n  <name>Fixture task</name>\n  <files>src/api.js</files>\n  <action>Implement fixture behavior</action>\n  <verify>node --test tests/api.test.cjs</verify>\n  <done>Fixture done</done>\n</task>\n</tasks>\n`);
+    const legacyPlan = `---\nphase: 03-api\nplan: 02\ntdd: true\ntdd_rationale: Legacy metadata said this plan should use TDD.\n---\n\n<objective>\nBuild API behavior\n</objective>\n\n<tasks>\n<task type="auto">\n  <name>Fixture task</name>\n  <files>src/api.js</files>\n  <action>Implement fixture behavior</action>\n  <done>Fixture done</done>\n</task>\n</tasks>\n`;
+    fs.writeFileSync(planPath, legacyPlan);
 
     const result = runGsdTools('init:plan-phase 03 --verbose', tmpDir);
     assert.ok(result.success, `Command failed: ${result.error}`);
+    const output = JSON.parse(result.output);
 
-    const rewrittenPlan = fs.readFileSync(planPath, 'utf-8');
-    assert.ok(rewrittenPlan.includes('type: tdd'), 'selected plans should normalize to type: tdd');
-    assert.ok(rewrittenPlan.includes('> **TDD Decision:** Selected — API request/response behavior should execute through TDD.'), 'canonical selected callout should stay intact');
+    assert.strictEqual(output.tdd, null, 'legacy roadmap hints should no longer be normalized for active readers');
+    assert.strictEqual(fs.readFileSync(roadmapPath, 'utf-8'), legacyRoadmap, 'legacy roadmap metadata should remain untouched on read');
+    assert.strictEqual(fs.readFileSync(planPath, 'utf-8'), legacyPlan, 'legacy plan metadata should remain untouched on read');
   });
 
   // --compact flag tests
