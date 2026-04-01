@@ -177,12 +177,12 @@ function getCommandsForIntent(intent) {
       { pattern: 'plan milestone', command: 'plan:milestone', description: 'Create or complete a milestone through the canonical planning family' }
     ],
     execute: [
-      { pattern: 'execute phase', command: 'execute:phase', description: 'Execute a phase plan' },
-      { pattern: 'run tests', command: 'execute:quick', description: 'Run tests quickly' },
-      { pattern: 'resume work', command: 'session:resume', description: 'Resume paused work' }
+      { pattern: 'execute phase', command: '/bgsd-execute-phase', description: 'Execute a phase plan' },
+      { pattern: 'run tests', command: '/bgsd-quick', description: 'Run focused work quickly' },
+      { pattern: 'resume work', command: '/bgsd-resume', description: 'Resume paused work' }
     ],
     verify: [
-      { pattern: 'verify work', command: 'verify:work', description: 'Verify completed work' },
+      { pattern: 'verify work', command: '/bgsd-verify-work', description: 'Verify completed work' },
       { pattern: 'check status', command: 'verify:state', description: 'Check project state and canonical progress details' }
     ],
     query: [

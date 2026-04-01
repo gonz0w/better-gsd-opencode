@@ -70,8 +70,8 @@ describe('validateCommandIntegrity', () => {
     const legacyGroup = result.groupedIssues.find(group => group.file === 'workflows/legacy.md');
     assert.ok(legacyGroup, 'expected grouped report for workflows/legacy.md');
     assert.ok(
-      legacyGroup.issues.some(issue => issue.kind === 'nonexistent-command' && issue.command === '/bgsd-plan-phase 159'),
-      'removed planning aliases should now be reported as unknown slash commands'
+      legacyGroup.issues.some(issue => issue.kind === 'legacy-command' && issue.command === '/bgsd-plan-phase 159'),
+      'removed planning aliases should now be reported as legacy surfaced guidance'
     );
   });
 
@@ -387,6 +387,11 @@ describe('validateCommandIntegrity', () => {
           path: 'src/lib/nl/nl-parser.js',
           content: readRepoFile('src/lib/nl/nl-parser.js'),
         },
+        {
+          surface: 'runtime',
+          path: 'src/lib/nl/help-fallback.js',
+          content: readRepoFile('src/lib/nl/help-fallback.js'),
+        },
       ],
     });
 
@@ -394,17 +399,59 @@ describe('validateCommandIntegrity', () => {
 
     const staleMentions = [
       'src/lib/nl/command-registry.js',
+      'src/lib/nl/help-fallback.js',
       'src/lib/nl/suggestion-engine.js',
       'src/lib/nl/conversational-planner.js',
       'src/lib/nl/nl-parser.js',
     ].map(file => ({ file, content: readRepoFile(file) }));
 
     for (const { file, content } of staleMentions) {
-      assert.doesNotMatch(content, /verify:phase|session:progress|roadmap:show|milestone:new/, `${file} should not preserve stale compatibility-era command names`);
+      assert.doesNotMatch(
+        content,
+        /execute:phase|execute:quick|verify:work|session:resume|session:pause|verify:phase|session:progress|roadmap:show|milestone:new/,
+        `${file} should not preserve stale compatibility-era command names`
+      );
     }
 
     assert.match(readRepoFile('src/lib/nl/command-registry.js'), /verify:state/, 'NL registry should keep canonical verification routing');
     assert.match(readRepoFile('src/lib/nl/command-registry.js'), /plan:milestone/, 'NL registry should keep canonical milestone routing');
+  });
+
+  test('Phase 174 canonical command guidance rejects stale surfaced docs and workflow drift', () => {
+    const result = validateCommandIntegrity({
+      cwd: ROOT,
+      surfaces: [
+        {
+          surface: 'docs',
+          path: 'docs/commands.md',
+          content: readRepoFile('docs/commands.md'),
+        },
+        {
+          surface: 'docs',
+          path: 'docs/workflows.md',
+          content: readRepoFile('docs/workflows.md'),
+        },
+        {
+          surface: 'workflow',
+          path: 'workflows/plan-phase.md',
+          content: readRepoFile('workflows/plan-phase.md'),
+        },
+        {
+          surface: 'workflow',
+          path: 'workflows/discuss-phase.md',
+          content: readRepoFile('workflows/discuss-phase.md'),
+        },
+      ],
+    });
+
+    assert.equal(result.valid, true, 'Phase 174 surfaced command guidance should stay on canonical supported routes only');
+    for (const surfacedFile of ['docs/commands.md', 'docs/workflows.md', 'workflows/plan-phase.md', 'workflows/discuss-phase.md']) {
+      assert.equal(
+        result.issues.some(issue => issue.file === surfacedFile),
+        false,
+        `${surfacedFile} should not reintroduce stale surfaced command guidance`
+      );
+    }
   });
 
   test('NL fallback surfaces teach only canonical routed replacements', () => {

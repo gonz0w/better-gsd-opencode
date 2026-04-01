@@ -1,104 +1,85 @@
 ---
 phase: 174-greenfield-compatibility-surface-cleanup
-verified: 2026-04-01T00:56:43Z
+verified: 2026-04-01T02:06:29.433Z
 status: gaps_found
-score: 9/12
-intent_alignment: misaligned
+score: 10/12
+intent_alignment: partial
 requirements_coverage: partial
 gaps:
-  - id: GAP-174-01
-    severity: blocker
-    requirement: CLEAN-02
-    type: artifact
-    summary: Plugin roadmap parsing still ships legacy TDD normalization helpers in a touched artifact.
-    evidence:
-      - src/plugin/parsers/roadmap.js:17
-      - src/plugin/parsers/roadmap.js:29
-  - id: GAP-174-02
+  - id: GAP-174-RV-01
     severity: blocker
     requirement: CLEAN-03
     type: truth
-    summary: Touched NL/fallback helpers still point users toward unsupported non-routed commands, so discovery remains split-brain.
+    summary: Shipped workflow guidance still fails command-integrity validation because `workflows/plan-phase.md` and `workflows/discuss-phase.md` contain surfaced fallback examples that are not canonical-safe.
     evidence:
-      - src/lib/nl/command-registry.js:11
-      - src/lib/nl/command-registry.js:17
-      - src/lib/nl/command-registry.js:30
-      - src/lib/nl/help-fallback.js:180
-      - src/lib/nl/suggestion-engine.js:22
-      - src/lib/nl/conversational-planner.js:105
-      - src/lib/nl/nl-parser.js:249
-  - id: GAP-174-03
+      - workflows/plan-phase.md:17
+      - workflows/plan-phase.md:22
+      - workflows/discuss-phase.md:53
+      - workflows/discuss-phase.md:67
+      - tests/validate-commands.test.cjs:420
+  - id: GAP-174-RV-02
     severity: warning
     requirement: CLEAN-03
-    type: shipped-surface
-    summary: Repo-wide surfaced guidance still fails command-integrity validation against the canonical CLI, so the product docs/help surface is not fully cleaned up.
+    type: regression
+    summary: The focused command-integrity regression slice is still red because legacy planning alias classification no longer reports `/bgsd-plan-phase 159` as legacy surfaced guidance.
     evidence:
-      - docs/commands.md:345
-      - docs/workflows.md:149
-      - workflows/plan-phase.md:22
-      - workflows/discuss-phase.md:67
+      - tests/validate-commands.test.cjs:38
+      - src/lib/commandDiscovery.js:1051
+      - src/lib/commandDiscovery.js:1063
 ---
 
 # Phase 174 Verification
 
 ## Intent Alignment
 
-**Verdict:** misaligned
+**Verdict:** partial
 
-The core expected user change was not fully achieved. Phase 174 removed major compatibility-era surfaces, but the repo still ships touched hidden discovery mappings to unsupported commands and still contains a legacy roadmap-normalization helper in the plugin parser, so the support model is not yet a single clean greenfield surface.
+The core cleanup intent mostly landed: migration-only command drag is removed, canonical planning artifacts still parse without the old plugin normalization helper surface, hidden NL fallback mappings were cleaned up, and workspace-first docs/templates are in place. But the phase still falls short of full alignment because shipped workflow guidance in `workflows/plan-phase.md` and `workflows/discuss-phase.md` does not yet pass the canonical command-integrity gate, so the repo does not completely present one clean greenfield support story end-to-end.
 
 ## Goal Achievement
 
 | Truth | Status | Evidence |
 |---|---|---|
-| `util:config-migrate` is no longer routed or advertised as a supported CLI/discovery command. | ✓ VERIFIED | `src/router.js` rejects unknown util subcommands; `tests/infra.test.cjs:344`; `tests/integration.test.cjs:400`; `node bin/bgsd-tools.cjs util:config-migrate` returns unknown-command failure. |
-| Canonical config troubleshooting points users to validation/edit flows instead of a migration helper. | ✓ VERIFIED | `docs/troubleshooting.md:190-206`; `docs/expert-guide.md`; `tests/guidance-docs.test.cjs:61-67`. |
-| Active memory and init flows no longer auto-import legacy JSON memory stores. | ✓ VERIFIED | `src/commands/memory.js:497-529`; `tests/memory.test.cjs:105-147`; `node bin/bgsd-tools.cjs util:memory read --store decisions --query Legacy` returns `count: 0`, `source: sql`. |
-| Canonical `.planning/` roadmap/plan reads still parse and validate without rewrite-on-read normalization on active paths. | ✓ VERIFIED | `tests/init.test.cjs` targeted Phase 174 assertions passed; `tests/plugin.test.cjs` targeted `parseRoadmap` assertion passed; `src/commands/roadmap.js` reads roadmap directly. |
-| Plugin roadmap parser no longer preserves hidden normalization behind the scenes. | ✗ FAILED | `src/plugin/parsers/roadmap.js:17-43` still contains `normalizeRoadmapTddMetadata()` and `readRoadmapWithTddNormalization()`. |
-| Published config docs/templates teach the supported workspace-first model. | ✓ VERIFIED | `templates/config-full.json:51-54`; `docs/configuration.md:81-84`; `docs/expert-guide.md` workspace-first guidance; Phase 174 docs tests pass even though unrelated Phase 158 checks still fail. |
-| Touched NL and fallback registries resolve only to supported canonical commands. | ✗ FAILED | `src/lib/nl/command-registry.js`, `src/lib/nl/help-fallback.js`, `src/lib/nl/suggestion-engine.js`, `src/lib/nl/conversational-planner.js`, and `src/lib/nl/nl-parser.js` still reference unsupported commands such as `execute:phase`, `execute:quick`, `verify:work`, `session:resume`, and `session:pause`. |
-| Regression coverage protects against reintroducing removed compatibility surfaces. | ? PARTIAL | Targeted tests cover `config-migrate`, legacy memory import, worktree-era guidance, and four stale NL names, but current stale NL mappings remain outside that regression slice. |
+| Migration-only commands/helpers for obsolete installs or upgrades are removed without leaving routed dead surfaces behind. | ✓ VERIFIED | `node bin/bgsd-tools.cjs util:config-migrate` returns `Unknown util subcommand`; `src/router.js`; `src/lib/constants.js`; `tests/validate-commands.test.cjs:333-364`. |
+| Active memory/init flows no longer auto-import legacy JSON memory stores. | ✓ VERIFIED | `src/commands/memory.js:497-529` keeps canonical SQL-first reads; `node bin/bgsd-tools.cjs util:memory read --store decisions --query Legacy` returned `{ count: 0, source: "sql" }`. |
+| Canonical `.planning/` files still parse and validate without legacy normalization paths for superseded planning/config shapes. | ✓ VERIFIED | `node --test tests/plugin.test.cjs --test-name-pattern "parseRoadmap|normalization|canonical roadmap"` passed the targeted parser assertions before the broad suite timeout; `src/plugin/parsers/roadmap.js` no longer contains the old helper names. |
+| The plugin roadmap parser no longer ships dead legacy TDD normalization helpers behind canonical behavior. | ✓ VERIFIED | `src/plugin/parsers/roadmap.js` contains only the canonical parse path; `verify:verify artifacts` and `verify:verify key-links` both passed for `174-06-PLAN.md`. |
+| Touched NL and fallback helpers point only at supported canonical command routes instead of unsupported internal command names. | ✓ VERIFIED | `src/lib/nl/command-registry.js`; `src/lib/nl/help-fallback.js`; no matches for `execute:phase|execute:quick|verify:work|session:resume|session:pause|verify:phase|session:progress|roadmap:show|milestone:new`; `verify:verify key-links` passed for `174-07-PLAN.md`. |
+| Docs and templates teach the supported JJ/workspace-first model instead of stale worktree-era guidance. | ✓ VERIFIED | `templates/config-full.json:51-54` uses `workspace`; no `config-migrate` matches in `src/**/*.js`; `docs/commands.md` and `docs/workflows.md` now teach canonical slash-command families. |
+| Surfaced docs and workflow guidance used by command-integrity validation match the canonical CLI and planning-family surface. | ✗ FAILED | `validateCommandIntegrity` still reports `missing-argument` and `nonexistent-command` issues in `workflows/plan-phase.md` and `workflows/discuss-phase.md`; focused test `tests/validate-commands.test.cjs:420-455` fails. |
+| Regression coverage protects against reintroducing removed compatibility surfaces. | ✗ FAILED | Focused slice `node --test tests/validate-commands.test.cjs --test-name-pattern "stale registry commands|fallback surfaces|canonical command guidance|Phase 174"` is red, including `tests/validate-commands.test.cjs:38-76` and `:420-455`. |
 
 ## Required Artifacts
 
 | Artifact | Exists | Substantive | Wired | Notes |
 |---|---|---|---|---|
-| `src/router.js` | ✓ | ✓ | ✓ | Artifact helper false-negative on `contains`, but routing and unknown-command behavior are present and exercised by tests. |
-| `src/lib/constants.js` | ✓ | ✓ | ✓ | `COMMAND_HELP` no longer lists `util:config-migrate`. |
-| `src/lib/commandDiscovery.js` | ✓ | ✓ | ✓ | Discovery inventory excludes `config-migrate`; command-integrity tests cover it. |
-| `src/lib/planning-cache.js` | ✓ | ✓ | ✓ | No migration bridge remains; canonical search path is SQL-first. |
-| `src/commands/memory.js` | ✓ | ✓ | ✓ | Current reads/searches stay on canonical store. |
-| `src/commands/roadmap.js` | ✓ | ✓ | ✓ | Reads roadmap directly without rewrite helper. |
-| `src/plugin/parsers/roadmap.js` | ✓ | ✗ | PARTIAL | Active parse path works, but dead compatibility normalization helpers still ship in the touched file. |
-| `templates/config-full.json` | ✓ | ✓ | ✓ | Uses `workspace`, not `worktree`. |
-| `docs/configuration.md` | ✓ | ✓ | ✓ | Workspace-first settings documented. |
-| `src/lib/nl/command-registry.js` | ✓ | ✗ | ✓ | File is wired, but substantive content still includes unsupported command mappings. |
-| `src/lib/nl/help-fallback.js` | ✓ | ✗ | ✓ | Fallback suggestions still advertise unsupported commands. |
-| `tests/validate-commands.test.cjs` | ✓ | ✓ | ✓ | Covers targeted stale names only; misses other unsupported NL mappings. |
+| `src/plugin/parsers/roadmap.js` | ✓ | ✓ | ✓ | Dead normalization helper surface removed; targeted plugin assertions pass. |
+| `tests/plugin.test.cjs` | ✓ | ✓ | ✓ | Contains explicit `parseRoadmap` and normalization-regression checks. |
+| `src/lib/nl/command-registry.js` | ✓ | ✓ | ✓ | Hidden mappings now point at canonical routed commands only. |
+| `src/lib/nl/help-fallback.js` | ✓ | ✓ | ✓ | Fallback suggestions no longer preserve the stale internal command names from the prior verification gaps. |
+| `docs/commands.md` | ✓ | ✓ | ✓ | Canonical command reference is aligned. |
+| `docs/workflows.md` | ✓ | ✓ | ✓ | Canonical workflow-family reference is aligned. |
+| `workflows/plan-phase.md` | ✓ | ✗ | PARTIAL | Still contains surfaced fallback examples that the validator treats as non-canonical guidance (`/bgsd-plan phase` without args and `init:plan-phase`). |
+| `workflows/discuss-phase.md` | ✓ | ✗ | PARTIAL | Same remaining issue pattern as `plan-phase.md` (`/bgsd-plan discuss` without args and `init:phase-op`). |
+| `tests/validate-commands.test.cjs` | ✓ | ✓ | ✓ | Coverage exists, but the focused slice is currently red, so regression proof is incomplete. |
 
 ## Key Link Verification
 
 | Link | Status | Evidence |
 |---|---|---|
-| `tests/infra.test.cjs` → `src/router.js` | WIRED | Helper verified pattern; test asserts unknown-command failure for `util:config-migrate`. |
-| `tests/validate-commands.test.cjs` → `src/lib/commandDiscovery.js` | WIRED | Helper verified pattern; inventory assertions cover `config-migrate` removal. |
-| `tests/memory.test.cjs` → `src/lib/planning-cache.js` | WIRED | Manual verification: tests at `105-147` exercise SQL-backed reads/searches; `src/lib/planning-cache.js:530-603` implements search path. |
-| `tests/init.test.cjs` → `src/commands/init.js` | WIRED | Manual verification from passing targeted test `init memory leaves legacy JSON memory stores inactive...`. |
-| `tests/init.test.cjs` → `src/lib/helpers.js` | WIRED | Helper verified pattern for canonical roadmap/plan metadata behavior. |
-| `tests/plugin.test.cjs` → `src/plugin/parsers/roadmap.js` | WIRED | Helper verified pattern and passing targeted `parseRoadmap` assertion. |
-| `tests/guidance-docs.test.cjs` → `docs/configuration.md` | WIRED | Helper verified pattern; workspace-first doc assertions pass. |
-| `tests/guidance-docs.test.cjs` → `templates/config-full.json` | WIRED | Helper verified pattern; template assertions pass. |
-| `tests/validate-commands.test.cjs` → `src/lib/nl/command-registry.js` | PARTIAL | Tests verify only the removed names from the plan; current file still maps other unsupported commands. |
-| `tests/validate-commands.test.cjs` → `src/lib/nl/help-fallback.js` | PARTIAL | Tests verify targeted replacements, but fallback content still contains unsupported commands outside the tested set. |
+| `tests/plugin.test.cjs` → `src/plugin/parsers/roadmap.js` | WIRED | `verify:verify key-links` passed for `174-06-PLAN.md`; targeted parser tests exercise `parseRoadmap` normalization behavior. |
+| `tests/validate-commands.test.cjs` → `src/lib/nl/help-fallback.js` | WIRED | `verify:verify key-links` passed for `174-07-PLAN.md`. |
+| `tests/validate-commands.test.cjs` → `docs/commands.md` | WIRED | `verify:verify key-links` passed for `174-07-PLAN.md`. |
+| `tests/validate-commands.test.cjs` → `workflows/plan-phase.md` | PARTIAL | The test targets this surface, but the current assertion remains red because the surfaced fallback guidance is still being flagged. |
+| `tests/validate-commands.test.cjs` → `workflows/discuss-phase.md` | PARTIAL | Same as above; the workflow remains in the validation failure set. |
 
 ## Requirement Coverage
 
 | Requirement | Verdict | Evidence |
 |---|---|---|
-| CLEAN-01 | covered | `util:config-migrate` removed; legacy memory auto-import removed from active paths. |
-| CLEAN-02 | partial | Canonical planning artifacts parse/validate, but `src/plugin/parsers/roadmap.js` still ships legacy normalization helpers. |
-| CLEAN-03 | partial | Workspace-first docs/template slice is aligned, but touched NL/fallback surfaces still advertise unsupported commands and repo-wide surfaced guidance still has stale command-integrity failures. |
+| CLEAN-01 | covered | `util:config-migrate` is gone from the routed surface; legacy memory reads stay on the canonical store. |
+| CLEAN-02 | covered | Canonical roadmap parsing works without the old plugin normalization helper surface; plan 06 artifact and key-link checks passed. |
+| CLEAN-03 | partial | Docs/templates and hidden NL mappings are aligned, but surfaced workflow guidance and the command-integrity regression slice are still not fully green. |
 
 **Overall requirement coverage verdict:** partial
 
@@ -106,15 +87,16 @@ The core expected user change was not fully achieved. Phase 174 removed major co
 
 | Severity | Finding | Evidence |
 |---|---|---|
-| 🛑 Blocker | Dead compatibility helper still ships in touched plugin roadmap parser. | `src/plugin/parsers/roadmap.js:17-43` |
-| 🛑 Blocker | Hidden discovery still maps to unsupported commands in touched NL files. | `src/lib/nl/command-registry.js:11-45`; `src/lib/nl/help-fallback.js:180-191`; `src/lib/nl/suggestion-engine.js:22-35`; `src/lib/nl/conversational-planner.js:103-107`; `src/lib/nl/nl-parser.js:245-256` |
-| ⚠️ Warning | Bundled verifier helper crashed during `verify:key-links` because `writeDebugDiagnostic` is undefined in the runtime path. | `bin/bgsd-tools.cjs` crash during helper execution; source call site `src/lib/helpers.js:82` |
-| ℹ️ Info | Broad docs and plugin suites still contain unrelated baseline failures/hangs; touched-slice proofs were separated from those baselines. | `tests/guidance-docs.test.cjs` Phase 158 failures; `tests/plugin.test.cjs` timeout after relevant Phase 174 assertions passed. |
+| 🛑 Blocker | Two shipped workflow files still contain fallback command examples that fail canonical command-integrity validation. | `workflows/plan-phase.md:17-23`; `workflows/discuss-phase.md:53-68`; `tests/validate-commands.test.cjs:420-455` |
+| ⚠️ Warning | The focused command-integrity regression slice is still red because legacy alias classification no longer reports `/bgsd-plan-phase 159` the way the test expects. | `tests/validate-commands.test.cjs:38-76`; `src/lib/commandDiscovery.js:1051-1073` |
+| ⚠️ Warning | `verify:verify artifacts` for `174-07-PLAN.md` crashed in the bundled runtime because `writeDebugDiagnostic` is undefined on a cache-warm path. | `/Users/cam/.config/opencode/bgsd-oc/bin/bgsd-tools.cjs`; `ReferenceError: writeDebugDiagnostic is not defined` |
 
 ## Human Verification Required
 
-None for this phase. The blocking issues are code-surface and verification-tooling problems that are directly observable in the repository.
+None. The remaining issues are directly observable in repository source and focused test output.
 
 ## Gaps Summary
 
-Phase 174 made substantial progress: the config migration command is gone, legacy memory auto-import is gone, canonical planning reads work without rewrite-on-read on active paths, and the workspace-first docs/template slice is aligned. However, the phase goal was not fully achieved because the repo still carries compatibility drag in touched artifacts: the plugin roadmap parser still ships dead normalization helpers, and the touched NL/fallback stack still routes to unsupported commands that keep the support model split-brain. Repo-wide command-integrity failures in surfaced docs/workflows reinforce that the canonical greenfield support model is not yet consistently reflected across shipped guidance.
+This re-verification confirms that the earlier blocker gaps on the plugin roadmap parser and hidden NL compatibility mappings are closed. Phase 174 now clearly removes `util:config-migrate`, keeps legacy memory data off active canonical paths, preserves canonical `.planning/` parsing without the old rewrite-on-read helper surface, and aligns the main docs/template slice with the workspace-first model.
+
+The phase still does not fully achieve its goal because one part of the shipped command/help surface remains inconsistent: `workflows/plan-phase.md` and `workflows/discuss-phase.md` still fail command-integrity validation, and the focused regression suite is not green. Until those workflow fallback examples are made canonical-safe and the regression slice passes, the repo does not yet fully reflect one clean greenfield support model end-to-end.

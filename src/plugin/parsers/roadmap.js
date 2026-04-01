@@ -14,34 +14,6 @@ function normalizeTddHintValue(value) {
   return null;
 }
 
-function normalizeRoadmapTddMetadata(raw) {
-  if (!raw || typeof raw !== 'string') return { content: raw, changed: false };
-  let changed = false;
-  const content = raw.replace(/^(\*\*TDD:?\*\*:?\s*)([^\n]*)$/gim, (match, _prefix, value) => {
-    const normalized = normalizeTddHintValue(value);
-    const canonical = normalized ? `**TDD:** ${normalized}` : '';
-    if (canonical !== match) changed = true;
-    return canonical;
-  }).replace(/\n{3,}/g, '\n\n');
-  return { content, changed };
-}
-
-function readRoadmapWithTddNormalization(cwd) {
-  const roadmapPath = join(cwd, '.planning', 'ROADMAP.md');
-  let raw;
-  try {
-    raw = readFileSync(roadmapPath, 'utf-8');
-  } catch {
-    return null;
-  }
-  const normalized = normalizeRoadmapTddMetadata(raw);
-  if (normalized.changed) {
-    writeFileSync(roadmapPath, normalized.content, 'utf-8');
-    return normalized.content;
-  }
-  return raw;
-}
-
 /**
  * ROADMAP.md parser for in-process reading.
  * Extracts milestones, phases, progress table from .planning/ROADMAP.md.

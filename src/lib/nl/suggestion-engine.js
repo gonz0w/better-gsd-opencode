@@ -19,19 +19,19 @@ function detectCommandType(lastCommand) {
   }
 
   // Execution commands
-  const executionCommands = ['exec', 'execute', 'execute:phase', 'execute:quick', 'execute:commit'];
+  const executionCommands = ['exec', 'execute', 'execute:commit', '/bgsd-execute-phase', '/bgsd-quick', '/bgsd-resume'];
   if (executionCommands.some(c => cmd.includes(c))) {
     return { category: 'execution', command: cmd };
   }
 
   // Verification commands
-  const verificationCommands = ['verify', 'verify:work', 'verify:state', 'test'];
+  const verificationCommands = ['verify', 'verify:state', 'test', '/bgsd-verify-work'];
   if (verificationCommands.some(c => cmd.includes(c))) {
     return { category: 'verification', command: cmd };
   }
 
   // Session commands
-  const sessionCommands = ['session', 'session:pause', 'session:resume'];
+  const sessionCommands = ['session', '/bgsd-pause', '/bgsd-resume'];
   if (sessionCommands.some(c => cmd.includes(c))) {
     return { category: 'session', command: cmd };
   }
@@ -83,13 +83,13 @@ function getSuggestions(commandType, currentState = {}) {
       if (milestoneStatus === 'ready') {
         add('plan milestone complete', 'Complete current milestone through the planning family', 1);
       } else {
-        add('session pause', 'Pause and review progress', 2);
+        add('/bgsd-pause', 'Pause and review progress', 2);
       }
       break;
 
     case 'session':
       if (commandType.command && commandType.command.includes('pause')) {
-        add('session resume', 'Resume working on the project', 1);
+        add('/bgsd-resume', 'Resume working on the project', 1);
       }
       break;
 

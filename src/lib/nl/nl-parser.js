@@ -246,13 +246,13 @@ function getIntentFromCommand(command) {
     'plan:phase': 'plan',
     'plan:roadmap': 'plan',
     'plan:milestone': 'plan',
-    'execute:phase': 'execute',
-    'execute:quick': 'execute',
+    '/bgsd-execute-phase': 'execute',
+    '/bgsd-quick': 'execute',
     'execute:commit': 'execute',
-    'session:resume': 'execute',
-    'verify:work': 'verify',
+    '/bgsd-resume': 'execute',
+    '/bgsd-verify-work': 'verify',
     'verify:state': 'verify',
-    'session:pause': 'query',
+    '/bgsd-pause': 'query',
     'health': 'query'
   };
   

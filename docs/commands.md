@@ -339,11 +339,9 @@ node bin/bgsd-tools.cjs <command> [args] --raw
 
 ### Common executable CLI routes
 
-These are the direct CLI commands most often used in planning, execution, validation, and settings flows:
+These are the supported direct CLI commands most often used in planning, execution, validation, and settings flows:
 
 ```bash
-node bin/bgsd-tools.cjs init:execute-phase 159
-node bin/bgsd-tools.cjs init:plan-phase 159
 node bin/bgsd-tools.cjs plan:roadmap get-phase 159
 node bin/bgsd-tools.cjs plan:find-phase 159
 node bin/bgsd-tools.cjs plan:requirements mark-complete CMD-05 CMD-06
@@ -367,7 +365,7 @@ node bin/bgsd-tools.cjs lessons:list --phase 159
 
 When JSON output exceeds 50KB, stdout emits a temp-file reference such as `@file:/tmp/bgsd-TIMESTAMP.json`.
 
-For lower-level command families beyond the routes above, use `node bin/bgsd-tools.cjs --help` or inspect the workflow file that owns the surface command you are following.
+For lower-level or workflow-private routes beyond the commands above, inspect the workflow file that owns the surfaced command you are following rather than copying internal bootstrap examples into user-facing guidance.
 
 ---
 

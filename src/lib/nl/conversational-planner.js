@@ -100,11 +100,11 @@ function calculateContextBoost(parsedResult, context) {
   if (!phaseNum) return 0;
   
   // Infer intent from command
-  const intentMap = {
-    'plan': ['plan:phase', 'plan:roadmap', 'plan:milestone'],
-    'execute': ['execute:phase', 'execute:quick', 'execute:commit', 'session:resume'],
-    'verify': ['verify:work', 'verify:state']
-  };
+    const intentMap = {
+      'plan': ['plan:phase', 'plan:roadmap', 'plan:milestone'],
+      'execute': ['/bgsd-execute-phase', '/bgsd-quick', 'execute:commit', '/bgsd-resume'],
+      'verify': ['/bgsd-verify-work', 'verify:state']
+    };
   
   for (const [intent, commands] of Object.entries(intentMap)) {
     if (commands.includes(command)) {

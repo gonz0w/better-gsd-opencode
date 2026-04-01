@@ -295,6 +295,40 @@ describe('plugin parsers and tool registry', () => {
     }
   });
 
+  test('parseRoadmap canonical roadmap parser ships no hidden normalization helper surface', () => {
+    const roadmapParserPath = path.join(__dirname, '..', 'src', 'plugin', 'parsers', 'roadmap.js');
+    const source = fs.readFileSync(roadmapParserPath, 'utf-8');
+
+    assert.doesNotMatch(
+      source,
+      /function\s+(?:normalizeRoadmapTddMetadata|readRoadmapWithTddNormalization)\s*\(/,
+      'GAP-174-01: plugin roadmap parser should not ship leftover helper-driven normalization entry points'
+    );
+    assert.doesNotMatch(
+      source,
+      /writeFileSync\s*\(/,
+      'GAP-174-01: plugin roadmap parser should never rewrite ROADMAP.md during canonical reads'
+    );
+  });
+
+  test('parseRoadmap canonical roadmap metadata still parses without normalization aliases', async () => {
+    const mod = await import(pluginPath);
+    const { parseRoadmap, invalidateRoadmap } = mod;
+    const tmpDir = createTempProject();
+
+    try {
+      const roadmapPath = path.join(tmpDir, '.planning', 'ROADMAP.md');
+      fs.writeFileSync(roadmapPath, '# Roadmap\n\n### Phase 1: Foundation\n**Goal:** Set up project\n**TDD:** required\n');
+      invalidateRoadmap(tmpDir);
+
+      const roadmap = parseRoadmap(tmpDir);
+      assert.ok(roadmap, 'should parse roadmap');
+      assert.strictEqual(roadmap.getPhase(1).tdd, 'required', 'canonical roadmap metadata should still be read directly');
+    } finally {
+      cleanup(tmpDir);
+    }
+  });
+
   test('parsePlan handles minimal frontmatter without tasks', async () => {
     const mod = await import(pluginPath);
     const { parsePlan, invalidatePlans } = mod;

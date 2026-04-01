@@ -143,13 +143,9 @@ These are thin wrappers that call `bgsd-tools.cjs` for data and format the outpu
 
 ### Context Injection
 
-Every workflow starts by calling an `init` command to get all necessary context:
+Workflows typically start by calling a workflow-private bootstrap route to get all necessary context. For example, the planning workflow uses the internal `init:plan-phase` bootstrap before it reads roadmap, state, and requirements context.
 
-```bash
-node bin/bgsd-tools.cjs init:plan-phase 1 --raw
-```
-
-This returns a compound JSON object with state, roadmap, config, codebase intelligence, memory, and session continuity — everything the workflow needs in one call.
+That bootstrap returns a compound JSON object with state, roadmap, config, codebase intelligence, memory, and session continuity — everything the workflow needs in one call.
 
 ### Agent Spawning
 

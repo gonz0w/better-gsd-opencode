@@ -12,7 +12,7 @@ v18.1 reduces cleanup drag before adding anything new. The milestone starts with
 ## Phases
 
 - [x] **Phase 173: Simplification Audit & Safe Sequencing** (completed 2026-03-31) - Classify cleanup targets and safe order of operations before deleting or flattening anything.
-- [x] **Phase 174: Greenfield Compatibility Surface Cleanup** (completed 2026-04-01) - Remove migration-only and superseded normalization paths while keeping canonical artifacts valid.
+- [ ] **Phase 174: Greenfield Compatibility Surface Cleanup** - Remove migration-only and superseded normalization paths while keeping canonical artifacts valid; verification gaps remain.
 - [ ] **Phase 175: Canonical Command Surface Alignment** - Move routing, aliases, help, and discovery toward one clearer command definition and supported guidance surface.
 - [ ] **Phase 176: Command Hotspot Simplification & Hardening** - Break up the highest-friction CLI hotspots and prove supported workflows still hold after cleanup.
 
@@ -36,7 +36,7 @@ v18.1 reduces cleanup drag before adding anything new. The milestone starts with
   1. Maintainers can remove migration-only commands and helpers for obsolete installs, storage transitions, or local-state upgrades without leaving routed dead surfaces behind.
   2. Current canonical `.planning/` files still parse and validate without legacy normalization paths for superseded planning or config shapes.
   3. Users see docs, templates, and help text that consistently teach the supported JJ/workspace-first model instead of stale worktree-era or compatibility-era guidance.
-**Plans**: 5/7 plans complete
+**Plans**: 7/7 plans complete
 
 ### Phase 175: Canonical Command Surface Alignment
 **Goal**: Maintainers can change the supported command surface from one clearer canonical definition instead of keeping routing, aliases, help, and discovery in parallel drift-prone paths
@@ -63,11 +63,14 @@ v18.1 reduces cleanup drag before adding anything new. The milestone starts with
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 173. Simplification Audit & Safe Sequencing | 2/2 | Complete    | 2026-03-31 |
-| 174. Greenfield Compatibility Surface Cleanup | 5/5 | Complete   | 2026-04-01 |
+| 174. Greenfield Compatibility Surface Cleanup | 7/7 | Gaps found  | - |
 | 175. Canonical Command Surface Alignment | 0/TBD | Not started | - |
 | 176. Command Hotspot Simplification & Hardening | 0/TBD | Not started | - |
 
 ## Backlog
+
+- **JJ Workspace Parallel Execution** - Future milestone candidate to make workspace-parallel execution real and safe by adding runtime-enforced workspace pinning, moving shared planning artifacts to a single-writer reconcile/finalize path, and proving deterministic shared-state outcomes after parallel plan execution.
+  - Backlog: `.planning/research/JJ-WORKSPACE-PARALLEL-EXECUTION-BACKLOG.md`
 
 - **Risk-Based Testing Strategy** - Future milestone candidate to formalize when this repo should use targeted proof versus broad regression gates, align TDD and verification guidance, and reduce redundant testing cost without lowering confidence.
   - PRD: `.planning/resources/RISK-BASED-TESTING-PRD.md`
@@ -75,4 +78,4 @@ v18.1 reduces cleanup drag before adding anything new. The milestone starts with
 
 ---
 
-*Last updated: 2026-03-31*
+*Last updated: 2026-04-01*
