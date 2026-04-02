@@ -5,17 +5,17 @@
 See: .planning/PROJECT.md (updated 2026-04-01)
 
 **Core value:** Manage and deliver high-quality software with high-quality documentation, while continuously reducing token usage and improving performance.
-**Current focus:** Phase 185 plan 01 complete — shared cmux backbone ready for plugin wiring
+**Current focus:** Phase 185 complete — ready for verification
 
 ## Current Position
 
 **Phase:** 185 of 186 (cmux Coordination Backbone)
 **Current Plan:** 2
 **Total Plans in Phase:** 2
-**Status:** In progress
+**Status:** Phase complete — ready for verification
 **Last Activity:** 2026-04-02
 
-Progress: [█████████░] 99%
+Progress: [██████████] 100%
 
 ## Performance Metrics
 
@@ -38,14 +38,13 @@ Progress: [█████████░] 99%
 **Recent Trend:**
 - Last shipped milestone: v18.1 completed 8 phases (173-180)
 - Trend: Stable
+| Phase 185-cmux-coordination-backbone P02 | 6 min | 2 tasks | 2 files |
+| Phase 185-cmux-coordination-backbone P02 | 6 min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
 ### Decisions
 
-- [Phase 174]: Canonical roadmap and plan readers now stay strict and stop rewriting legacy TDD metadata on read — Phase 174 intent requires canonical-only active paths with CLI and plugin reader parity rather than hidden normalization
-- [Phase 173]: Defined gate-based cleanup sequencing and staged router/ambient-global hot spots last — Phase 173 now needs explicit safety boundaries so later cleanup plans can start with proven low-blast-radius work and defer router, argv, and oversized command hotspots until earlier reductions land.
-- [Phase 173]: Defined gate-based cleanup sequencing and staged router/ambient-global hot spots last — Phase 173 now needs explicit safety boundaries so later cleanup plans can start with proven low-blast-radius work and defer router, argv, and oversized command hotspots until earlier reductions land.
 - [Phase 174]: Removed util:config-migrate from the supported CLI surface and docs — Phase 174 requires migration-only config helpers to disappear so maintainers follow canonical validate/edit workflows.
 - [Phase 174]: Removed legacy JSON memory auto-import from active init and util:memory flows — Phase 174 needs canonical greenfield-only memory behavior, so active SQLite-backed paths now ignore retired JSON migration bridges while map fallback stays explicit runtime resilience.
 - [Phase 174]: Canonical roadmap and plan readers now stay strict and stop rewriting legacy TDD metadata on read — Phase 174 intent requires canonical-only active paths with CLI and plugin reader parity rather than hidden normalization
@@ -544,6 +543,8 @@ Progress: [█████████░] 99%
 - [Phase 180-command-validator-drift-resolution]: Lock validator-drift closure with a focused regression over the exact backlog files plus raw proof-inventory assertions instead of adding a second manifest or extra exclusions.
 - [Phase 184-deterministic-finalize-partial-wave-recovery]: Wave-aware inventory now surfaces staged-ready blockers and canonical recovery-summary guidance. — Phase 184 needs operator-facing surfaces to preserve deterministic recovery truth instead of forcing raw manifest reconstruction.
 - [Phase 185-cmux-coordination-backbone]: Added a dependency-injected single-flight cmux refresh backbone with bounded trigger merging so later plugin hooks can share one fresh payload instead of spawning duplicate cmux refresh work.
+- [Phase 185-cmux-coordination-backbone]: Plugin hooks now share one debounced cmux refresh backbone with bounded suppression wake-up. — Phase 185 needed one coordinated refresh path so startup stays immediate, later bursts coalesce, and retryable suppression can wake early on planning-file changes without duplicate sidebar or attention reads.
+- [Phase 185-cmux-coordination-backbone]: Plugin hooks now share one debounced cmux refresh backbone with bounded suppression wake-up on planning-file changes.
 
 ### Pending Todos
 
@@ -555,6 +556,6 @@ None
 
 ## Session Continuity
 
-Last session: 2026-04-02T04:22:23Z
-Stopped at: Completed 185-01-PLAN.md
+Last session: 2026-04-02T04:33:44.144Z
+Stopped at: Completed 185-02-PLAN.md
 Resume file: None
