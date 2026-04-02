@@ -6,7 +6,7 @@ const { execFileSync } = require('child_process');
 const { output, error, debugLog } = require('../lib/output');
 const { extractFrontmatter } = require('../lib/frontmatter');
 const { requireJjForExecution } = require('../lib/jj');
-const { collectWorkspaceProof, comparablePath, inspectWorkspace } = require('../lib/jj-workspace');
+const { applyWaveRecoveryMetadata, collectWorkspaceProof, comparablePath, inspectWorkspace } = require('../lib/jj-workspace');
 
 const WORKSPACE_DEFAULTS = {
   base_path: '/tmp/gsd-workspaces',
@@ -141,7 +141,7 @@ function listActiveWorkspaceInventory(cwd, phaseNumber) {
     phasePlans.map((plan) => [plan.planId, plan])
   );
 
-  return listManagedWorkspaces(cwd)
+  const phaseWorkspaces = listManagedWorkspaces(cwd)
     .map((workspace) => {
       const inspected = inspectWorkspace(workspace);
       const plan = planMap.get(inspected.plan_id);
@@ -159,7 +159,13 @@ function listActiveWorkspaceInventory(cwd, phaseNumber) {
         } : null,
       };
     })
-    .filter((workspace) => normalizedPhase ? workspace.phase_matches_execution : true)
+    .filter((workspace) => normalizedPhase ? workspace.phase_matches_execution : true);
+
+  return phaseWorkspaces
+    .map((workspace) => {
+      const siblings = phaseWorkspaces.filter((candidate) => candidate.name !== workspace.name);
+      return applyWaveRecoveryMetadata(workspace, siblings);
+    })
     .sort((a, b) => a.name.localeCompare(b.name));
 }
 
@@ -303,19 +309,23 @@ function cmdWorkspaceReconcile(cwd, target, raw) {
   }
 
   const inspected = inspectWorkspace(workspace);
+  const parsed = parsePlanId(inspected.plan_id || inspected.name || '');
+  const phaseInventory = parsed ? listActiveWorkspaceInventory(cwd, parsed.phase) : [];
+  const enriched = phaseInventory.find((entry) => entry.name === inspected.name) || applyWaveRecoveryMetadata(inspected, []);
 
   output({
-    reconciled: inspected.status === 'healthy',
+    reconciled: enriched.status === 'healthy',
     mode: 'preview',
-    workspace: inspected,
-    status: inspected.status,
-    result_manifest: inspected.result_manifest,
-    diagnostics: inspected.diagnostics,
-    recovery_allowed: inspected.recovery_allowed,
-    recovery_preview: inspected.recovery_preview,
-    message: inspected.recovery_needed
+    workspace: enriched,
+    status: enriched.status,
+    result_manifest: enriched.result_manifest,
+    diagnostics: enriched.diagnostics,
+    recovery_allowed: enriched.recovery_allowed,
+    recovery_preview: enriched.recovery_preview,
+    recovery_summary: enriched.recovery_summary,
+    message: enriched.recovery_needed
       ? 'Preview only: inspect the JJ-backed diagnostics and recovery proposal before choosing any mutation.'
-      : inspected.result_manifest?.quarantine
+      : enriched.result_manifest?.quarantine
         ? 'Preview only: inspect the quarantined workspace result manifest before finalize.'
         : 'Preview only: workspace reconcile remains preview-only; inspect the summary first and review direct proof for major completion claims or risky runtime/shared-state work.',
   }, raw);

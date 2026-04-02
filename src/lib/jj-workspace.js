@@ -7,6 +7,7 @@ const { execJj } = require('./jj');
 
 const OP_LOG_LIMIT = 5;
 const WORKSPACE_FALLBACK_REASON = 'workspace proof missing or mismatched before work start';
+const CANONICAL_RECONCILE_CMD = 'node bin/bgsd-tools.cjs workspace reconcile';
 const SHARED_PLANNING_FILES = [
   '.planning/STATE.md',
   '.planning/ROADMAP.md',
@@ -97,6 +98,24 @@ function parseStatusPaths(stdout) {
     .map((line) => line.match(/^[AMDRC?]\s+(.+)$/))
     .filter(Boolean)
     .map((match) => toPosixPath(match[1].trim()));
+}
+
+function parsePlanId(planId) {
+  if (!planId) return null;
+  const match = String(planId).match(/^(\d+(?:\.\d+)?)-(\d+)$/);
+  if (!match) return null;
+  return { phase: match[1], plan: match[2] };
+}
+
+function comparePlanOrder(left, right) {
+  const leftParsed = parsePlanId(left?.plan_id || left?.name || '');
+  const rightParsed = parsePlanId(right?.plan_id || right?.name || '');
+  if (!leftParsed || !rightParsed) {
+    return String(left?.plan_id || left?.name || '').localeCompare(String(right?.plan_id || right?.name || ''));
+  }
+  const phaseCmp = Number(leftParsed.phase) - Number(rightParsed.phase);
+  if (phaseCmp !== 0) return phaseCmp;
+  return Number(leftParsed.plan) - Number(rightParsed.plan);
 }
 
 function findPlanFile(workspaceRoot, planId) {
@@ -302,6 +321,92 @@ function createRecoveryPreview(workspace, status, statusResult) {
   return null;
 }
 
+function classifyBlockingReason(workspace) {
+  if (!workspace) return null;
+  if (workspace.result_manifest?.shared_planning_violation?.quarantine) return 'quarantine';
+  if (workspace.status === 'finalize_failed' || workspace.result_manifest?.finalize_failed) return 'finalize_failed';
+  if (!workspace.result_manifest?.summary_path && workspace.result_manifest?.inspection_level === 'direct-proof') return 'proof_missing';
+  if (workspace.status === 'stale') return 'stale';
+  if (workspace.status === 'divergent') return 'divergent';
+  if (workspace.status === 'missing') return 'missing';
+  if (workspace.status === 'failed') return 'failed';
+  return null;
+}
+
+function createProofArtifacts(blocker) {
+  if (!blocker) return null;
+  const planId = blocker.plan_id || blocker.name || null;
+  return {
+    summary: blocker.result_manifest?.summary_path || null,
+    jj_op_log: blocker.path ? `jj -R ${JSON.stringify(blocker.path)} op log --limit ${OP_LOG_LIMIT}` : null,
+    reconcile_preview: planId ? `${CANONICAL_RECONCILE_CMD} ${planId}` : null,
+    recovery_commands: Array.isArray(blocker.recovery_preview?.commands)
+      ? blocker.recovery_preview.commands.map((entry) => entry.command)
+      : [],
+  };
+}
+
+function createWaveRecoverySummary(targetWorkspace, siblingWorkspaces = []) {
+  const siblings = [targetWorkspace, ...siblingWorkspaces]
+    .filter(Boolean)
+    .sort(comparePlanOrder);
+  const targetId = targetWorkspace?.plan_id || targetWorkspace?.name;
+  const targetIndex = siblings.findIndex((workspace) => (workspace.plan_id || workspace.name) === targetId);
+  if (targetIndex === -1) return null;
+
+  const blockerIndex = siblings.findIndex((workspace) => classifyBlockingReason(workspace));
+  const blocker = blockerIndex === -1 ? null : siblings[blockerIndex];
+  const targetBlockerReason = classifyBlockingReason(targetWorkspace);
+  const gatingSibling = blocker ? (blocker.plan_id || blocker.name || null) : null;
+  const targetStatus = targetBlockerReason
+    ? targetBlockerReason
+    : (blockerIndex !== -1 && targetIndex > blockerIndex ? 'staged_ready' : targetWorkspace.status);
+
+  if (!targetBlockerReason && targetStatus !== 'staged_ready') {
+    return null;
+  }
+
+  const effectiveBlocker = targetBlockerReason ? targetWorkspace : blocker;
+  const planId = effectiveBlocker?.plan_id || effectiveBlocker?.name || null;
+
+  return {
+    status: targetStatus,
+    gating_sibling: gatingSibling,
+    blocking_reason: targetBlockerReason || classifyBlockingReason(blocker),
+    next_command: planId ? `${CANONICAL_RECONCILE_CMD} ${planId}` : null,
+    proof_artifacts: createProofArtifacts(effectiveBlocker),
+  };
+}
+
+function applyWaveRecoveryMetadata(targetWorkspace, siblingWorkspaces = []) {
+  const summary = createWaveRecoverySummary(targetWorkspace, siblingWorkspaces);
+  if (!summary) {
+    return {
+      ...targetWorkspace,
+      gating_sibling: null,
+      blocking_reason: null,
+      recovery_summary: null,
+    };
+  }
+
+  return {
+    ...targetWorkspace,
+    raw_status: targetWorkspace.status,
+    status: summary.status,
+    recovery_needed: summary.status !== 'healthy',
+    gating_sibling: summary.gating_sibling,
+    blocking_reason: summary.blocking_reason,
+    recovery_summary: summary,
+    result_manifest: {
+      ...(targetWorkspace.result_manifest || {}),
+      staged_ready: summary.status === 'staged_ready',
+      gating_sibling: summary.gating_sibling,
+      blocking_reason: summary.blocking_reason,
+      recovery_summary: summary,
+    },
+  };
+}
+
 function inspectWorkspace(workspace) {
   const diagnostics = {
     workspace: {
@@ -383,9 +488,12 @@ function inspectWorkspace(workspace) {
 }
 
 module.exports = {
+  applyWaveRecoveryMetadata,
   collectWorkspaceProof,
   comparablePath,
+  createWaveRecoverySummary,
   inspectWorkspace,
+  parsePlanId,
   SHARED_PLANNING_FILES,
   WORKSPACE_FALLBACK_REASON,
 };
