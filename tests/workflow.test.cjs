@@ -984,6 +984,19 @@ describe('Phase 183 workspace ownership workflow contracts', () => {
   });
 });
 
+describe('Phase 184 partial-wave recovery workflow contracts', () => {
+  test('execute-phase teaches summary-first recovery and trusted-main finalize-wave reruns', () => {
+    const executePhase = fs.readFileSync(path.join(process.cwd(), 'workflows', 'execute-phase.md'), 'utf-8');
+
+    assert.match(executePhase, /canonical recovery summary/i);
+    assert.match(executePhase, /gating sibling/i);
+    assert.match(executePhase, /next command/i);
+    assert.match(executePhase, /execute:finalize-wave/i);
+    assert.match(executePhase, /trusted main-checkout state/i);
+    assert.doesNotMatch(executePhase, /workspace-local retries/i);
+  });
+});
+
 describe('Phase 157 planning context cascade workflow contracts', () => {
   test('new-milestone gives milestone strategy a single owned home', () => {
     const workflow = fs.readFileSync(path.join(process.cwd(), 'workflows', 'new-milestone.md'), 'utf-8');

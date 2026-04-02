@@ -205,6 +205,34 @@ describe('workspace commands', () => {
     assert.match(reconcileData.recovery_summary.proof_artifacts.jj_op_log, /op log --limit 5/);
   });
 
+  test('list and init inventory surface staged-ready siblings plus canonical recovery summary guidance', (t) => {
+    if (!hasJj()) t.skip('jj unavailable');
+    createJjProject();
+
+    writePlan(tmpDir, '155-01', 'full', ['src/lib/jj-workspace.js']);
+    writePlan(tmpDir, '155-02', 'full', ['src/commands/workspace.js']);
+
+    const first = createManagedWorkspace(tmpDir, '155-01');
+    const second = createManagedWorkspace(tmpDir, '155-02');
+    writePlan(first.path, '155-01', 'full', ['src/lib/jj-workspace.js']);
+    writePlan(second.path, '155-02', 'full', ['src/commands/workspace.js']);
+    fs.writeFileSync(path.join(first.path, '.planning', 'phases', '155-jj-workspaces', '155-01-SUMMARY.md'), '# Summary\n');
+    fs.writeFileSync(path.join(second.path, '.planning', 'phases', '155-jj-workspaces', '155-02-SUMMARY.md'), '# Summary\n');
+    markWorkspaceStale(tmpDir, first.path);
+
+    const listData = JSON.parse(runGsdToolsInRepo('workspace list', tmpDir).output);
+    const listedSecond = listData.workspaces.find((workspace) => workspace.plan_id === '155-02');
+    assert.strictEqual(listedSecond.status, 'staged_ready');
+    assert.strictEqual(listedSecond.gating_sibling, '155-01');
+    assert.match(listedSecond.recovery_summary.next_command, /workspace reconcile 155-01/);
+
+    const initData = JSON.parse(runGsdToolsInRepo('init:execute-phase 155 --raw', tmpDir).output);
+    assert.deepStrictEqual(initData.workspace_active_summary.staged_ready, ['155-02']);
+    assert.deepStrictEqual(initData.workspace_active_summary.recovery_needed, ['155-01']);
+    assert.strictEqual(initData.workspace_active_summary.gating_sibling, '155-01');
+    assert.match(initData.workspace_active_summary.recovery_summary.next_command, /workspace reconcile 155-01/);
+  });
+
   test('cleanup retains stale recovery workspaces while removing healthy ones', (t) => {
     if (!hasJj()) t.skip('jj unavailable');
     createJjProject();
