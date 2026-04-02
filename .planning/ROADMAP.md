@@ -88,7 +88,7 @@ v19.0 hardens execution control in the order the repo needs it to become trustwo
 | 181. Workspace Root Truth & Safe Fallback | 2/2 | Complete    | 2026-04-01 |
 | 182. Risk-Routed Hardening Proof Policy | 2/2 | Complete    | 2026-04-01 |
 | 183. Plan-Local Workspace Ownership | 2/2 | Complete    | 2026-04-02 |
-| 184. Deterministic Finalize & Partial-Wave Recovery | 3/3 | Complete   | 2026-04-02 |
+| 184. Deterministic Finalize & Partial-Wave Recovery | 3/3 | Complete    | 2026-04-02 |
 | 185. cmux Coordination Backbone | 0/2 | Not started | - |
 | 186. cmux Truthful Lifecycle Signals | 0/2 | Not started | - |
 
