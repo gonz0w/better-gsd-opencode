@@ -1,5 +1,34 @@
 # Milestones
 
+## ✅ v19.0 Workspace Execution, cmux Coordination & Risk-Based Testing (Shipped: 2026-04-02)
+
+**Delivered:** bGSD now ships a runtime-truthful JJ workspace execution milestone with proof-first workspace safety, single-writer finalize and recovery, trustworthy `cmux` coordination, and explicit risk-based verification routing.
+
+**Phases completed:** 7 phases (181-187), 15 plans, 30 tasks
+**Commits:** 51 | **Files changed:** 75 | **Lines:** +12,657 / -5,241
+**Timeline:** 2 days (2026-04-01 -> 2026-04-02)
+
+**Key accomplishments:**
+- Added a real `workspace prove` triple-match gate so workspace-parallel execution only proceeds after intended root, cwd, and `jj workspace root` all agree, with safe sequential fallback when proof fails
+- Kept workspace execution plan-local until one trusted finalize path promotes shared `.planning/` truth through canonical state, roadmap, and requirements mutators
+- Made partial-wave recovery deterministic with staged-ready sibling handling, canonical recovery summaries, and `execute:finalize-wave` reruns from trusted main-checkout state
+- Routed plugin refresh work through one debounced, bounded, fail-open `cmux` backbone instead of duplicate sidebar and attention refresh paths
+- Reused one shared lifecycle signal for `cmux` sidebar status, progress treatment, logs, and intervention-only attention notifications so operators can tell normal progress from required action
+- Restored formal verification coverage for the risk-routing slice so `TEST-01` through `TEST-04` are now backed by current verification evidence instead of summary-only claims
+
+**What's next:** Ready for next milestone - `/bgsd-new-milestone`
+
+**Archives:**
+- `.planning/milestones/v19.0-ROADMAP.md`
+- `.planning/milestones/v19.0-REQUIREMENTS.md`
+- `.planning/milestones/v19.0-DOCS.md`
+- `.planning/milestones/v19.0-MILESTONE-AUDIT.md`
+- `.planning/milestones/v19.0-MILESTONE-INTENT.md`
+- `.planning/milestones/v19.0-phases/`
+- `.planning/archive/INTENT-vv19.0.md`
+
+---
+
 ## ✅ v18.1 Greenfield Cleanup & CLI Simplification (Shipped: 2026-04-01)
 
 **Delivered:** bGSD now ships a greener, smaller command surface with compatibility-era drag removed, smaller CLI hotspots, and trustworthy shipped guidance validation across source and bundled runtime.
@@ -899,29 +928,6 @@
 - `.planning/milestones/v14.1-ROADMAP.md`
 - `.planning/milestones/v14.1-REQUIREMENTS.md`
 - `.planning/milestones/v14.1-DOCS.md`
-
----
-
-## v19.0 Workspace Execution, cmux Coordination & Risk-Based Testing (Shipped: 2026-04-02)
-
-**Phases completed:** 7 phases, 15 plans, 0 tasks
-
-**Key accomplishments:**
-- Runtime JJ workspace proof gate with `workspace prove` triple-match evidence and one generic sequential fallback
-- Proof-first workspace execution gate with generic sequential fallback and workspace-rooted plan-local outputs
-- Policy-first verification routing now normalizes explicit proof buckets for risky runtime and plugin work
-- Planner and verifier artifacts now enforce explicit route metadata and bucketed required-versus-exempt proof reporting
-- Preview-only workspace reconcile now emits normalized result manifests with inspection escalation and shared-planning violation triage
-- Single-writer workspace finalize coordinator that auto-promotes healthy reconcile-ready workspaces through canonical state, roadmap, and requirements mutators
-- Wave-aware staged-ready reconcile metadata with canonical gating-sibling recovery summaries for JJ workspaces
-- Deterministic execute:finalize-wave promotion that preserves staged-ready siblings and regenerates canonical recovery metadata on rerun
-- Wave-aware workspace inventory now reports staged-ready blockers and execute-phase guidance points operators to canonical recovery summaries plus trusted-main finalize-wave reruns.
-- Single-flight cmux refresh backbone with debounced coalescing, one shared project snapshot, and bounded reruns
-- Plugin hooks now share one debounced cmux refresh backbone with quiet suppression backoff and planning-file wake-up
-- Shared cmux lifecycle classification now drives truthful waiting/stale/finalize-failed/running sidebar status, compact hints, and progress suppression from one source of truth.
-- cmux attention now reuses the shared lifecycle snapshot to notify only for waiting, stale, and finalize-failed workspaces while logging truthful recovery transitions.
-- Locked rebuilt-runtime proof wording is restored across execute and verify workflow guidance with the focused workflow suite green again
-- Phase 182 now has formal three-source verification coverage and TEST traceability rows that point at focused proof instead of summary-only claims
 
 ---
 
