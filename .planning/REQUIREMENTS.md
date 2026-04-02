@@ -21,7 +21,7 @@
 ### cmux Runtime Coordination & Observability
 
 - [x] **CMUX-01**: Plugin coalesces noisy runtime events into a debounced, bounded cmux refresh pipeline that avoids duplicate parse or process storms during parallel activity
-- [ ] **CMUX-02**: User can see truthful workspace-scoped status, progress, and logs in cmux for running, blocked, waiting, stale, reconciling, finalize-failed, idle, and complete states
+- [x] **CMUX-02**: User can see truthful workspace-scoped status, progress, and logs in cmux for running, blocked, waiting, stale, reconciling, finalize-failed, idle, and complete states
 - [ ] **CMUX-03**: User receives clear cmux attention signals when human input, stale-workspace recovery, or finalize intervention is required
 - [x] **CMUX-04**: Plugin preserves quiet fail-open behavior when cmux is unavailable, unreachable, or not trusted for attachment
 
@@ -64,7 +64,7 @@
 | FIN-03 | Phase 184 | Complete | TBD |
 | FIN-04 | Phase 184 | Complete | TBD |
 | CMUX-01 | Phase 185 | Complete | TBD |
-| CMUX-02 | Phase 186 | Pending | TBD |
+| CMUX-02 | Phase 186 | Complete | TBD |
 | CMUX-03 | Phase 186 | Pending | TBD |
 | CMUX-04 | Phase 185 | Complete | TBD |
 | TEST-01 | Phase 182 | Pending | TBD |

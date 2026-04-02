@@ -79,7 +79,7 @@ v19.0 hardens execution control in the order the repo needs it to become trustwo
   1. User can see truthful workspace-scoped status, progress, and logs for running, blocked, waiting, stale, reconciling, finalize-failed, idle, and complete states.
   2. User receives a clear `cmux` attention signal when human input, stale-workspace recovery, or finalize intervention is required.
   3. Required-intervention states stand out from normal progress so operators can tell where to act without polling raw logs.
-**Plans**: 2 plans
+**Plans**: 1/2 plans complete
 
 ## Progress
 
@@ -90,7 +90,7 @@ v19.0 hardens execution control in the order the repo needs it to become trustwo
 | 183. Plan-Local Workspace Ownership | 2/2 | Complete    | 2026-04-02 |
 | 184. Deterministic Finalize & Partial-Wave Recovery | 3/3 | Complete    | 2026-04-02 |
 | 185. cmux Coordination Backbone | 2/2 | Complete    | 2026-04-02 |
-| 186. cmux Truthful Lifecycle Signals | 0/2 | Not started | - |
+| 186. cmux Truthful Lifecycle Signals | 1/2 | In Progress | - |
 
 ---
 

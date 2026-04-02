@@ -5,24 +5,24 @@
 See: .planning/PROJECT.md (updated 2026-04-01)
 
 **Core value:** Manage and deliver high-quality software with high-quality documentation, while continuously reducing token usage and improving performance.
-**Current focus:** Phase 185 complete — ready for verification
+**Current focus:** Phase 186 Plan 02 pending — attention and notification wiring can now reuse the shared lifecycle classifier
 
 ## Current Position
 
-**Phase:** 185 of 186 (cmux Coordination Backbone)
-**Current Plan:** Not started
+**Phase:** 186 of 186 (cmux Truthful Lifecycle Signals)
+**Current Plan:** 2 of 2
 **Total Plans in Phase:** 2
-**Status:** Ready to plan
+**Status:** In progress
 **Last Activity:** 2026-04-02
 
-Progress: [██████████] 100%
+Progress: [█████████░] 99%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 371
+- Total plans completed: 372
 - Average duration: ~12 min
-- Total execution time: ~56.4 hours
+- Total execution time: ~56.5 hours
 
 **By Phase:**
 
@@ -34,10 +34,12 @@ Progress: [██████████] 100%
 | 183 | 2 | 16 min | 8 min |
 | 184 | 3 | 23 min | 8 min |
 | 185 | 1 | 3 min | 3 min |
+| 186 | 1 | 8 min | 8 min |
 
 **Recent Trend:**
 - Last shipped milestone: v18.1 completed 8 phases (173-180)
 - Trend: Stable
+| Phase 186-cmux-truthful-lifecycle-signals P01 | 8 min | 2 tasks | 6 files |
 | Phase 185-cmux-coordination-backbone P02 | 6 min | 2 tasks | 2 files |
 | Phase 185-cmux-coordination-backbone P02 | 6 min | 2 tasks | 2 files |
 
@@ -545,6 +547,7 @@ Progress: [██████████] 100%
 - [Phase 185-cmux-coordination-backbone]: Added a dependency-injected single-flight cmux refresh backbone with bounded trigger merging so later plugin hooks can share one fresh payload instead of spawning duplicate cmux refresh work.
 - [Phase 185-cmux-coordination-backbone]: Plugin hooks now share one debounced cmux refresh backbone with bounded suppression wake-up. — Phase 185 needed one coordinated refresh path so startup stays immediate, later bursts coalesce, and retryable suppression can wake early on planning-file changes without duplicate sidebar or attention reads.
 - [Phase 185-cmux-coordination-backbone]: Plugin hooks now share one debounced cmux refresh backbone with bounded suppression wake-up on planning-file changes.
+- [Phase 186-cmux-truthful-lifecycle-signals]: Sidebar truth now comes from one ordered lifecycle classifier with separate compact activity hints and hidden progress for waiting, stale, finalize-failed, and other intervention states. — Phase 186 plan 01 needed one semantic source of truth so cmux surfaces stop inventing conflicting lifecycle meanings.
 
 ### Pending Todos
 
@@ -556,6 +559,6 @@ None
 
 ## Session Continuity
 
-Last session: 2026-04-02T04:33:44.144Z
-Stopped at: Completed 185-02-PLAN.md
-Resume file: None
+Last session: 2026-04-02T05:12:36Z
+Stopped at: Completed 186-01-PLAN.md
+Resume file: .planning/phases/186-cmux-truthful-lifecycle-signals/186-02-PLAN.md
