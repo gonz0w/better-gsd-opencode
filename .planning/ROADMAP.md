@@ -28,7 +28,7 @@ v19.1 should land in the order the repo now needs: first remove JJ/Git correctne
   1. User can run JJ-backed commit or health flows in a colocated repo without detached Git HEAD being treated as a generic failure.
   2. User can inspect bookmark existence, tracked status, target revision, and conflict state without relying on checked-out Git branch state.
   3. JJ-backed diagnostics prioritize `jj root`, `jj status`, and bookmark state, while detached HEAD is shown only as informational context when relevant.
-**Plans**: 0 plans
+**Plans**: 2 plans
 
 ### Phase 189: JJ-First Vocabulary & Interop-Safe Guidance
 **Goal**: Users see one consistent JJ-first local mental model across help, workflows, docs, and runtime guidance while Git branch wording remains only where remote interop needs it
