@@ -5,16 +5,17 @@
 See: .planning/PROJECT.md (updated 2026-04-01)
 
 **Core value:** Manage and deliver high-quality software with high-quality documentation, while continuously reducing token usage and improving performance.
-**Current focus:** Phase 184 plan 02 complete — ready for truthful partial-wave reporting
+**Current focus:** Phase 184 complete — ready for verification
 
 ## Current Position
 
-Phase: 184 of 186 (Deterministic Finalize & Partial-Wave Recovery)
-Plan: 02 of 03 in current phase
-Status: In progress — deterministic wave finalize shipped
-Last activity: 2026-04-02 - Completed plan 02 deterministic wave finalize
+**Phase:** 184 of 186 (Deterministic Finalize & Partial-Wave Recovery)
+**Current Plan:** 3
+**Total Plans in Phase:** 3
+**Status:** Phase complete — ready for verification
+**Last Activity:** 2026-04-02 - Completed plan 03 truthful partial-wave reporting
 
-Progress: [███████░░░] 67%
+Progress: [██████████] 100%
 
 ## Performance Metrics
 
@@ -31,7 +32,7 @@ Progress: [███████░░░] 67%
 | 181 | 2 | 8 min | 4 min |
 | 182 | 2 | ~0.3 hours | ~9 min |
 | 183 | 2 | 16 min | 8 min |
-| 184 | 2 | 17 min | 9 min |
+| 184 | 3 | 23 min | 8 min |
 
 **Recent Trend:**
 - Last shipped milestone: v18.1 completed 8 phases (173-180)
@@ -41,8 +42,6 @@ Progress: [███████░░░] 67%
 
 ### Decisions
 
-- [Phase 184]: `execute:finalize-wave` now promotes only the canonical healthy prefix and regenerates shared wave recovery JSON on rerun. — Deterministic finalize needs one trusted-main command that keeps healthy siblings staged behind the first blocker without letting finish order leak into shared planning truth.
-- [Phase 184]: Wave-aware reconcile now marks later healthy siblings as `staged_ready` and routes recovery inspection through one canonical gating-sibling summary. — Deterministic finalize needs healthy work to stay inspectable behind the first blocker without inventing new recovery prose per surface.
 - [Phase 182]: Verifier/report surfaces now keep behavior proof, regression proof, and human verification in separate buckets, with route-exempt buckets rendered as `not required`. — Phase 182 needs verifier output to distinguish missing proof from exempt proof clearly.
 - [Phase 174]: Canonical roadmap and plan readers now stay strict and stop rewriting legacy TDD metadata on read — Phase 174 intent requires canonical-only active paths with CLI and plugin reader parity rather than hidden normalization
 - [Phase 173]: Defined gate-based cleanup sequencing and staged router/ambient-global hot spots last — Phase 173 now needs explicit safety boundaries so later cleanup plans can start with proven low-blast-radius work and defer router, argv, and oversized command hotspots until earlier reductions land.
@@ -543,6 +542,7 @@ Progress: [███████░░░] 67%
 - [Phase 180-command-validator-drift-resolution]: Validator raw output now reports proof inventory and named exclusions from validator-owned data so green results have stable meaning.
 - [Phase 180-command-validator-drift-resolution]: Use util:validate-commands --raw as the sole authority for surfaced backlog reconciliation, leaving Phase 180 backlog files untouched when the settled contract already validates them cleanly.
 - [Phase 180-command-validator-drift-resolution]: Lock validator-drift closure with a focused regression over the exact backlog files plus raw proof-inventory assertions instead of adding a second manifest or extra exclusions.
+- [Phase 184-deterministic-finalize-partial-wave-recovery]: Wave-aware inventory now surfaces staged-ready blockers and canonical recovery-summary guidance. — Phase 184 needs operator-facing surfaces to preserve deterministic recovery truth instead of forcing raw manifest reconstruction.
 
 ### Pending Todos
 
@@ -554,6 +554,6 @@ None
 
 ## Session Continuity
 
-Last session: 2026-04-02T03:11:24Z
-Stopped at: Completed 184-02-PLAN.md
+Last session: 2026-04-02T03:23:45.845Z
+Stopped at: Completed 184-03-PLAN.md
 Resume file: None

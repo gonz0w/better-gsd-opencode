@@ -14,7 +14,7 @@ v19.0 hardens execution control in the order the repo needs it to become trustwo
 - [x] **Phase 181: Workspace Root Truth & Safe Fallback** (completed 2026-04-01) - Runtime-prove JJ workspace pinning before parallel execution is allowed to proceed.
 - [x] **Phase 182: Risk-Routed Hardening Proof Policy** (completed 2026-04-01) - Make `skip` / `light` / `full` verification routing govern runtime-hardening work early.
 - [x] **Phase 183: Plan-Local Workspace Ownership** (completed 2026-04-02) - Keep workspace execution isolated from shared planning artifacts until finalize.
-- [ ] **Phase 184: Deterministic Finalize & Partial-Wave Recovery** - Finalize shared state once, preserve healthy sibling progress, and keep recovery inspectable.
+- [x] **Phase 184: Deterministic Finalize & Partial-Wave Recovery** (completed 2026-04-02) - Finalize shared state once, preserve healthy sibling progress, and keep recovery inspectable.
 - [ ] **Phase 185: cmux Coordination Backbone** - Turn bursty runtime activity into one debounced, bounded, fail-open `cmux` refresh path.
 - [ ] **Phase 186: cmux Truthful Lifecycle Signals** - Show readable workspace-scoped status, progress, logs, and intervention signals for the real execution lifecycle.
 
@@ -59,7 +59,7 @@ v19.0 hardens execution control in the order the repo needs it to become trustwo
   1. Healthy sibling workspaces can reconcile and report useful status even when another workspace in the same wave fails, goes stale, or needs recovery.
   2. Final shared planning state is the same regardless of the order in which healthy workspaces finish or are finalized.
   3. If a workspace becomes stale, divergent, or finalize fails partway through, operator can inspect durable recovery metadata and rerun recovery or finalize from the main checkout without re-executing already-healthy work.
-**Plans**: 2/3 plans executed
+**Plans**: 3/3 plans complete
 
 ### Phase 185: cmux Coordination Backbone
 **Goal**: `cmux` updates become a trustworthy projection of runtime state because plugin refresh work is debounced, bounded, and quiet when `cmux` is absent or untrusted
@@ -88,7 +88,7 @@ v19.0 hardens execution control in the order the repo needs it to become trustwo
 | 181. Workspace Root Truth & Safe Fallback | 2/2 | Complete    | 2026-04-01 |
 | 182. Risk-Routed Hardening Proof Policy | 2/2 | Complete    | 2026-04-01 |
 | 183. Plan-Local Workspace Ownership | 2/2 | Complete    | 2026-04-02 |
-| 184. Deterministic Finalize & Partial-Wave Recovery | 2/3 | In Progress|  |
+| 184. Deterministic Finalize & Partial-Wave Recovery | 3/3 | Complete   | 2026-04-02 |
 | 185. cmux Coordination Backbone | 0/2 | Not started | - |
 | 186. cmux Truthful Lifecycle Signals | 0/2 | Not started | - |
 
