@@ -16,7 +16,7 @@ v19.0 hardens execution control in the order the repo needs it to become trustwo
 - [x] **Phase 183: Plan-Local Workspace Ownership** (completed 2026-04-02) - Keep workspace execution isolated from shared planning artifacts until finalize.
 - [x] **Phase 184: Deterministic Finalize & Partial-Wave Recovery** (completed 2026-04-02) - Finalize shared state once, preserve healthy sibling progress, and keep recovery inspectable.
 - [x] **Phase 185: cmux Coordination Backbone** (completed 2026-04-02) - Turn bursty runtime activity into one debounced, bounded, fail-open `cmux` refresh path.
-- [ ] **Phase 186: cmux Truthful Lifecycle Signals** - Show readable workspace-scoped status, progress, logs, and intervention signals for the real execution lifecycle.
+- [x] **Phase 186: cmux Truthful Lifecycle Signals** (completed 2026-04-02) - Show readable workspace-scoped status, progress, logs, and intervention signals for the real execution lifecycle.
 
 ## Phase Details
 
@@ -79,7 +79,7 @@ v19.0 hardens execution control in the order the repo needs it to become trustwo
   1. User can see truthful workspace-scoped status, progress, and logs for running, blocked, waiting, stale, reconciling, finalize-failed, idle, and complete states.
   2. User receives a clear `cmux` attention signal when human input, stale-workspace recovery, or finalize intervention is required.
   3. Required-intervention states stand out from normal progress so operators can tell where to act without polling raw logs.
-**Plans**: 1/2 plans complete
+**Plans**: 2/2 plans complete
 
 ## Progress
 
@@ -90,7 +90,7 @@ v19.0 hardens execution control in the order the repo needs it to become trustwo
 | 183. Plan-Local Workspace Ownership | 2/2 | Complete    | 2026-04-02 |
 | 184. Deterministic Finalize & Partial-Wave Recovery | 3/3 | Complete    | 2026-04-02 |
 | 185. cmux Coordination Backbone | 2/2 | Complete    | 2026-04-02 |
-| 186. cmux Truthful Lifecycle Signals | 1/2 | In Progress | - |
+| 186. cmux Truthful Lifecycle Signals | 2/2 | Complete   | 2026-04-02 |
 
 ---
 
