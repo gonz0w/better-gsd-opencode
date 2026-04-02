@@ -6,6 +6,7 @@ const configUtils = require('./config-utils');
 const templates = require('./templates');
 const historyExamples = require('./history-examples');
 const gitHelpers = require('./git-helpers');
+const finalize = require('./finalize');
 const recovery = require('./recovery');
 
 module.exports = Object.assign(
@@ -15,5 +16,6 @@ module.exports = Object.assign(
   templates,
   historyExamples,
   gitHelpers,
+  finalize,
   recovery
 );

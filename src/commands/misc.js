@@ -9,5 +9,6 @@ module.exports = Object.assign(
   require('./misc/templates'),
   require('./misc/history-examples'),
   require('./misc/git-helpers'),
+  require('./misc/finalize'),
   require('./misc/recovery')
 );
