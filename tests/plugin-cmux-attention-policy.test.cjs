@@ -39,10 +39,10 @@ test.afterEach(() => {
 });
 
 describe('plugin cmux attention policy', () => {
-  test('planner-start, executor-start, and task-complete stay log-only', async () => {
+  test('planner-start, executor-start, task-complete, blocked, and running stay log-only', async () => {
     const { classifyAttentionEvent } = await loadAttentionPolicyModule();
 
-    for (const kind of ['planner-start', 'executor-start', 'task-complete']) {
+    for (const kind of ['planner-start', 'executor-start', 'task-complete', 'blocked', 'running']) {
       const event = classifyAttentionEvent(buildEvent({ kind, identity: kind, message: `${kind} log-only` }));
       assert.strictEqual(event.kind, kind);
       assert.ok(event.log, `${kind} should log`);
@@ -50,34 +50,34 @@ describe('plugin cmux attention policy', () => {
     }
   });
 
-  test('checkpoint, waiting-input, blocker, warning, plan-complete, phase-complete, and workflow-complete notify on first occurrence', async () => {
+  test('waiting, stale, and finalize-failed notify on first occurrence', async () => {
     const { classifyAttentionEvent } = await loadAttentionPolicyModule();
 
-    for (const kind of ['checkpoint', 'waiting-input', 'blocker', 'warning', 'plan-complete', 'phase-complete', 'workflow-complete']) {
+    for (const kind of ['waiting', 'stale', 'finalize-failed']) {
       const event = classifyAttentionEvent(buildEvent({ kind, identity: kind, message: `${kind} notify` }));
       assert.ok(event.log, `${kind} should log`);
       assert.ok(event.notify, `${kind} should notify`);
     }
   });
 
-  test('buildAttentionEventKey reuses one semantic dedupe key for unchanged warnings and blockers', async () => {
+  test('buildAttentionEventKey reuses one semantic dedupe key for unchanged intervention states', async () => {
     const { buildAttentionEventKey } = await loadAttentionPolicyModule();
-    const warningKey = buildAttentionEventKey(buildEvent({ kind: 'warning', identity: 'semantic dedupe' }));
-    const warningRefreshKey = buildAttentionEventKey(buildEvent({ kind: 'warning', identity: 'semantic dedupe', message: 'semantic dedupe refresh' }));
-    const blockerKey = buildAttentionEventKey(buildEvent({ kind: 'blocker', identity: 'semantic dedupe' }));
+    const waitingKey = buildAttentionEventKey(buildEvent({ kind: 'waiting', identity: 'semantic dedupe' }));
+    const waitingRefreshKey = buildAttentionEventKey(buildEvent({ kind: 'waiting', identity: 'semantic dedupe', message: 'semantic dedupe refresh' }));
+    const staleKey = buildAttentionEventKey(buildEvent({ kind: 'stale', identity: 'semantic dedupe' }));
 
-    assert.strictEqual(warningKey, warningRefreshKey);
-    assert.notStrictEqual(warningKey, blockerKey);
-    assert.match(warningKey, /workspace:1/);
-    assert.match(warningKey, /semantic dedupe/);
+    assert.strictEqual(waitingKey, waitingRefreshKey);
+    assert.notStrictEqual(waitingKey, staleKey);
+    assert.match(waitingKey, /workspace:1/);
+    assert.match(waitingKey, /semantic dedupe/);
   });
 
-  test('shouldEmitAttentionEvent cools down repeated unchanged warning events until cooldown expiry or identity change', async () => {
+  test('shouldEmitAttentionEvent cools down repeated unchanged stale events until cooldown expiry or identity change', async () => {
     const { shouldEmitAttentionEvent } = await loadAttentionPolicyModule();
-    const first = buildEvent({ kind: 'warning', identity: 'cooldown', now: 1_000 });
-    const repeat = buildEvent({ kind: 'warning', identity: 'cooldown', now: 2_000 });
-    const expired = buildEvent({ kind: 'warning', identity: 'cooldown', now: 400_000 });
-    const changed = buildEvent({ kind: 'warning', identity: 'cooldown:new', now: 2_000 });
+    const first = buildEvent({ kind: 'stale', identity: 'cooldown', now: 1_000 });
+    const repeat = buildEvent({ kind: 'stale', identity: 'cooldown', now: 2_000 });
+    const expired = buildEvent({ kind: 'stale', identity: 'cooldown', now: 400_000 });
+    const changed = buildEvent({ kind: 'stale', identity: 'cooldown:new', now: 2_000 });
 
     const firstDecision = shouldEmitAttentionEvent(first);
     const repeatDecision = shouldEmitAttentionEvent(repeat, { lastEvent: firstDecision.event });
