@@ -316,6 +316,31 @@ class PlanningCache {
     }
   }
 
+  /**
+   * Invalidate a cache key with mutex protection for concurrent access safety.
+   * Uses CAS loop to acquire mutex before invalidation, releases in finally block.
+   *
+   * @param {string} key - Cache key to invalidate
+   */
+  invalidateMutex(key) {
+    const slot = this._mutexSlotForKey(key);
+
+    // CAS loop to acquire mutex
+    while (true) {
+      const old = Atomics.load(this._mutexPool, slot);
+      if (Atomics.compareExchange(this._mutexPool, slot, old, 1) === old) {
+        try {
+          this.invalidateFile(key); // actual invalidation
+        } finally {
+          this._releaseMutex(slot);
+        }
+        return;
+      }
+      // Contended — yield to event loop briefly
+      Atomics.wait(this._mutexPool, slot, 1, 1); // 1ms wait
+    }
+  }
+
   // -------------------------------------------------------------------------
   // Store Operations (write-through)
   // -------------------------------------------------------------------------
