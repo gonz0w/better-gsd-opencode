@@ -127,6 +127,7 @@ function lazyQuestions() { return _modules.questions || (_modules.questions = re
 function lazyReview() { return _modules.review || (_modules.review = require('./commands/review')); }
 function lazySecurity() { return _modules.security || (_modules.security = require('./commands/security')); }
 function lazyRelease() { return _modules.release || (_modules.release = require('./commands/release')); }
+function lazyDeliver() { return _modules.deliver || (_modules.deliver = require('./commands/deliver')); }
 
 function parseOptionValue(args, flag) {
   const idx = args.indexOf(flag);
@@ -276,7 +277,7 @@ async function main() {
   let namespace = null;
   let remainingArgs = args.slice(1);
   
-  const KNOWN_NAMESPACES = ['init', 'plan', 'phase', 'execute', 'verify', 'review', 'security', 'release', 'workspace', 'util', 'memory', 'research', 'cache', 'audit', 'decisions', 'detect', 'lessons', 'skills', 'workflow', 'questions'];
+  const KNOWN_NAMESPACES = ['init', 'plan', 'phase', 'execute', 'verify', 'review', 'security', 'release', 'workspace', 'util', 'memory', 'research', 'cache', 'audit', 'decisions', 'detect', 'lessons', 'skills', 'workflow', 'questions', 'deliver'];
   
   if (command && command.includes(':')) {
     const colonIdx = command.indexOf(':');
@@ -559,6 +560,23 @@ Use without --exact for fuzzy matching.`);
           lazyWorkspace().cmdWorkspaceReconcile(cwd, restArgs[0], raw);
         } else {
           error('Unknown workspace subcommand. Available: add, list, forget, cleanup, prove, reconcile');
+        }
+        break;
+      }
+
+      // deliver namespace
+      case 'deliver': {
+        const subcommand = subCmd;
+        if (subcommand === 'phase') {
+          const freshCtxIdx = restArgs.indexOf('--fresh-step-context');
+          const fastIdx = restArgs.indexOf('--fast');
+          const options = {
+            fresh_step_context: freshCtxIdx !== -1,
+            fast: fastIdx !== -1,
+          };
+          lazyDeliver().cmdDeliverPhase(cwd, restArgs[0], options, raw);
+        } else {
+          error('Unknown deliver subcommand. Available: phase');
         }
         break;
       }
