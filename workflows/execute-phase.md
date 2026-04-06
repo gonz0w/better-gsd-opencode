@@ -47,14 +47,14 @@ CI_FLAG=""
 
 <!-- section: handoff_gating -->
 <step name="gate_chain_continuation">
-Use `resume_summary` as the authoritative continuation contract whenever handoff state exists.
-
-- If `resume_summary` is absent: standalone `/bgsd-execute-phase` works normally.
-- If `resume_summary` is present and `latest_valid_step` is `plan` or `execute`: continue from the latest valid artifact instead of guessing from partial summaries, plan counts, or `STATE.md`.
-- If `resume_summary.valid` is false: fail closed, present `repair_guidance`, and stop. Do not continue execution on missing or invalid chain state.
-- If the newest artifact is corrupt but an older one is valid: trust the latest valid artifact, not the newest file blindly.
-- If source drift is detected (`stale_sources` true or the latest artifact fingerprint no longer matches the refreshed phase snapshot's expected fingerprint): warn, rebuild from source, validate that the reconstructed state now matches the current expected fingerprint, and only then allow continuation.
-- If the rebuild still cannot produce a valid handoff: stop with repair or restart guidance.
+```
+Task(
+  prompt="Determine execution continuation action. resume_summary: {resume_summary}, latest_valid_step: {latest_valid_step}, resume_valid: {resume_valid}, stale_sources: {stale_sources}",
+  subagent_type="bgsd-context-bootstrapper",
+  model="gpt-5.4-nano",
+  description="Validate handoff continuation"
+)
+```
 </step>
 <!-- /section -->
 

@@ -16,25 +16,25 @@ Requirements for v19.4 Workflow Acceleration II + TDD Reliability. Each maps to 
 
 ### TDD Reliability
 
-- [ ] **TDD-01**: `execute:tdd validate-red` verifies test FAILED for expected missing behavior (not just exit code ≠ 0)
+- [x] **TDD-01**: `execute:tdd validate-red` verifies test FAILED for expected missing behavior (not just exit code ≠ 0)
 - [ ] **TDD-02**: `execute:tdd validate-green` verifies test PASSED + test file NOT modified during GREEN phase
 - [ ] **TDD-03**: `execute:tdd validate-refactor` verifies all tests still pass + no new behavior added (test count unchanged)
 - [ ] **TDD-04**: TDD plan structure verification rejects malformed `type:tdd` plans at planning-time — required fields (test_file, impl_files, steps with RED/GREEN/REFACTOR sequence) are present and correctly ordered
-- [ ] **TDD-05**: TDD E2E fixture proves RED→GREEN→REFACTOR commit trail in actual repo — automated end-to-end validation of full TDD cycle
+- [x] **TDD-05**: TDD E2E fixture proves RED→GREEN→REFACTOR commit trail in actual repo — automated end-to-end validation of full TDD cycle
 - [ ] **TDD-06**: TDD rationale visibility in plan output — selected/skipped rationale surfaced in plan output and summary rendering
 - [ ] **TDD-07**: Planner evaluates TDD eligibility for every implementation plan, not only phases with explicit ROADMAP TDD hint
 - [ ] **TDD-08**: TDD decision rationale field on every `type:tdd` plan — structured in frontmatter, why TDD was selected or intentionally skipped
 
 ### Non-Regression (Must Not Break)
 
-- [ ] **REGR-01**: phase:snapshot continues to work as single CLI call replacing repeated phase discovery
-- [ ] **REGR-02**: verify:state complete-plan continues to work as atomic batched state mutation
-- [ ] **REGR-03**: Phase handoff artifacts (XX-HANDOFF.json) continue to enable fresh-context chaining between workflow steps
-- [ ] **REGR-04**: PlanningCache-backed plan reads continue to work with SQLite-first git-hash+mtime invalidation
-- [ ] **REGR-05**: Mutex-protected cache continues to prevent race corruption in parallel stages
-- [ ] **REGR-06**: Kahn topological sort with cycle detection continues to order parallel waves correctly
-- [ ] **REGR-07**: discuss-phase --fast and verify-work --batch N continue to work as shipped in v19.3
-- [ ] **REGR-08**: Deterministic TDD selection with rationale visibility continues as shipped in v16.1
+- [x] **REGR-01**: phase:snapshot continues to work as single CLI call replacing repeated phase discovery
+- [x] **REGR-02**: verify:state complete-plan continues to work as atomic batched state mutation
+- [x] **REGR-03**: Phase handoff artifacts (XX-HANDOFF.json) continue to enable fresh-context chaining between workflow steps
+- [x] **REGR-04**: PlanningCache-backed plan reads continue to work with SQLite-first git-hash+mtime invalidation
+- [x] **REGR-05**: Mutex-protected cache continues to prevent race corruption in parallel stages
+- [x] **REGR-06**: Kahn topological sort with cycle detection continues to order parallel waves correctly
+- [x] **REGR-07**: discuss-phase --fast and verify-work --batch N continue to work as shipped in v19.3
+- [x] **REGR-08**: Deterministic TDD selection with rationale visibility continues as shipped in v16.1
 
 ## Future Requirements
 
@@ -73,11 +73,11 @@ Which phases cover which requirements. Updated during roadmap creation.
 | ACCEL-02 | Phase 207 | Pending | Checkpoint preservation |
 | ACCEL-03 | Phase 207 | Pending | JJ proof gate mandatory |
 | ACCEL-04 | Phase 207 | Pending | /clear-safe resumption |
-| TDD-01 | Phase 206 | Pending | RED gate semantic validation |
+| TDD-01 | Phase 206 | Complete | RED gate semantic validation |
 | TDD-02 | Phase 209 | Pending | GREEN gate semantic validation |
 | TDD-03 | Phase 209 | Pending | REFACTOR gate semantic validation |
 | TDD-04 | Phase 209 | Pending | Plan structure verification at planning-time |
-| TDD-05 | Phase 206 | Pending | E2E fixture for TDD cycle |
+| TDD-05 | Phase 206 | Complete | E2E fixture for TDD cycle |
 | TDD-06 | Phase 208 | Pending | Rationale visibility in output |
 | TDD-07 | Phase 209 | Pending | Eligibility evaluation for ALL plans |
 | TDD-08 | Phase 209 | Pending | Rationale field in plan frontmatter |
