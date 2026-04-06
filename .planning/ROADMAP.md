@@ -4,36 +4,89 @@
 
 - ✅ **v19.1 Execution Simplicity, Speculative Decoding & JJ-First UX** - Phases 188-200 (shipped 2026-04-05)
 - ✅ **v19.3 Workflow Acceleration** - Phases 201-205 (shipped 2026-04-06)
+- 🚧 **v19.4 Workflow Acceleration II + TDD Reliability** - Phases 206-210 (in progress)
 
-<details>
-<summary>v19.3 Workflow Acceleration — shipped 2026-04-06</summary>
+## Overview
 
-**Phases:** 5 (201-205), **Plans:** 13, **Commits:** 68, **Files:** 153 changed, **Lines:** +21,915 / -9,177
+v19.4 continues v19.3's workflow acceleration and hardens TDD reliability. The milestone implements `/bgsd-deliver-phase --fresh-step-context` for end-to-end fresh-context chaining without giant context windows, implements the stubbed TDD validators (RED/GREEN/REFACTOR gate semantics), wires TDD audit continuity through handoff artifacts, and adds mutex protection for parallel TDD verification stages.
 
-**Key accomplishments:**
-- Measurement infrastructure: telemetryLog hooks, TTL-computed PlanningCache, batchCheckFreshness, ACCEL-BASELINE.json
-- Fast-mode commands: `--fast` in discuss-phase, `--batch N` in verify-work, `workflow:hotpath` telemetry
-- Mutex-protected PlanningCache with Atomics+SharedArrayBuffer CAS primitives for parallel cache access
-- Kahn topological sort with cycle detection in resolvePhaseDependencies
-- JJ workspace proof gate preservation and Promise.all fan-in parallel coordination
-- Batch transaction API with sacred data guards for non-sacred state mutations
-- CLI contract validation wired into execute-phase after routing changes
-- canBatch routing and storeSessionBundleBatch wired into cmdStateCompletePlan
-- Kahn wave routing and mutex-protected cache access in fanInParallelSpawns
+## Phases
 
-**Archives:**
-- `.planning/milestones/v19.3-ROADMAP.md`
-- `.planning/milestones/v19.3-REQUIREMENTS.md`
-- `.planning/milestones/v19.3-DOCS.md`
-- `.planning/milestones/v19.3-MILESTONE-AUDIT.md`
-- `.planning/milestones/v19.3-phases/`
+- [ ] **Phase 206: TDD Validator Shipping** - Implement cmdTdd validate-red/green/refactor stubs; unblocks all downstream TDD proof consumers
+- [ ] **Phase 207: Fresh-Context Chaining** - Implement /bgsd-deliver-phase --fresh-step-context; enables end-to-end delivery without giant context windows
+- [ ] **Phase 208: TDD Audit Continuity** - Wire TDD audit sidecar into handoff artifact inventory; ensure proof survives resume/refresh cycles
+- [ ] **Phase 209: TDD Gate Hardening** - Implement TDD plan structure verification and Phase B/C gate semantics; extends execute:tdd beyond exit-code checks
+- [ ] **Phase 210: Parallel TDD Safety** - Add mutex protection for TDD cache keys; enables safe parallel TDD verification stages
 
-</details>
+## Phase Details
 
-## Status
+### Phase 206: TDD Validator Shipping
+**Goal**: Production execute:tdd validate-red/green/refactor with proper semantic validation; unblocks all downstream TDD proof consumers
+**Depends on**: Phase 205
+**Requirements**: TDD-01, TDD-05, REGR-01, REGR-02, REGR-03, REGR-04, REGR-05, REGR-06, REGR-07, REGR-08
+**Success Criteria** (what must be TRUE):
+  1. `execute:tdd validate-red` verifies test FAILED for expected missing behavior — exit code ≠ 0 alone is insufficient; must detect semantically that the failure is about missing behavior
+  2. `execute:tdd validate-green` verifies test PASSED + test file NOT modified during GREEN phase — prevents false GREEN from modified tests
+  3. `execute:tdd validate-refactor` verifies all tests still pass + no new behavior added — test count unchanged from GREEN
+  4. TDD E2E fixture proves RED→GREEN→REFACTOR commit trail in actual repo — automated end-to-end validation of full TDD cycle
+  5. cmdTdd in misc/recovery.js returns production proof JSON instead of "not yet implemented" stub
+**Plans**: TBD
 
-No active milestone. Run `/bgsd-new-milestone` to start the next one.
+### Phase 207: Fresh-Context Chaining
+**Goal**: /bgsd-deliver-phase --fresh-step-context pipeline works end-to-end; enables delivery without giant context windows
+**Depends on**: Phase 206
+**Requirements**: ACCEL-01, ACCEL-02, ACCEL-03, ACCEL-04, REGR-01, REGR-02, REGR-03, REGR-04, REGR-05, REGR-06, REGR-07, REGR-08
+**Success Criteria** (what must be TRUE):
+  1. `/bgsd-deliver-phase --fresh-step-context` pipeline runs end-to-end — each step runs in fresh context, reads from snapshot+handoff, writes compact output, clears context, chains to next
+  2. Stop points at checkpoints and interactive decisions are preserved through the full deliver-phase chain — no data loss at decision boundaries
+  3. JJ workspace proof gate remains mandatory on all deliver-phase paths — never bypassed by --fast or acceleration flags
+  4. Fresh-context chaining works after `/clear` — session can be cleared mid-chain and resumed from disk truth
+**Plans**: TBD
+
+### Phase 208: TDD Audit Continuity
+**Goal**: TDD proof survives execute → verify → summary transitions and resume/inspect flows; human-legible rendering in summaries
+**Depends on**: Phase 207
+**Requirements**: TDD-06, REGR-01, REGR-02, REGR-03, REGR-04, REGR-05, REGR-06, REGR-07, REGR-08
+**Success Criteria** (what must be TRUE):
+  1. TDD rationale visibility in plan output — selected/skipped rationale surfaced in plan output and summary rendering
+  2. tdd_audit added to handoff artifact inventory in phase-handoff.js — proof survives resume/refresh cycles
+  3. Human-legible TDD proof rendering in summary:generate — not backtick-wrapped raw tokens but narrative format
+  4. verify:state includes TDD audit sidecar checks — audit continuity verified at state validation
+**Plans**: TBD
+
+### Phase 209: TDD Gate Hardening
+**Goal**: TDD plan structure verification at planning-time; RED/GREEN/REFACTOR gate semantics beyond exit-code checks
+**Depends on**: Phase 208
+**Requirements**: TDD-02, TDD-03, TDD-04, TDD-07, TDD-08, REGR-01, REGR-02, REGR-03, REGR-04, REGR-05, REGR-06, REGR-07, REGR-08
+**Success Criteria** (what must be TRUE):
+  1. TDD plan structure verification rejects malformed type:tdd plans at planning-time — required fields (test_file, impl_files, steps with RED/GREEN/REFACTOR sequence) are present and correctly ordered
+  2. Planner evaluates TDD eligibility for every implementation plan — not only phases with explicit ROADMAP TDD hint
+  3. TDD decision rationale field on every type:tdd plan — structured in frontmatter, why TDD was selected or intentionally skipped
+  4. RED gate verifies test FAILED for expected missing behavior (file-diff per phase)
+  5. GREEN gate verifies test PASSED + test file NOT modified (no-new-behavior enforcement)
+  6. REFACTOR gate verifies all tests still pass + no new behavior added (test count unchanged)
+**Plans**: TBD
+
+### Phase 210: Parallel TDD Safety
+**Goal**: Safe parallel TDD verification stages with mutex-protected cache writes; extends v19.3 mutex infrastructure to TDD-specific cache keys
+**Depends on**: Phase 209
+**Requirements**: REGR-01, REGR-02, REGR-03, REGR-04, REGR-05, REGR-06, REGR-07, REGR-08
+**Success Criteria** (what must be TRUE):
+  1. Mutex per TDD cache key (tdd_audit:${plan_path}, tdd_proof:${plan_path}, tdd_summary:${plan_path}) — prevents simultaneous invalidation races
+  2. Bounded parallelism for TDD batch operations — fan-out limited by mutex availability
+  3. Serial cache-warm call before parallel fan-out — ensures fresh state before concurrent verification
+**Plans**: TBD
+
+## Progress
+
+| Phase | Plans Complete | Status | Completed |
+|-------|----------------|--------|-----------|
+| 206. TDD Validator Shipping | 0/1 | Not started | - |
+| 207. Fresh-Context Chaining | 0/1 | Not started | - |
+| 208. TDD Audit Continuity | 0/1 | Not started | - |
+| 209. TDD Gate Hardening | 0/1 | Not started | - |
+| 210. Parallel TDD Safety | 0/1 | Not started | - |
 
 ---
 
-*Last updated: 2026-04-06 during v19.3 milestone completion*
+*Last updated: 2026-04-06 during v19.4 roadmap creation*
