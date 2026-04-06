@@ -261,11 +261,92 @@ async function fanInTddParallel(planBatches, cwd, workerLimit) {
   return results;
 }
 
-// Placeholder for TDD verification — actual implementation in execute-plan subagents
 async function runTddVerify(plan, cwd) {
-  // TDD verification runs inside execute-plan subagents; this placeholder
-  // allows the bounded parallel fan-out to proceed when called directly
-  return { plan_id: plan.plan_id, verified: true };
+  const { spawn } = require('child_process');
+  
+  // Non-type:tdd plans delegate verification to execute-plan subagents
+  if (plan.type !== 'tdd') {
+    return { plan_id: plan.plan_id, verified: true };
+  }
+  
+  // Read plan file to extract TDD targets from <feature><tdd-targets>
+  const path = plan.path || plan.plan_id;
+  const planContent = require('fs').readFileSync(path, 'utf8');
+  
+  // Extract red, green, refactor commands using whitespace-insensitive regex
+  const redMatch = planContent.match(/<red>([\s\S]*?)<\/red>/i);
+  const greenMatch = planContent.match(/<green>([\s\S]*?)<\/green>/i);
+  const refactorMatch = planContent.match(/<refactor>([\s\S]*?)<\/refactor>/i);
+  
+  const redCmd = redMatch ? redMatch[1].trim() : null;
+  const greenCmd = greenMatch ? greenMatch[1].trim() : null;
+  const refactorCmd = refactorMatch ? refactorMatch[1].trim() : null;
+  
+  // Extract test_file for validate-green/validate-refactor
+  const testFileMatch = planContent.match(/test_file:\s*([^\s\n]+)/i);
+  const testFile = testFileMatch ? testFileMatch[1] : null;
+  
+  // Extract prev-count for validate-refactor (test count from GREEN phase)
+  const prevCountMatch = planContent.match(/prev-count:\s*(\d+)/i);
+  const prevCount = prevCountMatch ? parseInt(prevCountMatch[1], 10) : null;
+  
+  // Helper to spawn CLI validator
+  const spawnValidator = (stage, args) => {
+    return new Promise((resolve) => {
+      const child = spawn(
+        process.execPath,
+        ['bin/bgsd-tools.cjs', 'execute:tdd', stage, ...args],
+        { cwd, stdio: ['pipe', 'pipe', 'pipe'] }
+      );
+      
+      let stdout = '';
+      let stderr = '';
+      
+      child.stdout.on('data', d => { stdout += d; });
+      child.stderr.on('data', d => { stderr += d; });
+      
+      child.on('close', (code) => {
+        let result;
+        try {
+          result = JSON.parse(stdout);
+        } catch {
+          result = { stage, exitCode: code, error: stderr || 'parse error' };
+        }
+        resolve(result);
+      });
+      child.on('error', (err) => {
+        resolve({ stage, exitCode: -1, error: String(err) });
+      });
+    });
+  };
+  
+  // Run RED stage
+  const redResult = redCmd 
+    ? await spawnValidator('validate-red', ['--test-cmd', redCmd])
+    : { stage: 'red', verified: false, error: 'No red command found' };
+  
+  // Run GREEN stage (only if RED passed semantically)
+  const greenResult = (redResult.failed || redResult.semanticFailure) && greenCmd
+    ? await spawnValidator('validate-green', ['--test-cmd', greenCmd, '--test-file', testFile || ''])
+    : { stage: 'green', verified: false, skipped: true };
+  
+  // Run REFACTOR stage (only if GREEN passed)
+  const refactorResult = (greenResult.passed && greenResult.testFileUnmodified) && refactorCmd
+    ? await spawnValidator('validate-refactor', ['--test-cmd', refactorCmd, '--prev-count', String(prevCount || greenResult.testCount || 0)])
+    : { stage: 'refactor', verified: false, skipped: true };
+  
+  // Aggregate results: verified if all stages passed
+  const verified = redResult.failed === true && 
+                   greenResult.passed === true && 
+                   greenResult.testFileUnmodified === true &&
+                   refactorResult.passed === true &&
+                   refactorResult.countUnchanged === true;
+  
+  return {
+    plan_id: plan.plan_id,
+    verified,
+    stages: { red: redResult, green: greenResult, refactor: refactorResult }
+  };
 }
 <!-- /section -->
 </step>

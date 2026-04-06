@@ -1011,5 +1011,53 @@
     "affected_agents": [
       "bgsd-planner"
     ]
+  },
+  {
+    "id": "edff32d9-9e0f-44cf-b38d-88cba16b344b",
+    "date": "2026-04-06T19:15:01.806Z",
+    "title": "Check current state before deep-diving mechanism for fix-type phases",
+    "severity": "LOW",
+    "type": "workflow",
+    "root_cause": "For deployment-fix phases, the fix may have already been applied. Researching the build/deploy mechanism first wastes cycles when a quick size comparison and command test would reveal the current state.",
+    "prevention_rule": "For phases labeled 'fix' or 'deployment': (1) First check current file sizes and run the cited failing command. (2) If fix is already applied, document verification and close the gap. (3) Only investigate mechanisms if verification fails.",
+    "affected_agents": [
+      "bgsd-phase-researcher"
+    ]
+  },
+  {
+    "id": "1e4e54e9-95f9-4ce5-8441-f2d75c2def34",
+    "date": "2026-04-06T19:16:08.505Z",
+    "title": "Always cross-reference existing plans for frontmatter completeness",
+    "severity": "MEDIUM",
+    "type": "workflow",
+    "root_cause": "The planner template example in the prompt shows verification_route as optional, but the schema validation treats it as required. Without checking an existing plan first, the missing field only surfaces at the validate step.",
+    "prevention_rule": "Before writing a new plan, read one recent existing plan to confirm all required fields are present. The schema tool and template example can diverge; always verify against a real artifact.",
+    "affected_agents": [
+      "bgsd-planner"
+    ]
+  },
+  {
+    "id": "fbc085e0-dc27-4f0d-a24d-d602da5134e1",
+    "date": "2026-04-06T19:52:43.872Z",
+    "title": "Placeholder phases: verify actual implementation exists before deep research",
+    "severity": "LOW",
+    "type": "workflow",
+    "root_cause": "Phase 214 research involved understanding the runTddVerify placeholder, but the actual TDD validators (validate-red/green/refactor) were already implemented in the CLI. Time was spent tracing through audit docs rather than first verifying the gap was real.",
+    "prevention_rule": "When researching a phase that replaces a placeholder or stub, first grep for the actual implementation pattern (e.g., validate-red) to confirm whether the gap is in the placeholder or in missing integration wiring.",
+    "affected_agents": [
+      "bgsd-phase-researcher"
+    ]
+  },
+  {
+    "id": "2efc2a9f-f94e-4165-b820-6481e8f05678",
+    "date": "2026-04-06T19:55:52.949Z",
+    "title": "Workflow plan verification: use rg instead of node -e for simple file checks",
+    "severity": "LOW",
+    "type": "workflow",
+    "root_cause": "Inline node -e verification scripts with complex string escaping confuse the plan-structure analyzer, causing false unavailable-validation-step errors. The analyzer appears to parse the inline script content as file paths.",
+    "prevention_rule": "For workflow file plans, use simple rg (ripgrep) file content checks or direct file-read commands for verification instead of complex node -e inline scripts. Reserve node -e for cases where actual computation is needed.",
+    "affected_agents": [
+      "bgsd-planner"
+    ]
   }
 ]
