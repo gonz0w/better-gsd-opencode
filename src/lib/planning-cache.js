@@ -25,6 +25,9 @@ const fs = require('fs');
 // TTL for computed values: 10 minutes (stress-tested hybrid value)
 const COMPUTED_TTL_MS = 10 * 60 * 1000;
 
+// Fixed mutex pool size for lock-free CAS per cache key (hash-based slot selection)
+const MUTEX_POOL_SIZE = 256; // Fixed pool, hash-based slot selection
+
 // ---------------------------------------------------------------------------
 // PlanningCache class
 // ---------------------------------------------------------------------------
@@ -36,6 +39,9 @@ class PlanningCache {
   constructor(db) {
     this._db = db;
     this._stmts = {}; // lazy prepared statement cache
+    // SharedArrayBuffer-backed mutex pool for cross-thread cache key synchronization
+    // Int32Array view on raw bytes — Atomics.compareExchange for CAS, Atomics.store for release
+    this._mutexPool = new Int32Array(new SharedArrayBuffer(MUTEX_POOL_SIZE * 4)); // 4 bytes per slot
   }
 
   // -------------------------------------------------------------------------
@@ -63,6 +69,42 @@ class PlanningCache {
       this._stmts[key] = this._db.prepare(sql);
     }
     return this._stmts[key];
+  }
+
+  /**
+   * Map a cache key to a stable mutex slot index (0-255).
+   * Uses djb2-style hash for 32-bit signed integer stability.
+   * @param {string} key
+   * @returns {number} Slot index in range [0, MUTEX_POOL_SIZE)
+   * @private
+   */
+  _mutexSlotForKey(key) {
+    let hash = 0;
+    for (let i = 0; i < key.length; i++) {
+      hash = ((hash << 5) - hash) + key.charCodeAt(i);
+      hash = hash & hash; // Keep 32-bit signed integer
+    }
+    return Math.abs(hash) % MUTEX_POOL_SIZE;
+  }
+
+  /**
+   * Acquire mutex on a slot via compare-and-swap.
+   * Returns true if lock was acquired (was 0, now 1).
+   * @param {number} slot - Mutex slot index
+   * @returns {boolean}
+   * @private
+   */
+  _acquireMutex(slot) {
+    return Atomics.compareExchange(this._mutexPool, slot, 0, 1) === 0;
+  }
+
+  /**
+   * Release mutex on a slot by storing 0.
+   * @param {number} slot - Mutex slot index
+   * @private
+   */
+  _releaseMutex(slot) {
+    Atomics.store(this._mutexPool, slot, 0);
   }
 
   // -------------------------------------------------------------------------
