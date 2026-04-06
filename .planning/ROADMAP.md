@@ -52,7 +52,7 @@ v19.3 accelerates workflow execution through measurement-grounded caching, fast-
   3. Sacred data writes (decisions, lessons, trajectories, requirements) are never batched — they always use the canonical single-write path
   4. `npm run build` smoke test runs after every plan and fails closed on bundle parity issues
   5. `util:validate-commands --raw` confirms CLI contract validity after any routing change
-**Plans**: TBD
+**Plans**: 3 plans (203-01, 203-02, 203-03)
 
 ## Progress
 
@@ -60,7 +60,7 @@ v19.3 accelerates workflow execution through measurement-grounded caching, fast-
 |-------|----------------|--------|-----------|
 | 201. Measurement Foundation & Fast Commands | 2/2 | Complete    | 2026-04-06 |
 | 202. Parallelization Safety | 3/3 | Complete    | 2026-04-06 |
-| 203. State Mutation Safety | 0/TBD | Not started | - |
+| 203. State Mutation Safety | 0/3 | Not started | - |
 
 ---
 
