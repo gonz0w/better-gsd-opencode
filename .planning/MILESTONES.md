@@ -953,3 +953,20 @@
 
 ---
 
+
+## v19.4 Workflow Acceleration II + TDD Reliability (Shipped: 2026-04-06)
+
+**Phases completed:** 9 phases, 9 plans, 0 tasks
+
+**Key accomplishments:**
+- Production TDD validator commands (validate-red/green/refactor) with spawnSync-based semantic failure detection and E2E fixture proving RED→GREEN→REFACTOR cycle
+- /bgsd-deliver-phase --fresh-step-context CLI orchestrator with JJ proof gate, fresh-context chaining, and disk-based handoff for resume
+- TDD audit sidecar wired into handoff inventory with narrative proof rendering and continuity validation
+- TDD gate hardening with planning-time validate-tdd-plan, mtime+size fast path, and semantic diff fallback
+- TDD mutex namespace in PlanningCache with serial cache warm and bounded parallel fan-out
+- TDD gate validators verified via E2E execution, closing GAP-R1/R2/R3/R5/R6
+- Extract tdd_rationale from PLAN.md frontmatter and render as TDD Decision section before audit trail
+- Implemented runTddVerify with child_process spawn for TDD stage validation via execute:tdd CLI
+
+---
+
