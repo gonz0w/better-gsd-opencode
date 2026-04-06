@@ -158,13 +158,25 @@ This helper caches the workspace proof for 30 seconds within a wave dispatch. Th
 async function fanInParallelSpawns(plans, cwd, options = {}) {
   const { timeout_ms = 300_000, onProgress } = options;
   const { spawn } = require('child_process');
+  const { PlanningCache } = require('../src/lib/planning-cache');
 
-  // Kahn waves come from enrichment.decisions['phase-dependencies'].value.waves
-  // which maps phase-number → wave-number
-  // fanInParallelSpawns should group by kahnWaves[plan.phase] not frontmatter.wave
+  // Kahn waves from enrichment.decisions['phase-dependencies'].value.waves
+  // Maps phase-number (String) → wave-number
+  // Uses Kahn-derived wave when available, falls back to frontmatter.wave for backward compatibility
+  const kahnWaves = enrichment?.decisions?.['phase-dependencies']?.value?.waves || {};
+
+  // Shared cache for parallel spawn coordination (mutex-protected)
+  const cache = new PlanningCache({});
 
   const spawns = plans.map(plan => {
-    return new Promise(resolve => {
+    return new Promise(async resolve => {
+      // Kahn wave assignment: derive phase number from plan, look up wave
+      const planPhase = plan.phase || String(plan.plan_id?.match(/^(\d+)/)?.[1] || 1);
+      const planWave = kahnWaves[planPhase] ?? parseInt(plan.wave, 10) ?? 1;
+
+      // Mutex-protected cache read for shared state before spawning
+      const { value: cachedResult } = await cache.getMutexValue(`spawn_${plan.plan_id}`);
+
       const child = spawn(
         process.execPath,
         ['bin/bgsd-tools.cjs', 'execute:plan', plan.plan_id, '--no-interactive'],
@@ -185,11 +197,14 @@ async function fanInParallelSpawns(plans, cwd, options = {}) {
 
       child.on('close', code => {
         clearTimeout(timeout);
-        resolve({ plan_id: plan.plan_id, code: timedOut ? -1 : code, stdout, stderr, timedOut });
+        // Mutex-protected cache invalidation after spawn completes
+        cache.invalidateMutex(`spawn_${plan.plan_id}`);
+        resolve({ plan_id: plan.plan_id, code: timedOut ? -1 : code, stdout, stderr, timedOut, wave: planWave });
       });
       child.on('error', err => {
         clearTimeout(timeout);
-        resolve({ plan_id: plan.plan_id, code: -1, stdout: '', stderr: String(err), timedOut: false });
+        cache.invalidateMutex(`spawn_${plan.plan_id}`);
+        resolve({ plan_id: plan.plan_id, code: -1, stdout: '', stderr: String(err), timedOut: false, wave: planWave });
       });
     });
   });
