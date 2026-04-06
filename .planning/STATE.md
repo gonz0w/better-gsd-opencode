@@ -11,10 +11,10 @@ See: .planning/PROJECT.md (updated 2026-04-05)
 
 Phase: 201 of 203 (Measurement Foundation & Fast Commands)
 Plan: 02 of 02 in current phase
-Status: Ready to plan
-Last activity: 2026-04-06 — plan 201-01 complete, measurement infrastructure delivered
+Status: Plan complete
+Last activity: 2026-04-06 — plan 201-02 complete, fast commands delivered
 
-Progress: [▓▓░░░░░░░░] 10%
+Progress: [▓▓▓▓▓░░░░░] 20%
 
 ## Performance Metrics
 
@@ -41,6 +41,9 @@ Progress: [▓▓░░░░░░░░] 10%
 - **201-01: TTL cache pattern**: 10-minute TTL for computed values in PlanningCache. Hybrid value balancing freshness vs performance.
 - **201-01: Batch freshness**: batchCheckFreshness uses single SQLite transaction with IN clause instead of N individual queries. Falls back to per-file on transaction failure.
 - **201-01: ACCEL baseline**: workflow:baseline saves ACCEL-BASELINE.json to .planning/research/ for Phase 201 measurement tracking.
+- **201-02: --fast flag**: discuss-phase --fast flag auto-qualifies routine phases (≤2 gray areas) for faster discussion; must never bypass locked decisions or deferred ideas.
+- **201-02: --batch N flag**: verify-work --batch N flag already wired; partitions tests into groups, drill-down on failure; high-risk tests excluded from batch mode.
+- **201-02: workflow:hotpath**: Aggregates routing telemetry from .planning/telemetry/routing-log.jsonl; displays function count, top profile, top model table.
 
 ### Pending Todos
 
@@ -54,6 +57,6 @@ None
 
 ## Session Continuity
 
-Last session: 2026-04-06T00:51:12.291Z
-Stopped at: Phase 201 context gathered
-Resume file: .planning/phases/201-measurement-foundation-fast-commands/201-CONTEXT.md
+Last session: 2026-04-06T01:32:35Z
+Stopped at: Phase 201 complete
+Resume file: None

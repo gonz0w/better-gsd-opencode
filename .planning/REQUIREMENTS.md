@@ -14,9 +14,9 @@
 
 ### FAST — Fast Mode Commands
 
-- [ ] **FAST-01:** Add `discuss-phase --fast` flag that batches low-risk clarification choices and reduces turns for routine phases
-- [ ] **FAST-02:** Add `verify-work --batch N` flag that batches routine test verification (default stays one-at-a-time for ambiguous/high-risk)
-- [ ] **FAST-03:** Add `workflow:hotpath` command that shows which routing paths are most frequently used based on telemetry
+- [x] **FAST-01:** Add `discuss-phase --fast` flag that batches low-risk clarification choices and reduces turns for routine phases
+- [x] **FAST-02:** Add `verify-work --batch N` flag that batches routine test verification (default stays one-at-a-time for ambiguous/high-risk)
+- [x] **FAST-03:** Add `workflow:hotpath` command that shows which routing paths are most frequently used based on telemetry
 
 ### PARALLEL — Parallelization
 
