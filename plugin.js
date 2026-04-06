@@ -9270,6 +9270,7 @@ function enrichCommand(input, output, cwd) {
     if (roadmap && roadmap.phases && roadmap.phases.length > 0) {
       enrichment.phases_total = roadmap.phases.length;
       enrichment.phases_complete = roadmap.phases.filter((p) => p.status === "complete").length;
+      enrichment.phases = roadmap.phases;
     }
   } catch {
   }
