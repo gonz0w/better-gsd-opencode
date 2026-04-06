@@ -22,8 +22,8 @@
 
 - [x] **PARALLEL-01:** Add mutex-protected cache entries for parallel stages sharing cache layer
 - [x] **PARALLEL-02:** Add Kahn topological sort verification to `resolvePhaseDependencies` to ensure correct parallel wave ordering
-- [ ] **PARALLEL-03:** Preserve JJ workspace proof gate on all accelerated parallel paths — proof check may be optimized but never bypassed
-- [ ] **PARALLEL-04:** Add `Promise.all` fan-in coordination for independent workflow stage execution using `child_process.spawn`
+- [x] **PARALLEL-03:** Preserve JJ workspace proof gate on all accelerated parallel paths — proof check may be optimized but never bypassed
+- [x] **PARALLEL-04:** Add `Promise.all` fan-in coordination for independent workflow stage execution using `child_process.spawn`
 
 ### STATE — State Mutation Safety
 
