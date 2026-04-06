@@ -1508,6 +1508,86 @@ function cmdStateValidate(cwd, options, raw) {
     }
   }
 
+  // ─── Check 4: TDD audit continuity (SVAL-04) ───────────────────────────
+  {
+    const phaseTree = getPhaseTree(cwd);
+    for (const [normalizedPhase, phaseEntry] of phaseTree) {
+      const phaseDir = path.join(cwd, phaseEntry.dirName);
+      if (!fs.existsSync(phaseDir)) continue;
+
+      const tddAuditFiles = fs.readdirSync(phaseDir)
+        .filter(f => f.endsWith('-TDD-AUDIT.json'))
+        .sort();
+
+      for (const auditFile of tddAuditFiles) {
+        const auditPath = path.join(phaseDir, auditFile);
+
+        // Check 4a: Audit file exists and is readable
+        if (!fs.existsSync(auditPath)) {
+          issues.push({
+            type: 'tdd_audit_missing',
+            location: `${phaseEntry.dirName}/${auditFile}`,
+            expected: 'TDD audit file exists',
+            actual: 'File not found',
+            severity: 'warn',
+          });
+          continue;
+        }
+
+        // Check 4b: Valid JSON structure
+        let auditData;
+        try {
+          auditData = JSON.parse(fs.readFileSync(auditPath, 'utf-8'));
+        } catch {
+          issues.push({
+            type: 'tdd_audit_invalid',
+            location: `${phaseEntry.dirName}/${auditFile}`,
+            expected: 'Valid JSON with stage data',
+            actual: 'JSON parse failed',
+            severity: 'warn',
+          });
+          continue;
+        }
+
+        // Normalize structure - handle both {phases: {red, green, refactor}} and direct stage objects
+        const source = auditData && typeof auditData === 'object'
+          ? (auditData.phases && typeof auditData.phases === 'object' ? auditData.phases : auditData)
+          : {};
+
+        const validStages = ['red', 'green', 'refactor'].filter(s => source[s] && typeof source[s] === 'object');
+
+        if (validStages.length === 0) {
+          issues.push({
+            type: 'tdd_audit_empty',
+            location: `${phaseEntry.dirName}/${auditFile}`,
+            expected: 'At least one of red/green/refactor stage data',
+            actual: 'No valid stage data found',
+            severity: 'warn',
+          });
+          continue;
+        }
+
+        // Check 4c: Referenced commits exist in git
+        for (const stage of validStages) {
+          const stageData = source[stage];
+          const commit = stageData.commit;
+          if (commit) {
+            const commitCheck = execGit(cwd, ['cat-file', '-t', commit]);
+            if (commitCheck.exitCode !== 0 || commitCheck.stdout.trim() !== 'commit') {
+              issues.push({
+                type: 'tdd_audit_commit_missing',
+                location: `${phaseEntry.dirName}/${auditFile} stage=${stage}`,
+                expected: `Commit ${commit} exists in git`,
+                actual: 'Commit not found',
+                severity: 'warn',
+              });
+            }
+          }
+        }
+      }
+    }
+  }
+
   // ─── Check 5: Blocker/todo staleness (SVAL-05) ──────────────────────────
   if (stateContent) {
     const config = loadConfig(cwd);
