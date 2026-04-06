@@ -37,16 +37,7 @@ Progress: [▓▓▓▓▓▓▓▓░░] 60%
 
 ### Decisions
 
-- **201-01: Telemetry infrastructure**: Added telemetryLog as non-blocking append-only hook in orchestration.js wrapping routing functions. Ensures telemetry never blocks routing performance.
-- **201-01: TTL cache pattern**: 10-minute TTL for computed values in PlanningCache. Hybrid value balancing freshness vs performance.
-- **201-01: Batch freshness**: batchCheckFreshness uses single SQLite transaction with IN clause instead of N individual queries. Falls back to per-file on transaction failure.
-- **201-01: ACCEL baseline**: workflow:baseline saves ACCEL-BASELINE.json to .planning/research/ for Phase 201 measurement tracking.
-- **201-02: --fast flag**: discuss-phase --fast flag auto-qualifies routine phases (≤2 gray areas) for faster discussion; must never bypass locked decisions or deferred ideas.
-- **201-02: --batch N flag**: verify-work --batch N flag already wired; partitions tests into groups, drill-down on failure; high-risk tests excluded from batch mode.
-- **201-02: workflow:hotpath**: Aggregates routing telemetry from .planning/telemetry/routing-log.jsonl; displays function count, top profile, top model table.
-- **202-02: Kahn topological sort**: resolvePhaseDependencies uses Kahn BFS for parallel wave ordering; wave assignment = max(dep waves) + 1; cycle detection returns {valid: false, errors: [...]}
-- **202-01: Mutex-protected cache**: MUTEX_POOL_SIZE=256 (fixed pool, hash-based slot selection); _mutexPool backed by SharedArrayBuffer; getMutexValue uses Atomics.waitAsync for non-blocking spin-wait; invalidateMutex uses CAS loop with finally-block release
-- **202-03: Proof gate + Promise.all fan-in**: PROOF_CACHE_TTL_MS=30s for wave-dispatch caching; getWorkspaceProof() never bypasses proof check; fanInParallelSpawns() coordinates parallel child_process.spawn with Promise.all; structured {plan_id, code, stdout, stderr, timedOut} results; sequential fallback when parallel_allowed=false
+None yet.
 
 ### Pending Todos
 
@@ -60,6 +51,6 @@ None
 
 ## Session Continuity
 
-Last session: 2026-04-06T02:08:46Z
-Stopped at: Phase 202-03 complete
-Resume file: None
+Last session: 2026-04-06T03:01:40.726Z
+Stopped at: Phase 203 context gathered
+Resume file: .planning/phases/203-state-mutation-safety/203-CONTEXT.md
