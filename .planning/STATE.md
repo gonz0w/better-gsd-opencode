@@ -41,12 +41,15 @@ Progress: [██████████] 100%
 | Phase 210 P01 | 6 min | 3 tasks | 2 files |
 | Phase 211-tdd-gate-hardening-execution P01 | 2 min | 4 tasks | 2 files |
 | Phase 212-tdd-rationale-visibility P01 | 2 min | 3 tasks | 1 files |
+| Phase 214-runtddverify-implementation P01 | 2 min | 1 tasks | 1 files |
 
 ## Accumulated Context
 
 ### Decisions
 
 - [Phase 212-tdd-rationale-visibility]: GAP-R4 closed: tdd_rationale now surfaces in summary output — Added extractFrontmatter call and TDD Decision section rendering before audit trail
+- [Phase 214-runtddverify-implementation]: Used child_process.spawn for async TDD CLI validation
+- [Phase 214-runtddverify-implementation]: Non-type:tdd plans delegate to execute-plan subagents via verified:true return
 
 ### Pending Todos
 
