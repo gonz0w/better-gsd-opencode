@@ -383,6 +383,22 @@ If the phase already produced canonical `*-TDD-AUDIT.json` proof sidecars, the s
 </step>
 <!-- /section -->
 
+<!-- section: bundle_smoke_test -->
+<step name="bundle_smoke_test">
+Run npm run build smoke test to verify bundle parity:
+```bash
+BUILD_OUTPUT=$(npm run build 2>&1)
+BUILD_EXIT=$?
+if [ $BUILD_EXIT -ne 0 ]; then
+  echo "BUNDLE PARITY FAILURE: $BUILD_OUTPUT"
+  exit 1
+fi
+echo "Bundle smoke test: PASS"
+```
+If build fails: exit 1, do not proceed to verify_phase_goal.
+</step>
+<!-- /section -->
+
 <!-- section: close_artifacts -->
 <step name="close_parent_artifacts">
 **Decimal/polish phases only (X.Y pattern).** Skip for whole-number phases.
@@ -399,6 +415,22 @@ If the phase already produced canonical `*-TDD-AUDIT.json` proof sidecars, the s
 <!-- section: ci_quality_gate if="ci_enabled" -->
 <step name="ci_quality_gate">
 <skill:ci-quality-gate scope="phase-${PHASE_NUMBER}" base_branch="${BASE_BRANCH:-main}" />
+</step>
+<!-- /section -->
+
+<!-- section: cli_contract_validation -->
+<step name="cli_contract_validation">
+Run `util:validate-commands --raw` to confirm CLI contract after routing changes:
+```bash
+VALIDATE_OUTPUT=$(node __OPENCODE_CONFIG__/bgsd-oc/bin/bgsd-tools.cjs util:validate-commands --raw 2>&1)
+VALIDATE_EXIT=$?
+if [ $VALIDATE_EXIT -ne 0 ]; then
+  echo "CLI CONTRACT DRIFT: $VALIDATE_OUTPUT"
+  exit 1
+fi
+echo "CLI contract validation: PASS"
+```
+If validation fails: exit 1, do not proceed to verify_phase_goal.
 </step>
 <!-- /section -->
 
