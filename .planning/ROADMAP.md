@@ -52,7 +52,7 @@ v19.4 continues v19.3's workflow acceleration and hardens TDD reliability. The m
   2. tdd_audit added to handoff artifact inventory in phase-handoff.js — proof survives resume/refresh cycles
   3. Human-legible TDD proof rendering in summary:generate — not backtick-wrapped raw tokens but narrative format
   4. verify:state includes TDD audit sidecar checks — audit continuity verified at state validation
-**Plans**: TBD
+**Plans**: 1/1
 
 ### Phase 209: TDD Gate Hardening
 **Goal**: TDD plan structure verification at planning-time; RED/GREEN/REFACTOR gate semantics beyond exit-code checks
@@ -83,7 +83,7 @@ v19.4 continues v19.3's workflow acceleration and hardens TDD reliability. The m
 |-------|----------------|--------|-----------|
 | 206. TDD Validator Shipping | 0/1 | Complete    | 2026-04-06 |
 | 207. Fresh-Context Chaining | 0/1 | Complete    | 2026-04-06 |
-| 208. TDD Audit Continuity | 0/1 | Not started | - |
+| 208. TDD Audit Continuity | 0/1 | Planned | - |
 | 209. TDD Gate Hardening | 0/1 | Not started | - |
 | 210. Parallel TDD Safety | 0/1 | Not started | - |
 
