@@ -718,6 +718,7 @@ Use without --exact for fuzzy matching.`);
             const decisionRationaleIdx = restArgs.indexOf('--decision-rationale');
             const stoppedIdx = restArgs.indexOf('--stopped-at');
             const resumeIdx = restArgs.indexOf('--resume-file');
+            const dryRunIdx = restArgs.indexOf('--dry-run');
             lazyState().cmdStateCompletePlan(cwd, {
               phase: phaseIdx !== -1 ? restArgs[phaseIdx + 1] : null,
               plan: planIdx !== -1 ? restArgs[planIdx + 1] : null,
@@ -728,6 +729,7 @@ Use without --exact for fuzzy matching.`);
               decision_rationale: decisionRationaleIdx !== -1 ? restArgs[decisionRationaleIdx + 1] : null,
               stopped_at: stoppedIdx !== -1 ? restArgs[stoppedIdx + 1] : null,
                 resume_file: resumeIdx !== -1 ? restArgs[resumeIdx + 1] : 'None',
+              dry_run: dryRunIdx !== -1,
             }, raw);
           } else if (stateSub === 'handoff') {
             lazyState().cmdStateHandoff(cwd, restArgs.slice(1), raw);

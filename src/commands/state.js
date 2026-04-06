@@ -1036,6 +1036,20 @@ function cmdStateCompletePlan(cwd, options, raw) {
     return;
   }
 
+  // Dry-run: output routing decision and return early without making any changes
+  if (options.dry_run || options['dry-run']) {
+    const useBatch = canBatch('state');
+    const canBatchValue = canBatch('state');
+    if (useBatch) {
+      console.error(`[dry-run] batch-state: canBatch('state')=${canBatchValue} using=BATCH-WRITE path`);
+      console.error(`[dry-run] batch-state: stores affected = state, metrics, session (non-sacred)`);
+    } else {
+      console.error(`[dry-run] batch-state: SACRED store detected, forcing SINGLE-WRITE path`);
+    }
+    output({ dry_run: true, canBatch: canBatchValue, path: useBatch ? 'BATCH-WRITE' : 'SINGLE-WRITE' }, raw, 'true');
+    return;
+  }
+
   const phaseTruth = computePhaseCompletionTruth(cwd, options.phase, content);
   const currentPlan = phaseTruth ? phaseTruth.current_plan : parseInt(stateExtractField(content, 'Current Plan'), 10);
   const totalPlans = phaseTruth ? phaseTruth.total_plans : parseInt(stateExtractField(content, 'Total Plans in Phase'), 10);
@@ -1048,7 +1062,6 @@ function cmdStateCompletePlan(cwd, options, raw) {
   const decisionSummary = options.decision_summary || null;
   const decisionRationale = options.decision_rationale || null;
   const useBatch = canBatch('state');
-  console.error(`batch-state: canBatch=${canBatch('state')}, using=${useBatch ? 'BATCH' : 'SINGLE'}`);
   let completionResult;
 
   if (useBatch) {
