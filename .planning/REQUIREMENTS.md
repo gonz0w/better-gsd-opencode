@@ -47,15 +47,15 @@
 | FAST-01 | 201 | Features (--fast mode) |
 | FAST-02 | 201 | Features (--batch mode) |
 | FAST-03 | 201 | Features (hot-path visibility) |
-| PARALLEL-01 | 202 | Pitfalls #2 (cache races) |
-| PARALLEL-02 | 202 | Architecture (Kahn sort) |
+| PARALLEL-01 | 205 | Pitfalls #2 (cache races) |
+| PARALLEL-02 | 205 | Architecture (Kahn sort) |
 | PARALLEL-03 | 202 | Pitfalls #3 (JJ proof gate) |
 | PARALLEL-04 | 202 | Stack (Promise.all spawn) |
 | STATE-01 | 203 | Pitfalls #4 (state compatibility) |
-| STATE-02 | 203 | Features (batched state) |
-| STATE-03 | 203 | Pitfalls #4 (sacred data) |
-| BUNDLE-01 | All | Pitfalls (bundle parity) |
-| BUNDLE-02 | All | Architecture (CLI contract) |
+| STATE-02 | 204 | Features (batched state) |
+| STATE-03 | 204 | Pitfalls #4 (sacred data) |
+| BUNDLE-01 | 204 | Pitfalls (bundle parity) |
+| BUNDLE-02 | 204 | Architecture (CLI contract) |
 
 ## Out of Scope
 

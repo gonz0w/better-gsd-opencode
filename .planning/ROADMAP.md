@@ -3,7 +3,7 @@
 ## Milestones
 
 - ✅ **v19.1 Execution Simplicity, Speculative Decoding & JJ-First UX** - Phases 188-200 (shipped 2026-04-05)
-- ✅ **v19.3 Workflow Acceleration** - Phases 201-203 (shipped 2026-04-06)
+- 🔄 **v19.3 Workflow Acceleration** - Phases 201-205 (in progress)
 
 ## Overview
 
@@ -14,6 +14,8 @@ v19.3 accelerates workflow execution through measurement-grounded caching, fast-
 - [x] **Phase 201: Measurement Foundation & Fast Commands** - Establish baseline telemetry, TTL-backed routing cache, batch freshness checks, and --fast/--batch hot-path commands (completed 2026-04-06)
 - [x] **Phase 202: Parallelization Safety** (completed 2026-04-06) - Mutex-protected cache entries, Kahn sort verification, preserved JJ proof gate, and Promise.all fan-in coordination (3 plans)
 - [x] **Phase 203: State Mutation Safety** (completed 2026-04-06) - verify:state validate wired after batched writes, batch transaction support, sacred data never batched, CLI contract validation
+- [ ] **Phase 204: Wire Batch State API** - Wire storeSessionBundleBatch into execute-plan, add canBatch routing (gap closure)
+- [ ] **Phase 205: Wire Parallelization Safety** - Trigger resolvePhaseDependencies, wire mutex primitives, fix Kahn sort bypass (gap closure)
 
 ## Phase Details
 
@@ -54,6 +56,28 @@ v19.3 accelerates workflow execution through measurement-grounded caching, fast-
   5. `util:validate-commands --raw` confirms CLI contract validity after any routing change
 **Plans**: 3/3 plans complete
 
+### Phase 204: Wire Batch State API
+**Goal**: Wire storeSessionBundleBatch into execute-plan workflow and add canBatch routing between batch/single-write paths
+**Depends on**: Phase 203
+**Requirements**: STATE-02, STATE-03, BUNDLE-01, BUNDLE-02
+**Gap Closure**: Closes GAP-001, GAP-002, FLOW-002 from v19.3 audit
+**Success Criteria** (what must be TRUE):
+  1. `storeSessionBundleBatch` is called from execute-plan workflow for applicable state mutations
+  2. `canBatch` guard routes between batch and single-write paths based on store type
+  3. Batch path includes BEGIN/COMMIT/ROLLBACK transaction support
+  4. `execute-plan --dry-run` shows batch path being selected for non-sacred stores
+
+### Phase 205: Wire Parallelization Safety
+**Goal**: Trigger resolvePhaseDependencies Kahn sort and wire mutex primitives into parallel cache access
+**Depends on**: Phase 204
+**Requirements**: PARALLEL-01, PARALLEL-02
+**Gap Closure**: Closes GAP-003, GAP-004, FLOW-001 from v19.3 audit
+**Success Criteria** (what must be TRUE):
+  1. `enrichment.phases` is set to trigger `resolvePhaseDependencies` rule
+  2. `fanInParallelSpawns` uses Kahn sort output instead of frontmatter `wave` field
+  3. Parallel stages acquire mutex-protected cache entries via `getMutexValue`/`invalidateMutex`
+  4. Mutex primitives prevent cache race conditions during parallel execution
+
 ## Progress
 
 | Phase | Plans Complete | Status | Completed |
@@ -61,6 +85,8 @@ v19.3 accelerates workflow execution through measurement-grounded caching, fast-
 | 201. Measurement Foundation & Fast Commands | 2/2 | Complete    | 2026-04-06 |
 | 202. Parallelization Safety | 3/3 | Complete    | 2026-04-06 |
 | 203. State Mutation Safety | 3/3 | Complete    | 2026-04-06 |
+| 204. Wire Batch State API | 0/4 | Pending     | — |
+| 205. Wire Parallelization Safety | 0/4 | Pending     | — |
 
 ---
 
