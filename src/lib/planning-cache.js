@@ -160,6 +160,38 @@ class PlanningCache {
   }
 
   /**
+   * Get a cached value with mutex protection for concurrent access safety.
+   * Non-blocking: uses Atomics.waitAsync for spin-wait when slot is contested.
+   *
+   * @param {string} key - Cache key
+   * @returns {{ value: object|null, stale: boolean, locked: boolean }} - Promise resolving to cache entry
+   */
+  getMutexValue(key) {
+    const slot = this._mutexSlotForKey(key);
+
+    // Try lock-free read first (no contention path)
+    const noWait = Atomics.waitAsync(this._mutexPool, slot, 0, 0);
+    if (noWait.async) {
+      // Contention detected — wait non-blocking, then read
+      return noWait.value.then(() => this._getUnlocked(key));
+    }
+
+    // Fast path: no contention, read directly
+    return Promise.resolve(this._getUnlocked(key));
+  }
+
+  /**
+   * Internal unlock read — assumes caller has verified no mutex contention.
+   * @param {string} key
+   * @returns {{ value: object|null, stale: boolean, locked: boolean }}
+   * @private
+   */
+  _getUnlocked(key) {
+    const val = this.getComputedValue(key);
+    return { value: val, stale: val === null, locked: false };
+  }
+
+  /**
    * Store a computed value with TTL.
    * @param {string} key
    * @param {object} value
