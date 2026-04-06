@@ -17,13 +17,13 @@ Requirements for v19.4 Workflow Acceleration II + TDD Reliability. Each maps to 
 ### TDD Reliability
 
 - [x] **TDD-01**: `execute:tdd validate-red` verifies test FAILED for expected missing behavior (not just exit code ≠ 0)
-- [ ] **TDD-02**: `execute:tdd validate-green` verifies test PASSED + test file NOT modified during GREEN phase
-- [ ] **TDD-03**: `execute:tdd validate-refactor` verifies all tests still pass + no new behavior added (test count unchanged)
-- [ ] **TDD-04**: TDD plan structure verification rejects malformed `type:tdd` plans at planning-time — required fields (test_file, impl_files, steps with RED/GREEN/REFACTOR sequence) are present and correctly ordered
+- [x] **TDD-02**: `execute:tdd validate-green` verifies test PASSED + test file NOT modified during GREEN phase
+- [x] **TDD-03**: `execute:tdd validate-refactor` verifies all tests still pass + no new behavior added (test count unchanged)
+- [x] **TDD-04**: TDD plan structure verification rejects malformed `type:tdd` plans at planning-time — required fields (test_file, impl_files, steps with RED/GREEN/REFACTOR sequence) are present and correctly ordered
 - [x] **TDD-05**: TDD E2E fixture proves RED→GREEN→REFACTOR commit trail in actual repo — automated end-to-end validation of full TDD cycle
 - [ ] **TDD-06**: TDD rationale visibility in plan output — selected/skipped rationale surfaced in plan output and summary rendering
-- [ ] **TDD-07**: Planner evaluates TDD eligibility for every implementation plan, not only phases with explicit ROADMAP TDD hint
-- [ ] **TDD-08**: TDD decision rationale field on every `type:tdd` plan — structured in frontmatter, why TDD was selected or intentionally skipped
+- [x] **TDD-07**: Planner evaluates TDD eligibility for every implementation plan, not only phases with explicit ROADMAP TDD hint
+- [x] **TDD-08**: TDD decision rationale field on every `type:tdd` plan — structured in frontmatter, why TDD was selected or intentionally skipped
 
 ### Non-Regression (Must Not Break)
 
@@ -74,13 +74,13 @@ Which phases cover which requirements. Updated during roadmap creation.
 | ACCEL-03 | Phase 207 | Complete | JJ proof gate mandatory |
 | ACCEL-04 | Phase 207 | Complete | /clear-safe resumption |
 | TDD-01 | Phase 206 | Complete | RED gate semantic validation |
-| TDD-02 | Phase 211 | Pending | GREEN gate semantic validation |
-| TDD-03 | Phase 211 | Pending | REFACTOR gate semantic validation |
-| TDD-04 | Phase 211 | Pending | Plan structure verification at planning-time |
+| TDD-02 | Phase 211 | Complete | GREEN gate semantic validation |
+| TDD-03 | Phase 211 | Complete | REFACTOR gate semantic validation |
+| TDD-04 | Phase 211 | Complete | Plan structure verification at planning-time |
 | TDD-05 | Phase 206 | Complete | E2E fixture for TDD cycle |
 | TDD-06 | Phase 212 | Pending | Rationale visibility in output |
-| TDD-07 | Phase 211 | Pending | Eligibility evaluation for ALL plans |
-| TDD-08 | Phase 211 | Pending | Rationale field in plan frontmatter |
+| TDD-07 | Phase 211 | Complete | Eligibility evaluation for ALL plans |
+| TDD-08 | Phase 211 | Complete | Rationale field in plan frontmatter |
 | REGR-01 | All phases | Regression | Must not break phase:snapshot |
 | REGR-02 | All phases | Regression | Must not break verify:state complete-plan |
 | REGR-03 | All phases | Regression | Must not break handoff artifacts |
