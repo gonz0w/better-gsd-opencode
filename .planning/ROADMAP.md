@@ -4,7 +4,7 @@
 
 - ✅ **v19.1 Execution Simplicity, Speculative Decoding & JJ-First UX** - Phases 188-200 (shipped 2026-04-05)
 - ✅ **v19.3 Workflow Acceleration** - Phases 201-205 (shipped 2026-04-06)
-- 🚧 **v19.4 Workflow Acceleration II + TDD Reliability** - Phases 206-210 (in progress)
+- 🚧 **v19.4 Workflow Acceleration II + TDD Reliability** - Phases 206-214 (in progress)
 
 ## Overview
 
@@ -17,6 +17,10 @@ v19.4 continues v19.3's workflow acceleration and hardens TDD reliability. The m
 - [x] **Phase 208: TDD Audit Continuity** - Wire TDD audit sidecar into handoff artifact inventory; ensure proof survives resume/refresh cycles (completed 2026-04-06)
 - [ ] **Phase 209: TDD Gate Hardening** - Implement TDD plan structure verification and Phase B/C gate semantics; extends execute:tdd beyond exit-code checks
 - [x] **Phase 210: Parallel TDD Safety** (completed 2026-04-06) - Add mutex protection for TDD cache keys; enables safe parallel TDD verification stages
+- [ ] **Phase 211: TDD Gate Hardening Execution** - Execute Phase 209 plans to close TDD-02/03/04/07/08 requirements
+- [ ] **Phase 212: TDD Rationale Visibility** - Implement TDD rationale visibility (Selected/Skipped surfacing) for Phase 208
+- [ ] **Phase 213: Phase 206 Deployment Fix** - Deploy updated CLI to fix installed CLI mismatch
+- [ ] **Phase 214: runTddVerify Implementation** - Replace runTddVerify placeholder with actual verification logic
 
 ## Phase Details
 
@@ -77,6 +81,30 @@ v19.4 continues v19.3's workflow acceleration and hardens TDD reliability. The m
   3. Serial cache-warm call before parallel fan-out — ensures fresh state before concurrent verification
 **Plans**: 1/1 plans complete
 
+### Phase 211: TDD Gate Hardening Execution
+**Goal**: Execute Phase 209 plans to verify TDD-02/03/04/07/08 requirements
+**Depends on**: Phase 209
+**Requirements**: TDD-02, TDD-03, TDD-04, TDD-07, TDD-08, REGR-01, REGR-02, REGR-03, REGR-04, REGR-05, REGR-06, REGR-07, REGR-08
+**Gap Closure**: Closes GAP-R1, GAP-R2, GAP-R3, GAP-R5, GAP-R6
+
+### Phase 212: TDD Rationale Visibility
+**Goal**: Surface TDD rationale (Selected/Skipped) in plan output and summary rendering
+**Depends on**: Phase 208
+**Requirements**: TDD-06, REGR-01, REGR-02, REGR-03, REGR-04, REGR-05, REGR-06, REGR-07, REGR-08
+**Gap Closure**: Closes GAP-R4
+
+### Phase 213: Phase 206 Deployment Fix
+**Goal**: Deploy updated CLI to fix installed CLI mismatch (1287012 bytes vs DEV 1290582 bytes)
+**Depends on**: Phase 206
+**Requirements**: REGR-01, REGR-02, REGR-03, REGR-04, REGR-05, REGR-06, REGR-07, REGR-08
+**Gap Closure**: Closes GAP-I1
+
+### Phase 214: runTddVerify Implementation
+**Goal**: Replace runTddVerify placeholder with actual TDD verification logic
+**Depends on**: Phase 210
+**Requirements**: REGR-01, REGR-02, REGR-03, REGR-04, REGR-05, REGR-06, REGR-07, REGR-08
+**Gap Closure**: Closes GAP-I2
+
 ## Progress
 
 | Phase | Plans Complete | Status | Completed |
@@ -85,7 +113,11 @@ v19.4 continues v19.3's workflow acceleration and hardens TDD reliability. The m
 | 207. Fresh-Context Chaining | 0/1 | Complete    | 2026-04-06 |
 | 208. TDD Audit Continuity | 0/1 | Complete    | 2026-04-06 |
 | 209. TDD Gate Hardening | 1/1 | Planned | - |
-| 210. Parallel TDD Safety | 1/1 | Complete   | 2026-04-06 |
+| 210. Parallel TDD Safety | 1/1 | Complete    | 2026-04-06 |
+| 211. TDD Gate Hardening Execution | 0/1 | Planned | - |
+| 212. TDD Rationale Visibility | 0/1 | Planned | - |
+| 213. Phase 206 Deployment Fix | 0/1 | Planned | - |
+| 214. runTddVerify Implementation | 0/1 | Planned | - |
 
 ---
 

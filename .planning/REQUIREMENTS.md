@@ -74,13 +74,13 @@ Which phases cover which requirements. Updated during roadmap creation.
 | ACCEL-03 | Phase 207 | Complete | JJ proof gate mandatory |
 | ACCEL-04 | Phase 207 | Complete | /clear-safe resumption |
 | TDD-01 | Phase 206 | Complete | RED gate semantic validation |
-| TDD-02 | Phase 209 | Pending | GREEN gate semantic validation |
-| TDD-03 | Phase 209 | Pending | REFACTOR gate semantic validation |
-| TDD-04 | Phase 209 | Pending | Plan structure verification at planning-time |
+| TDD-02 | Phase 211 | Pending | GREEN gate semantic validation |
+| TDD-03 | Phase 211 | Pending | REFACTOR gate semantic validation |
+| TDD-04 | Phase 211 | Pending | Plan structure verification at planning-time |
 | TDD-05 | Phase 206 | Complete | E2E fixture for TDD cycle |
-| TDD-06 | Phase 208 | Pending | Rationale visibility in output |
-| TDD-07 | Phase 209 | Pending | Eligibility evaluation for ALL plans |
-| TDD-08 | Phase 209 | Pending | Rationale field in plan frontmatter |
+| TDD-06 | Phase 212 | Pending | Rationale visibility in output |
+| TDD-07 | Phase 211 | Pending | Eligibility evaluation for ALL plans |
+| TDD-08 | Phase 211 | Pending | Rationale field in plan frontmatter |
 | REGR-01 | All phases | Regression | Must not break phase:snapshot |
 | REGR-02 | All phases | Regression | Must not break verify:state complete-plan |
 | REGR-03 | All phases | Regression | Must not break handoff artifacts |
