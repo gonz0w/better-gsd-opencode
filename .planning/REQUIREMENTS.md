@@ -34,7 +34,7 @@
 ### BUNDLE — Bundle Integrity
 
 - [ ] **BUNDLE-01:** Run `npm run build` smoke test after every plan — bundle parity failures are a recurring issue pattern
-- [ ] **BUNDLE-02:** Run `util:validate-commands --raw` to confirm CLI contract after any routing change
+- [x] **BUNDLE-02:** Run `util:validate-commands --raw` to confirm CLI contract after any routing change
 
 ## Traceability
 
