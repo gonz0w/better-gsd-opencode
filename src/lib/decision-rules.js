@@ -5,6 +5,8 @@
 // No file I/O — functions receive pre-computed state objects.
 //
 // Categories: workflow-routing, execution-mode, state-assessment, configuration, argument-parsing
+//
+// Phase 202: resolvePhaseDependencies restored with Kahn sort verification (PARALLEL-02)
 
 // ─── Decision Functions ──────────────────────────────────────────────────────
 
@@ -1159,7 +1161,8 @@ function resolveBenchmarkMode(state) {
  * @returns {{ value: { ordered_phases: Array, waves: object, verification: { valid: boolean, errors: string[] } }, confidence: string, rule_id: string }}
  */
 function resolvePhaseDependencies(state) {
-  const { phases = [] } = state || {};
+  const { phases: rawPhases } = state || {};
+  const phases = Array.isArray(rawPhases) ? rawPhases : [];
 
   // Build adjacency: phase -> [deps] and in-degree tracking
   const adj = new Map();
