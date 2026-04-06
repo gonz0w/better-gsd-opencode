@@ -5,14 +5,14 @@
 See: .planning/PROJECT.md (updated 2026-04-05)
 
 **Core value:** Manage and deliver high-quality software with high-quality documentation, while continuously reducing token usage and improving performance.
-**Current focus:** Phase 201 of v19.3 Workflow Acceleration
+**Current focus:** Phase 202 of v19.3 Workflow Acceleration
 
 ## Current Position
 
-Phase: 201 of 203 (Measurement Foundation & Fast Commands)
+Phase: 202 of 203 (Parallelization Safety)
 Plan: 02 of 02 in current phase
 Status: Plan complete
-Last activity: 2026-04-06 — plan 201-02 complete, fast commands delivered
+Last activity: 2026-04-06 — plan 202-02 complete, resolvePhaseDependencies restored with Kahn sort
 
 Progress: [▓▓▓▓▓░░░░░] 20%
 
@@ -44,6 +44,7 @@ Progress: [▓▓▓▓▓░░░░░] 20%
 - **201-02: --fast flag**: discuss-phase --fast flag auto-qualifies routine phases (≤2 gray areas) for faster discussion; must never bypass locked decisions or deferred ideas.
 - **201-02: --batch N flag**: verify-work --batch N flag already wired; partitions tests into groups, drill-down on failure; high-risk tests excluded from batch mode.
 - **201-02: workflow:hotpath**: Aggregates routing telemetry from .planning/telemetry/routing-log.jsonl; displays function count, top profile, top model table.
+- **202-02: Kahn topological sort**: resolvePhaseDependencies uses Kahn BFS for parallel wave ordering; wave assignment = max(dep waves) + 1; cycle detection returns {valid: false, errors: [...]}
 
 ### Pending Todos
 
