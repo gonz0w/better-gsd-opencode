@@ -7,10 +7,10 @@
 
 ### ACCEL — Acceleration Infrastructure
 
-- [ ] **ACCEL-01:** Run `workflow:baseline` before any routing/caching changes and save baseline metrics to `.planning/research/ACCEL-BASELINE.json`
-- [ ] **ACCEL-02:** Add adaptive hot-path telemetry hooks to `orchestration.js` that log which routing paths are actually taken
-- [ ] **ACCEL-03:** Extend `PlanningCache` with TTL-backed computed-value tables for `classifyTaskComplexity` and `routeTask` results
-- [ ] **ACCEL-04:** Add batch freshness check to `PlanningCache` that reads N phase/plan fingerprints in a single SQLite transaction instead of per-file mtime checks
+- [x] **ACCEL-01:** Run `workflow:baseline` before any routing/caching changes and save baseline metrics to `.planning/research/ACCEL-BASELINE.json`
+- [x] **ACCEL-02:** Add adaptive hot-path telemetry hooks to `orchestration.js` that log which routing paths are actually taken
+- [x] **ACCEL-03:** Extend `PlanningCache` with TTL-backed computed-value tables for `classifyTaskComplexity` and `routeTask` results
+- [x] **ACCEL-04:** Add batch freshness check to `PlanningCache` that reads N phase/plan fingerprints in a single SQLite transaction instead of per-file mtime checks
 
 ### FAST — Fast Mode Commands
 

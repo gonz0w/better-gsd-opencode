@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-04-05)
 ## Current Position
 
 Phase: 201 of 203 (Measurement Foundation & Fast Commands)
-Plan: 01 of TBD in current phase
+Plan: 02 of 02 in current phase
 Status: Ready to plan
-Last activity: 2026-04-05 — v19.3 roadmap created, phase 201 ready to plan
+Last activity: 2026-04-06 — plan 201-01 complete, measurement infrastructure delivered
 
-Progress: [░░░░░░░░░░] 0%
+Progress: [▓▓░░░░░░░░] 10%
 
 ## Performance Metrics
 
@@ -37,7 +37,10 @@ Progress: [░░░░░░░░░░] 0%
 
 ### Decisions
 
-None yet.
+- **201-01: Telemetry infrastructure**: Added telemetryLog as non-blocking append-only hook in orchestration.js wrapping routing functions. Ensures telemetry never blocks routing performance.
+- **201-01: TTL cache pattern**: 10-minute TTL for computed values in PlanningCache. Hybrid value balancing freshness vs performance.
+- **201-01: Batch freshness**: batchCheckFreshness uses single SQLite transaction with IN clause instead of N individual queries. Falls back to per-file on transaction failure.
+- **201-01: ACCEL baseline**: workflow:baseline saves ACCEL-BASELINE.json to .planning/research/ for Phase 201 measurement tracking.
 
 ### Pending Todos
 

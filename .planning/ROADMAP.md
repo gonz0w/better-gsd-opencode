@@ -29,7 +29,7 @@ v19.3 accelerates workflow execution through measurement-grounded caching, fast-
   5. `discuss-phase --fast` batches low-risk clarification choices and reduces turns for routine phases without changing defaults
   6. `verify-work --batch N` batches routine test verification while defaulting to one-at-a-time for ambiguous or high-risk work
   7. `workflow:hotpath` command shows which routing paths are most frequently used based on collected telemetry
-**Plans**: 2 (201-01, 201-02)
+**Plans**: 1/2 plans executed
 
 ### Phase 202: Parallelization Safety
 **Goal**: Parallel stages share cache safely with mutex protection, verified Kahn-sort ordering, and preserved JJ workspace proof gates on all accelerated paths
@@ -58,7 +58,7 @@ v19.3 accelerates workflow execution through measurement-grounded caching, fast-
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 201. Measurement Foundation & Fast Commands | 0/2 | Not started | - |
+| 201. Measurement Foundation & Fast Commands | 1/2 | In Progress|  |
 | 202. Parallelization Safety | 0/TBD | Not started | - |
 | 203. State Mutation Safety | 0/TBD | Not started | - |
 
