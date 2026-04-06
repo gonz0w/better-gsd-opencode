@@ -5,7 +5,7 @@
 See: .planning/PROJECT.md (updated 2026-04-06)
 
 **Core value:** Manage and deliver high-quality software with high-quality documentation, while continuously reducing token usage and improving performance.
-**Current focus:** Phase 211 complete — ready for verification
+**Current focus:** Phase 212 complete — ready for verification
 
 ## Current Position
 
@@ -40,12 +40,13 @@ Progress: [██████████] 100%
 | Phase 208-tdd-audit-continuity P01 | 2 min | 4 tasks | 4 files |
 | Phase 210 P01 | 6 min | 3 tasks | 2 files |
 | Phase 211-tdd-gate-hardening-execution P01 | 2 min | 4 tasks | 2 files |
+| Phase 212-tdd-rationale-visibility P01 | 2 min | 3 tasks | 1 files |
 
 ## Accumulated Context
 
 ### Decisions
 
-- [Phase 211-tdd-gate-hardening-execution]: Gap closure: E2E execution proves TDD validators — Phase 211 gap closure verifies Phase 209 validators by running E2E tests
+- [Phase 212-tdd-rationale-visibility]: GAP-R4 closed: tdd_rationale now surfaces in summary output — Added extractFrontmatter call and TDD Decision section rendering before audit trail
 
 ### Pending Todos
 
@@ -59,6 +60,6 @@ None
 
 ## Session Continuity
 
-Last session: 2026-04-06T18:48:07.064Z
-Stopped at: Completed 211-01-PLAN.md
+Last session: 2026-04-06T19:08:52.062Z
+Stopped at: Completed 212-01-PLAN.md
 Resume file: None

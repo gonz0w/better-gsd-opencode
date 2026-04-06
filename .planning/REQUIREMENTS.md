@@ -21,7 +21,7 @@ Requirements for v19.4 Workflow Acceleration II + TDD Reliability. Each maps to 
 - [x] **TDD-03**: `execute:tdd validate-refactor` verifies all tests still pass + no new behavior added (test count unchanged)
 - [x] **TDD-04**: TDD plan structure verification rejects malformed `type:tdd` plans at planning-time — required fields (test_file, impl_files, steps with RED/GREEN/REFACTOR sequence) are present and correctly ordered
 - [x] **TDD-05**: TDD E2E fixture proves RED→GREEN→REFACTOR commit trail in actual repo — automated end-to-end validation of full TDD cycle
-- [ ] **TDD-06**: TDD rationale visibility in plan output — selected/skipped rationale surfaced in plan output and summary rendering
+- [x] **TDD-06**: TDD rationale visibility in plan output — selected/skipped rationale surfaced in plan output and summary rendering
 - [x] **TDD-07**: Planner evaluates TDD eligibility for every implementation plan, not only phases with explicit ROADMAP TDD hint
 - [x] **TDD-08**: TDD decision rationale field on every `type:tdd` plan — structured in frontmatter, why TDD was selected or intentionally skipped
 
@@ -78,7 +78,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | TDD-03 | Phase 211 | Complete | REFACTOR gate semantic validation |
 | TDD-04 | Phase 211 | Complete | Plan structure verification at planning-time |
 | TDD-05 | Phase 206 | Complete | E2E fixture for TDD cycle |
-| TDD-06 | Phase 212 | Pending | Rationale visibility in output |
+| TDD-06 | Phase 212 | Complete | Rationale visibility in output |
 | TDD-07 | Phase 211 | Complete | Eligibility evaluation for ALL plans |
 | TDD-08 | Phase 211 | Complete | Rationale field in plan frontmatter |
 | REGR-01 | All phases | Regression | Must not break phase:snapshot |
