@@ -10148,11 +10148,14 @@
       ],
       "src/router.js": [
         "src/lib/constants.js",
+        "src/lib/router-contract.js",
         "src/lib/output.js",
+        "src/lib/output-context.js",
         "src/lib/runtime-capabilities.js",
         "src/lib/cli-tools/bun-runtime.js",
         "src/lib/config.js",
         "src/lib/format.js",
+        "src/lib/debug.js",
         "src/commands/state.js",
         "src/commands/roadmap.js",
         "src/commands/phase.js",
@@ -10164,6 +10167,7 @@
         "src/commands/intent.js",
         "src/commands/env.js",
         "src/commands/mcp.js",
+        "src/commands/workspace.js",
         "src/commands/codebase.js",
         "src/commands/trajectory.js",
         "src/lib/git.js",
@@ -10172,7 +10176,24 @@
         "src/commands/agent.js",
         "src/commands/research.js",
         "src/commands/tools.js",
-        "src/commands/runtime.js"
+        "src/commands/runtime.js",
+        "src/commands/measure.js",
+        "src/lib/recovery/index.js",
+        "src/commands/audit.js",
+        "src/commands/decisions.js",
+        "src/lib/db.js",
+        "src/commands/lessons.js",
+        "src/commands/skills.js",
+        "src/commands/workflow.js",
+        "src/commands/scaffold.js",
+        "src/commands/questions.js",
+        "src/commands/review.js",
+        "src/commands/security.js",
+        "src/commands/release.js",
+        "src/lib/commandDiscovery.js",
+        "src/commands/milestone.js",
+        "src/lib/helpContext.js",
+        "src/lib/helpExamples.js"
       ],
       "tests/agent.test.cjs": [
         "tests/helpers.cjs",
@@ -10209,10 +10230,13 @@
       ],
       "tests/intent.test.cjs": [
         "tests/helpers.cjs",
-        "src/commands/intent.js"
+        "src/commands/intent.js",
+        "src/lib/phase-context.js"
       ],
       "tests/memory.test.cjs": [
-        "tests/helpers.cjs"
+        "tests/helpers.cjs",
+        "src/lib/db.js",
+        "src/lib/planning-cache.js"
       ],
       "tests/misc.test.cjs": [
         "tests/helpers.cjs"
@@ -10235,6 +10259,8 @@
       ],
       "tests/trajectory.test.cjs": [
         "tests/helpers.cjs",
+        "src/lib/db.js",
+        "src/lib/planning-cache.js",
         "src/lib/recovery/stuck-detector.js"
       ],
       "tests/verify.test.cjs": [
@@ -10247,11 +10273,13 @@
         "src/lib/output.js",
         "src/lib/config.js",
         "src/lib/helpers.js",
-        "src/lib/frontmatter.js"
+        "src/lib/frontmatter.js",
+        "src/lib/plugin-paths.js"
       ],
       "src/commands/cache.js": [
         "src/lib/output.js",
-        "src/lib/cache.js"
+        "src/lib/cache.js",
+        "src/lib/db.js"
       ],
       "src/commands/codebase.js": [
         "src/lib/output.js",
@@ -10278,25 +10306,33 @@
         "src/lib/regex-cache.js",
         "src/lib/frontmatter.js",
         "src/lib/git.js",
+        "src/lib/plan-metadata.js",
         "src/lib/context.js",
         "src/lib/codebase-intel.js",
         "src/lib/deps.js",
         "src/lib/format.js",
         "src/lib/cli-tools/index.js",
         "src/lib/cli-tools/fallback.js",
+        "src/commands/lessons.js",
         "src/commands/misc.js",
         "src/commands/init.js"
       ],
       "src/commands/init.js": [
         "src/lib/output.js",
+        "src/lib/db.js",
+        "src/lib/planning-cache.js",
         "src/lib/format.js",
         "src/lib/config.js",
         "src/lib/helpers.js",
         "src/lib/frontmatter.js",
         "src/lib/git.js",
+        "src/lib/phase-handoff.js",
+        "src/lib/questions.js",
         "src/commands/intent.js",
         "src/commands/env.js",
         "src/commands/codebase.js",
+        "src/lib/jj.js",
+        "src/commands/workspace.js",
         "src/lib/codebase-intel.js",
         "src/commands/research.js",
         "src/commands/trajectory.js",
@@ -10309,13 +10345,27 @@
         "src/lib/git.js",
         "src/lib/helpers.js",
         "src/lib/frontmatter.js",
-        "src/lib/format.js"
+        "src/lib/format.js",
+        "src/lib/phase-context.js"
       ],
       "src/commands/mcp.js": [
         "src/lib/output.js"
       ],
       "src/commands/memory.js": [
-        "src/lib/output.js"
+        "src/lib/output.js",
+        "src/lib/db.js",
+        "src/lib/planning-cache.js",
+        "src/lib/json-store-mutator.js",
+        "src/lib/atomic-write.js"
+      ],
+      "src/commands/misc.js": [
+        "src/commands/misc/frontmatter.js",
+        "src/commands/misc/config-utils.js",
+        "src/commands/misc/templates.js",
+        "src/commands/misc/history-examples.js",
+        "src/commands/misc/git-helpers.js",
+        "src/commands/misc/finalize.js",
+        "src/commands/misc/recovery.js"
       ],
       "src/commands/phase.js": [
         "src/lib/output.js",
@@ -10345,7 +10395,11 @@
         "src/lib/config.js",
         "src/lib/helpers.js",
         "src/lib/git.js",
-        "src/lib/format.js"
+        "src/lib/format.js",
+        "src/lib/db.js",
+        "src/lib/planning-cache.js",
+        "src/lib/state-session-mutator.js",
+        "src/lib/phase-handoff.js"
       ],
       "src/commands/tools.js": [
         "src/lib/cli-tools/detector.js",
@@ -10358,7 +10412,16 @@
         "src/lib/output.js",
         "src/lib/git.js",
         "src/lib/format.js",
-        "src/lib/constants.js"
+        "src/lib/constants.js",
+        "src/lib/db.js",
+        "src/lib/planning-cache.js",
+        "src/lib/json-store-mutator.js"
+      ],
+      "src/commands/verify.js": [
+        "src/commands/verify/quality.js",
+        "src/commands/verify/references.js",
+        "src/commands/verify/search.js",
+        "src/commands/verify/health.js"
       ],
       "src/lib/ast.js": [
         "src/lib/codebase-intel.js",
@@ -10373,6 +10436,7 @@
         "src/lib/cli-tools/index.js"
       ],
       "src/lib/config.js": [
+        "src/lib/config-contract.js",
         "src/lib/output.js"
       ],
       "src/lib/context.js": [
@@ -10414,6 +10478,9 @@
         "src/lib/codebase-intel.js",
         "src/lib/deps.js"
       ],
+      "src/lib/output.js": [
+        "src/lib/output-context.js"
+      ],
       "src/lib/runtime-capabilities.js": [
         "src/lib/output.js"
       ],
@@ -10422,11 +10489,16 @@
       ],
       "src/plugin/command-enricher.js": [
         "src/plugin/project-state.js",
-        "src/plugin/parsers/index.js"
+        "src/plugin/parsers/index.js",
+        "src/lib/decision-rules.js",
+        "src/plugin/lib/db-cache.js",
+        "src/plugin/debug-contract.js",
+        "src/plugin/tool-availability.js"
       ],
       "src/plugin/context-builder.js": [
         "src/plugin/project-state.js",
-        "src/plugin/token-budget.js"
+        "src/plugin/token-budget.js",
+        "src/plugin/debug-contract.js"
       ],
       "src/plugin/file-watcher.js": [
         "src/plugin/parsers/index.js",
@@ -10450,8 +10522,14 @@
         "src/plugin/idle-validator.js",
         "src/plugin/stuck-detector.js",
         "src/plugin/advisory-guardrails.js",
+        "src/plugin/cmux-refresh-backbone.js",
+        "src/plugin/cmux-targeting.js",
+        "src/plugin/cmux-sidebar-sync.js",
+        "src/plugin/cmux-attention-sync.js",
         "src/plugin/parsers/config.js",
         "src/plugin/parsers/index.js",
+        "src/plugin/debug-contract.js",
+        "src/plugin/tool-availability.js",
         "src/plugin/parsers/state.js",
         "src/plugin/parsers/roadmap.js",
         "src/plugin/parsers/plan.js",
@@ -10467,13 +10545,17 @@
         "src/plugin/parsers/plan.js",
         "src/plugin/parsers/config.js",
         "src/plugin/parsers/project.js",
-        "src/plugin/parsers/intent.js"
+        "src/plugin/parsers/intent.js",
+        "src/plugin/lib/db-cache.js"
       ],
       "src/plugin/safe-hook.js": [
         "src/plugin/logger.js"
       ],
       "src/plugin/stuck-detector.js": [
         "src/plugin/logger.js"
+      ],
+      "src/plugin/tool-registry.js": [
+        "src/plugin/debug-contract.js"
       ],
       "src/lib/adapters/discovery.js": [
         "src/lib/output.js",
@@ -10523,13 +10605,26 @@
       "src/lib/utils/parity-check.js": [
         "src/lib/adapters/discovery.js"
       ],
+      "src/plugin/parsers/config.js": [
+        "src/lib/config-contract.js"
+      ],
       "src/plugin/parsers/index.js": [
         "src/plugin/parsers/state.js",
         "src/plugin/parsers/roadmap.js",
         "src/plugin/parsers/plan.js",
         "src/plugin/parsers/config.js",
         "src/plugin/parsers/project.js",
-        "src/plugin/parsers/intent.js"
+        "src/plugin/parsers/intent.js",
+        "src/plugin/lib/db-cache.js"
+      ],
+      "src/plugin/parsers/plan.js": [
+        "src/plugin/lib/db-cache.js"
+      ],
+      "src/plugin/parsers/roadmap.js": [
+        "src/plugin/lib/db-cache.js"
+      ],
+      "src/plugin/parsers/state.js": [
+        "src/plugin/lib/db-cache.js"
       ],
       "src/plugin/tools/bgsd-context.js": [
         "src/plugin/project-state.js"
@@ -10542,7 +10637,9 @@
       "src/plugin/tools/bgsd-progress.js": [
         "src/plugin/project-state.js",
         "src/plugin/parsers/state.js",
-        "src/plugin/parsers/plan.js"
+        "src/plugin/parsers/plan.js",
+        "src/plugin/cli-path.js",
+        "src/plugin/node-runtime.js"
       ],
       "src/plugin/tools/bgsd-status.js": [
         "src/plugin/project-state.js"
@@ -10558,7 +10655,591 @@
         "src/plugin/tools/bgsd-progress.js"
       ],
       "src/plugin/validation/adapter.js": [
-        "src/plugin/validation/flags.js"
+        "src/plugin/validation/flags.js",
+        "src/plugin/debug-contract.js"
+      ],
+      "src/commands/audit.js": [
+        "src/lib/output.js",
+        "src/lib/format.js",
+        "src/lib/plugin-paths.js"
+      ],
+      "src/commands/decisions.js": [
+        "src/lib/decision-rules.js",
+        "src/lib/output.js",
+        "src/lib/format.js",
+        "src/lib/plugin-paths.js"
+      ],
+      "src/commands/lessons.js": [
+        "src/lib/output.js",
+        "src/lib/db.js",
+        "src/lib/planning-cache.js",
+        "src/lib/json-store-mutator.js"
+      ],
+      "src/commands/measure.js": [
+        "src/lib/cli-tools/plugin-benchmark.js"
+      ],
+      "src/commands/milestone.js": [
+        "src/lib/output.js",
+        "src/lib/helpers.js",
+        "src/lib/reports/milestone-summary.js"
+      ],
+      "src/commands/misc/config-utils.js": [
+        "src/lib/output.js",
+        "src/lib/config.js",
+        "src/lib/config-contract.js",
+        "src/lib/constants.js",
+        "src/lib/atomic-write.js",
+        "src/lib/helpers.js"
+      ],
+      "src/commands/misc/finalize.js": [
+        "src/lib/output.js",
+        "src/lib/frontmatter.js",
+        "src/lib/jj-workspace.js",
+        "src/commands/workspace.js"
+      ],
+      "src/commands/misc/frontmatter.js": [
+        "src/lib/frontmatter.js",
+        "src/lib/output.js",
+        "src/lib/helpers.js",
+        "src/lib/commandDiscovery.js"
+      ],
+      "src/commands/misc/git-helpers.js": [
+        "src/lib/output.js",
+        "src/lib/config.js",
+        "src/lib/git.js",
+        "src/lib/jj.js",
+        "src/lib/helpers.js"
+      ],
+      "src/commands/misc/history-examples.js": [
+        "src/lib/output.js",
+        "src/lib/helpers.js"
+      ],
+      "src/commands/misc/index.js": [
+        "src/commands/misc/frontmatter.js",
+        "src/commands/misc/config-utils.js",
+        "src/commands/misc/templates.js",
+        "src/commands/misc/history-examples.js",
+        "src/commands/misc/git-helpers.js",
+        "src/commands/misc/finalize.js",
+        "src/commands/misc/recovery.js"
+      ],
+      "src/commands/misc/recovery.js": [
+        "src/lib/output.js",
+        "src/lib/helpers.js",
+        "src/lib/git.js",
+        "src/lib/codebase-intel.js",
+        "src/lib/utils/parity-check.js"
+      ],
+      "src/commands/misc/templates.js": [
+        "src/lib/output.js",
+        "src/lib/helpers.js",
+        "src/lib/frontmatter.js"
+      ],
+      "src/commands/questions.js": [
+        "src/lib/output.js",
+        "src/lib/questions.js"
+      ],
+      "src/commands/release.js": [
+        "src/lib/output.js",
+        "src/lib/release/bump.js",
+        "src/lib/release/changelog.js",
+        "src/lib/release/mutate.js",
+        "src/lib/release/pr.js"
+      ],
+      "src/commands/review.js": [
+        "src/lib/output.js",
+        "src/lib/review/config.js",
+        "src/lib/review/exclusions.js",
+        "src/lib/review/readiness.js",
+        "src/lib/review/routing.js",
+        "src/lib/review/scan.js",
+        "src/lib/review/severity.js",
+        "src/lib/review/target.js"
+      ],
+      "src/commands/scaffold.js": [
+        "src/lib/output.js",
+        "src/lib/helpers.js",
+        "src/lib/frontmatter.js",
+        "src/lib/plan-metadata.js",
+        "src/lib/scaffold.js"
+      ],
+      "src/commands/security.js": [
+        "src/lib/output.js",
+        "src/lib/security/config.js",
+        "src/lib/security/scan.js",
+        "src/lib/security/schema.js"
+      ],
+      "src/commands/skills.js": [
+        "src/lib/output.js"
+      ],
+      "src/commands/verify/health.js": [
+        "src/lib/output.js",
+        "src/lib/helpers.js",
+        "src/lib/frontmatter.js",
+        "src/lib/cli-tools/index.js",
+        "src/lib/plan-metadata.js",
+        "src/lib/config-contract.js",
+        "src/lib/constants.js",
+        "src/lib/format.js",
+        "src/commands/verify/references.js",
+        "src/commands/verify/search.js"
+      ],
+      "src/commands/verify/index.js": [
+        "src/commands/verify/quality.js",
+        "src/commands/verify/references.js",
+        "src/commands/verify/search.js",
+        "src/commands/verify/health.js"
+      ],
+      "src/commands/verify/quality.js": [
+        "src/lib/output.js",
+        "src/lib/helpers.js",
+        "src/lib/frontmatter.js",
+        "src/lib/format.js",
+        "src/lib/plan-metadata.js",
+        "src/lib/config-contract.js",
+        "src/lib/constants.js",
+        "src/lib/decision-rules.js",
+        "src/lib/commandDiscovery.js",
+        "src/lib/config.js"
+      ],
+      "src/commands/verify/references.js": [
+        "src/lib/output.js",
+        "src/lib/helpers.js",
+        "src/lib/frontmatter.js",
+        "src/lib/git.js",
+        "src/commands/verify/quality.js",
+        "src/commands/verify/search.js"
+      ],
+      "src/commands/verify/search.js": [
+        "src/lib/output.js",
+        "src/lib/helpers.js",
+        "src/lib/frontmatter.js",
+        "src/lib/commandDiscovery.js",
+        "src/lib/format.js"
+      ],
+      "src/commands/workflow.js": [
+        "src/lib/output.js",
+        "src/commands/features.js",
+        "src/lib/context.js"
+      ],
+      "src/commands/workspace.js": [
+        "src/lib/output.js",
+        "src/lib/frontmatter.js",
+        "src/lib/jj.js",
+        "src/lib/jj-workspace.js"
+      ],
+      "src/lib/abort-handler.js": [
+        "src/lib/prompts.js"
+      ],
+      "src/lib/commandDiscovery.js": [
+        "src/lib/planning-command-surface.js",
+        "src/lib/router-contract.js",
+        "src/lib/constants.js"
+      ],
+      "src/lib/config-contract.js": [
+        "src/lib/constants.js"
+      ],
+      "src/lib/debug.js": [
+        "src/lib/format.js",
+        "src/lib/error.js"
+      ],
+      "src/lib/decision-rules.js": [
+        "src/lib/helpers.js",
+        "src/lib/questions.js"
+      ],
+      "src/lib/error.js": [
+        "src/lib/format.js"
+      ],
+      "src/lib/jj-workspace.js": [
+        "src/lib/frontmatter.js",
+        "src/lib/jj.js"
+      ],
+      "src/lib/jj.js": [
+        "src/lib/output.js"
+      ],
+      "src/lib/json-store-mutator.js": [
+        "src/lib/helpers.js",
+        "src/lib/project-lock.js",
+        "src/lib/atomic-write.js"
+      ],
+      "src/lib/nl/conversational-planner.js": [
+        "src/lib/nl/requirement-extractor.js",
+        "src/lib/nl/multi-intent-detector.js",
+        "src/lib/nl/suggestion-engine.js",
+        "src/lib/nl/nl-parser.js"
+      ],
+      "src/lib/nl/fuzzy-resolver.js": [
+        "src/lib/nl/command-registry.js"
+      ],
+      "src/lib/nl/help-fallback.js": [
+        "src/lib/nl/command-registry.js"
+      ],
+      "src/lib/nl/multi-intent-detector.js": [
+        "src/lib/nl/nl-parser.js"
+      ],
+      "src/lib/nl/nl-parser.js": [
+        "src/lib/nl/intent-classifier.js",
+        "src/lib/nl/parameter-extractor.js",
+        "src/lib/nl/command-registry.js",
+        "src/lib/nl/fuzzy-resolver.js",
+        "src/lib/nl/help-fallback.js"
+      ],
+      "src/lib/phase-context.js": [
+        "src/lib/helpers.js"
+      ],
+      "src/lib/phase-handoff.js": [
+        "src/lib/helpers.js",
+        "src/lib/project-lock.js",
+        "src/lib/atomic-write.js"
+      ],
+      "src/lib/plan-metadata.js": [
+        "src/lib/frontmatter.js",
+        "src/lib/helpers.js"
+      ],
+      "src/lib/prompts.js": [
+        "src/lib/questions.js"
+      ],
+      "src/lib/recovery/autoRecovery.js": [
+        "src/lib/review/severity.js"
+      ],
+      "src/lib/recovery/index.js": [
+        "src/lib/recovery/autoRecovery.js",
+        "src/lib/recovery/checkpointAdvisor.js",
+        "src/lib/recovery/stuck-detector.js"
+      ],
+      "src/lib/release/bump.js": [
+        "src/lib/release/history.js"
+      ],
+      "src/lib/release/changelog.js": [
+        "src/lib/release/history.js",
+        "src/lib/release/bump.js"
+      ],
+      "src/lib/release/history.js": [
+        "src/lib/git.js",
+        "src/lib/release/config.js"
+      ],
+      "src/lib/release/mutate.js": [
+        "src/lib/release/bump.js",
+        "src/lib/release/changelog.js",
+        "src/lib/git.js",
+        "src/lib/release/state.js"
+      ],
+      "src/lib/release/pr.js": [
+        "src/lib/cli-tools/gh.js",
+        "src/lib/git.js",
+        "src/lib/release/mutate.js",
+        "src/lib/release/state.js"
+      ],
+      "src/lib/reports/milestone-summary.js": [
+        "src/lib/format.js",
+        "src/lib/helpers.js",
+        "src/lib/frontmatter.js",
+        "src/lib/git.js"
+      ],
+      "src/lib/reports/velocity-metrics.js": [
+        "src/lib/format.js",
+        "src/lib/helpers.js",
+        "src/lib/git.js",
+        "src/lib/viz/sparkline.js"
+      ],
+      "src/lib/review/exclusions.js": [
+        "src/lib/review/diff.js"
+      ],
+      "src/lib/review/fixes.js": [
+        "src/lib/atomic-write.js"
+      ],
+      "src/lib/review/readiness.js": [
+        "src/lib/git.js"
+      ],
+      "src/lib/review/routing.js": [
+        "src/lib/review/fixes.js",
+        "src/lib/review/severity.js"
+      ],
+      "src/lib/review/rules/debug-leftovers.js": [
+        "src/lib/review/severity.js"
+      ],
+      "src/lib/review/rules/index.js": [
+        "src/lib/review/rules/js-unused-import.js",
+        "src/lib/review/rules/debug-leftovers.js",
+        "src/lib/review/rules/trust-boundary.js"
+      ],
+      "src/lib/review/rules/js-unused-import.js": [
+        "src/lib/review/severity.js"
+      ],
+      "src/lib/review/rules/trust-boundary.js": [
+        "src/lib/review/severity.js"
+      ],
+      "src/lib/review/scan.js": [
+        "src/lib/review/rules/index.js"
+      ],
+      "src/lib/review/target.js": [
+        "src/lib/git.js",
+        "src/lib/review/diff.js"
+      ],
+      "src/lib/scaffold.js": [
+        "src/lib/frontmatter.js"
+      ],
+      "src/lib/security/engines/dependencies.js": [
+        "src/lib/security/schema.js"
+      ],
+      "src/lib/security/engines/owasp.js": [
+        "src/lib/security/schema.js",
+        "src/lib/security/rules/index.js"
+      ],
+      "src/lib/security/engines/secrets.js": [
+        "src/lib/security/schema.js"
+      ],
+      "src/lib/security/exclusions.js": [
+        "src/lib/review/diff.js"
+      ],
+      "src/lib/security/rules/index.js": [
+        "src/lib/security/rules/js-injection.js",
+        "src/lib/security/rules/unsafe-exec.js",
+        "src/lib/security/rules/auth-misconfig.js",
+        "src/lib/security/rules/config-misuse.js",
+        "src/lib/security/rules/xss.js",
+        "src/lib/security/rules/xxe.js",
+        "src/lib/security/rules/access-control.js",
+        "src/lib/security/rules/insecure-deserialization.js",
+        "src/lib/security/rules/logging-gaps.js"
+      ],
+      "src/lib/security/scan.js": [
+        "src/lib/security/schema.js",
+        "src/lib/security/exclusions.js",
+        "src/lib/security/engines/owasp.js",
+        "src/lib/security/engines/secrets.js",
+        "src/lib/security/engines/dependencies.js"
+      ],
+      "src/lib/security/schema.js": [
+        "src/lib/review/diff.js"
+      ],
+      "src/lib/state-session-mutator.js": [
+        "src/lib/db.js",
+        "src/lib/helpers.js",
+        "src/lib/planning-cache.js",
+        "src/lib/project-lock.js",
+        "src/lib/atomic-write.js",
+        "src/commands/state.js"
+      ],
+      "src/lib/viz/index.js": [
+        "src/lib/viz/progress.js",
+        "src/lib/viz/milestone.js",
+        "src/lib/viz/quality.js",
+        "src/lib/viz/burndown.js",
+        "src/lib/viz/sparkline.js",
+        "src/lib/viz/dashboard.js",
+        "src/lib/reports/milestone-summary.js",
+        "src/lib/reports/velocity-metrics.js"
+      ],
+      "src/lib/viz/milestone.js": [
+        "src/lib/viz/progress.js"
+      ],
+      "src/lib/wizard.js": [
+        "src/lib/prompts.js"
+      ],
+      "src/plugin/cmux-attention-sync.js": [
+        "src/plugin/cmux-sidebar-snapshot.js",
+        "src/plugin/cmux-attention-policy.js"
+      ],
+      "src/plugin/cmux-sidebar-snapshot.js": [
+        "src/plugin/cmux-lifecycle-signal.js"
+      ],
+      "src/plugin/cmux-sidebar-sync.js": [
+        "src/plugin/cmux-sidebar-snapshot.js"
+      ],
+      "src/plugin/cmux-targeting.js": [
+        "src/plugin/cmux-cli.js"
+      ],
+      "src/plugin/debug-contract.js": [
+        "src/lib/output-context.js"
+      ],
+      "src/plugin/tool-availability.js": [
+        "src/plugin/cli-path.js",
+        "src/plugin/node-runtime.js"
+      ],
+      "test-commands.cjs": [
+        "src/commands/misc.js",
+        "src/commands/env.js",
+        "src/commands/memory.js",
+        "src/commands/state.js",
+        "src/commands/verify.js",
+        "src/commands/features.js",
+        "src/commands/roadmap.js",
+        "src/commands/phase.js",
+        "src/commands/intent.js",
+        "src/commands/trajectory.js",
+        "src/commands/milestone.js",
+        "src/commands/research.js",
+        "src/commands/cache.js",
+        "src/commands/init.js",
+        "src/commands/agent.js",
+        "src/commands/codebase.js"
+      ],
+      "tests/cli-tools-integration.test.cjs": [
+        "src/lib/constants.js",
+        "src/lib/cli-tools/fallback.js",
+        "src/lib/cli-tools/ripgrep.js",
+        "src/lib/cli-tools/fd.js",
+        "src/lib/cli-tools/jq.js",
+        "src/lib/adapters/discovery.js",
+        "src/lib/cli-tools/yq.js",
+        "src/lib/cli-tools/bat.js",
+        "src/lib/cli-tools/gh.js",
+        "src/lib/cli-tools/detector.js",
+        "src/lib/cli-tools/index.js"
+      ],
+      "tests/cli-tools.test.cjs": [
+        "tests/helpers.cjs",
+        "src/lib/cli-tools/detector.js",
+        "src/lib/cli-tools/install-guidance.js",
+        "src/lib/cli-tools/fallback.js"
+      ],
+      "tests/config-contract.test.cjs": [
+        "tests/helpers.cjs",
+        "src/lib/constants.js",
+        "src/lib/config-contract.js",
+        "src/lib/config.js",
+        "src/commands/misc.js",
+        "plugin.js"
+      ],
+      "tests/db.test.cjs": [
+        "src/lib/db.js"
+      ],
+      "tests/decisions.test.cjs": [
+        "tests/helpers.cjs",
+        "src/lib/decision-rules.js",
+        "src/lib/helpers.js"
+      ],
+      "tests/enricher-decisions.test.cjs": [
+        "tests/helpers.cjs",
+        "src/lib/decision-rules.js",
+        "src/lib/context.js",
+        "src/lib/cli-tools/detector.js"
+      ],
+      "tests/finalize.test.cjs": [
+        "tests/helpers.cjs"
+      ],
+      "tests/guidance-command-integrity-agent-skill-surfaces.test.cjs": [
+        "src/lib/commandDiscovery.js"
+      ],
+      "tests/guidance-command-integrity-docs.test.cjs": [
+        "src/lib/commandDiscovery.js"
+      ],
+      "tests/guidance-command-integrity-gap-closure.test.cjs": [
+        "src/lib/commandDiscovery.js"
+      ],
+      "tests/guidance-command-integrity-remaining-surfaces.test.cjs": [
+        "src/lib/commandDiscovery.js"
+      ],
+      "tests/guidance-command-integrity-skill-tail.test.cjs": [
+        "src/lib/commandDiscovery.js"
+      ],
+      "tests/guidance-command-integrity-workflow-prep-a.test.cjs": [
+        "src/lib/commandDiscovery.js"
+      ],
+      "tests/guidance-command-integrity-workflow-prep-b.test.cjs": [
+        "src/lib/commandDiscovery.js"
+      ],
+      "tests/guidance-command-integrity-workflow-prep-c.test.cjs": [
+        "src/lib/commandDiscovery.js"
+      ],
+      "tests/guidance-command-integrity-workflow-prep-d.test.cjs": [
+        "src/lib/commandDiscovery.js"
+      ],
+      "tests/guidance-command-integrity-workflows-handoffs.test.cjs": [
+        "src/lib/commandDiscovery.js"
+      ],
+      "tests/memory-store-mutator.test.cjs": [
+        "tests/helpers.cjs",
+        "src/lib/json-store-mutator.js"
+      ],
+      "tests/mutation-primitives.test.cjs": [
+        "src/lib/project-lock.js",
+        "src/lib/atomic-write.js"
+      ],
+      "tests/plan-metadata-contract.test.cjs": [
+        "tests/helpers.cjs",
+        "src/commands/scaffold.js",
+        "src/lib/plan-metadata.js"
+      ],
+      "tests/planning-cache.test.cjs": [
+        "src/lib/db.js",
+        "src/lib/planning-cache.js"
+      ],
+      "tests/plugin-progress-contract.test.cjs": [
+        "tests/helpers.cjs",
+        "src/lib/db.js"
+      ],
+      "tests/release-workflow.test.cjs": [
+        "tests/helpers.cjs",
+        "src/commands/init.js"
+      ],
+      "tests/release.test.cjs": [
+        "tests/helpers.cjs"
+      ],
+      "tests/research-score.test.cjs": [
+        "src/commands/research.js",
+        "tests/helpers.cjs"
+      ],
+      "tests/review-readiness.test.cjs": [
+        "tests/helpers.cjs"
+      ],
+      "tests/review-workflow.test.cjs": [
+        "tests/helpers.cjs",
+        "src/commands/init.js"
+      ],
+      "tests/review.test.cjs": [
+        "tests/helpers.cjs"
+      ],
+      "tests/scaffold-generate.test.cjs": [
+        "tests/helpers.cjs"
+      ],
+      "tests/scaffold.test.cjs": [
+        "src/lib/scaffold.js"
+      ],
+      "tests/security-workflow.test.cjs": [
+        "tests/helpers.cjs",
+        "src/commands/init.js"
+      ],
+      "tests/security.test.cjs": [
+        "tests/helpers.cjs",
+        "src/lib/security/rules/index.js"
+      ],
+      "tests/session-state.test.cjs": [
+        "src/lib/db.js",
+        "src/lib/planning-cache.js",
+        "src/commands/state.js"
+      ],
+      "tests/state-session-mutator.test.cjs": [
+        "src/lib/db.js",
+        "src/lib/planning-cache.js",
+        "src/lib/state-session-mutator.js",
+        "tests/helpers.cjs"
+      ],
+      "tests/summary-generate.test.cjs": [
+        "tests/helpers.cjs"
+      ],
+      "tests/unit/decision-rules.test.cjs": [
+        "src/lib/decision-rules.js"
+      ],
+      "tests/validate-commands.test.cjs": [
+        "src/lib/commandDiscovery.js",
+        "src/lib/router-contract.js",
+        "tests/helpers.cjs"
+      ],
+      "tests/verify-metadata-truthfulness.test.cjs": [
+        "tests/helpers.cjs"
+      ],
+      "tests/workflow.test.cjs": [
+        "tests/helpers.cjs",
+        "src/commands/workflow.js"
+      ],
+      "tests/workspace-ownership.test.cjs": [
+        "src/lib/jj-workspace.js",
+        "tests/helpers.cjs"
+      ],
+      "tests/workspace.test.cjs": [
+        "tests/helpers.cjs"
       ]
     },
     "reverse": {
@@ -10567,11 +11248,13 @@
         "tests/codebase.test.cjs",
         "src/lib/ast.js",
         "src/lib/codebase-intel.js",
-        "src/lib/utils/parity-check.js"
+        "src/lib/utils/parity-check.js",
+        "tests/cli-tools-integration.test.cjs"
       ],
       "plugin.js": [
         "baseline.cjs",
-        "tests/plugin-advisory-guardrails.test.cjs"
+        "tests/plugin-advisory-guardrails.test.cjs",
+        "tests/config-contract.test.cjs"
       ],
       "src/lib/runtime-capabilities.js": [
         "benchmark-compile-cache.cjs",
@@ -10587,7 +11270,16 @@
         "src/commands/research.js",
         "src/commands/state.js",
         "src/commands/trajectory.js",
-        "src/lib/orchestration.js"
+        "src/lib/orchestration.js",
+        "src/commands/audit.js",
+        "src/commands/decisions.js",
+        "src/commands/verify/health.js",
+        "src/commands/verify/quality.js",
+        "src/commands/verify/search.js",
+        "src/lib/debug.js",
+        "src/lib/error.js",
+        "src/lib/reports/milestone-summary.js",
+        "src/lib/reports/velocity-metrics.js"
       ],
       "src/router.js": [
         "src/index.js"
@@ -10596,7 +11288,19 @@
         "src/router.js",
         "src/commands/features.js",
         "src/commands/trajectory.js",
-        "src/lib/helpers.js"
+        "src/lib/helpers.js",
+        "src/commands/misc/config-utils.js",
+        "src/commands/verify/health.js",
+        "src/commands/verify/quality.js",
+        "src/lib/commandDiscovery.js",
+        "src/lib/config-contract.js",
+        "tests/cli-tools-integration.test.cjs",
+        "tests/config-contract.test.cjs"
+      ],
+      "src/lib/router-contract.js": [
+        "src/router.js",
+        "src/lib/commandDiscovery.js",
+        "tests/validate-commands.test.cjs"
       ],
       "src/lib/output.js": [
         "src/router.js",
@@ -10626,7 +11330,36 @@
         "src/lib/lifecycle.js",
         "src/lib/orchestration.js",
         "src/lib/runtime-capabilities.js",
-        "src/lib/adapters/discovery.js"
+        "src/lib/adapters/discovery.js",
+        "src/commands/audit.js",
+        "src/commands/decisions.js",
+        "src/commands/lessons.js",
+        "src/commands/milestone.js",
+        "src/commands/misc/config-utils.js",
+        "src/commands/misc/finalize.js",
+        "src/commands/misc/frontmatter.js",
+        "src/commands/misc/git-helpers.js",
+        "src/commands/misc/history-examples.js",
+        "src/commands/misc/recovery.js",
+        "src/commands/misc/templates.js",
+        "src/commands/questions.js",
+        "src/commands/release.js",
+        "src/commands/review.js",
+        "src/commands/scaffold.js",
+        "src/commands/security.js",
+        "src/commands/skills.js",
+        "src/commands/verify/health.js",
+        "src/commands/verify/quality.js",
+        "src/commands/verify/references.js",
+        "src/commands/verify/search.js",
+        "src/commands/workflow.js",
+        "src/commands/workspace.js",
+        "src/lib/jj.js"
+      ],
+      "src/lib/output-context.js": [
+        "src/router.js",
+        "src/lib/output.js",
+        "src/plugin/debug-contract.js"
       ],
       "src/lib/cli-tools/bun-runtime.js": [
         "src/router.js",
@@ -10641,57 +11374,88 @@
         "src/commands/research.js",
         "src/commands/state.js",
         "src/lib/helpers.js",
-        "src/lib/cli-tools/fallback.js"
+        "src/lib/cli-tools/fallback.js",
+        "src/commands/misc/config-utils.js",
+        "src/commands/misc/git-helpers.js",
+        "src/commands/verify/quality.js",
+        "tests/config-contract.test.cjs"
+      ],
+      "src/lib/debug.js": [
+        "src/router.js"
       ],
       "src/commands/state.js": [
-        "src/router.js"
+        "src/router.js",
+        "src/lib/state-session-mutator.js",
+        "test-commands.cjs",
+        "tests/session-state.test.cjs"
       ],
       "src/commands/roadmap.js": [
-        "src/router.js"
+        "src/router.js",
+        "test-commands.cjs"
       ],
       "src/commands/phase.js": [
-        "src/router.js"
+        "src/router.js",
+        "test-commands.cjs"
       ],
       "src/commands/verify.js": [
         "src/router.js",
-        "src/commands/features.js"
+        "src/commands/features.js",
+        "test-commands.cjs"
       ],
       "src/commands/init.js": [
         "src/router.js",
-        "src/commands/features.js"
+        "src/commands/features.js",
+        "test-commands.cjs",
+        "tests/release-workflow.test.cjs",
+        "tests/review-workflow.test.cjs",
+        "tests/security-workflow.test.cjs"
       ],
       "src/commands/features.js": [
-        "src/router.js"
+        "src/router.js",
+        "src/commands/workflow.js",
+        "test-commands.cjs"
       ],
       "src/commands/misc.js": [
         "src/router.js",
-        "src/commands/features.js"
+        "src/commands/features.js",
+        "test-commands.cjs",
+        "tests/config-contract.test.cjs"
       ],
       "src/commands/memory.js": [
-        "src/router.js"
+        "src/router.js",
+        "test-commands.cjs"
       ],
       "src/commands/intent.js": [
         "src/router.js",
         "tests/init.test.cjs",
         "tests/intent.test.cjs",
         "src/commands/init.js",
-        "src/lib/codebase-intel.js"
+        "src/lib/codebase-intel.js",
+        "test-commands.cjs"
       ],
       "src/commands/env.js": [
         "src/router.js",
         "src/commands/init.js",
-        "src/commands/research.js"
+        "src/commands/research.js",
+        "test-commands.cjs"
       ],
       "src/commands/mcp.js": [
         "src/router.js"
       ],
+      "src/commands/workspace.js": [
+        "src/router.js",
+        "src/commands/init.js",
+        "src/commands/misc/finalize.js"
+      ],
       "src/commands/codebase.js": [
         "src/router.js",
-        "src/commands/init.js"
+        "src/commands/init.js",
+        "test-commands.cjs"
       ],
       "src/commands/trajectory.js": [
         "src/router.js",
-        "src/commands/init.js"
+        "src/commands/init.js",
+        "test-commands.cjs"
       ],
       "src/lib/git.js": [
         "src/router.js",
@@ -10704,7 +11468,17 @@
         "src/commands/trajectory.js",
         "src/lib/codebase-intel.js",
         "src/lib/context.js",
-        "src/lib/adapters/discovery.js"
+        "src/lib/adapters/discovery.js",
+        "src/commands/misc/git-helpers.js",
+        "src/commands/misc/recovery.js",
+        "src/commands/verify/references.js",
+        "src/lib/release/history.js",
+        "src/lib/release/mutate.js",
+        "src/lib/release/pr.js",
+        "src/lib/reports/milestone-summary.js",
+        "src/lib/reports/velocity-metrics.js",
+        "src/lib/review/readiness.js",
+        "src/lib/review/target.js"
       ],
       "src/lib/orchestration.js": [
         "src/router.js",
@@ -10712,20 +11486,107 @@
         "src/commands/init.js"
       ],
       "src/commands/cache.js": [
-        "src/router.js"
+        "src/router.js",
+        "test-commands.cjs"
       ],
       "src/commands/agent.js": [
         "src/router.js",
-        "tests/agent.test.cjs"
+        "tests/agent.test.cjs",
+        "test-commands.cjs"
       ],
       "src/commands/research.js": [
         "src/router.js",
-        "src/commands/init.js"
+        "src/commands/init.js",
+        "test-commands.cjs",
+        "tests/research-score.test.cjs"
       ],
       "src/commands/tools.js": [
         "src/router.js"
       ],
       "src/commands/runtime.js": [
+        "src/router.js"
+      ],
+      "src/commands/measure.js": [
+        "src/router.js"
+      ],
+      "src/lib/recovery/index.js": [
+        "src/router.js"
+      ],
+      "src/commands/audit.js": [
+        "src/router.js"
+      ],
+      "src/commands/decisions.js": [
+        "src/router.js"
+      ],
+      "src/lib/db.js": [
+        "src/router.js",
+        "tests/memory.test.cjs",
+        "tests/trajectory.test.cjs",
+        "src/commands/cache.js",
+        "src/commands/init.js",
+        "src/commands/memory.js",
+        "src/commands/state.js",
+        "src/commands/trajectory.js",
+        "src/commands/lessons.js",
+        "src/lib/state-session-mutator.js",
+        "tests/db.test.cjs",
+        "tests/planning-cache.test.cjs",
+        "tests/plugin-progress-contract.test.cjs",
+        "tests/session-state.test.cjs",
+        "tests/state-session-mutator.test.cjs"
+      ],
+      "src/commands/lessons.js": [
+        "src/router.js",
+        "src/commands/features.js"
+      ],
+      "src/commands/skills.js": [
+        "src/router.js"
+      ],
+      "src/commands/workflow.js": [
+        "src/router.js",
+        "tests/workflow.test.cjs"
+      ],
+      "src/commands/scaffold.js": [
+        "src/router.js",
+        "tests/plan-metadata-contract.test.cjs"
+      ],
+      "src/commands/questions.js": [
+        "src/router.js"
+      ],
+      "src/commands/review.js": [
+        "src/router.js"
+      ],
+      "src/commands/security.js": [
+        "src/router.js"
+      ],
+      "src/commands/release.js": [
+        "src/router.js"
+      ],
+      "src/lib/commandDiscovery.js": [
+        "src/router.js",
+        "src/commands/misc/frontmatter.js",
+        "src/commands/verify/quality.js",
+        "src/commands/verify/search.js",
+        "tests/guidance-command-integrity-agent-skill-surfaces.test.cjs",
+        "tests/guidance-command-integrity-docs.test.cjs",
+        "tests/guidance-command-integrity-gap-closure.test.cjs",
+        "tests/guidance-command-integrity-remaining-surfaces.test.cjs",
+        "tests/guidance-command-integrity-skill-tail.test.cjs",
+        "tests/guidance-command-integrity-workflow-prep-a.test.cjs",
+        "tests/guidance-command-integrity-workflow-prep-b.test.cjs",
+        "tests/guidance-command-integrity-workflow-prep-c.test.cjs",
+        "tests/guidance-command-integrity-workflow-prep-d.test.cjs",
+        "tests/guidance-command-integrity-workflows-handoffs.test.cjs",
+        "tests/validate-commands.test.cjs"
+      ],
+      "src/commands/milestone.js": [
+        "src/router.js",
+        "test-commands.cjs"
+      ],
+      "src/lib/helpContext.js": [
+        "src/router.js"
+      ],
+      "src/lib/helpExamples.js": [
         "src/router.js"
       ],
       "tests/helpers.cjs": [
@@ -10745,7 +11606,31 @@
         "tests/state.test.cjs",
         "tests/trajectory.test.cjs",
         "tests/verify.test.cjs",
-        "tests/worktree.test.cjs"
+        "tests/worktree.test.cjs",
+        "tests/cli-tools.test.cjs",
+        "tests/config-contract.test.cjs",
+        "tests/decisions.test.cjs",
+        "tests/enricher-decisions.test.cjs",
+        "tests/finalize.test.cjs",
+        "tests/memory-store-mutator.test.cjs",
+        "tests/plan-metadata-contract.test.cjs",
+        "tests/plugin-progress-contract.test.cjs",
+        "tests/release-workflow.test.cjs",
+        "tests/release.test.cjs",
+        "tests/research-score.test.cjs",
+        "tests/review-readiness.test.cjs",
+        "tests/review-workflow.test.cjs",
+        "tests/review.test.cjs",
+        "tests/scaffold-generate.test.cjs",
+        "tests/security-workflow.test.cjs",
+        "tests/security.test.cjs",
+        "tests/state-session-mutator.test.cjs",
+        "tests/summary-generate.test.cjs",
+        "tests/validate-commands.test.cjs",
+        "tests/verify-metadata-truthfulness.test.cjs",
+        "tests/workflow.test.cjs",
+        "tests/workspace-ownership.test.cjs",
+        "tests/workspace.test.cjs"
       ],
       "src/lib/context.js": [
         "tests/agent.test.cjs",
@@ -10753,7 +11638,9 @@
         "tests/integration.test.cjs",
         "src/commands/codebase.js",
         "src/commands/features.js",
-        "src/commands/init.js"
+        "src/commands/init.js",
+        "src/commands/workflow.js",
+        "tests/enricher-decisions.test.cjs"
       ],
       "src/lib/codebase-intel.js": [
         "tests/agent.test.cjs",
@@ -10764,7 +11651,8 @@
         "src/lib/context.js",
         "src/lib/conventions.js",
         "src/lib/deps.js",
-        "src/lib/orchestration.js"
+        "src/lib/orchestration.js",
+        "src/commands/misc/recovery.js"
       ],
       "src/lib/deps.js": [
         "tests/codebase.test.cjs",
@@ -10789,10 +11677,49 @@
         "src/commands/roadmap.js",
         "src/commands/state.js",
         "src/lib/codebase-intel.js",
-        "src/lib/orchestration.js"
+        "src/lib/orchestration.js",
+        "src/commands/milestone.js",
+        "src/commands/misc/config-utils.js",
+        "src/commands/misc/frontmatter.js",
+        "src/commands/misc/git-helpers.js",
+        "src/commands/misc/history-examples.js",
+        "src/commands/misc/recovery.js",
+        "src/commands/misc/templates.js",
+        "src/commands/scaffold.js",
+        "src/commands/verify/health.js",
+        "src/commands/verify/quality.js",
+        "src/commands/verify/references.js",
+        "src/commands/verify/search.js",
+        "src/lib/decision-rules.js",
+        "src/lib/json-store-mutator.js",
+        "src/lib/phase-context.js",
+        "src/lib/phase-handoff.js",
+        "src/lib/plan-metadata.js",
+        "src/lib/reports/milestone-summary.js",
+        "src/lib/reports/velocity-metrics.js",
+        "src/lib/state-session-mutator.js",
+        "tests/decisions.test.cjs"
+      ],
+      "src/lib/phase-context.js": [
+        "tests/intent.test.cjs",
+        "src/commands/intent.js"
+      ],
+      "src/lib/planning-cache.js": [
+        "tests/memory.test.cjs",
+        "tests/trajectory.test.cjs",
+        "src/commands/init.js",
+        "src/commands/memory.js",
+        "src/commands/state.js",
+        "src/commands/trajectory.js",
+        "src/commands/lessons.js",
+        "src/lib/state-session-mutator.js",
+        "tests/planning-cache.test.cjs",
+        "tests/session-state.test.cjs",
+        "tests/state-session-mutator.test.cjs"
       ],
       "src/lib/recovery/stuck-detector.js": [
-        "tests/trajectory.test.cjs"
+        "tests/trajectory.test.cjs",
+        "src/lib/recovery/index.js"
       ],
       "src/lib/frontmatter.js": [
         "src/commands/agent.js",
@@ -10803,7 +11730,25 @@
         "src/commands/phase.js",
         "src/commands/roadmap.js",
         "src/lib/helpers.js",
-        "src/lib/orchestration.js"
+        "src/lib/orchestration.js",
+        "src/commands/misc/finalize.js",
+        "src/commands/misc/frontmatter.js",
+        "src/commands/misc/templates.js",
+        "src/commands/scaffold.js",
+        "src/commands/verify/health.js",
+        "src/commands/verify/quality.js",
+        "src/commands/verify/references.js",
+        "src/commands/verify/search.js",
+        "src/commands/workspace.js",
+        "src/lib/jj-workspace.js",
+        "src/lib/plan-metadata.js",
+        "src/lib/reports/milestone-summary.js",
+        "src/lib/scaffold.js"
+      ],
+      "src/lib/plugin-paths.js": [
+        "src/commands/agent.js",
+        "src/commands/audit.js",
+        "src/commands/decisions.js"
       ],
       "src/lib/cache.js": [
         "src/commands/cache.js",
@@ -10823,11 +11768,20 @@
         "src/commands/tools.js",
         "src/lib/codebase-intel.js",
         "src/lib/conventions.js",
-        "src/lib/deps.js"
+        "src/lib/deps.js",
+        "src/commands/verify/health.js",
+        "tests/cli-tools-integration.test.cjs"
       ],
       "src/lib/regex-cache.js": [
         "src/commands/features.js",
         "src/lib/helpers.js"
+      ],
+      "src/lib/plan-metadata.js": [
+        "src/commands/features.js",
+        "src/commands/scaffold.js",
+        "src/commands/verify/health.js",
+        "src/commands/verify/quality.js",
+        "tests/plan-metadata-contract.test.cjs"
       ],
       "src/lib/cli-tools/fallback.js": [
         "src/commands/features.js",
@@ -10838,24 +11792,122 @@
         "src/lib/cli-tools/index.js",
         "src/lib/cli-tools/jq.js",
         "src/lib/cli-tools/ripgrep.js",
-        "src/lib/cli-tools/yq.js"
+        "src/lib/cli-tools/yq.js",
+        "tests/cli-tools-integration.test.cjs",
+        "tests/cli-tools.test.cjs"
+      ],
+      "src/lib/phase-handoff.js": [
+        "src/commands/init.js",
+        "src/commands/state.js"
+      ],
+      "src/lib/questions.js": [
+        "src/commands/init.js",
+        "src/commands/questions.js",
+        "src/lib/decision-rules.js",
+        "src/lib/prompts.js"
+      ],
+      "src/lib/jj.js": [
+        "src/commands/init.js",
+        "src/commands/misc/git-helpers.js",
+        "src/commands/workspace.js",
+        "src/lib/jj-workspace.js"
+      ],
+      "src/lib/json-store-mutator.js": [
+        "src/commands/memory.js",
+        "src/commands/trajectory.js",
+        "src/commands/lessons.js",
+        "tests/memory-store-mutator.test.cjs"
+      ],
+      "src/lib/atomic-write.js": [
+        "src/commands/memory.js",
+        "src/commands/misc/config-utils.js",
+        "src/lib/json-store-mutator.js",
+        "src/lib/phase-handoff.js",
+        "src/lib/review/fixes.js",
+        "src/lib/state-session-mutator.js",
+        "tests/mutation-primitives.test.cjs"
+      ],
+      "src/commands/misc/frontmatter.js": [
+        "src/commands/misc.js",
+        "src/commands/misc/index.js"
+      ],
+      "src/commands/misc/config-utils.js": [
+        "src/commands/misc.js",
+        "src/commands/misc/index.js"
+      ],
+      "src/commands/misc/templates.js": [
+        "src/commands/misc.js",
+        "src/commands/misc/index.js"
+      ],
+      "src/commands/misc/history-examples.js": [
+        "src/commands/misc.js",
+        "src/commands/misc/index.js"
+      ],
+      "src/commands/misc/git-helpers.js": [
+        "src/commands/misc.js",
+        "src/commands/misc/index.js"
+      ],
+      "src/commands/misc/finalize.js": [
+        "src/commands/misc.js",
+        "src/commands/misc/index.js"
+      ],
+      "src/commands/misc/recovery.js": [
+        "src/commands/misc.js",
+        "src/commands/misc/index.js"
       ],
       "src/lib/cli-tools/install-guidance.js": [
         "src/commands/runtime.js",
         "src/commands/tools.js",
         "src/lib/cli-tools/fallback.js",
-        "src/lib/cli-tools/index.js"
+        "src/lib/cli-tools/index.js",
+        "tests/cli-tools.test.cjs"
+      ],
+      "src/lib/state-session-mutator.js": [
+        "src/commands/state.js",
+        "tests/state-session-mutator.test.cjs"
       ],
       "src/lib/cli-tools/detector.js": [
         "src/commands/tools.js",
         "src/lib/cli-tools/fallback.js",
         "src/lib/cli-tools/gh.js",
         "src/lib/cli-tools/index.js",
-        "src/lib/cli-tools/ripgrep.js"
+        "src/lib/cli-tools/ripgrep.js",
+        "tests/cli-tools-integration.test.cjs",
+        "tests/cli-tools.test.cjs",
+        "tests/enricher-decisions.test.cjs"
       ],
       "src/lib/cli-tools/jq.js": [
         "src/commands/tools.js",
-        "src/lib/cli-tools/index.js"
+        "src/lib/cli-tools/index.js",
+        "tests/cli-tools-integration.test.cjs"
+      ],
+      "src/commands/verify/quality.js": [
+        "src/commands/verify.js",
+        "src/commands/verify/index.js",
+        "src/commands/verify/references.js"
+      ],
+      "src/commands/verify/references.js": [
+        "src/commands/verify.js",
+        "src/commands/verify/health.js",
+        "src/commands/verify/index.js"
+      ],
+      "src/commands/verify/search.js": [
+        "src/commands/verify.js",
+        "src/commands/verify/health.js",
+        "src/commands/verify/index.js",
+        "src/commands/verify/references.js"
+      ],
+      "src/commands/verify/health.js": [
+        "src/commands/verify.js",
+        "src/commands/verify/index.js"
+      ],
+      "src/lib/config-contract.js": [
+        "src/lib/config.js",
+        "src/plugin/parsers/config.js",
+        "src/commands/misc/config-utils.js",
+        "src/commands/verify/health.js",
+        "src/commands/verify/quality.js",
+        "tests/config-contract.test.cjs"
       ],
       "src/plugin/logger.js": [
         "src/plugin/advisory-guardrails.js",
@@ -10878,6 +11930,33 @@
       "src/plugin/parsers/index.js": [
         "src/plugin/command-enricher.js",
         "src/plugin/file-watcher.js",
+        "src/plugin/index.js"
+      ],
+      "src/lib/decision-rules.js": [
+        "src/plugin/command-enricher.js",
+        "src/commands/decisions.js",
+        "src/commands/verify/quality.js",
+        "tests/decisions.test.cjs",
+        "tests/enricher-decisions.test.cjs",
+        "tests/unit/decision-rules.test.cjs"
+      ],
+      "src/plugin/lib/db-cache.js": [
+        "src/plugin/command-enricher.js",
+        "src/plugin/project-state.js",
+        "src/plugin/parsers/index.js",
+        "src/plugin/parsers/plan.js",
+        "src/plugin/parsers/roadmap.js",
+        "src/plugin/parsers/state.js"
+      ],
+      "src/plugin/debug-contract.js": [
+        "src/plugin/command-enricher.js",
+        "src/plugin/context-builder.js",
+        "src/plugin/index.js",
+        "src/plugin/tool-registry.js",
+        "src/plugin/validation/adapter.js"
+      ],
+      "src/plugin/tool-availability.js": [
+        "src/plugin/command-enricher.js",
         "src/plugin/index.js"
       ],
       "src/plugin/token-budget.js": [
@@ -10933,6 +12012,18 @@
       "src/plugin/advisory-guardrails.js": [
         "src/plugin/index.js"
       ],
+      "src/plugin/cmux-refresh-backbone.js": [
+        "src/plugin/index.js"
+      ],
+      "src/plugin/cmux-targeting.js": [
+        "src/plugin/index.js"
+      ],
+      "src/plugin/cmux-sidebar-sync.js": [
+        "src/plugin/index.js"
+      ],
+      "src/plugin/cmux-attention-sync.js": [
+        "src/plugin/index.js"
+      ],
       "src/plugin/parsers/plan.js": [
         "src/plugin/index.js",
         "src/plugin/project-state.js",
@@ -10952,22 +12043,42 @@
       ],
       "src/lib/cli-tools/fd.js": [
         "src/lib/adapters/discovery.js",
-        "src/lib/cli-tools/index.js"
+        "src/lib/cli-tools/index.js",
+        "tests/cli-tools-integration.test.cjs"
       ],
       "src/lib/cli-tools/ripgrep.js": [
-        "src/lib/cli-tools/index.js"
+        "src/lib/cli-tools/index.js",
+        "tests/cli-tools-integration.test.cjs"
       ],
       "src/lib/cli-tools/yq.js": [
-        "src/lib/cli-tools/index.js"
+        "src/lib/cli-tools/index.js",
+        "tests/cli-tools-integration.test.cjs"
       ],
       "src/lib/cli-tools/bat.js": [
-        "src/lib/cli-tools/index.js"
+        "src/lib/cli-tools/index.js",
+        "tests/cli-tools-integration.test.cjs"
       ],
       "src/lib/cli-tools/gh.js": [
-        "src/lib/cli-tools/index.js"
+        "src/lib/cli-tools/index.js",
+        "src/lib/release/pr.js",
+        "tests/cli-tools-integration.test.cjs"
       ],
       "src/lib/review/severity.js": [
-        "src/lib/recovery/stuck-detector.js"
+        "src/lib/recovery/stuck-detector.js",
+        "src/commands/review.js",
+        "src/lib/recovery/autoRecovery.js",
+        "src/lib/review/routing.js",
+        "src/lib/review/rules/debug-leftovers.js",
+        "src/lib/review/rules/js-unused-import.js",
+        "src/lib/review/rules/trust-boundary.js"
+      ],
+      "src/plugin/cli-path.js": [
+        "src/plugin/tools/bgsd-progress.js",
+        "src/plugin/tool-availability.js"
+      ],
+      "src/plugin/node-runtime.js": [
+        "src/plugin/tools/bgsd-progress.js",
+        "src/plugin/tool-availability.js"
       ],
       "src/plugin/tools/bgsd-status.js": [
         "src/plugin/tools/index.js"
@@ -10986,16 +12097,245 @@
       ],
       "src/plugin/validation/flags.js": [
         "src/plugin/validation/adapter.js"
+      ],
+      "src/lib/cli-tools/plugin-benchmark.js": [
+        "src/commands/measure.js"
+      ],
+      "src/lib/reports/milestone-summary.js": [
+        "src/commands/milestone.js",
+        "src/lib/viz/index.js"
+      ],
+      "src/lib/jj-workspace.js": [
+        "src/commands/misc/finalize.js",
+        "src/commands/workspace.js",
+        "tests/workspace-ownership.test.cjs"
+      ],
+      "src/lib/utils/parity-check.js": [
+        "src/commands/misc/recovery.js"
+      ],
+      "src/lib/release/bump.js": [
+        "src/commands/release.js",
+        "src/lib/release/changelog.js",
+        "src/lib/release/mutate.js"
+      ],
+      "src/lib/release/changelog.js": [
+        "src/commands/release.js",
+        "src/lib/release/mutate.js"
+      ],
+      "src/lib/release/mutate.js": [
+        "src/commands/release.js",
+        "src/lib/release/pr.js"
+      ],
+      "src/lib/release/pr.js": [
+        "src/commands/release.js"
+      ],
+      "src/lib/review/config.js": [
+        "src/commands/review.js"
+      ],
+      "src/lib/review/exclusions.js": [
+        "src/commands/review.js"
+      ],
+      "src/lib/review/readiness.js": [
+        "src/commands/review.js"
+      ],
+      "src/lib/review/routing.js": [
+        "src/commands/review.js"
+      ],
+      "src/lib/review/scan.js": [
+        "src/commands/review.js"
+      ],
+      "src/lib/review/target.js": [
+        "src/commands/review.js"
+      ],
+      "src/lib/scaffold.js": [
+        "src/commands/scaffold.js",
+        "tests/scaffold.test.cjs"
+      ],
+      "src/lib/security/config.js": [
+        "src/commands/security.js"
+      ],
+      "src/lib/security/scan.js": [
+        "src/commands/security.js"
+      ],
+      "src/lib/security/schema.js": [
+        "src/commands/security.js",
+        "src/lib/security/engines/dependencies.js",
+        "src/lib/security/engines/owasp.js",
+        "src/lib/security/engines/secrets.js",
+        "src/lib/security/scan.js"
+      ],
+      "src/lib/prompts.js": [
+        "src/lib/abort-handler.js",
+        "src/lib/wizard.js"
+      ],
+      "src/lib/planning-command-surface.js": [
+        "src/lib/commandDiscovery.js"
+      ],
+      "src/lib/error.js": [
+        "src/lib/debug.js"
+      ],
+      "src/lib/project-lock.js": [
+        "src/lib/json-store-mutator.js",
+        "src/lib/phase-handoff.js",
+        "src/lib/state-session-mutator.js",
+        "tests/mutation-primitives.test.cjs"
+      ],
+      "src/lib/nl/requirement-extractor.js": [
+        "src/lib/nl/conversational-planner.js"
+      ],
+      "src/lib/nl/multi-intent-detector.js": [
+        "src/lib/nl/conversational-planner.js"
+      ],
+      "src/lib/nl/suggestion-engine.js": [
+        "src/lib/nl/conversational-planner.js"
+      ],
+      "src/lib/nl/nl-parser.js": [
+        "src/lib/nl/conversational-planner.js",
+        "src/lib/nl/multi-intent-detector.js"
+      ],
+      "src/lib/nl/command-registry.js": [
+        "src/lib/nl/fuzzy-resolver.js",
+        "src/lib/nl/help-fallback.js",
+        "src/lib/nl/nl-parser.js"
+      ],
+      "src/lib/nl/intent-classifier.js": [
+        "src/lib/nl/nl-parser.js"
+      ],
+      "src/lib/nl/parameter-extractor.js": [
+        "src/lib/nl/nl-parser.js"
+      ],
+      "src/lib/nl/fuzzy-resolver.js": [
+        "src/lib/nl/nl-parser.js"
+      ],
+      "src/lib/nl/help-fallback.js": [
+        "src/lib/nl/nl-parser.js"
+      ],
+      "src/lib/recovery/autoRecovery.js": [
+        "src/lib/recovery/index.js"
+      ],
+      "src/lib/recovery/checkpointAdvisor.js": [
+        "src/lib/recovery/index.js"
+      ],
+      "src/lib/release/history.js": [
+        "src/lib/release/bump.js",
+        "src/lib/release/changelog.js"
+      ],
+      "src/lib/release/config.js": [
+        "src/lib/release/history.js"
+      ],
+      "src/lib/release/state.js": [
+        "src/lib/release/mutate.js",
+        "src/lib/release/pr.js"
+      ],
+      "src/lib/viz/sparkline.js": [
+        "src/lib/reports/velocity-metrics.js",
+        "src/lib/viz/index.js"
+      ],
+      "src/lib/review/diff.js": [
+        "src/lib/review/exclusions.js",
+        "src/lib/review/target.js",
+        "src/lib/security/exclusions.js",
+        "src/lib/security/schema.js"
+      ],
+      "src/lib/review/fixes.js": [
+        "src/lib/review/routing.js"
+      ],
+      "src/lib/review/rules/js-unused-import.js": [
+        "src/lib/review/rules/index.js"
+      ],
+      "src/lib/review/rules/debug-leftovers.js": [
+        "src/lib/review/rules/index.js"
+      ],
+      "src/lib/review/rules/trust-boundary.js": [
+        "src/lib/review/rules/index.js"
+      ],
+      "src/lib/review/rules/index.js": [
+        "src/lib/review/scan.js"
+      ],
+      "src/lib/security/rules/index.js": [
+        "src/lib/security/engines/owasp.js",
+        "tests/security.test.cjs"
+      ],
+      "src/lib/security/rules/js-injection.js": [
+        "src/lib/security/rules/index.js"
+      ],
+      "src/lib/security/rules/unsafe-exec.js": [
+        "src/lib/security/rules/index.js"
+      ],
+      "src/lib/security/rules/auth-misconfig.js": [
+        "src/lib/security/rules/index.js"
+      ],
+      "src/lib/security/rules/config-misuse.js": [
+        "src/lib/security/rules/index.js"
+      ],
+      "src/lib/security/rules/xss.js": [
+        "src/lib/security/rules/index.js"
+      ],
+      "src/lib/security/rules/xxe.js": [
+        "src/lib/security/rules/index.js"
+      ],
+      "src/lib/security/rules/access-control.js": [
+        "src/lib/security/rules/index.js"
+      ],
+      "src/lib/security/rules/insecure-deserialization.js": [
+        "src/lib/security/rules/index.js"
+      ],
+      "src/lib/security/rules/logging-gaps.js": [
+        "src/lib/security/rules/index.js"
+      ],
+      "src/lib/security/exclusions.js": [
+        "src/lib/security/scan.js"
+      ],
+      "src/lib/security/engines/owasp.js": [
+        "src/lib/security/scan.js"
+      ],
+      "src/lib/security/engines/secrets.js": [
+        "src/lib/security/scan.js"
+      ],
+      "src/lib/security/engines/dependencies.js": [
+        "src/lib/security/scan.js"
+      ],
+      "src/lib/viz/progress.js": [
+        "src/lib/viz/index.js",
+        "src/lib/viz/milestone.js"
+      ],
+      "src/lib/viz/milestone.js": [
+        "src/lib/viz/index.js"
+      ],
+      "src/lib/viz/quality.js": [
+        "src/lib/viz/index.js"
+      ],
+      "src/lib/viz/burndown.js": [
+        "src/lib/viz/index.js"
+      ],
+      "src/lib/viz/dashboard.js": [
+        "src/lib/viz/index.js"
+      ],
+      "src/lib/reports/velocity-metrics.js": [
+        "src/lib/viz/index.js"
+      ],
+      "src/plugin/cmux-sidebar-snapshot.js": [
+        "src/plugin/cmux-attention-sync.js",
+        "src/plugin/cmux-sidebar-sync.js"
+      ],
+      "src/plugin/cmux-attention-policy.js": [
+        "src/plugin/cmux-attention-sync.js"
+      ],
+      "src/plugin/cmux-lifecycle-signal.js": [
+        "src/plugin/cmux-sidebar-snapshot.js"
+      ],
+      "src/plugin/cmux-cli.js": [
+        "src/plugin/cmux-targeting.js"
       ]
     },
     "stats": {
-      "total_files_parsed": 112,
-      "total_edges": 269,
+      "total_files_parsed": 304,
+      "total_edges": 688,
       "languages_parsed": [
         "javascript"
       ],
-      "parse_errors": 3
+      "parse_errors": 0
     },
-    "built_at": "2026-04-06T01:59:32.413Z"
+    "built_at": "2026-04-06T02:18:01.475Z"
   }
 }

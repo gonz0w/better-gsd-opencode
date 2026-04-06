@@ -925,5 +925,17 @@
     "affected_agents": [
       "bgsd-executor"
     ]
+  },
+  {
+    "id": "4e4066f9-4d34-465f-9fe6-943c3395184a",
+    "date": "2026-04-06T03:14:21.896Z",
+    "title": "Verifier false positive on add-feature tasks",
+    "severity": "LOW",
+    "type": "agent-behavior",
+    "root_cause": "Analyzer checks current file state, but add-feature tasks verify NEW patterns that don't exist until implementation. Pattern absence at plan-creation time is expected for add tasks.",
+    "prevention_rule": "Accept that add-feature task verification naturally shows concerns until implementation completes. The verification command itself is correct.",
+    "affected_agents": [
+      "bgsd-planner"
+    ]
   }
 ]
