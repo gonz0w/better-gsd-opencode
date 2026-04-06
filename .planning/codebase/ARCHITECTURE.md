@@ -1,205 +1,385 @@
-# Architecture
+# bGSD Architecture
 
-**Analysis Date:** 2026-03-07
-
-## Pattern Overview
-
-**Overall:** Single-entry CLI with namespace-based command router, lazy-loaded command modules, and a shared library layer. All 39 source modules are bundled by esbuild into one CJS file (`bin/gsd-tools.cjs`) for zero-dependency deployment.
-
-**Key Characteristics:**
-- **Single-file bundle:** `src/` modules are bundled into `bin/gsd-tools.cjs` (~29K source lines pre-bundle) — only runtime dependency is `tokenx` (token estimation) and `acorn` (AST parsing), both bundled in
-- **Namespace routing:** All commands use `namespace:command` syntax (e.g., `plan:intent create`, `verify:state get`). No legacy flat commands remain
-- **Lazy module loading:** Command modules are loaded on first use via `_modules` cache object in `src/router.js`, avoiding parsing all 18 command modules when only one runs per invocation
-- **Synchronous by default:** All file I/O uses `fs.readFileSync`/`fs.writeFileSync` and `execFileSync`. Only `websearch`, `profiler cache-speedup`, and esbuild's `build()` are async
-- **Dual-mode output:** TTY detection routes to formatted (human-readable) or JSON (machine-parseable) output automatically. `--pretty` forces formatted mode when piped
-
-## Module Dependency Direction
-
-**Layer 0 — Foundation (no internal dependencies):**
-- `src/lib/profiler.js` — Performance timing (zero-cost when `GSD_PROFILE` unset)
-- `src/lib/regex-cache.js` — LRU regex compilation cache
-- `src/lib/constants.js` — Config schema, model profiles, command help text
-
-**Layer 1 — Core Output:**
-- `src/lib/output.js` — `output()`, `error()`, `debugLog()`, `status()`, field filtering, tmpfile fallback
-- `src/lib/format.js` — ANSI color, tables, progress bars, banners (NO_COLOR aware)
-
-**Layer 2 — Config & Parsing:**
-- `src/lib/config.js` → depends on `output`, `constants`
-- `src/lib/frontmatter.js` — YAML frontmatter parser with parse cache
-- `src/lib/context.js` → depends on `output`, `profiler`; lazy-loads `tokenx`
-
-**Layer 3 — Infrastructure:**
-- `src/lib/helpers.js` → depends on `output`, `config`, `constants`, `regex-cache`, `profiler`; lazy-loads `cache`. Central utility module with file I/O, phase tree scanning, intent parsing
-- `src/lib/git.js` → depends on `output`, `profiler`. Shell-free git via `execFileSync`
-- `src/lib/cache.js` — SQLite-backed persistent cache (Node.js v22.5+ `node:sqlite`)
-
-**Layer 4 — Analysis:**
-- `src/lib/codebase-intel.js` → depends on `output`, `git`, `helpers`. File scanning, language detection, import analysis
-- `src/lib/ast.js` → depends on `codebase-intel`, `profiler`. AST extraction via acorn with TypeScript stripping
-- `src/lib/deps.js` → depends on `output`, `codebase-intel`. Multi-language import parsing and dependency graph
-- `src/lib/conventions.js` → depends on `codebase-intel`. Naming pattern detection, style analysis
-- `src/lib/lifecycle.js` → depends on `output`, `deps`. Migration/seed/boot ordering detection
-- `src/lib/orchestration.js` → depends on `output`, `frontmatter`, `format`. Task XML parsing, plan classification
-
-**Layer 5 — Subdirectory modules:**
-- `src/lib/recovery/stuck-detector.js` — Loop detection for stuck execution patterns
-- `src/lib/review/severity.js` — Review finding severity classification
-
-**Layer 6 — Commands (depend on lib/ modules, never on each other except targeted cross-imports):**
-- 18 command modules in `src/commands/` (see STRUCTURE.md for details)
-- Notable cross-command imports: `init.js` imports from `intent.js`, `env.js`, `codebase.js`, `worktree.js`; `features.js` imports `verify.js`'s `parseAssertionsMd`
-
-**Layer 7 — Router & Entry:**
-- `src/router.js` → depends on `constants`, `output`; lazy-loads all command modules + `git`, `orchestration`
-- `src/index.js` → depends on `router.js` only. 5-line entry point
-
-**Dependency Rules:**
-- lib/ modules never import from commands/
-- Commands import from lib/ and occasionally from other commands
-- router.js lazy-loads everything; nothing imports router.js except index.js
-
-## Command Routing
-
-**Namespace Architecture (router.js, 930 lines):**
-
-The CLI uses a `namespace:command` pattern with 7 namespaces:
-
-| Namespace | Purpose | Lazy Loaders |
-|-----------|---------|--------------|
-| `init` | Workflow initialization (context gathering for agents) | `lazyInit()` |
-| `plan` | Planning operations (intent, roadmap, phases, milestones) | `lazyIntent()`, `lazyRoadmap()`, `lazyPhase()`, `lazyMisc()` |
-| `execute` | Execution operations (commit, worktree, TDD, trajectory) | `lazyMisc()`, `lazyFeatures()`, `lazyWorktree()`, `lazyTrajectory()` |
-| `verify` | Verification & validation (state, assertions, search) | `lazyState()`, `lazyVerify()`, `lazyFeatures()`, `lazyMisc()` |
-| `util` | Utilities (config, env, memory, codebase, templates, git) | Multiple loaders |
-| `research` | RAG research pipeline (YouTube, NLM, collection) | `lazyResearch()` |
-| `cache` | Cache management (status, clear, warm, research) | `lazyCache()` |
-
-**Routing Flow:**
-1. `process.argv` → parse global flags (`--pretty`, `--verbose`, `--fields`, `--manifest`, `--no-cache`)
-2. Split command on first colon: `plan:intent` → namespace=`plan`, remaining=`intent`
-3. Switch on namespace → switch on subcommand → call specific `cmd*()` function
-4. Each `cmd*()` function receives `(cwd, ...args, raw)` and calls `output(result, raw)` to emit
-
-**Output Modes:**
-- `json` (default when piped) — JSON to stdout, field filtering via `--fields`, tmpfile fallback for >50KB
-- `formatted` (default on TTY) — Human-readable via formatter functions using `src/lib/format.js`
-- `pretty` (forced via `--pretty`) — Same as formatted, even when piped
-
-## Data Flow
-
-**CLI Invocation Flow:**
-```
-process.argv → router.js main()
-  ├── Parse global flags (--pretty, --verbose, --fields, --manifest, --no-cache)
-  ├── Extract namespace:command
-  ├── Start profiler timer (if GSD_PROFILE=1)
-  ├── Lazy-load target command module
-  ├── Call cmd*() function with (cwd, args, raw)
-  │   ├── Read .planning/ files via cachedReadFile() or safeReadFile()
-  │   ├── Parse markdown/frontmatter/YAML
-  │   ├── Perform computation (validation, analysis, git ops)
-  │   └── Call output(result, options) → JSON or formatted to stdout
-  └── process.exit(0)
-```
-
-**File I/O Pattern:**
-- `cachedReadFile(path)` → checks SQLite cache → falls back to `fs.readFileSync` → populates cache
-- `safeReadFile(path)` → direct `fs.readFileSync` with error handling (for guaranteed fresh reads)
-- `invalidateFileCache(path)` → called after writes to ensure cache coherence
-- `getPhaseTree(cwd)` → single scan of `.planning/phases/` directory tree, cached per invocation
-
-**State Management:**
-- No in-process state between invocations — each CLI call is stateless
-- Persistent state lives in `.planning/STATE.md` (markdown with `**Field:** value` patterns)
-- Module-level caches (`_configCache`, `_phaseTreeCache`, `_milestoneCache`, `dirCache`) live for a single CLI invocation only
-- Persistent file cache uses SQLite via `src/lib/cache.js` (`~/.config/oc/get-shit-done/cache.db`)
-
-## Agent System
-
-**Architecture:** Agents are AI model instances (Claude) that invoke `gsd-tools` as a CLI subprocess. The agent system is defined entirely in markdown files — the CLI provides structured data, agents provide intelligence.
-
-**Agent Definitions (`agents/`):**
-- `gsd-planner.md` — Creates execution plans for phases
-- `gsd-executor.md` — Executes plans (writes code, runs tests)
-- `gsd-verifier.md` — Verifies completed work against criteria
-- `gsd-roadmapper.md` — Builds and refines project roadmaps
-- `gsd-phase-researcher.md` — Researches requirements for a phase
-- `gsd-project-researcher.md` — Project-level research
-- `gsd-debugger.md` — Diagnoses issues and stuck states
-- `gsd-plan-checker.md` — Reviews plan quality before execution
-- `gsd-codebase-mapper.md` — Analyzes codebase structure (this agent)
-
-**Agent Invocation Pattern:**
-1. User runs slash command (e.g., `/bgsd-plan-phase`)
-2. Command file (`commands/bgsd-plan-phase.md`) defines the workflow
-3. Workflow file (`workflows/plan-phase.md`) orchestrates the agent
-4. Agent calls `gsd-tools init:plan-phase <phase>` to gather context
-5. Agent reads the structured JSON output and performs its task
-6. Agent calls additional `gsd-tools` commands as needed
-
-**Model Profile Resolution:**
-- Configured in `.planning/config.json` via `model_profile` (quality/balanced/budget)
-- Per-agent model mapping in `src/lib/constants.js` `MODEL_PROFILES` table
-- Per-agent overrides via `config.json` `model_overrides` object
-- Resolved by `resolveModelInternal()` in `src/lib/helpers.js`
-
-## Key Design Decisions
-
-**Single-File Bundle:**
-- All source bundled into one `bin/gsd-tools.cjs` via esbuild
-- Enables atomic deployment: copy one file, everything works
-- Bundle size tracked with 1500KB budget (enforced in `build.js`)
-- npm dependencies (`tokenx`, `acorn`) are bundled in; Node.js builtins are external
-
-**Synchronous I/O:**
-- All file and git operations use sync APIs (`readFileSync`, `execFileSync`)
-- Simplifies control flow — no async/await propagation through the call stack
-- Acceptable because each CLI invocation runs one command and exits
-- Only exceptions: web search (`cmdWebsearch`), profiler cache-speedup, and the build script itself
-
-**Markdown as Data Store:**
-- Planning state lives in `.planning/*.md` files (ROADMAP.md, STATE.md, phase PLANs, SUMMARYs)
-- Custom YAML frontmatter parser (`src/lib/frontmatter.js`) — not a full YAML parser, handles the subset used
-- Regex-based field extraction from markdown patterns (`**Field:** value`)
-- Human-readable AND machine-parseable — agents can read/write these files directly
-
-**Performance Tuning:**
-- Lazy module loading in router.js (only load what's needed)
-- SQLite-backed file cache with mtime-based staleness detection
-- Module-level caches for config, phase tree, milestone info, directory listings
-- LRU regex cache to avoid repeated `new RegExp()` in hot paths
-- Profiler opt-in via `GSD_PROFILE=1` with baseline comparison support
-- `getPhaseTree()` replaces N individual `readdirSync` calls with one tree scan
-
-**Compact Mode (Default):**
-- `--verbose` flag disabled by default (`global._gsdCompactMode = true`)
-- Commands emit minimal JSON by default, full detail with `--verbose`
-- `--manifest` flag adds context manifest for token budget tracking
-
-## Error Handling
-
-**Strategy:** Fail fast with descriptive error messages to stderr.
-
-**Patterns:**
-- `error(message)` → writes to stderr and calls `process.exit(1)` — used for unrecoverable errors (missing args, invalid commands)
-- `debugLog(context, message, err)` → conditional stderr output when `GSD_DEBUG=1` — used for diagnosable failures
-- `safeReadFile()` returns `null` on read failure instead of throwing — callers check for null
-- Git operations via `execGit()` return `{ exitCode, stdout, stderr }` — callers check `exitCode`
-
-## Cross-Cutting Concerns
-
-**Logging:** No logging framework. `debugLog()` writes to stderr when `GSD_DEBUG=1`. `status()` writes progress messages to stderr (visible even when stdout is piped).
-
-**Validation:** Input validation happens at command entry points. Schema validation for config via `CONFIG_SCHEMA` in constants. Frontmatter validation via custom parser. Plan structure validation via `verify` commands.
-
-**Authentication:** Not applicable — CLI tool runs locally with user's filesystem permissions.
-
-**Caching:** Three-tier caching strategy:
-1. Module-level Maps (single invocation): config, phase tree, milestone info, directory listings
-2. Frontmatter parse cache (module-level Map, LRU-bounded at 100 entries)
-3. SQLite persistent cache (`cache.db`): file contents with mtime-based invalidation
+This document describes the overall system architecture of the Better Getting Stuff Done (bGSD) planning plugin for OpenCode.
 
 ---
 
-*Architecture analysis: 2026-03-07*
+## Design Philosophy
+
+bGSD separates **deterministic operations** from **AI reasoning**:
+
+- **Deterministic layer** (`bin/bgsd-tools.cjs`) — Parsing, validation, git operations, file I/O, state management, AST analysis, task classification. Always produces the same output for the same input.
+- **AI layer** (workflow `.md` files) — Agent behavior definitions. LLMs follow these as step-by-step prompts, calling the bGSD CLI for structured data.
+
+This separation means:
+- AI agents never parse markdown directly — they receive clean JSON from CLI commands
+- State changes are atomic — CLI helpers handle file writes and git commits
+- Workflows are portable — any LLM that follows markdown instructions can execute them
+- Testing is straightforward — 1,500+ tests cover the deterministic layer
+
+---
+
+## Overall System Architecture
+
+```
+User Input
+    |
+    v
+OpenCode Editor Session
+    |
+    v
+Slash Command (commands/bgsd-*.md)       <-- Thin wrapper, routes to workflow
+    |
+    v
+Workflow (.md files)                       <-- AI follows step-by-step prompts
+    |
+    +-- calls bgsd-tools.cjs              <-- Deterministic data operations
+    |     |
+    |     +-- reads/writes .planning/    <-- Structured markdown + JSON
+    |     +-- git operations              <-- Commits, branches, tags
+    |     +-- JSON output                 <-- Structured data for AI
+    |
+    +-- spawns subagents                  <-- Specialized AI agents
+          |
+          +-- bgsd-planner               <-- Creates PLAN.md
+          +-- bgsd-executor               <-- Implements code
+          +-- bgsd-verifier               <-- Verifies results
+          +-- (etc.)
+```
+
+### Two-Layer Architecture
+
+The architecture follows a strict two-layer model:
+
+**Layer 1: Deterministic CLI** (`bin/bgsd-tools.cjs`)
+- Built from `src/` via esbuild (see `build.cjs`)
+- Single-file Node.js bundle, zero external runtime dependencies
+- Handles all file I/O, git operations, parsing, validation, and state management
+- Commands return structured JSON for AI consumption
+- Lazy-loading architecture: only required command modules are loaded per invocation
+
+**Layer 2: AI Workflows** (`workflows/*.md`)
+- Markdown files containing step-by-step prompts for AI agents
+- Call the CLI for data gathering and state mutation
+- Spawn specialized subagents for complex tasks
+- Human-readable and portable across AI providers
+
+---
+
+## Key Components
+
+### 1. CLI Tool (`bin/bgsd-tools.cjs`)
+
+The CLI is the **brain** of the system. Built from `src/` via esbuild:
+
+**Source structure (`src/`):**
+```
+src/
+  index.js                 # Entry point, argument parsing
+  router.js                # Command dispatch, namespace routing (init:, plan:, etc.)
+  commands/                 # 30 command modules (lazy-loaded)
+  lib/                     # Shared libraries (db, cache, git, ast, etc.)
+  plugin/                   # Host editor plugin (ESM, separate build)
+```
+
+**Command namespaces:**
+- `init:*` — Compound context for workflows (13 subcommands)
+- `plan:*` — Plan lifecycle management
+- `verify:*` — Quality gates and validation
+- `execute:*` — Execution operations including trajectory engineering
+- `workspace:*` — JJ workspace management
+- `util:*` — Utility operations (config, codebase analysis, etc.)
+- `memory:*` — Persistent memory store operations
+- `research:*` — Research infrastructure
+- `release:*` — Release operations
+- `review:*` — Code review scanning
+
+**Lazy loading pattern:**
+```javascript
+function lazyState() { return _modules.state || (_modules.state = require('./commands/state')); }
+```
+
+Each command module is loaded on first use, not at startup. This avoids parsing and initializing all modules when only one command runs.
+
+---
+
+### 2. Workflows (`workflows/*.md`)
+
+Workflows are step-by-step prompts that AI agents follow. They are **not** executable code but instruction sets for LLMs.
+
+**Key workflows:**
+
+| Workflow | Purpose |
+|----------|---------|
+| `plan-phase.md` | Creates PLAN.md files from phase context |
+| `execute-phase.md` | Wave-based parallel plan execution |
+| `execute-plan.md` | Single plan execution with TDD support |
+| `verify-work.md` | Verifies phase goals achieved |
+| `discuss-phase.md` | Implementation decision gathering |
+| `new-project.md` | Project initialization with 5 parallel researchers |
+| `map-codebase.md` | Brownfield codebase analysis |
+| `github-ci.md` | Autonomous CI quality gate |
+
+**Workflow structure:**
+- `<purpose>` — What this workflow accomplishes
+- `<core_principle>` — Key design constraint
+- `<required_reading>` — Files to read before starting
+- `<process>` — Sequential steps with named sections
+- `<skill:*>` — Skill references for reusable behaviors
+
+---
+
+### 3. Commands (`commands/*.md`)
+
+Commands are thin wrappers deployed to the host editor's `commands/` directory. They route to the appropriate workflow:
+
+```markdown
+description: Canonical planning-family command for planning roadmap gaps
+---
+<objective>
+Use the canonical planning-family entrypoint...
+</objective>
+<execution_context>
+Route first. Do not preload sibling planning-family workflows...
+</execution_context>
+<process>
+Treat `/bgsd-plan` as the canonical planning umbrella...
+</process>
+```
+
+**Command routing pattern:**
+- Commands use `<process>` sections to determine which workflow to invoke
+- Workflows are loaded via the Read tool using `__OPENCODE_CONFIG__` path placeholder
+- Path placeholders are substituted during deploy to actual OpenCode config paths
+
+**24 commands deployed:**
+- `bgsd-plan.md`, `bgsd-execute-phase.md`, `bgsd-verify-work.md`
+- `bgsd-new-project.md`, `bgsd-new-milestone.md`, `bgsd-quick.md`
+- `bgsd-github-ci.md`, `bgsd-security.md`, `bgsd-release.md`
+- `bgsd-debug.md`, `bgsd-help.md`, `bgsd-settings.md`
+- `bgsd-inspect.md`, `bgsd-resume.md`, `bgsd-pause.md`
+- And more...
+
+---
+
+### 4. Agents (`agents/*.md`)
+
+bGSD uses **10 specialized AI agents**, each purpose-built for a specific task. Communication happens through files, not conversation history.
+
+**Agent roster:**
+
+| Agent | Role | Spawned By |
+|-------|------|------------|
+| `bgsd-planner` | Creates PLAN.md from phase context | `/bgsd-plan phase` |
+| `bgsd-executor` | Implements a single plan | `/bgsd-execute-phase` |
+| `bgsd-verifier` | Verifies phase goals achieved | `/bgsd-execute-phase` |
+| `bgsd-plan-checker` | Reviews plan quality, requests revisions | `/bgsd-plan phase` |
+| `bgsd-debugger` | Systematic debugging with persistent state | `/bgsd-debug` |
+| `bgsd-phase-researcher` | Researches implementation approaches | `/bgsd-plan phase --research` |
+| `bgsd-project-researcher` | Domain research (5 parallel) | `/bgsd-new-project` |
+| `bgsd-roadmapper` | Creates phased roadmaps | `/bgsd-new-project` |
+| `bgsd-github-ci` | Autonomous CI quality gate | `/bgsd-github-ci` |
+| `bgsd-codebase-mapper` | Codebase analysis (4 parallel) | `/bgsd-map-codebase` |
+
+**Agent spawning pattern:**
+```javascript
+Task(
+  prompt="<context and instructions>",
+  subagent_type="bgsd-executor",
+  model="{executor_model}",
+  description="Execute Plan 01-01"
+)
+```
+
+Each agent gets a **fresh context window**. Communication through files:
+- Plans go in → Code and summaries come out
+- Research documents go in → Synthesis comes out
+- Verification criteria go in → Verification reports come out
+
+**Model profiles:**
+| Profile | Model | Intended Use |
+|---------|-------|--------------|
+| `quality` | `gpt-5.4` | Best reasoning and review quality |
+| `balanced` | `gpt-5.4-mini` | Recommended day-to-day default |
+| `budget` | `gpt-5.4-nano` | Fastest/lowest-cost routine work |
+
+---
+
+### 5. Hooks (Plugin System)
+
+The plugin (`plugin.js`, built from `src/plugin/`) integrates with OpenCode's hook system:
+
+**5 hooks registered:**
+
+1. **`experimental.chat.system.transform`** — Compact system prompt + notification injection
+2. **`experimental.session.compacting`** — Structured XML context preservation
+3. **`command.execute.before`** — Slash command enrichment
+4. **`event`** — Session idle + file watcher dispatch
+5. **`tool.execute.after`** — Stuck/loop detection
+
+**Hook wrapper (`safe-hook.js`):**
+All hooks are wrapped in `safeHook` for universal error boundary protection:
+- Retry logic
+- Timeout handling
+- Circuit breaker pattern
+- Correlation-ID logging
+
+**Event subsystems:**
+- `createNotifier` — Notification system with dual-channel routing (OS + context injection)
+- `createFileWatcher` — File watching for `.planning/` changes
+- `createIdleValidator` — Idle-time validation runner
+- `createStuckDetector` — Agent stuck/loop detection
+- `createAdvisoryGuardrails` — Convention and planning file warnings
+
+---
+
+## Data Flow Between Components
+
+### Example: Plan and Execute Flow
+
+```
+/bgsd-plan phase 1
+    |
+    v
+plan-phase.md workflow
+    |
+    +-- node bin/bgsd-tools.cjs init:plan-phase 1 --raw
+    |     --> JSON: roadmap, state, config, codebase context
+    +-- node bin/bgsd-tools.cjs plan:roadmap get-phase 1
+    |     --> JSON: phase goal, success criteria
+    +-- node bin/bgsd-tools.cjs lessons:list --query 1
+    |     --> JSON: relevant past lessons
+    +-- node bin/bgsd-tools.cjs verify:assertions list --req REQ-01
+    |     --> JSON: acceptance criteria
+    |
+    +-- spawn bgsd-planner agent
+    |     --> Writes PLAN.md files
+    +-- spawn bgsd-plan-checker agent
+          --> Reviews, requests revisions (max 3)
+
+/bgsd-execute-phase 1
+    |
+    v
+execute-phase.md workflow
+    |
+    +-- node bin/bgsd-tools.cjs init:execute-phase 1 --raw
+    |     --> JSON: all context
+    +-- node bin/bgsd-tools.cjs verify:validate-dependencies 1
+    |     --> JSON: dependency validation
+    +-- node bin/bgsd-tools.cjs util:phase-plan-index 1
+    |     --> JSON: plan waves and ordering
+    |
+    +-- For each wave:
+    |     +-- spawn bgsd-executor agents
+    |     |     --> Implement code, commit per-task
+    |     +-- node bin/bgsd-tools.cjs verify:state advance-plan
+    |     +-- node bin/bgsd-tools.cjs verify:state record-metric
+    |
+    +-- spawn bgsd-verifier agent
+    |     --> Creates VERIFICATION.md
+    +-- node bin/bgsd-tools.cjs plan:phase complete 1
+```
+
+### Init System (Context Injection)
+
+The `init:*` command family is bGSD's context injection system. Each workflow calls its corresponding `init` subcommand to get all necessary context in one JSON payload:
+
+```bash
+node bin/bgsd-tools.cjs init:execute-phase 1 --raw
+```
+
+Returns compound JSON with:
+- Current state (from STATE.md)
+- Roadmap data (from ROADMAP.md)
+- Phase plans (from disk)
+- Configuration (from config.json)
+- Codebase intelligence (from codebase-intel.json)
+- Memory (from memory stores)
+- Session continuity
+
+---
+
+## Design Patterns Used
+
+### 1. Two-Layer Architecture
+Separation of deterministic CLI operations from AI-driven workflow execution. The CLI never calls AI models; workflows never directly manipulate files.
+
+### 2. Lazy Loading
+Command modules are loaded on first use via factory functions:
+```javascript
+function lazyState() { return _modules.state || (_modules.state = require('./commands/state')); }
+```
+
+### 3. File-Based Communication
+Agents communicate exclusively through files (PLAN.md in, SUMMARY.md out), not shared memory or conversation history. This enables session resumption and parallel execution.
+
+### 4. Context Injection
+Instead of agents reading files, the CLI pre-loads all context and passes it as JSON. This reduces token usage and ensures deterministic data.
+
+### 5. Wave-Based Parallel Execution
+Plans are grouped into dependency waves. Independent plans within a wave execute concurrently via parallel agent spawning.
+
+### 6. Trajectory Engineering
+Git-branch-per-attempt pattern with checkpoint journals for tracking alternative approaches:
+- `trajectory checkpoint` — Create named checkpoint
+- `trajectory pivot` — Abandon and rewind
+- `trajectory compare` — Compare metrics across attempts
+- `trajectory choose` — Select winner, archive rest
+
+### 7. SQLite-First Data Layer
+Primary data store at `.planning/.cache.db` with:
+- Write-through consistency
+- WAL mode for concurrent access
+- Map fallback for older Node versions
+- L1/L2 caching (in-memory + SQLite)
+
+### 8. Safe Hook Pattern
+All plugin hooks wrapped with retry, timeout, circuit breaker:
+```javascript
+export function safeHook(name, fn) {
+  return async (input, output) => {
+    try {
+      // Timeout, retry, circuit breaker logic
+    } catch (error) {
+      // Correlation-ID logging
+    }
+  };
+}
+```
+
+### 9. Model Profile Resolution
+Deterministic model selection without LLM involvement:
+```javascript
+config.model_settings.default_profile
+  --> config.model_settings.profiles[profile]
+  --> config.model_settings.agent_overrides[agent] (optional)
+```
+
+### 10. Skill Reference Pattern
+Reusable behavior referenced via `<skill:skill-name />` markup in workflows and agents. Skills are validated at build time and checked for broken references at deploy time.
+
+---
+
+## Build System
+
+**esbuild** bundles all `src/` into a single `bin/bgsd-tools.cjs`:
+- Tree-shaking enabled
+- Minification enabled
+- Zero runtime dependencies in bundle
+- Separate ESM build for `plugin.js`
+
+**Build validation:**
+- ESM output has zero `require()` calls
+- All critical exports verified present
+- Tool registration validated
+- Bundle size budget enforced (1550KB)
+- Artifact validation checks planning files
+
+**Deploy process (`deploy.sh`):**
+1. Build from source
+2. Backup current installation
+3. Manifest-based file sync
+4. Copy plugin to OpenCode plugin directory
+5. Substitute path placeholders
+6. Smoke test deployed artifact
+7. Validate skill references
