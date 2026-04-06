@@ -1624,8 +1624,10 @@ Examples:
           lazyWorkflow().cmdWorkflowVerifyStructure(cwd, workflowRestArgs, raw);
         } else if (subCmd === 'savings') {
           lazyWorkflow().cmdWorkflowSavings(cwd, workflowRestArgs, raw);
+        } else if (subCmd === 'hotpath') {
+          lazyWorkflow().cmdWorkflowHotpath(cwd, raw);
         } else {
-          error('Unknown workflow subcommand: ' + subCmd + '. Available: baseline, compare, verify-structure, savings');
+          error('Unknown workflow subcommand: ' + subCmd + '. Available: baseline, compare, verify-structure, savings, hotpath');
         }
         break;
       }

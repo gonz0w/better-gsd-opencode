@@ -848,10 +848,93 @@ function cmdWorkflowSavings(cwd, args, raw) {
   output(result, raw);
 }
 
+// ─── workflow:hotpath ─────────────────────────────────────────────────────────
+
+/**
+ * CLI: workflow:hotpath
+ * Aggregate and display routing telemetry from .planning/telemetry/routing-log.jsonl
+ * Shows which routing paths (classifyTaskComplexity, routeTask) are most frequently used.
+ *
+ * @param {string} cwd - Current working directory
+ * @param {boolean} raw - JSON output mode
+ */
+function cmdWorkflowHotpath(cwd, raw) {
+  const logPath = path.join(cwd, '.planning', 'telemetry', 'routing-log.jsonl');
+
+  let entries = [];
+  if (fs.existsSync(logPath)) {
+    try {
+      const content = fs.readFileSync(logPath, 'utf-8');
+      const lines = content.split('\n').filter(line => line.trim());
+      for (const line of lines) {
+        try {
+          entries.push(JSON.parse(line));
+        } catch {
+          // Skip malformed lines
+        }
+      }
+    } catch {
+      // File unreadable — show empty hotpath
+    }
+  }
+
+  // Aggregate by function name
+  const byFunction = {};
+  for (const entry of entries) {
+    const fn = entry.function || 'unknown';
+    if (!byFunction[fn]) {
+      byFunction[fn] = { count: 0, profiles: {}, models: {} };
+    }
+    byFunction[fn].count++;
+    if (entry.profile) {
+      byFunction[fn].profiles[entry.profile] = (byFunction[fn].profiles[entry.profile] || 0) + 1;
+    }
+    if (entry.model) {
+      byFunction[fn].models[entry.model] = (byFunction[fn].models[entry.model] || 0) + 1;
+    }
+  }
+
+  // Sort by count descending (hot paths first)
+  const sorted = Object.entries(byFunction)
+    .map(([fn, data]) => ({ function: fn, ...data }))
+    .sort((a, b) => b.count - a.count);
+
+  const result = {
+    log_file: path.relative(cwd, logPath),
+    total_entries: entries.length,
+    hot_paths: sorted,
+  };
+
+  // Print human-readable table to stderr
+  process.stderr.write('\n## Workflow Hot-Path Telemetry\n\n');
+  if (entries.length === 0) {
+    process.stderr.write('No telemetry data yet. Run some planning/execution cycles first.\n');
+    process.stderr.write(`Log file: ${path.relative(cwd, logPath)}\n\n`);
+  } else {
+    process.stderr.write(`Log: ${path.relative(cwd, logPath)}  |  Entries: ${entries.length}\n\n`);
+    const maxFnLen = Math.max(20, ...sorted.map(s => s.function.length));
+    const header = `${'Function'.padEnd(maxFnLen)} | Count  | Top Profile | Top Model`;
+    const sep = '-'.repeat(maxFnLen) + '-+--------+-------------+---------';
+    process.stderr.write(header + '\n');
+    process.stderr.write(sep + '\n');
+    for (const row of sorted) {
+      const fn = row.function.padEnd(maxFnLen);
+      const count = String(row.count).padStart(6);
+      const topProfile = Object.entries(row.profiles).sort((a, b) => b[1] - a[1])[0];
+      const topModel = Object.entries(row.models).sort((a, b) => b[1] - a[1])[0];
+      process.stderr.write(`${fn} | ${count} | ${(topProfile ? topProfile[0] : '-').padEnd(11)} | ${topModel ? topModel[0] : '-'}\n`);
+    }
+    process.stderr.write(sep + '\n\n');
+  }
+
+  output(result, raw);
+}
+
 module.exports = {
   cmdWorkflowBaseline,
   cmdWorkflowCompare,
   cmdWorkflowVerifyStructure,
   cmdWorkflowSavings,
+  cmdWorkflowHotpath,
   extractStructuralFingerprint,
 };
