@@ -12,23 +12,23 @@ Manage and deliver high-quality software with high-quality documentation, while 
 
 ## Current Milestone
 
-**Current milestone:** v19.1 Execution Simplicity, Speculative Decoding & JJ-First UX
-**Goal:** Make bGSD execution output simpler, more predictable, and more JJ-native while reducing avoidable token-generation overhead.
+**Current milestone:** v19.3 Workflow Acceleration
+**Goal:** Accelerate workflow execution through smarter routing, reduced redundancy, and faster feedback loops.
 **Target features:**
-- Phase-level simplification analysis and refactor loop between execution and verification
-- Speculative-decoding-friendly agent, workflow, and template contracts
-- JJ-first bookmark/workspace UX with detached-HEAD-safe JJ repo behavior
+- Workflow hot-path optimization with faster task routing
+- Reduced I/O overhead through better caching and batching
+- Parallel workflow stages where dependencies allow
 
 ## Milestone Status
 
-**Current milestone:** v19.1 Execution Simplicity, Speculative Decoding & JJ-First UX
-**Last completed milestone:** v19.0 Workspace Execution, cmux Coordination & Risk-Based Testing
-**Next step:** Define requirements, create roadmap, and start Phase 188 planning
+**Current milestone:** v19.3 Workflow Acceleration
+**Last completed milestone:** v19.1 Execution Simplicity, Speculative Decoding & JJ-First UX
+**Next step:** Define requirements, create roadmap, and start Phase 201 planning
 
 ## Current State
 
-**Last shipped:** v19.0 Workspace Execution, cmux Coordination & Risk-Based Testing (2026-04-02)
-**Now planning:** v19.1 Execution Simplicity, Speculative Decoding & JJ-First UX
+**Last shipped:** v19.1 Execution Simplicity, Speculative Decoding & JJ-First UX (2026-04-05)
+**Now planning:** v19.3 Workflow Acceleration
 
 <details>
 <summary>Latest shipment: v19.0 Workspace Execution, cmux Coordination & Risk-Based Testing (shipped 2026-04-02)</summary>
