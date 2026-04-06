@@ -133,6 +133,9 @@ Add constants and helper function at the top of the process section, after the p
 
 ```javascript
 const PROOF_CACHE_TTL_MS = 30_000; // Proof valid within single wave dispatch
+// Kahn waves from enrichment.decisions['phase-dependencies'].value.waves
+// Maps phase-number (String) → wave-number
+const kahnWaves = enrichment?.decisions?.['phase-dependencies']?.value?.waves || {};
 const { collectWorkspaceProof } = require('../src/lib/jj-workspace');
 let _cachedProof = null;
 let _cachedProofTime = 0;
@@ -155,6 +158,10 @@ This helper caches the workspace proof for 30 seconds within a wave dispatch. Th
 async function fanInParallelSpawns(plans, cwd, options = {}) {
   const { timeout_ms = 300_000, onProgress } = options;
   const { spawn } = require('child_process');
+
+  // Kahn waves come from enrichment.decisions['phase-dependencies'].value.waves
+  // which maps phase-number → wave-number
+  // fanInParallelSpawns should group by kahnWaves[plan.phase] not frontmatter.wave
 
   const spawns = plans.map(plan => {
     return new Promise(resolve => {
