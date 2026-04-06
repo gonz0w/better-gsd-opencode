@@ -11019,6 +11019,7 @@
         "src/lib/planning-cache.js",
         "src/lib/project-lock.js",
         "src/lib/atomic-write.js",
+        "src/commands/memory.js",
         "src/commands/state.js"
       ],
       "src/lib/viz/index.js": [
@@ -11423,6 +11424,7 @@
       ],
       "src/commands/memory.js": [
         "src/router.js",
+        "src/lib/state-session-mutator.js",
         "test-commands.cjs"
       ],
       "src/commands/intent.js": [
@@ -12330,12 +12332,12 @@
     },
     "stats": {
       "total_files_parsed": 304,
-      "total_edges": 688,
+      "total_edges": 689,
       "languages_parsed": [
         "javascript"
       ],
       "parse_errors": 0
     },
-    "built_at": "2026-04-06T02:18:01.475Z"
+    "built_at": "2026-04-06T03:33:11.471Z"
   }
 }

@@ -7,7 +7,7 @@ const { execGit } = require('../lib/git');
 const { banner, sectionHeader, formatTable, summaryLine, actionHint, color, SYMBOLS, progressBar, box } = require('../lib/format');
 const { getDb } = require('../lib/db');
 const { PlanningCache } = require('../lib/planning-cache');
-const { applyStateSessionMutation } = require('../lib/state-session-mutator');
+const { applyStateSessionMutation, canBatch } = require('../lib/state-session-mutator');
 const { buildPhaseHandoffPayload, buildPhaseHandoffValidation, clearPhaseHandoffs, listPhaseHandoffArtifacts, writePhaseHandoff } = require('../lib/phase-handoff');
 
 // ─── Pre-compiled Regex Cache ────────────────────────────────────────────────
@@ -1047,8 +1047,125 @@ function cmdStateCompletePlan(cwd, options, raw) {
   const progress = computeProgressSnapshot(cwd);
   const decisionSummary = options.decision_summary || null;
   const decisionRationale = options.decision_rationale || null;
+  const useBatch = canBatch('state');
+  console.error(`batch-state: canBatch=${canBatch('state')}, using=${useBatch ? 'BATCH' : 'SINGLE'}`);
   let completionResult;
-  try {
+
+  if (useBatch) {
+    // Batch path: collect state, metrics, and continuity bundles
+    // Decisions are sacred and always use single-write path
+    try {
+      const cache = _getCache(cwd);
+
+      // Build state bundle from phase truth
+      const stateBundle = {
+        state: {
+          phase_number: options.phase,
+          phase_name: phaseTruth && phaseTruth.phase_name ? phaseTruth.phase_name : null,
+          current_plan: phaseTruth ? currentPlan : null,
+          total_plans: phaseTruth ? totalPlans : null,
+          status: phaseTruth ? phaseTruth.status : null,
+          progress: progress.percent,
+          current_focus: phaseTruth ? phaseTruth.current_focus : null,
+          last_activity: new Date().toISOString().split('T')[0],
+        },
+      };
+
+      // Build metrics bundle if duration is provided
+      const bundles = [stateBundle];
+      if (options.duration) {
+        bundles.push({
+          state: {
+            phase: options.phase,
+            plan: options.plan,
+            duration: options.duration,
+            tasks: options.tasks != null ? parseInt(options.tasks, 10) : null,
+            files: options.files != null ? parseInt(options.files, 10) : null,
+            timestamp: new Date().toISOString(),
+          },
+        });
+      }
+
+      // Build continuity bundle
+      bundles.push({
+        continuity: {
+          last_session: new Date().toISOString(),
+          stopped_at: options.stopped_at || null,
+          next_step: options.resume_file || 'None',
+        },
+      });
+
+      // Batch write state, metrics, continuity
+      const batchResult = cache.storeSessionBundleBatch(cwd, bundles);
+      if (!batchResult || !batchResult.stored) {
+        throw new Error('Batch write failed');
+      }
+
+      // For batch path, compute the completion core result manually
+      // since we're not calling applyStateSessionMutation for state
+      const currentPlanVal = phaseTruth ? currentPlan : parseInt(stateExtractField(content, 'Current Plan'), 10);
+      const totalPlansVal = phaseTruth ? totalPlans : parseInt(stateExtractField(content, 'Total Plans in Phase'), 10);
+      const nextPlan = currentPlanVal >= totalPlansVal ? currentPlanVal : currentPlanVal + 1;
+      const nextStatus = nextPlan >= totalPlansVal ? 'Phase complete — ready for verification' : 'Ready to execute';
+
+      completionResult = {
+        core: {
+          previous_plan: currentPlanVal,
+          current_plan: nextPlan,
+          total_plans: totalPlansVal,
+          status: nextStatus,
+          progress: progress.percent,
+          decision_recorded: !!decisionSummary,
+        },
+      };
+
+      // Write state markdown directly (batch wrote to SQLite)
+      const now = new Date().toISOString();
+      let updatedContent = stateReplaceField(content, 'Current Plan', String(nextPlan));
+      if (updatedContent) {
+        updatedContent = stateReplaceField(updatedContent, 'Total Plans in Phase', String(totalPlansVal));
+        updatedContent = stateReplaceField(updatedContent, 'Status', nextStatus);
+        updatedContent = stateReplaceField(updatedContent, 'Last Activity', now.split('T')[0]);
+        if (phaseTruth && phaseTruth.current_focus) {
+          updatedContent = stateReplaceField(updatedContent, 'Current focus', phaseTruth.current_focus);
+        }
+        // Update progress bar
+        const percent = progress.percent;
+        const barWidth = 10;
+        const filled = Math.round(percent / 100 * barWidth);
+        const barStr = `[${'█'.repeat(filled)}${'░'.repeat(barWidth - filled)}] ${percent}%`;
+        const progressFieldPattern = /(\*\*Progress:\*\*\s*).*/i;
+        const inlinePattern = /(Progress:\s*)\[[\u2588\u2591]+\]\s*\d+%/;
+        if (progressFieldPattern.test(updatedContent)) {
+          updatedContent = updatedContent.replace(progressFieldPattern, `$1${barStr}`);
+        } else if (inlinePattern.test(updatedContent)) {
+          updatedContent = updatedContent.replace(inlinePattern, `$1${barStr}`);
+        }
+        fs.writeFileSync(statePath, updatedContent, 'utf-8');
+        invalidateFileCache(statePath);
+        cache.updateMtime(statePath);
+      }
+
+      // Decision is sacred - use single-write path
+      if (decisionSummary) {
+        try {
+          applyStateSessionMutation(cwd, {
+            type: 'appendDecision',
+            phase: options.phase,
+            summary: decisionSummary,
+            rationale: decisionRationale,
+          });
+        } catch (e) {
+          warnings.push({ step: 'decision-write', reason: e.message });
+        }
+      }
+    } catch (e) {
+      output({ completed: false, reason: 'batch_write_failed', error: e.message, warnings }, raw, 'false');
+      return;
+    }
+  } else {
+    // Single-write path for sacred data (should not happen for 'state' but preserved for other stores)
+    try {
       completionResult = applyStateSessionMutation(cwd, {
         type: 'completePlanCore',
         phase: options.phase,
@@ -1060,9 +1177,10 @@ function cmdStateCompletePlan(cwd, options, raw) {
         status: phaseTruth ? phaseTruth.status : null,
         current_focus: phaseTruth ? phaseTruth.current_focus : null,
       });
-  } catch (e) {
-    output({ completed: false, reason: 'core_write_failed', error: e.message, warnings }, raw, 'false');
-    return;
+    } catch (e) {
+      output({ completed: false, reason: 'core_write_failed', error: e.message, warnings }, raw, 'false');
+      return;
+    }
   }
 
   try {
